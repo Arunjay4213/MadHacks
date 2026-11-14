@@ -4,7 +4,7 @@ from copy import deepcopy
 
 
 DEFAULT_BASE = "a wide shot of a meadow with a single oak tree"
-KINDS = ("season", "weather", "time", "extra")
+KINDS = ("world", "season", "weather", "time", "extra")
 
 
 def _text(value, field):

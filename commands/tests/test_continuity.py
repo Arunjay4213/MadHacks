@@ -18,6 +18,13 @@ class ContinuityTests(unittest.TestCase):
             self.assertNotIn("parked", service.committed_prompt)
         self.assertEqual([c["label"] for c in result["state"]["changes"]], ["car", "winter", "river", "night"])
 
+    def test_motion_adjective_before_noun_does_not_erase_subject(self):
+        service = CommandService()
+        send(service, "add a running dog near the car")
+        send(service, "make the dog walk forward")
+        self.assertIn("a dog near the car walking forward", service.committed_prompt)
+        self.assertNotIn("running", service.committed_prompt)
+
     def test_generic_repeat_retains_specific_description(self):
         service = CommandService()
         send(service, "add a red car driving forward")
@@ -73,6 +80,24 @@ class ContinuityTests(unittest.TestCase):
         service = CommandService()
         send(service, "add a red car driving slowly forward")
         self.assertIn("driving slowly forward", service.committed_prompt)
+
+class StrengthScopeTests(unittest.TestCase):
+    def test_size_and_colour_words_in_an_object_description_are_attributes(self):
+        for text, phrase in [("add a little red car", "a little red car"), ("add a light blue boat", "a light blue boat"),
+                             ("add a very small dog", "a very small dog")]:
+            service = CommandService()
+            result = send(service, text)
+            self.assertEqual(result["state"]["changes"][0]["strength"], 1.0, text)
+            self.assertIn(phrase, service.committed_prompt)
+            self.assertNotIn("subtle hint", service.committed_prompt)
+
+    def test_strength_words_still_work_for_world_changes_and_outside_the_description(self):
+        self.assertEqual(read("add a little rain", {"changes": []})["op"]["strength"], 0.3)
+        self.assertEqual(read("a little foggy", {"changes": []})["op"]["strength"], 0.3)
+        self.assertEqual(read("slightly add a dog", {"changes": []})["op"]["strength"], 0.3)
+        winter = {"changes": [{"id": "c1", "label": "winter", "kind": "season", "phrase": "p", "strength": 1.0}]}
+        self.assertEqual(read("a lot more snow", winter)["op"]["strength"], 1.3)
+
 
 class RampTests(unittest.TestCase):
     def test_confirmed_edit_is_fast_while_slow_and_guess_remain_gentle(self):

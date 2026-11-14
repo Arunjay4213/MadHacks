@@ -1,0 +1,139 @@
+"""World (setting) support: "make it a desert" replaces the world, never the subject (issue #74).
+
+The world is one change of kind "world" (a singleton, like season), so ids, undo, chips and compound
+sentences work unchanged. Phrases are Ishaan's exact tested template sentences (board #6885673339).
+Pure stdlib. Imports only dictionary.py, so reader.py can import this module without a cycle.
+"""
+
+import re
+
+from .dictionary import KEYWORD_RX, normalize
+from .state import DEFAULT_BASE
+
+# Ishaan's template: prompt = SUBJECT + world phrase + STYLE (plain concatenation). Direction wording not final.
+SUBJECT = ("A red sports car driving fast along a road, seen from behind in a smooth tracking shot, "
+           "the car in the centre of the frame, ")
+STYLE = " Cinematic, highly detailed, realistic, sharp focus, motion blur on the road."
+
+# Each world is a list of segments (text, tags). Joined, the segments are Ishaan's tested sentence verbatim.
+# Tagged segments are the built-in sky/time/weather; world_with_overrides drops one only when an explicit
+# change of the same kind (time/weather/season) says something different.
+_D, _N, _SUN = {"time": "day"}, {"time": "night"}, {"time": "sunset"}
+_TABLE = [
+    ("country road", [("a two-lane country road through green fields and trees", {}),
+                      (" under a clear blue summer sky", {"time": "day", "weather": "clear", "season": "summer"}),
+                      (", bright sunshine", {"time": "day", "weather": "clear"})],
+     ["country road", "countryside", "fields", "farmland", "the start", "the country"]),
+    ("desert", [("a long straight desert highway between red sandstone mesas and sand dunes", {}),
+                (", heat haze", {"weather": "haze", "season": "summer"}),
+                (", orange sunset sky", _SUN)],
+     ["desert", "desert highway", "sand dunes", "dunes", "mesas"]),
+    ("snowy mountain road", [("a snowy mountain road between pine forests covered in thick white snow", {}),
+                             (", snow falling", {"weather": "snow", "season": "winter"}),
+                             (", cold blue overcast light", {"time": "day", "weather": "overcast"})],
+     ["snowy mountains", "snowy mountain road", "mountain road", "the mountains"]),
+    ("neon city", [("a wet city street", {}), (" at night", _N), (" in the rain", {"weather": "rain"}),
+                   (", tall skyscrapers with glowing neon signs on both sides, reflections on the asphalt", {})],
+     ["neon city", "city", "city street", "cyberpunk city", "downtown"]),
+    ("ocean coast", [("a coastal cliff road beside a bright turquoise ocean with waves and palm trees", {}),
+                     (", sunny tropical day", {"time": "day", "weather": "clear", "season": "summer"})],
+     ["ocean", "coast", "coastal road", "beach", "seaside", "sea", "tropical coast", "cliffs"]),
+    ("mars", [("a dusty road across the red rocky surface of Mars, craters and red mountains", {}),
+              (", a pale pink sky with two small moons", _D)],
+     ["mars", "red planet", "martian surface", "surface of mars"]),
+    # Added per lead (not from Ishaan's tested set): same template style.
+    ("forest", [("a narrow road through a dense green pine forest, tall trees on both sides", {}),
+                (", soft sunlight through the branches", {"time": "day", "weather": "clear"})],
+     ["forest", "woods", "woodland", "pine forest"]),
+    # The oak scene's own world, so "take me back to the meadow" can return to it.
+    ("meadow", [("a green meadow with soft grass", {}), (", under a clear blue sky", {"time": "day", "weather": "clear"})],
+     ["meadow", "the meadow", "grassland"]),
+]
+_SEGMENTS = {label: segments for label, segments, _ in _TABLE}
+_PHRASES = {"".join(text for text, _ in segments) + ".": label for label, segments, _ in _TABLE}
+WORLDS: dict[str, dict] = {}
+for _label, _segments, _aliases in _TABLE:
+    for _alias in [_label, *_aliases]:
+        WORLDS[normalize(_alias)] = {"label": _label, "kind": "world", "phrase": "".join(t for t, _ in _segments) + "."}
+DEFAULT_WORLD = WORLDS["country road"]
+
+# Setting verbs only. "make it" needs an article ("make it a desert"), so "make it night" never matches.
+_SETTING_RX = re.compile(
+    r"^(?:please\s+)?(?:make it(?=\s+an?\b)|take me (?:back )?to|go (?:back )?to|switch to|"
+    r"set (?:it|the scene|everything) (?:in|on|at)|move (?:it|us|me|the scene|everything) (?:back )?to|"
+    r"change the (?:scene|setting|world|location|background|place|scenery) to)\s+(?:(a|an|the)\s+)?(.+)$")
+_BLOCKED_RX = re.compile(r"\b(?:don't|dont|do not|not|never|instead of|into|replace|swap)\b")
+_FILLER_TAIL_RX = re.compile(r"(?:\s+\b(?:please|now|instead|for me|again)\b)+$")
+_VAGUE = {"it", "one", "nice", "something", "somewhere", "place", "there", "here", "that", "this", "good", "cool"}
+_MAX_PLACE_WORDS = 6
+
+
+def world_op(text: str) -> dict | None:
+    """An add op of kind "world" for an explicit setting command, else None.
+
+    Known places use Ishaan's sentences. Unknown places (1-6 words, no dictionary word) fall back to the spoken
+    place. Season/weather/time/object words, negation and transforms return None for the reader to handle.
+    """
+    t = normalize(text)
+    if _BLOCKED_RX.search(t):
+        return None
+    m = _SETTING_RX.match(t)
+    if not m:
+        return None
+    article, place = m.group(1), _FILLER_TAIL_RX.sub("", m.group(2)).strip()
+    if not place:
+        return None
+    if place in WORLDS:
+        return {"op": "add", **WORLDS[place], "strength": 1.0}
+    words = place.split()
+    if KEYWORD_RX.search(place) or len(words) > _MAX_PLACE_WORDS or set(words) <= _VAGUE:
+        return None  # "make it a dog", "a desert at night", "misty grove": the reader handles dictionary words
+    phrase = f"{article} {place}." if article else f"{place}."
+    return {"op": "add", "label": place, "kind": "world", "phrase": phrase, "strength": 1.0}
+
+
+def world_phrase(snapshot: dict) -> str:
+    """The active world's phrase (most recent world change), else the default world."""
+    worlds = [c for c in snapshot.get("changes", []) if c.get("kind") == "world"]
+    return worlds[-1]["phrase"] if worlds else DEFAULT_WORLD["phrase"]
+
+
+def world_with_overrides(world_change: dict | None, changes: list) -> str | None:
+    """The active world's phrase with conflicting BUILT-IN sky/time/weather segments removed.
+
+    A segment is dropped only when an explicit change of the same kind (time, weather, season) names a
+    different label: "desert" + "night" loses "orange sunset sky" but keeps "heat haze". Other changes and
+    the scene state are untouched. Unknown (fallback) world phrases are returned literally. None if no world.
+    """
+    if world_change is None:
+        return None
+    phrase = world_change["phrase"]
+    segments = _SEGMENTS.get(_PHRASES.get(phrase))
+    if segments is None:
+        return phrase
+    explicit = {c["kind"]: c["label"] for c in changes if c.get("kind") in ("time", "weather", "season")}
+    kept = [text for text, tags in segments if all(explicit.get(k, v) == v for k, v in tags.items())]
+    return "".join(kept) + "."
+
+
+_WORLD_ALIAS_RX = re.compile(r"\b(?:" + "|".join(sorted(map(re.escape, WORLDS), key=len, reverse=True)) + r")\b")
+_OAK_SUBJECT = "a wide shot of a single oak tree"
+
+
+def compose_base(base: str, world: str) -> str:
+    """The base with its world replaced by `world` (a world phrase), never touching the subject.
+
+    - DEFAULT_BASE (oak in a meadow): "a wide shot of a single oak tree; " + world.
+    - Ishaan's template (SUBJECT + known world + STYLE, or SUBJECT + STYLE): only the world part is swapped.
+    - A subject-only or generic base without its own world words: base + "; " + world.
+    - A base that names its own world in an unknown way: ValueError (no guessing which words to cut).
+    """
+    if base == DEFAULT_BASE:
+        return f"{_OAK_SUBJECT}; {world}"
+    if base.startswith(SUBJECT) and base.endswith(STYLE):
+        middle = base[len(SUBJECT):len(base) - len(STYLE)]
+        if not middle or middle in _PHRASES:
+            return SUBJECT + world + STYLE
+    if _WORLD_ALIAS_RX.search(normalize(base)):
+        raise ValueError(f"base names its own world; cannot replace it safely: {base!r}")
+    return f"{base}; {world}"

@@ -140,3 +140,8 @@ Normal/confirmed ramps are one chunk, gradual edits remain 12, and guesses remai
 The optional cached enrichment boundary lives in commands.rewriter; the engine owns its network call.
 See [integration and frame-evaluation notes](../docs/prompt-continuity.md).
 Language embeddings do not store visual history; clean anchors remain the backend's responsibility.
+
+World/place commands now replace a singleton world layer rather than append a style.
+The embedded world dictionary includes the tested desert, mountain-road, city, coast and Mars descriptions, plus forest/meadow.
+The default scene and Ishaan’s subject/world/style template support replacement; unsupported mixed custom bases are rejected safely.
+Enrichment accepts the full final sentence through build_messages(prompt, command=None), and preserves the canonical scene verbatim.
