@@ -1,6 +1,6 @@
 // DOM wiring. Logic lives in lib.js. Element ids are listed in PLAN.md.
 import {
-  PROTOCOL, TYPING_IDLE_MS, BURST_IDLE_MS, partialMsg, finalMsg, tapMsg, parseFrame, parseServerMessage,
+  PROTOCOL, finalizeDelay, partialMsg, finalMsg, tapMsg, parseFrame, parseServerMessage,
   splitKeyword, backoffMs, makeFrameGate, makeLatencyTracker, makeTranscriber,
   changesKey, commandKey, makeInputClassifier, PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
   wsBaseUrl, fitSize, videoNotice, formatStamps, isResetShortcut,
@@ -229,7 +229,9 @@ el.command.addEventListener('input', (e) => {
   const text = el.command.value.trim();
   if (!text) return;
   send(partialMsg(text));
-  idleTimer = setTimeout(sendFinalFromBox, kind === 'burst' ? BURST_IDLE_MS : TYPING_IDLE_MS);
+  // Sent after a pause, unless it still looks unfinished ("a car,"): then only Enter sends it.
+  const delay = finalizeDelay(kind, text);
+  if (delay !== null) idleTimer = setTimeout(sendFinalFromBox, delay);
 });
 el.form.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -273,7 +275,7 @@ function begin() {
   rec.continuous = true;
   rec.interimResults = true;
   rec.lang = 'en-US';
-  transcriber.start();
+  transcriber.start({ hold: listening === 'ptt' }); // push-to-talk: one command per press
   startedAt = performance.now();
   rec.onresult = (e) => transcriber.handle(Array.from(e.results, (r) => ({ transcript: r[0].transcript, isFinal: r.isFinal })));
   rec.onerror = (e) => {
