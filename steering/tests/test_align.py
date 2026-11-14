@@ -187,3 +187,33 @@ def test_blend_after_removing_middle_phrase():
     # Without alignment the survivors after the removed phrase get mixed up.
     raw = blend(a, b, 0.5)
     assert not torch.allclose(raw[4], a[4], atol=1e-3)
+
+
+def test_occupied_preference_order():
+    al = Aligner(8)
+    al.place(_enc([1, 2, 3], 8), [1, 2, 3])  # previous layout uses 0, 1, 2
+    occ = [False, True, False, True, True, False, False, False]
+    # 1 keeps 0. Free: 1..7. (a) unused+free: 5, 6, 7; (b) free, was used: 2;
+    # (c) unused, occupied: 3, 4; (d) used and occupied: 1.
+    new = [1, 10, 11, 12, 13, 14, 15, 16]
+    al.place(_enc(new, 8), new, occupied=occ)
+    assert _positions(al) == [0, 5, 6, 7, 2, 3, 4, 1]
+
+
+def test_occupied_tensor_mask_and_matched_tokens_unaffected():
+    al = Aligner(L)
+    al.place(_enc([1, 2, 3]), [1, 2, 3])
+    occ = torch.ones(L, dtype=torch.bool)
+    occ[5] = False
+    _, layout = al.prepare(_enc([1, 2, 7, 3]), [1, 2, 7, 3], occupied=occ)
+    assert layout == ((0, 1), (1, 2), (5, 7), (2, 3))
+
+
+@pytest.mark.parametrize("occ", [[False] * (L - 1), torch.zeros(L + 1, dtype=torch.bool),
+                                 torch.zeros(1, L, dtype=torch.bool)])
+def test_occupied_bad_length_raises_and_changes_nothing(occ):
+    al = Aligner(L)
+    al.place(_enc([1, 2]), [1, 2])
+    with pytest.raises(ValueError, match="occupied"):
+        al.place(_enc([1, 3]), [1, 3], occupied=occ)
+    assert al.layout == ((0, 1), (1, 2))

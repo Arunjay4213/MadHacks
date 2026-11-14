@@ -1,8 +1,10 @@
 import pytest
 import torch
 
+from steering import Aligner
 from steering.eval.scenarios import (
     BASE,
+    FAKE_ALIGN_LEN,
     NIGHT,
     RAIN,
     WINTER,
@@ -11,6 +13,7 @@ from steering.eval.scenarios import (
     Scenario,
     default_scenarios,
     fake_encode,
+    fake_encode_ids,
     main,
     pace_scenarios,
     run,
@@ -160,3 +163,42 @@ def test_default_scenarios_valid_for_any_ramp(ramp):
 def test_cli_requires_fake(capsys):
     assert main([]) == 2
     assert "README" in capsys.readouterr().err
+
+
+def _rows(emb: torch.Tensor) -> list[tuple]:
+    rows = emb.reshape(-1, emb.shape[-1])
+    return sorted(tuple(r.tolist()) for r in rows if r.ne(0).any())
+
+
+def test_stack_remove_middle_with_aligner_ends_on_placed_prompt():
+    spy = _SpyModel()
+    al = Aligner(FAKE_ALIGN_LEN)
+    res = run(_by_name()["stack_remove_middle"], spy, fake_encode_ids, FPS, aligner=al)
+    assert [r["kind"] for _, r in res.handled] == ["final"] * 4
+    plain, ids = fake_encode_ids(BASE + WINTER + RAIN)
+    last = spy.conds[-1]
+    assert last.shape == plain.shape
+    assert _rows(last) == _rows(plain)
+    assert [i for _, i in al.layout] == ids
+    for p, i in al.layout:  # each token's row sits at its placed position
+        assert torch.equal(last[0, p], plain[0, ids.index(i)])
+
+
+def test_fake_encode_ids_rows_keyed_by_id():
+    a, ia = fake_encode_ids(BASE)
+    b, ib = fake_encode_ids(BASE + WINTER)
+    assert len(ia) == 17 and ib[: len(ia) - 1] == ia[:-1]
+    assert torch.equal(a[0, : len(ia) - 1], b[0, : len(ia) - 1])
+    assert torch.count_nonzero(a[0, len(ia):]) == 0
+    assert len(fake_encode_ids(BASE + WINTER + NIGHT + RAIN)[1]) <= FAKE_ALIGN_LEN
+
+
+@pytest.mark.parametrize("sc", default_scenarios(), ids=lambda s: s.name)
+def test_every_default_scenario_runs_with_aligner(sc):
+    res = run(sc, FakeModel(), fake_encode_ids, FPS, aligner=Aligner(FAKE_ALIGN_LEN))
+    assert len(res.steps) == sc.steps
+
+
+def test_cli_fake_align(capsys):
+    assert main(["--fake", "--align", "--ramp", "2"]) == 0
+    assert "stack_remove_middle" in capsys.readouterr().out

@@ -5,18 +5,20 @@ a fake model here and on the real one on a GPU machine:
 
     generate(cond) -> frames [F, C, H, W] in [0, 1]   (one call per step)
     encode(prompt) -> conditioning tensor
+                      (or (tensor, real token ids) when run with an aligner)
 
 `run` also calls `on_cond_changed()` right before every step whose
 conditioning differs from the previous step's; the real engine must reset
 the model's text cross-attention cache at exactly those moments.
 
-    python -m steering.eval.scenarios --fake
+    python -m steering.eval.scenarios --fake [--align]
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import re
 import sys
 import time
 from collections.abc import Callable, Mapping
@@ -26,12 +28,13 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-from ..controller import Controller
+from ..align import Aligner
+from ..controller import Controller, Encoded
 from ..steerer import Steerer
 from .metrics import find_cuts, summarize
 
 Generate = Callable[[Tensor], Tensor]
-Encode = Callable[[str], Tensor]
+Encode = Callable[[str], Encoded]
 
 BASE = "a wide shot of a meadow with a single oak tree, gentle wind, cinematic"
 WINTER = ", in deep winter with snow on the ground"
@@ -139,12 +142,21 @@ def run(
     encode: Encode,
     fps: float,
     on_cond_changed: Callable[[], None] | None = None,
+    aligner: Aligner | None = None,
 ) -> Result:
-    """Play `scenario` step by step; see the module docstring."""
+    """Play `scenario` step by step; see the module docstring.
+
+    With `aligner`, `encode` returns (embedding, ids); the aligner is reset,
+    places the initial prompt, and is passed to the Controller.
+    """
     if not fps > 0:
         raise ValueError(f"fps must be > 0, got {fps!r}")
-    steerer = Steerer(encode(scenario.initial_prompt))
-    controller = Controller(steerer, encode)
+    if aligner is None:
+        steerer = Steerer(encode(scenario.initial_prompt))
+    else:
+        aligner.reset()
+        steerer = Steerer(aligner.place(*encode(scenario.initial_prompt)))
+    controller = Controller(steerer, encode, aligner=aligner)
     by_step: dict[int, list[Event]] = {}
     for e in scenario.events:
         by_step.setdefault(e.step, []).append(e)
@@ -280,10 +292,34 @@ def fake_encode(prompt: str) -> Tensor:
     return torch.randn(1, 16, 32, generator=torch.Generator().manual_seed(seed))
 
 
+FAKE_ALIGN_LEN = 64  # rows of fake_encode_ids; the longest default prompt has 37 tokens
+_EOS = 1
+
+
+def _fake_id(word: str) -> int:
+    return 2 + int.from_bytes(hashlib.sha256(word.encode()).digest()[:4], "little")
+
+
+def fake_encode_ids(prompt: str) -> tuple[Tensor, list[int]]:
+    """([1, FAKE_ALIGN_LEN, 32] tensor, token ids) for runs with an aligner.
+
+    Tokens are words and punctuation plus an end token; each id has one fixed
+    row (seeded from the id) in every prompt, and rows after the tokens are 0.
+    """
+    ids = [_fake_id(w) for w in re.findall(r"\w+|[^\w\s]", prompt)] + [_EOS]
+    if len(ids) > FAKE_ALIGN_LEN:
+        raise ValueError(f"prompt has {len(ids)} tokens > {FAKE_ALIGN_LEN}")
+    emb = torch.zeros(1, FAKE_ALIGN_LEN, 32)
+    for k, i in enumerate(ids):
+        emb[0, k] = torch.randn(32, generator=torch.Generator().manual_seed(i))
+    return emb, ids
+
+
 class FakeModel:
     """Renders 4 frames of 3x32x32 per call as a smooth function of cond.
 
-    cond is projected (fixed random matrix) to a 3x4x4 colour grid, upsampled
+    cond (any shape; the projection is sized on first use) is projected
+    (fixed random matrix) to a 3x4x4 colour grid, upsampled
     to a smooth image, plus small per-frame seeded noise. All frames of a call
     share the image, so a conditioning jump between calls shows as a one-frame
     change: a full prompt swap is scaled to read as a cut, a 4-step eased ramp
@@ -295,12 +331,15 @@ class FakeModel:
     NOISE = 0.002
 
     def __init__(self, seed: int = 0) -> None:
-        g = torch.Generator().manual_seed(seed)
-        self._proj = torch.randn(16 * 32, 3 * 4 * 4, generator=g) / (16 * 32) ** 0.5
+        self._proj: Tensor | None = None
         self._seed = seed
         self._calls = 0
 
     def __call__(self, cond: Tensor) -> Tensor:
+        n = cond.numel()
+        if self._proj is None or self._proj.shape[0] != n:
+            g = torch.Generator().manual_seed(self._seed)
+            self._proj = torch.randn(n, 3 * 4 * 4, generator=g) / n**0.5
         coarse = (cond.reshape(-1).to(torch.float32) @ self._proj).view(1, 3, 4, 4)
         img = F.interpolate(coarse, size=self.SIZE, mode="bilinear", align_corners=True)
         img = 0.5 + self.SCALE * img
@@ -317,6 +356,8 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--fake", action="store_true", help="run against the built-in fake model")
     p.add_argument("--ramp", type=int, default=4, help="default ramp in steps (default 4)")
+    p.add_argument("--align", action="store_true",
+                   help="with --fake: place token rows with steering.align.Aligner")
     p.add_argument("--fps", type=float, default=16.0, help="video fps for metrics (default 16)")
     args = p.parse_args(argv)
     if not args.fake:
@@ -328,8 +369,11 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
+    encode = fake_encode_ids if args.align else fake_encode
     for sc in default_scenarios(args.ramp):
-        print(run(sc, FakeModel(), fake_encode, args.fps).report(), end="\n\n")
+        aligner = Aligner(FAKE_ALIGN_LEN) if args.align else None
+        res = run(sc, FakeModel(), encode, args.fps, aligner=aligner)
+        print(res.report(), end="\n\n")
     return 0
 
 

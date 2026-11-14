@@ -18,6 +18,8 @@ from torch import Tensor
 
 # (position, token id) for each real token, in prompt order.
 Layout = tuple[tuple[int, int], ...]
+# Per-position flags (bool tensor or sequence of `length` items).
+Mask = Tensor | Sequence[bool]
 
 
 class Aligner:
@@ -29,6 +31,13 @@ class Aligner:
     previous position, and each unmatched one gets the lowest free position,
     preferring positions the previous layout did not use (so a new word fades
     in from zero rather than out of a word that is leaving).
+
+    `occupied` (optional, `length` bools) marks positions that are non-zero in
+    the conditioning right now, e.g. rows of an older layout still fading
+    after a capped or interrupted move. Unmatched tokens take free positions
+    in this order: unused by the previous layout and not occupied; not
+    occupied; unused by the previous layout; any. Matched tokens and the first
+    call (identity) ignore it.
 
     `place` = `prepare` + `commit`. Use `prepare`/`commit` to commit only
     after the placed tensor was actually used. All methods are thread safe.
@@ -47,23 +56,28 @@ class Aligner:
         with self._lock:
             return self._layout
 
-    def place(self, emb: Tensor, ids: Sequence[int]) -> Tensor:
+    def place(
+        self, emb: Tensor, ids: Sequence[int], occupied: Mask | None = None
+    ) -> Tensor:
         """Return `emb` with its real rows moved to their positions; commit.
 
         `emb` is [L, D] or [1, L, D] with L == length, whose first len(ids)
         rows are the real tokens. Returns a new tensor of the same shape,
         dtype and device; every position not holding a token is exactly zero.
-        Raises ValueError on a wrong shape or len(ids) not in [1, length].
+        Raises ValueError on a wrong shape, len(ids) not in [1, length], or
+        len(occupied) != length.
         """
         with self._lock:
-            out, layout = self._prepare(emb, ids)
+            out, layout = self._prepare(emb, ids, occupied)
             self._layout = layout
             return out
 
-    def prepare(self, emb: Tensor, ids: Sequence[int]) -> tuple[Tensor, Layout]:
+    def prepare(
+        self, emb: Tensor, ids: Sequence[int], occupied: Mask | None = None
+    ) -> tuple[Tensor, Layout]:
         """Like `place` but does not commit; returns (placed, layout)."""
         with self._lock:
-            return self._prepare(emb, ids)
+            return self._prepare(emb, ids, occupied)
 
     def commit(self, layout: Layout) -> None:
         """Make `layout` (from `prepare`) the previous layout for the next call."""
@@ -75,7 +89,9 @@ class Aligner:
         with self._lock:
             self._layout = None
 
-    def _prepare(self, emb: Tensor, ids: Sequence[int]) -> tuple[Tensor, Layout]:
+    def _prepare(
+        self, emb: Tensor, ids: Sequence[int], occupied: Mask | None
+    ) -> tuple[Tensor, Layout]:
         ids = [int(i) for i in ids]
         n = len(ids)
         rows = emb[0] if emb.dim() == 3 and emb.shape[0] == 1 else emb
@@ -86,14 +102,24 @@ class Aligner:
             )
         if not 1 <= n <= self.length:
             raise ValueError(f"need 1 <= len(ids) <= {self.length}, got {n}")
+        if occupied is None:
+            occ = [False] * self.length
+        else:
+            if isinstance(occupied, Tensor):
+                if occupied.dim() != 1:
+                    raise ValueError(f"occupied must be 1-D, got {tuple(occupied.shape)}")
+                occupied = occupied.tolist()
+            occ = [bool(o) for o in occupied]
+            if len(occ) != self.length:
+                raise ValueError(f"occupied must have length {self.length}, got {len(occ)}")
 
-        positions = self._assign(ids)
+        positions = self._assign(ids, occ)
         out_rows = torch.zeros_like(rows)
         out_rows[torch.tensor(positions, device=rows.device)] = rows[:n]
         out = out_rows.unsqueeze(0) if emb.dim() == 3 else out_rows
         return out, tuple(zip(positions, ids))
 
-    def _assign(self, ids: list[int]) -> list[int]:
+    def _assign(self, ids: list[int], occ: list[bool]) -> list[int]:
         if self._layout is None:
             return list(range(len(ids)))
         prev_pos = [p for p, _ in self._layout]
@@ -105,7 +131,7 @@ class Aligner:
                 out[b + k] = prev_pos[a + k]
         taken = {p for p in out if p is not None}
         was_used = set(prev_pos)
-        free = [p for p in range(self.length) if p not in taken and p not in was_used]
-        free += [p for p in range(self.length) if p not in taken and p in was_used]
+        free = [p for p in range(self.length) if p not in taken]
+        free.sort(key=lambda p: (occ[p], p in was_used))  # stable: lowest first
         it = iter(free)
         return [p if p is not None else next(it) for p in out]

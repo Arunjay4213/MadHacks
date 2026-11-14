@@ -51,8 +51,9 @@ class Controller:
     With an `aligner`, `encode` must return (embedding, real token ids). The
     cache keeps that raw pair; each applied message is placed by the aligner
     right before `set_target`, and the aligner's layout is committed only if
-    `set_target` succeeds. The aligner must already hold the layout of the
-    steerer's initial conditioning: build the Steerer from
+    `set_target` succeeds. New tokens avoid positions whose row is non-zero
+    in `steerer.current` (see `Aligner`). The aligner must already hold the
+    layout of the steerer's initial conditioning: build the Steerer from
     `aligner.place(initial_emb, initial_ids)`.
     """
 
@@ -144,7 +145,11 @@ class Controller:
         if self._aligner is None:
             self._steerer.set_target(emb, ramp, cap)
             return
-        placed, layout = self._aligner.prepare(*emb)
+        # New tokens avoid rows still non-zero now (e.g. an older layout fading
+        # out after a capped or interrupted move).
+        cur = self._steerer.current
+        occupied = (cur[0] if cur.dim() == 3 else cur).ne(0).any(-1)
+        placed, layout = self._aligner.prepare(*emb, occupied=occupied)
         self._steerer.set_target(placed, ramp, cap)
         self._aligner.commit(layout)  # only once the steerer accepted it
 
