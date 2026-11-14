@@ -157,6 +157,8 @@ python -m engine.server --backend fake|causal_forcing --reader standin|commands 
 - `--precompute-file` is a text file with one prompt per line; each is encoded at startup, so a known prompt needs no encoding time.
 - `--backend-opt key=value` is passed to the backend's `load()` and may be repeated; numbers and true/false are converted.
 - The fake backend's options are `gen_ms` (170), `decode_ms` (60), `encode_ms` (80), `frames_per_chunk` (4), `first_chunk_frames` (1) and `fps` (16), plus `fail_on_chunk`, `fail_count` and `fail_in` to inject crashes (see "Crash recovery").
+- `shared_device=true` makes the fake's encode, generation and decode share one simulated GPU by fair time sharing (two jobs at once each run at half speed), as umT5-xxl and the generator share one GPU on the live machine.
+  To time the live machine on a laptop, use `--backend-opt gen_ms=213 --backend-opt decode_ms=21 --backend-opt encode_ms=53 --backend-opt shared_device=true`.
 - `--lead-margin` sets how much video generation keeps ready ahead of what is on screen (see "Pipeline").
 - `--reanchor off|on` (default `off`) turns on the steering re-anchor policy (see "Re-anchor").
 - `--record-dir` and `--record-max-gb` control the recorder (see "Recorder"); `--record-dir none` turns it off.
@@ -247,6 +249,12 @@ contract 1 on `/control` -> reader worker thread: `reader.handle` -> `steer` (co
   That jumps the steerer to the new target with no ramp, honours a strength pair, and keeps the controller's prompt cache.
 - The encoder service runs on its own thread with a priority queue, caches embeddings and token ids by exact prompt text (LRU, 512 entries), shares one encoding between identical requests, and logs cache hits, misses and encode ms.
 - The reader's `likely_prompts()` are encoded at startup, and after every command they are queued again at background priority, behind any command's encoding.
+  Each new set replaces the background prompts still queued from the last one, because those belong to an older scene.
+- Prefetch is paced by `PrefetchPacer` (state `held`, `saving` or `ready`, shown in `/stats` as `encoder.prefetch`), because the text encoder shares the GPU with the generator.
+  While a command is in flight (HEARD to SHOWN) it is `held` and no background encode starts.
+  Otherwise the time generation waits at the lead gate, which is spare GPU time, is saved up; once it covers one encode (the fastest of the last 20 encodes) it is `ready` and one background encode runs.
+  Urgent encodes (a command's own prompt) never wait for it.
+  Without the pacing, the about 20 likely prompts queued after each command (about 53 ms each on the L40S) ran back to back on the GPU right when the command's chunk was being generated, which doubled that chunk's generation time and starved playback.
 
 ## Slow reader (LLM fallback)
 
@@ -298,6 +306,19 @@ Stamps use the monotonic clock and are reported as integer ms after `heard`:
 
 `set_target` and `get_cond` are ordered under one lock in the engine, so "the first `get_cond` after `set_target`" is exact.
 That chunk's number is sent as `applies_from_chunk`.
+`get_cond` is taken right before `generate_chunk`, after the lead gate wait, so that chunk is the first one not yet started.
+`generated` is the first chunk of the ramp, not its end: with a 4-chunk ramp that chunk carries `ease(1/4)`, about 10% of the move; half the move is on screen one chunk (0.25 s) later and all of it three chunks later.
+A command the reader found no operation for (an unmatched final, a tap with nothing to do) has only `heard`, and `applies_from_chunk` stays null.
+
+Where the delay goes, measured on the fake backend at the live timings (generation 213 ms, decode 21 ms, 10 commands, cached prompts):
+
+| Part | Mean | Range |
+|---|---|---|
+| heard to embedded (reader, cache hit) | 3 ms | 2 to 4 |
+| embedded to the next chunk's `get_cond` (the chunk being generated finishes, then the lead gate) | 102 ms | 18 to 228 |
+| that chunk's generation | 213 ms | 213 |
+| generated to shown (decode, JPEG, and the about 2 older frames still ahead in the lead buffer) | 161 ms | 160 |
+| heard to shown | 479 ms | 396 to 605 |
 
 ## Contract 4 fields
 
@@ -306,6 +327,7 @@ The engine sends one message per chunk when the chunk's first frame is sent.
 - `changes`, `heard`, `keyword`, `unmatched`: from `reader.state_fields()`, called for every message.
 - `chunk`: that chunk's number.
 - `progress`: `steerer.progress` right after the `get_cond` for that chunk.
-- `stamps`, `t_client`, `applies_from_chunk`: from the most recent command, which is the newest one the reader gave a `steer` (or a `POST /target`).
-  A message with no steer does not replace it.
+- `stamps`, `t_client`, `applies_from_chunk`: from the most recent command, which is the newest `final`, `tap` or `POST /target` the reader read, with or without an operation, or a `partial` that got a steer.
+  So an unmatched final updates `t_client` together with `heard`, `keyword` and `unmatched`, and its stamps are `{"heard": 0}`.
+  A `partial` with no steer, and a message the reader rejected or failed on, do not replace it.
 - Stamps appear as they become known, so the page sees `heard` and `decided` first and `shown` last; `{}` before any command.
