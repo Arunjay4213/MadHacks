@@ -128,6 +128,70 @@ class LeadGate:
             self._cond.notify_all()
 
 
+class PrefetchState(enum.Enum):
+    """Whether the encoder may run a background (prefetch) encode. See PrefetchPacer."""
+    HELD = "held"      # a command is in flight: no background encode starts, and no idle time is saved up
+    SAVING = "saving"  # no command in flight: generation's idle time at the lead gate is saved up
+    READY = "ready"    # enough idle time is saved for one background encode; the encoder takes it
+
+
+class PrefetchPacer:
+    """Keeps prefetch encodes from competing with generation for the GPU.
+
+    On the real machine the text encoder (umT5-xxl) and the generator share one GPU, and generation uses most of
+    it (about 213 of every 250 ms). After each command the reader's likely prompts change and about 20 of them are
+    queued for prefetch; run back to back (about 53 ms each) they slow the chunks right after the command, which
+    delays that very command and starves playback. So:
+
+    - While a command is in flight (CommandBook.in_flight), the state is HELD: background encodes wait.
+    - Otherwise the time generation spends waiting at the lead gate, which is time the GPU has to spare, is saved
+      up (SAVING). Once it covers one encode (EncoderService.work_ms) the state is READY, and the encoder takes the
+      turn, which moves it back to SAVING.
+
+    Urgent encodes (a command's own prompt that is not cached) never wait for this.
+    """
+
+    DEFAULT_COST_MS = 100.0  # the cost of one encode before any has been timed
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self.state = PrefetchState.HELD
+        self._saved_ms = 0.0
+
+    def hold(self) -> None:
+        """A command arrived: hold background encodes until it is shown."""
+        with self._lock:
+            self.state = PrefetchState.HELD
+            self._saved_ms = 0.0
+
+    def chunk_done(self, idle_ms: float, in_flight: bool, cost_ms: float | None) -> bool:
+        """Generation thread, after each chunk. Returns True when the state became READY."""
+        with self._lock:
+            if in_flight:
+                self.state = PrefetchState.HELD
+                self._saved_ms = 0.0
+                return False
+            if self.state is PrefetchState.HELD:
+                self.state = PrefetchState.SAVING
+            if self.state is PrefetchState.READY:
+                return False  # one turn at a time; it waits for the encoder
+            self._saved_ms += idle_ms
+            cost = self.DEFAULT_COST_MS if cost_ms is None else cost_ms
+            if self._saved_ms < cost:
+                return False
+            self._saved_ms -= cost
+            self.state = PrefetchState.READY
+            return True
+
+    def take(self) -> bool:
+        """Encoder thread, before a background encode: True (and back to SAVING) when it may start now."""
+        with self._lock:
+            if self.state is not PrefetchState.READY:
+                return False
+            self.state = PrefetchState.SAVING
+            return True
+
+
 class Rolling:
     """Last and windowed average of a timing in ms."""
 
@@ -178,6 +242,7 @@ class Engine:
         self._decode_queue: queue.Queue = queue.Queue(maxsize=config.decode_queue_size)
         self._playout_queue: queue.Queue = queue.Queue(maxsize=config.playout_max_frames)
         self._gate = LeadGate()
+        self.prefetch = PrefetchPacer()
         self._reset_lock = threading.Lock()
         self._reset_waiters: list[threading.Event] = []
         self._reset_seed: tuple[dict, CommandRecord] | None = None  # (the reset's steer, its command)
@@ -258,7 +323,7 @@ class Engine:
                 return
             self.reanchor_state = self._reanchor_support()
             self.lifecycle.transition(Lifecycle.WARMING, "backend loaded")
-            self.encoder = EncoderService(self.backend.encode_prompt_with_ids)
+            self.encoder = EncoderService(self.backend.encode_prompt_with_ids, background_turn=self.prefetch.take)
             self.encoder.start()
             self.recorder.start(self.backend.fps)
             committed = self.reader.committed_prompt
@@ -436,7 +501,9 @@ class Engine:
             if self._reset_waiters:
                 self._do_reset()
                 last_cond = None
+            t_wait = time.perf_counter()
             self._gate.wait(self._lead_limit, self._stop, self._crashed)
+            idle_ms = (time.perf_counter() - t_wait) * 1e3
             if self._stop.is_set() or self._crashed.is_set():
                 break
             cond, progress, anchor = self.book.take_cond(self._take_cond, chunk)
@@ -447,6 +514,8 @@ class Engine:
             latents = self._generate(cond, anchor)
             gen_ms = (time.perf_counter() - t0) * 1e3
             self.book.chunk_generated(chunk)
+            if self.prefetch.chunk_done(idle_ms, self.book.in_flight(), self.encoder.work_ms):
+                self.encoder.wake()
             with self._stats_lock:
                 self.gen_ms.add(gen_ms)
                 self.chunk_generated = chunk
@@ -653,6 +722,7 @@ class Engine:
         """
         msg = check(1, message)
         self._require_running()
+        self.prefetch.hold()
         rec = self.book.heard("control", msg.get("text"), msg.get("t_client"), heard_ns)
         return self._reader_pool.submit(self._read, msg, rec, reply)
 
@@ -683,7 +753,7 @@ class Engine:
                         self.encoder.encode(prompt)  # into the cache now, so the reset itself does not wait
                 seed = (steer, rec)
             else:
-                self.book.drop(rec, "reset to the starting prompt")
+                self.book.no_operation(rec, "reset to the starting prompt")
             try:
                 return self.request_reset(seed)
             except BadMessage as exc:
@@ -691,7 +761,10 @@ class Engine:
                 reply({"error": str(exc)})
                 return None
         if steer is None:
-            self.book.drop(rec, f"no steer for {msg['type']}")
+            if msg["type"] == "partial":  # not a command until it gives a steer
+                self.book.drop(rec, "no steer for partial")
+            else:
+                self.book.no_operation(rec, f"no operation for {msg['type']}")
             return None
         self.book.decided(rec, steer)
         self._embed(rec, steer)
@@ -705,6 +778,7 @@ class Engine:
         """A contract 2 message from POST /target, bypassing the reader. Passed to the Controller unchanged."""
         target = check_target(message)
         self._require_running()
+        self.prefetch.hold()
         rec = self.book.heard("target", None, None, heard_ns)
         self.book.decided(rec, target)
         self._embed(rec, target)
@@ -786,7 +860,8 @@ class Engine:
                        width=self.backend.width, height=self.backend.height)
         if self.encoder is not None:
             out["encoder"] = {"cache_size": self.encoder.cache_size, "pending": self.encoder.pending, "hits": self.encoder.hits,
-                              "misses": self.encoder.misses, "last_encode_ms": _round(self.encoder.last_encode_ms)}
+                              "misses": self.encoder.misses, "last_encode_ms": _round(self.encoder.last_encode_ms),
+                              "prefetch": self.prefetch.state.value}
         out["recorder"] = self.recorder.stats()
         out["clients"] = self.client_counts()
         return out

@@ -9,13 +9,19 @@ and the next chunk's frames get a white border and a "re-anchor" label, so a bro
 
 Options (pass as --backend-opt key=value):
     gen_ms=170, decode_ms=60, encode_ms=80, frames_per_chunk=4, first_chunk_frames=1, fps=16
-    fail_on_chunk=-1, fail_count=1, fail_in=generate
+    fail_on_chunk=-1, fail_count=1, fail_in=generate, shared_device=false
+
+shared_device=true models one GPU that runs the text encoder, generation and decode, as on the real machine
+(umT5-xxl and the generator share one GPU). Their simulated work then shares one device by fair time sharing:
+while n jobs run at once, each advances at 1/n speed. So a prompt encoded while a chunk is generating makes that
+chunk take longer. Without it every job sleeps its full time independently.
 
 fail_on_chunk=N injects a crash to test recovery: from chunk N on (chunks count across resets), generate_chunk
 (fail_in=generate) or decode_chunk (fail_in=decode) raises RuntimeError, fail_count times in total.
 """
 
 import hashlib
+import threading
 import time
 
 import numpy as np
@@ -23,6 +29,33 @@ import torch
 from PIL import Image, ImageDraw, ImageFont
 
 TOKENS, DIM = 16, 32
+
+
+class SharedDevice:
+    """One simulated GPU shared by fair time sharing: while n jobs run at once, each advances at 1/n speed."""
+
+    STEP_S = 0.002
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._jobs = 0
+
+    def run(self, seconds: float) -> None:
+        """Block until `seconds` of work is done on this device."""
+        with self._lock:
+            self._jobs += 1
+        try:
+            left, last = seconds, time.perf_counter()
+            while left > 0:
+                time.sleep(min(self.STEP_S, left))
+                now = time.perf_counter()
+                with self._lock:
+                    jobs = self._jobs
+                left -= (now - last) / jobs
+                last = now
+        finally:
+            with self._lock:
+                self._jobs -= 1
 
 
 def load(width: int, height: int, steps: int, device: str = "cpu", decode_device: str = "cpu", **options):
@@ -37,12 +70,14 @@ def _rgb(vec: torch.Tensor) -> np.ndarray:
 class FakeBackend:
     def __init__(self, width: int, height: int, steps: int, gen_ms: float = 170, decode_ms: float = 60,
                  encode_ms: float = 80, frames_per_chunk: int = 4, first_chunk_frames: int = 1, fps: int = 16,
-                 fail_on_chunk: int = -1, fail_count: int = 1, fail_in: str = "generate"):
+                 fail_on_chunk: int = -1, fail_count: int = 1, fail_in: str = "generate",
+                 shared_device: bool = False):
         self.width, self.height, self.steps = int(width), int(height), int(steps)
         self.fps = int(fps)
         self.frames_per_chunk = int(frames_per_chunk)
         self.first_chunk_frames = int(first_chunk_frames)
         self.gen_s, self.decode_s, self.encode_s = float(gen_ms) / 1e3, float(decode_ms) / 1e3, float(encode_ms) / 1e3
+        self.device = SharedDevice() if shared_device else None
         self._chunks_generated = 0       # counts every generate_chunk call; not cleared by reset
         self._chunks_since_reset = 0     # the "frame cache": restarts the motion after reset
         self._frame_phase = 0            # decoder state: frames decoded since reset
@@ -61,8 +96,15 @@ class FakeBackend:
         except TypeError:
             self._font = ImageFont.load_default()
 
+    def _work(self, seconds: float) -> None:
+        """Stand-in for GPU work: on the shared device if there is one, else a plain sleep."""
+        if self.device is not None:
+            self.device.run(seconds)
+        elif seconds > 0:
+            time.sleep(seconds)
+
     def encode_prompt(self, prompt: str) -> torch.Tensor:
-        time.sleep(self.encode_s)
+        self._work(self.encode_s)
         seed = int.from_bytes(hashlib.sha256(prompt.encode()).digest()[:8], "big")
         gen = torch.Generator().manual_seed(seed)
         return torch.randn(1, TOKENS, DIM, generator=gen)
@@ -91,7 +133,7 @@ class FakeBackend:
             raise RuntimeError(f"fake backend: injected {where} failure at chunk {chunk}")
 
     def generate_chunk(self, cond: torch.Tensor) -> dict:
-        time.sleep(self.gen_s)
+        self._work(self.gen_s)
         self._maybe_fail("generate", self._chunks_generated)
         n = self.first_chunk_frames if self._chunks_since_reset == 0 else self.frames_per_chunk
         latents = {"number": self._chunks_generated, "frames": n,
@@ -125,7 +167,5 @@ class FakeBackend:
                           font=self._font, stroke_width=2, stroke_fill=(0, 0, 0))
             frames[i] = np.asarray(img)
             self._frame_phase += 1
-        left = self.decode_s - (time.perf_counter() - t0)
-        if left > 0:
-            time.sleep(left)
+        self._work(self.decode_s - (time.perf_counter() - t0))
         return frames

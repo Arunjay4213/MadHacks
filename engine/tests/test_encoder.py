@@ -95,3 +95,36 @@ def test_prefetch_runs_behind_urgent_requests():
     assert order == ["first", "now", "bg2", "bg1"]
     assert svc.prefetch(["now"]) == 0
     svc.stop()
+
+
+def test_background_waits_for_its_turn_and_urgent_never_does():
+    turns = threading.Event()
+    svc, calls = make(delay=0.01)
+    svc._background_turn = lambda: turns.is_set()  # what the engine's PrefetchPacer.take does
+    assert svc.prefetch(["bg"]) == 1
+    time.sleep(0.1)
+    assert calls == []  # no turn yet
+    t0 = time.perf_counter()
+    assert svc.encode("urgent") == "emb:urgent"  # not held behind the waiting background item
+    assert time.perf_counter() - t0 < 0.1
+    turns.set()
+    svc.wake()
+    assert svc.request("bg").result(2) == ("emb:bg", [2])
+    assert calls == ["urgent", "bg"]
+    svc.stop()
+
+
+def test_prefetch_drops_stale_background_prompts():
+    svc, calls = make(delay=0.01)
+    svc._background_turn = lambda: False
+    assert svc.prefetch(["old1", "old2", "keep"]) == 3
+    assert svc.prefetch(["keep", "new"]) == 1  # "keep" is already queued
+    assert svc.pending == 2
+    svc._background_turn = lambda: True
+    svc.wake()
+    t0 = time.monotonic()
+    while svc.pending and time.monotonic() - t0 < 2:
+        time.sleep(0.01)
+    assert sorted(calls) == ["keep", "new"]
+    assert svc.work_ms is not None and svc.work_ms >= 10
+    svc.stop()

@@ -106,6 +106,7 @@ def test_reader_api_reset_seed_and_errors():
         assert e.handle_control({"type": "final", "text": "reject me", "t_client": 1}, time.monotonic_ns(),
                                 replies.append).result(5) is None
         assert replies and "no thanks" in replies[0]["error"]
+        assert e.book.latest() is None  # a rejected message is not the most recent command
         done = e.handle_control({"type": "tap", "action": "reset", "t_client": 9}, time.monotonic_ns()).result(5)
         assert done.wait(5)
         rec = e.book.latest()
@@ -173,3 +174,39 @@ def test_repeated_crashes_fail_and_call_on_fatal():
     finally:
         e.stop()
     assert e.lifecycle.state is Lifecycle.STOPPED
+
+
+def test_unmatched_final_is_the_most_recent_command():
+    """Contract 4 echoes the most recent command's t_client, also when the reader found no operation for it."""
+    from commands.service import CommandService
+
+    states = []
+    e = Engine(_fast(), lambda b: None, states.append, reader=CommandService())
+    e.start()
+    try:
+        assert wait(lambda: e.lifecycle.state is Lifecycle.GENERATING)
+        e.handle_control({"type": "final", "text": "make it winter", "t_client": 101}, time.monotonic_ns()).result(5)
+        winter = e.book.latest()
+        assert wait(lambda: winter.stage is CommandStage.SHOWN)
+        e.handle_control({"type": "final", "text": "make it day", "t_client": 202}, time.monotonic_ns()).result(5)
+        assert wait(lambda: any(s["heard"] == "make it day" for s in states))
+        n = len(states)
+        assert wait(lambda: len(states) > n + 2)
+        last = states[-1]
+        assert not errors(4, last)
+        assert last["heard"] == "make it day" and last["unmatched"] is True and last["keyword"] is None
+        assert last["t_client"] == 202
+        assert last["stamps"] == {"heard": 0}  # no operation: no decided, embedded, generated or shown
+        assert last["applies_from_chunk"] is None
+        day = e.book.latest()
+        assert day.stage is CommandStage.DROPPED and day.t_client == 202
+        # A partial with no steer is not a command: it does not replace the most recent one.
+        e.handle_control({"type": "partial", "text": "make it", "t_client": 303}, time.monotonic_ns()).result(5)
+        assert e.book.latest() is day
+        # A tap the reader has no operation for is a command too: contract 4 then carries its (absent) t_client.
+        e.handle_control({"type": "tap", "action": "remove", "id": "nope"}, time.monotonic_ns()).result(5)
+        tap = e.book.latest()
+        assert tap is not day and tap.stage is CommandStage.DROPPED and tap.t_client is None
+        assert e.book.latest_fields() == {"stamps": {"heard": 0}, "t_client": None, "applies_from_chunk": None}
+    finally:
+        e.stop()
