@@ -2,7 +2,7 @@
 
 Owner `@prateekraouw`. Turns heard text (contract 1) into a target prompt for the steerer (contract 2) and the
 scene-state fields of contract 4. The dictionary path uses the Python standard
-library. Interfaces
+library. The optional CPU vector path uses pinned sentence-transformers. Interfaces
 and rules: `PLAN.md` here.
 
 ## Use from the engine
@@ -32,6 +32,7 @@ because the engine restarts the video on it.
 | `composer.py` | `compose(snapshot)`: one prompt in a fixed order with stable wording |
 | `reader.py` | fast reader: keyword table, pace and strength words, name matching, partial-text spotting |
 | `keywords.json`, `dictionary.py` | embedded canonical vocabulary, aliases, validated loader and compiled whole-word matching |
+| `semantic.py` | optional final-only CPU vector retrieval |
 | `service.py` | `CommandService`: ties them together, early-steering guesses and rollback, optional slow reader |
 
 The slow reader is an injected callable `fn(text, snapshot) -> op dict | None`, off by default.
@@ -51,6 +52,50 @@ over generic adjective aliases: “add a bright red car” selects car, not dayt
 An explicit new object such as “add a glowing unicorn” is preserved as a named
 change, even when it is absent from the dictionary; retrieval never substitutes
 the nearest familiar animal. Whole-word partial matching stays deterministic.
+
+## Local vector embeddings
+
+Install once in the engine's Python 3.10 venv (these deployment pins do not support Python 3.13), save the small encoder in a fixed local folder before
+the live run, and enable it at process startup:
+
+```sh
+pip install -r commands/requirements-semantic.txt
+python -m commands.semantic --prepare
+python -m commands.check_semantic
+COMMAND_SEMANTIC=1 python -m engine.server --backend fake --reader commands --port 8000
+```
+
+Use the real backend flag for the real GPU engine; this model remains on CPU.
+The fixed model folder is `~/.cache/madhacks/command-minilm`. Run setup as
+the same OS user as the engine service (currently `ubuntu` on the GPU host),
+then set `COMMAND_SEMANTIC=1` in that service environment and restart it.
+If dependencies or prepared files are missing, startup logs a warning and disables
+the vector layer; dictionary and the existing slow LLM still work. Runtime loading
+is local-only, so a command never downloads a model.
+Without that flag, the dictionary/open-object path still works without model
+dependencies. A caller can also inject `CommandService(semantic_reader=reader)`.
+
+The encoder is `sentence-transformers/all-MiniLM-L6-v2` (384-dimensional vectors).
+Its normalized vectors are compared by cosine similarity. The reference index is
+built once, recent queries are cached (256 entries), and only final dictionary
+misses use it. Semantic additions need similarity ≥0.55 and a ≥0.05 lead over the
+next canonical concept. Semantic removal searches only active changes and uses
+stricter ≥0.60 / ≥0.10 thresholds (minimum ≥0.70 with one active change). Negation and unsupported transformations are
+never turned into additions. A vector similarity score is not a probability and
+cannot guarantee correct interpretation of every sentence.
+
+The real-model self-check covers unseen paraphrases, literal new objects, negative
+inputs, and a compound edit. It reports command-reader milliseconds separately
+from download/startup, model generation and network/video latency. No remote LLM
+or API key is used by this fallback.
+
+The optional requirements preserve engine pins: torch 2.5.1, transformers 4.49.0,
+numpy 1.24.4, plus sentence-transformers 3.4.1. A Linux x86_64 / Python 3.10 `uv pip
+install --dry-run` resolves this set. The engine owner must install and check CPU
+contention before enabling it on the GPU host; local CPU timings do not prove that.
+
+Sources: [model card](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2),
+[similarity documentation](https://www.sbert.net/docs/sentence_transformer/usage/semantic_textual_similarity.html).
 
 ## Multiple commands per sentence
 
