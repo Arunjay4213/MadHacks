@@ -38,6 +38,17 @@ APP_FILES = {
     "lib.js": "text/javascript",
 }
 
+# The Lucid Studio build (a Vite app) served under /studio/. Its asset names are hashed, so any regular file
+# inside the folder is served, but never a dotfile or anything that resolves outside the folder.
+STUDIO = Path(__file__).resolve().parent.parent / "lucid-studio" / "dist"
+STUDIO_TYPES = {
+    ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css",
+    ".json": "application/json", ".map": "application/json", ".svg": "image/svg+xml", ".png": "image/png",
+    ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".ico": "image/x-icon",
+    ".woff2": "font/woff2", ".woff": "font/woff", ".ttf": "font/ttf", ".wasm": "application/wasm",
+    ".txt": "text/plain", ".webmanifest": "application/manifest+json",
+}
+
 FRAME_CLIENT_QUEUE = 8     # frames buffered per /frames client before that client drops frames
 CONTROL_CLIENT_QUEUE = 64  # messages buffered per /control client before that client drops messages
 
@@ -100,7 +111,7 @@ async def _serve(ws: WebSocket, q: asyncio.Queue, send, on_receive) -> None:
                 await t
 
 
-def build_app(config: EngineConfig, web_dir: Path = WEB) -> Starlette:
+def build_app(config: EngineConfig, web_dir: Path = WEB, studio_dir: Path = STUDIO) -> Starlette:
     hub = Hub()
     engine = Engine(config, hub.publish_frame, hub.publish_control)
     engine.client_counts = hub.counts
@@ -171,6 +182,25 @@ def build_app(config: EngineConfig, web_dir: Path = WEB) -> Starlette:
             return PlainTextResponse(f"web/{name} is missing on this machine", status_code=404)
         return Response(body, media_type=APP_FILES[name], headers={"Cache-Control": "no-cache"})
 
+    async def studio_redirect(request: Request):
+        query = request.url.query
+        return RedirectResponse("/studio/" + (f"?{query}" if query else ""))
+
+    def studio_file(request: Request):  # sync for the same reason as app_file
+        root = studio_dir.resolve()
+        if not root.is_dir():
+            return PlainTextResponse(f"Lucid Studio build not found at {studio_dir}", status_code=404)
+        name = request.path_params["name"] or "index.html"
+        parts = name.split("/")
+        if "\\" in name or any(not part or part.startswith(".") for part in parts):
+            return PlainTextResponse("not found", status_code=404)
+        path = (root / name).resolve()  # follows symlinks, so one that points outside fails the check below
+        if not path.is_relative_to(root) or not path.is_file():
+            return PlainTextResponse("not found", status_code=404)
+        hashed = parts[0] == "assets"
+        return FileResponse(path, media_type=STUDIO_TYPES.get(path.suffix.lower(), "application/octet-stream"),
+                            headers={"Cache-Control": "public, max-age=31536000, immutable" if hashed else "no-cache"})
+
     async def stats(_request: Request):
         return JSONResponse(engine.stats())
 
@@ -213,6 +243,8 @@ def build_app(config: EngineConfig, web_dir: Path = WEB) -> Starlette:
             Route("/", index),
             Route("/app", app_redirect),
             Route("/app/{name:path}", app_file),
+            Route("/studio", studio_redirect),
+            Route("/studio/{name:path}", studio_file),
             Route("/stats", stats),
             Route("/healthz", healthz),
             Route("/reset", reset, methods=["POST"]),
@@ -259,6 +291,7 @@ def parse_args(argv=None) -> argparse.Namespace:
                    help="option passed to the backend's load(); repeatable")
     p.add_argument("--lead-margin", type=float, default=EngineConfig.lead_margin,
                    help="safety factor on how much video generation keeps ahead of the playhead")
+    p.add_argument("--studio-dir", default=str(STUDIO), help="Lucid Studio build folder served at /studio/")
     p.add_argument("--log-level", default="info")
     return p.parse_args(argv)
 
@@ -278,7 +311,7 @@ def main(argv=None) -> None:
                           device=args.device, decode_device=args.decode_device, backend_options=options,
                           base_prompt=args.base_prompt, jpeg_quality=args.jpeg_quality,
                           precompute_file=args.precompute_file, lead_margin=args.lead_margin)
-    app = build_app(config)
+    app = build_app(config, studio_dir=Path(args.studio_dir))
     uvicorn.run(app, host=args.host, port=args.port, log_level=args.log_level, timeout_graceful_shutdown=2)
 
 
