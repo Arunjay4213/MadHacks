@@ -1,0 +1,166 @@
+:root {
+  --bg: #0b0d10;
+  --panel: #161a20;
+  --line: #2a313b;
+  --text: #e8ecf1;
+  --muted: #8a94a3;
+  --accent: #5aa9ff;
+  --ok: #3ccf91;
+  --warn: #f2b84b;
+  --bad: #ff5d5d;
+  --mark: #ffe36e;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Top bar: connection, mock banner, delay number */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+}
+
+.status {
+  font-size: 14px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.status[data-state="open"] { color: var(--ok); border-color: var(--ok); }
+.status[data-state="closed"] { color: var(--bad); border-color: var(--bad); }
+
+.banner {
+  font-size: 14px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--warn);
+  color: #1b1300;
+  font-weight: 600;
+}
+.banner[hidden] { display: none; }
+
+.delay {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  max-width: 50%;
+}
+.latency { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.timing { font-size: 11px; color: var(--muted); text-align: right; }
+
+/* The video takes all the room it can, keeping its aspect ratio */
+.stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+}
+/* Fill the stage and scale the frame inside it, whatever size the server's frames are. */
+#video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  border-radius: 8px;
+}
+
+.below { padding: 8px 16px 16px; }
+
+/* What was heard; the keyword is highlighted, unmatched words turn red */
+.words {
+  min-height: 1.6em;
+  margin: 0 0 8px;
+  font-size: 22px;
+  text-align: center;
+}
+.words[data-kind="partial"] { color: var(--muted); font-style: italic; }
+.words[data-unmatched="true"] { color: var(--bad); }
+.words mark { background: var(--mark); color: #111; border-radius: 4px; padding: 0 4px; }
+
+/* One chip per active change */
+.chips {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 0;
+  min-height: 36px;
+}
+.chips[data-stale="true"] { opacity: 0.45; }
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  font-size: 16px;
+}
+.chip-remove {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.chip-remove:hover { color: var(--text); background: var(--line); }
+
+/* Text box (Wispr Flow pastes here) and buttons */
+.controls { display: flex; gap: 8px; }
+#command {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 18px;
+  padding: 10px 12px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+#command:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.controls button {
+  font: inherit;
+  padding: 10px 14px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.controls button:hover:not(:disabled) { border-color: var(--accent); }
+.controls button[aria-pressed="true"] { background: var(--bad); border-color: var(--bad); }
+.controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.error { margin: 8px 0 0; color: var(--bad); font-size: 14px; }
+.error[hidden] { display: none; }
+
+@media (max-width: 640px) {
+  .controls { flex-wrap: wrap; }
+  #command { flex-basis: 100%; }
+  .delay { max-width: 60%; }
+}
