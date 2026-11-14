@@ -1,0 +1,23 @@
+# Python 3.10 venv. Install torch first from the CUDA index (see engine/setup_gpu.sh):
+#   uv pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu124
+# then this file, then the prebuilt flash-attn 2.7.4.post1 wheel for torch 2.5 / cp310.
+diffusers==0.31.0
+transformers>=4.49.0,<4.50
+tokenizers>=0.20.3
+accelerate>=1.1.1
+numpy==1.24.4
+omegaconf
+einops
+easydict
+ftfy
+sentencepiece
+safetensors
+pydantic==2.10.6
+av==13.1.0
+imageio
+imageio-ffmpeg
+opencv-python-headless
+lmdb
+scipy
+matplotlib
+tqdm
