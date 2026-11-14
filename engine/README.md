@@ -42,7 +42,7 @@ At 832x480 one chunk takes about 443 ms on this GPU, so that size is not real ti
 Start the server (first time on a new machine: `bash engine/setup_gpu.sh`, then `uv pip install -r engine/requirements.txt -r steering/requirements.txt` into `~/engine-venv`):
 
 ```
-tmux new-session -d -s engine "cd ~/madhacks && source ~/engine-venv/bin/activate && python -m engine.server --backend causal_forcing --reader commands --width 672 --height 384 --backend-opt vae=taehv --host 127.0.0.1 --port 8000 2>&1 | tee -a ~/runs/engine-server.log"
+tmux new-session -d -s engine "cd ~/madhacks && source ~/engine-venv/bin/activate && python -m engine.server --backend causal_forcing --reader commands --width 672 --height 384 --backend-opt vae=taehv --reanchor on --reanchor-opt refresh_every_chunks=none --host 127.0.0.1 --port 8000 --record-dir /home/ubuntu/recordings 2>&1 | tee -a ~/runs/engine-server.log"
 ```
 
 Loading takes about 70 s; `curl -s localhost:8000/stats | jq .state` prints `GENERATING` when it is up.
@@ -66,7 +66,7 @@ Without the tunnel, use an SSH port forward from a machine that has SSH access: 
 
 `engine/deploy/` holds two systemd units and a helper script:
 
-- `madhacks-engine.service` runs the server with the live command line above (plus `--record-dir /home/ubuntu/recordings`), with `Restart=always`, `RestartSec=2` and no start limit.
+- `madhacks-engine.service` runs the server with the live command line above, with `Restart=always`, `RestartSec=2` and no start limit.
 - `madhacks-tunnel.service` runs `cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8000` with `Restart=always`.
 - `tunnel-address.sh` prints the current trycloudflare address from the tunnel unit's journal (only the current run, so never an old address); it waits up to 30 s for it.
 
@@ -139,15 +139,16 @@ Check a recording with `ffprobe -v error -show_entries format=duration:stream=wi
 
 The picture degrades when a video runs long without a reset: it is clean for about 20 s, over-contrasted by about 30 s and broken by about 60 s.
 Press Reset (or send the reset tap) to start a clean video.
-A new prompt is read by the model but the frame history holds the old scene, so a command such as "make it winter" does not visibly change the scene yet.
-Both are being worked on in the backend (re-anchoring the frame history at a command and at intervals).
+Steering works with `--reanchor on`: Gate 2 passed live after PR #57, with full winter about 2 s after "make it winter" (`engine/samples/gate2_live_make_it_winter_pass.jpg`).
+The policy's periodic refresh (every 60 chunks at strength 0.25) visibly breaks the picture on the refresh chunk (`engine/samples/refresh_breaks_picture.jpg`).
+The live engine therefore runs with the refresh off: `--reanchor-opt refresh_every_chunks=none`.
 
 ## Command line
 
 ```
 python -m engine.server --backend fake|causal_forcing --reader standin|commands --host 127.0.0.1 --port 8000 --width 832 --height 480 \
     --steps 0 --base-prompt "..." --jpeg-quality 80 --precompute-file prompts.txt \
-    --device cuda:0 --decode-device cuda:0 --backend-opt key=value --lead-margin 1.3 --reanchor off --log-level info \
+    --device cuda:0 --decode-device cuda:0 --backend-opt key=value --lead-margin 1.3 --reanchor off --reanchor-opt key=value --log-level info \
     --record-dir ~/recordings --record-max-gb 20
 ```
 
@@ -161,6 +162,7 @@ python -m engine.server --backend fake|causal_forcing --reader standin|commands 
   To time the live machine on a laptop, use `--backend-opt gen_ms=213 --backend-opt decode_ms=21 --backend-opt encode_ms=53 --backend-opt shared_device=true`.
 - `--lead-margin` sets how much video generation keeps ready ahead of what is on screen (see "Pipeline").
 - `--reanchor off|on` (default `off`) turns on the steering re-anchor policy (see "Re-anchor").
+- `--reanchor-opt key=value` sets one field of the policy's `ReanchorConfig` and may be repeated (see "Re-anchor").
 - `--record-dir` and `--record-max-gb` control the recorder (see "Recorder"); `--record-dir none` turns it off.
 - SIGINT or SIGTERM shuts down cleanly, finalizes the open recording and moves the engine to STOPPED.
 - The process exits with code 70 when the engine reaches FAILED, so systemd restarts it.
@@ -230,9 +232,27 @@ With `--reanchor off`, the default, no policy exists and every chunk is exactly 
 - `on_reset()` runs on every reset, right after `Controller.reset`.
 - `Engine._generate(cond, anchor)` is the one backend call: with an anchor it calls `backend.reanchor(strength)` and then `backend.generate_chunk(cond)`.
 - The state is an enum, `ReanchorState`: `off`, `on`, or `unsupported` when `--reanchor on` is given but the backend has no `reanchor(strength)` (logged once at load, then the engine runs as with `off`).
-- The real backend (`causal_forcing`) cannot re-anchor yet, so it reports `unsupported`; the diffusion side is issue #45.
+- The real backend (`causal_forcing`) has `reanchor(strength)` since PR #52, so it reports `on`.
+  It cuts the frame cache and starts the next chunk from the last picture noised by an amount set by the strength.
 - The fake backend records each `reanchor` call and draws a white border and "re-anchor 1.00" on the next chunk's frames.
-- `/stats` has `reanchor`: `state`, `count`, `last_strength`, `last_reason` (`steer` or `refresh`), `last_chunk`, and the policy's `chunks_since_anchor`.
+- A re-anchor chunk is logged when it is generated and again on its decode line (`re-anchor steer 1.00`).
+- `/stats` has `reanchor`: `state`, `count`, `last_strength`, `last_reason` (`steer` or `refresh`), `last_chunk`, `config` (the options that differ from the defaults), and the policy's `chunks_since_anchor`.
+
+### Re-anchor options
+
+`--reanchor-opt KEY=VALUE` sets one field of `steering.reanchor.ReanchorConfig`, without a change to the steering code.
+It may be repeated; the fields and their defaults are in `steering/reanchor.py`.
+Each value is converted to the field's type: an int, a float, or for `refresh_every_chunks` an int or `none`.
+The live engine turns the periodic refresh off:
+
+```
+--reanchor on --reanchor-opt refresh_every_chunks=none
+```
+
+Other examples: `--reanchor-opt steer_strength=0.9`, `--reanchor-opt min_gap_chunks=8`.
+The options are checked when the server starts, before the backend loads.
+An unknown key, a value that does not convert, or a value `ReanchorConfig` rejects makes the server exit at once with a message such as `--reanchor-opt: unknown re-anchor option 'bogus'; known options: ...`.
+The options are kept with `--reanchor off` too, but have no effect there.
 
 ## Commands
 
