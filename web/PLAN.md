@@ -63,7 +63,10 @@ It sits in `PROTOCOL` in `lib.js` and in `fake-server.mjs`.
    so it never clashes with Wispr Flow's Ctrl hotkey, and never types into the box. The mic toggle restarts Chrome's
    recognizer when it ends by itself; blocked-mic and network errors are explained; the mic is disabled outside a
    secure context (HTTPS or localhost). Needs a real voice test on the demo laptop.
-4. to 6.: chips and undo on real state, delay and highlight polish, big-screen layout.
+4. Chips and undo on real state: done. Checked against the engine (fake backend, `--reader commands`, 672x384):
+   stack, remove by name and chip x, undo, unmatched words in red, delay steady at ~575 ms. Real-model check pending
+   the live engine address.
+5. and 6.: delay and highlight polish, connection-lost state, big-screen layout.
 
 ## Open
 

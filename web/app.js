@@ -3,6 +3,7 @@ import {
   PROTOCOL, TYPING_IDLE_MS, BURST_IDLE_MS, partialMsg, finalMsg, tapMsg, parseFrame, parseServerMessage,
   splitKeyword, backoffMs, makeFrameGate, makeLatencyTracker, makeTranscriber,
   changesKey, commandKey, makeInputClassifier, PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
+  wsBaseUrl, fitSize,
 } from './lib.js';
 
 const $ = (id) => document.getElementById(id);
@@ -14,10 +15,10 @@ const el = {
 const ctx = el.video.getContext('2d');
 // Same origin by default; `?server=host:port` points the page at another server (e.g. the engine on :8000).
 const params = new URLSearchParams(location.search);
-const serverHost = params.get('server') || location.host;
+// `?server=` also takes a full ws:// / wss:// / https:// URL, e.g. an HTTPS tunnel to the engine.
+const wsBase = wsBaseUrl(params.get('server'), location);
 // `?debug=1` logs every text-box input to the console, to see how Wispr Flow inserts on this laptop.
 const DEBUG = params.get('debug') === '1';
-const wsBase = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${serverHost}`;
 const latency = makeLatencyTracker();
 const PROXY_NOTE = 'command sent → first frame tagged with its chunk drawn to the canvas (page clock; chunk-tag proxy, not proof the picture changed or was painted)';
 
@@ -155,9 +156,16 @@ function connectFrames() {
       return; // undecodable frame: skip it, keep the last good one
     }
     if (!gate.tryDraw(seq)) return bmp.close(); // a newer frame was already drawn
-    if (el.video.width !== bmp.width) el.video.width = bmp.width;
-    if (el.video.height !== bmp.height) el.video.height = bmp.height;
-    ctx.drawImage(bmp, 0, 0);
+    // Size the canvas to the screen space it has (in device pixels) at the frame's own aspect ratio,
+    // read from the decoded frame, then upscale with high-quality smoothing.
+    const size = fitSize(bmp.width, bmp.height, el.video.clientWidth, el.video.clientHeight, window.devicePixelRatio || 1);
+    if (el.video.width !== size.width || el.video.height !== size.height) {
+      el.video.width = size.width; // resizing a canvas resets its drawing settings
+      el.video.height = size.height;
+    }
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(bmp, 0, 0, size.width, size.height);
     bmp.close();
     const r = latency.onFrameDrawn(f.chunk);
     if (r) renderLatency(r);
