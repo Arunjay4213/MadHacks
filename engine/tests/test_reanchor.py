@@ -1,5 +1,6 @@
 """The re-anchor wiring (--reanchor) with the fake backend: policy hooks, the backend call and /stats."""
 
+import re
 import time
 
 import pytest
@@ -7,15 +8,17 @@ import pytest
 import engine.engine as engine_module
 from engine.backends.fake import FakeBackend
 from engine.commands import CommandStage
-from engine.engine import Engine, EngineConfig, ReanchorState
+from engine.engine import Engine, EngineConfig, ReanchorState, reanchor_config
 from engine.lifecycle import Lifecycle
+from engine.server import main
 from engine.tests.test_engine import wait
 
 FAST = dict(gen_ms=5, decode_ms=1, encode_ms=5, frames_per_chunk=2, fps=100)
 
 
-def start(reanchor: str) -> Engine:
-    cfg = EngineConfig(backend="fake", width=64, height=48, backend_options=FAST, reanchor=reanchor)
+def start(reanchor: str, options: dict | None = None) -> Engine:
+    cfg = EngineConfig(backend="fake", width=64, height=48, backend_options=FAST, reanchor=reanchor,
+                       reanchor_options=options or {})
     e = Engine(cfg, lambda b: None, lambda m: None)
     e.start()
     assert wait(lambda: e.lifecycle.state is Lifecycle.GENERATING)
@@ -43,7 +46,8 @@ def test_off_never_calls_reanchor():
         assert e.reanchor_state is ReanchorState.OFF and e.policy is None
         assert e.backend.reanchor_calls == 0
         assert e.stats()["reanchor"] == {"state": "off", "count": 0, "last_strength": None, "last_reason": None,
-                                         "last_chunk": None, "chunks_since_anchor": None}
+                                         "last_chunk": None, "config": {},
+                                         "chunks_since_anchor": None}
     finally:
         e.stop()
 
@@ -103,3 +107,51 @@ def test_backend_without_reanchor_is_unsupported(monkeypatch):
 def test_bad_reanchor_value():
     with pytest.raises(ValueError):
         Engine(EngineConfig(reanchor="maybe"), lambda b: None, lambda m: None)
+
+
+# --- --reanchor-opt ----------------------------------------------------------------------------
+
+
+def test_reanchor_options_convert_to_the_field_types():
+    cfg = reanchor_config({"refresh_every_chunks": "none", "steer_strength": "0.9", "min_gap_chunks": "8"})
+    assert cfg.refresh_every_chunks is None
+    assert cfg.steer_strength == 0.9 and isinstance(cfg.steer_strength, float)
+    assert cfg.min_gap_chunks == 8 and isinstance(cfg.min_gap_chunks, int)
+    assert reanchor_config({"refresh_every_chunks": "30"}).refresh_every_chunks == 30
+    assert reanchor_config({}) == reanchor_config({"min_gap_chunks": "8"})  # 8 is the default
+
+
+@pytest.mark.parametrize("options, message", [
+    ({"bogus": "1"}, "unknown re-anchor option 'bogus'"),
+    ({"min_gap_chunks": "eight"}, "expected int"),
+    ({"refresh_every_chunks": "often"}, "expected int or none"),
+    ({"steer_strength": "1.5"}, "steer_strength must be a number in (0, 1]"),
+])
+def test_bad_reanchor_option_fails(options, message):
+    with pytest.raises(ValueError, match=re.escape(message)):
+        reanchor_config(options)
+    with pytest.raises(ValueError, match=re.escape(message)):  # at Engine construction, before the backend loads
+        Engine(EngineConfig(reanchor="on", reanchor_options=options), lambda b: None, lambda m: None)
+
+
+def test_server_exits_at_once_on_unknown_reanchor_option(monkeypatch):
+    def no_build(*a, **kw):
+        raise AssertionError("the app must not be built")
+    monkeypatch.setattr("engine.server.build_app", no_build)
+    with pytest.raises(SystemExit, match="--reanchor-opt: unknown re-anchor option 'bogus'"):
+        main(["--reanchor", "on", "--reanchor-opt", "bogus=1"])
+    with pytest.raises(SystemExit, match="--reanchor-opt expects KEY=VALUE"):
+        main(["--reanchor-opt", "refresh_every_chunks"])
+
+
+def test_refresh_off_never_refreshes_in_200_chunks():
+    e = start("on", {"refresh_every_chunks": "none"})
+    try:
+        assert e.reanchor_state is ReanchorState.ON and e.policy.config.refresh_every_chunks is None
+        assert wait(lambda: e.chunk_generated >= 200, timeout=30)
+        r = e.stats()["reanchor"]
+        assert (r["count"], r["last_reason"], r["config"]) == (0, None, {"refresh_every_chunks": None})
+        assert r["chunks_since_anchor"] >= 200
+        assert e.backend.reanchor_calls == 0
+    finally:
+        e.stop()
