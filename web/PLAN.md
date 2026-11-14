@@ -37,8 +37,10 @@ It sits in `PROTOCOL` in `lib.js` and in `fake-server.mjs`.
 - Chips render only from the last valid server `changes`. Clicking never changes chips locally.
 - Commands are sent only while the control socket is open; otherwise they are dropped and the error says so. Nothing is replayed after a reconnect.
 - Text box: paste / drop / replacement / multi-character insert sends one `final` with the whole value and clears the box.
-  Typing sends `partial` per input and `final` on Enter or after 1500 ms idle (`TYPING_IDLE_MS`).
-  Machine-fast keys (4 in a row, each within 30 ms: a tool simulating keystrokes) become final after 200 ms (`BURST_IDLE_MS`).
+  Typing sends `partial` per input and `final` on Enter or after 2500 ms idle (`TYPING_IDLE_MS`).
+  Machine-fast keys (4 in a row, each within 30 ms: a tool simulating keystrokes) become final after 600 ms (`BURST_IDLE_MS`).
+  Text that looks unfinished (ends in a comma or a joining word, `looksUnfinished`) is sent only on Enter, never on a pause.
+- Push-to-talk collects Chrome's final segments and sends the whole utterance as one `final` on release.
   Input during IME composition is ignored until the composed text lands.
   `?debug=1` logs each input's `inputType` to the console, to check how Wispr Flow inserts on the demo laptop.
 - Speech: interim results send `partial` (only when the text changed). Each final result is sent once, tracked by its index.
