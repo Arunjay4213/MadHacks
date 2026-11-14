@@ -92,6 +92,8 @@ class CommandService:
 
     def _hypothesis(self, entry: dict) -> str:
         """Prompt if this keyword were added, computed on a copy: the live state is never touched."""
+        if any(c["label"] == entry["label"] for c in self._state.snapshot()["changes"]):
+            return self._committed
         trial = copy.deepcopy(self._state)
         trial.apply({"op": "add", "label": entry["label"], "kind": entry["kind"], "phrase": entry["phrase"], "strength": 1.0})
         return compose(trial.snapshot())
@@ -113,7 +115,7 @@ class CommandService:
             self._guess = self._guess_prompt = None
             return self._steer(self._committed, RAMP["default"]) if had_guess else None
         self._guess, self._guess_prompt = label, prompt
-        return self._steer(prompt, RAMP["default"], provisional=True)
+        return self._steer(prompt, RAMP["provisional"], provisional=True)
 
     def _final(self, text: str):
         self._heard = text

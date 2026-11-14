@@ -129,3 +129,14 @@ python -m commands.check_engine --url http://127.0.0.1:8000
 The check resets the session, sends partial/final text and taps over the real
 websockets, checks stacking/removal/undo/rollback, and validates the streamed state.
 It does not measure real-model semantic quality or microphone latency.
+
+
+## Motion and continuity
+
+Explicit object descriptions and motion now remain in scene state across weather/light edits.
+For example, adding a red car driving forward preserves its color and direction when winter is added.
+A motion edit updates the existing subject; bare repeated additions and partial guesses keep its details.
+Normal/confirmed ramps are one chunk, gradual edits remain 12, and guesses remain four.
+The optional cached enrichment boundary lives in commands.rewriter; the engine owns its network call.
+See [integration and frame-evaluation notes](../docs/prompt-continuity.md).
+Language embeddings do not store visual history; clean anchors remain the backend's responsibility.

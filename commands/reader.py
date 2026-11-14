@@ -15,7 +15,7 @@ __all__ = ["KEYWORDS", "MAX_CLAUSES", "RAMP", "is_blocked", "read", "remove_targ
 
 MAX_CLAUSES = 16  # callers reject a sentence that splits into more
 
-RAMP = {"default": 4, "slow": 12, "sudden": 1, "confirm": 2}  # chunks; settings until the first real run
+RAMP = {"default": 1, "slow": 12, "sudden": 1, "confirm": 1, "provisional": 4}  # anchor fires at full target
 
 _STRENGTH_LOW = 0.3
 _STRENGTH_HIGH = 1.3  # "a lot": heavy wording in the composer
@@ -45,6 +45,9 @@ _ADD_RX = re.compile(r"\b(?:add|put|place|bring|include|build|draw|give me|i wan
 _PREP_RX = re.compile(r"\s+\b(?:in|on|at|near|by|over|under|to|with|beside|behind|across|next to|around|above|below)\b\s+")
 _FILLER_TAIL_RX = re.compile(r"(?:\s+\b(?:please|too|as well|now|here|there|for me|in the scene|to the scene)\b)+$")
 _NOT_AN_OBJECT = {"a", "an", "the", "another", "it", "that", "this", "them", "these", "those", "something", "anything", "one", "please", "more", "some"}
+_MOTION_FORMS = {"drive": "driving", "move": "moving", "walk": "walking", "run": "running",
+                 "fly": "flying", "swim": "swimming", "reverse": "reversing", "stop": "stopped"}
+_MOTION_RX = re.compile(r"\b(?:driv(?:e|ing)|mov(?:e|ing)|walk(?:ing)?|run(?:ning)?|fly(?:ing)?|swim(?:ming)?|revers(?:e|ing)|stop(?:ped)?|parked|standing|sitting)\b")
 _MAX_LABEL_WORDS = 5
 _ING_NOUNS = {"building", "buildings", "painting", "paintings", "ceiling", "evening", "morning", "string", "wedding", "clothing", "swing", "swings", "ring", "rings", "king", "kings", "wing", "wings", "thing", "things"}
 # Words that never pick a change by themselves: articles, pronouns, colours, sizes and generic nouns.
@@ -197,6 +200,17 @@ def read(text: str, snapshot: dict) -> dict:
     entry = KEYWORDS[keyword]
     existing = _find(snapshot, entry["label"])
     current = existing["strength"] if existing else 0.0
+    motion = _MOTION_RX.match(t[kw.end():].strip())
+    if entry["kind"] == "extra" and motion and not _ADD_RX.search(t):
+        if existing is None:
+            return out(None, keyword)
+        old_phrase = existing["phrase"]
+        old_motion = _MOTION_RX.search(old_phrase)
+        subject = old_phrase[:old_motion.start()].strip() if old_motion else old_phrase
+        action = t[kw.end():].strip()
+        action = _MOTION_FORMS.get(motion.group(0), motion.group(0)) + action[motion.end():]
+        return out({"op": "add", **entry, "phrase": f"{subject} {action}",
+                    "strength": existing["strength"]}, keyword)
     rest = t[: kw.start()] + " " + t[kw.end():]  # strength words outside the noun itself ("light house" is not "light")
     if _LOW_RX.search(rest):
         strength = _STRENGTH_LOW
@@ -208,6 +222,18 @@ def read(text: str, snapshot: dict) -> dict:
         strength = max(_STRENGTH_LOW / 3, round(current - _STEP, 2))
     else:
         strength = 1.0
+    if entry["kind"] == "extra":
+        add_match = _ADD_RX.search(t)
+        if add_match:
+            article, description = add_match.groups()
+            description = _FILLER_TAIL_RX.sub("", description).strip()
+            # Bare aliases keep their stable dictionary phrase; explicit visual details survive.
+            detail = KEYWORD_RX.sub(" ", description)
+            for rx in (_LOW_RX, _HIGH_RX, _MORE_RX, _LESS_RX):
+                detail = rx.sub(" ", detail)
+            if detail.strip() and detail.strip() not in _NOT_AN_OBJECT:
+                phrase = f"{article} {description}" if article in ("a", "an", "some") else description
+                return out({"op": "add", **entry, "phrase": phrase, "strength": strength}, keyword)
     if existing:
         return out({"op": "set_strength", "id": existing["id"], "strength": strength}, keyword)
     return out({"op": "add", "label": entry["label"], "kind": entry["kind"], "phrase": entry["phrase"], "strength": strength}, keyword)
@@ -315,13 +341,17 @@ def is_blocked(text: str) -> bool:
     """True when read() left the text unmatched ON PURPOSE (negation or a transform it cannot express).
     A local fallback must not turn these into an add; the slow LLM can interpret transforms."""
     t = _norm(text)
-    return bool(_NEGATION_RX.search(t) or _TRANSFORM_RX.search(t))
+    kw = _pick(t)
+    motion_edit = kw and KEYWORDS[kw.group(0)]["kind"] == "extra" and _MOTION_RX.match(t[kw.end():].strip()) and not _ADD_RX.search(t)
+    return bool(_NEGATION_RX.search(t) or _TRANSFORM_RX.search(t) or motion_edit)
 
 
 def spot(partial_text: str):
     """The KEYWORDS key in partial text, for early steering: whole aliases only, never prefixes or pass-through.
     None for undo/reset/remove/negation/transform/new-scene wording: never guessed."""
     t = _norm(partial_text)
+    if is_blocked(t):
+        return None
     if any(rx.search(t) for rx in (_UNDO_RX, _RESET_RX, _REMOVE_RX, _NEGATION_RX, _TRANSFORM_RX, _SCENE_RX)):
         return None
     m = _pick(t)
