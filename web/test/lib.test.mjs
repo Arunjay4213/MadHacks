@@ -3,7 +3,27 @@ import assert from 'node:assert/strict';
 import {
   parseFrame, parseServerMessage, splitKeyword, backoffMs, isWholeInsert,
   makeFrameGate, makeLatencyTracker, makeTranscriber, changesKey, commandKey, makeInputClassifier,
+  PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
 } from '../lib.js';
+
+test('push-to-talk: the set key alone; never with Ctrl (Wispr Flow), Cmd or Alt; never Ctrl itself', () => {
+  const key = (code, mods = {}) => ({ code, ctrlKey: false, metaKey: false, altKey: false, ...mods });
+  assert.ok(!/Control/.test(PUSH_TO_TALK_CODE));
+  assert.equal(isPushToTalk(key(PUSH_TO_TALK_CODE)), true);
+  assert.equal(isPushToTalk(key(PUSH_TO_TALK_CODE, { ctrlKey: true })), false);
+  assert.equal(isPushToTalk(key(PUSH_TO_TALK_CODE, { metaKey: true })), false);
+  assert.equal(isPushToTalk(key(PUSH_TO_TALK_CODE, { altKey: true })), false);
+  assert.equal(isPushToTalk(key('ControlLeft', { ctrlKey: true })), false);
+  assert.equal(isPushToTalk(key('KeyA')), false);
+  assert.equal(isPushToTalk(key('F13'), 'F13'), true); // the setting can be changed
+});
+
+test('micErrorText explains blocked mic and network, hides routine ends', () => {
+  assert.equal(micErrorText('no-speech'), null);
+  assert.equal(micErrorText('aborted'), null);
+  assert.match(micErrorText('not-allowed'), /blocked/);
+  assert.match(micErrorText('network'), /internet/);
+});
 
 test('input classifier: paste is whole, machine-fast keys are a burst, human keys are typing', () => {
   const c = makeInputClassifier();

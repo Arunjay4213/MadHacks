@@ -12,6 +12,24 @@ export const PROTOCOL = {
 export const TYPING_IDLE_MS = 1500;
 export const BURST_IDLE_MS = 200;
 
+// Push-to-talk for the live mic: hold this key (a KeyboardEvent.code). Change it here.
+// Never Ctrl or a Ctrl combination: Ctrl is Wispr Flow's hotkey on the demo laptop.
+export const PUSH_TO_TALK_CODE = 'Backquote';
+
+// True for a press of the push-to-talk key with no modifier held, so Ctrl (Wispr Flow),
+// Cmd and Alt shortcuts never start the mic.
+export const isPushToTalk = (e, code = PUSH_TO_TALK_CODE) =>
+  e.code === code && !e.ctrlKey && !e.metaKey && !e.altKey;
+
+// Plain-language text for Chrome speech recognition errors; null for ones not worth showing.
+export function micErrorText(error) {
+  if (error === 'no-speech' || error === 'aborted') return null;
+  if (error === 'not-allowed' || error === 'service-not-allowed') return 'Microphone blocked: allow it for this site in Chrome (lock icon in the address bar).';
+  if (error === 'network') return 'Speech recognition needs the internet (Chrome sends audio to Google). Use the text box or Wispr Flow.';
+  if (error === 'audio-capture') return 'No microphone found.';
+  return `Mic: ${error}`;
+}
+
 export const partialMsg = (text, t = Date.now()) => ({ type: 'partial', text, t_client: t });
 export const finalMsg = (text, t = Date.now()) => ({ type: 'final', text, t_client: t });
 export const tapMsg = (action, id) => (id === undefined ? { type: 'tap', action } : { type: 'tap', action, id });
