@@ -148,6 +148,8 @@ export function makeFrameGate() {
 
 // Delay = page-clock time a frame tagged with chunk >= applies_from_chunk is drawn, minus the
 // command's t_client. Only for t_client values this page sent, so an echo cannot invent a number.
+// The server repeats the most recent command's t_client in every per-chunk message, so each
+// command is measured once: a t_client already pending or already reported is ignored.
 export function makeLatencyTracker(maxSent = 50) {
   const sent = [];
   let pending = null;
@@ -157,14 +159,18 @@ export function makeLatencyTracker(maxSent = 50) {
       if (sent.length > maxSent) sent.shift();
     },
     onServer(m) {
-      if (isNum(m.t_client) && isChunk(m.applies_from_chunk) && sent.includes(m.t_client)) {
-        pending = { t: m.t_client, chunk: m.applies_from_chunk, stamps: m.stamps };
+      if (!isNum(m.t_client) || !isChunk(m.applies_from_chunk) || !sent.includes(m.t_client)) return;
+      if (pending?.t === m.t_client) {
+        pending.stamps = m.stamps; // same command: keep its target chunk, take the newest stamps
+        return;
       }
+      pending = { t: m.t_client, chunk: m.applies_from_chunk, stamps: m.stamps };
     },
     // Returns {ms, stamps} once per correlated command, else null.
     onFrameDrawn(chunk, now = Date.now()) {
       if (!pending || chunk < pending.chunk) return null;
       const r = { ms: Math.round(now - pending.t), stamps: pending.stamps };
+      sent.splice(sent.indexOf(pending.t), 1); // reported: later echoes of it are ignored
       pending = null;
       return r;
     },

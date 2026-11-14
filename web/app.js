@@ -68,6 +68,7 @@ function connectControl() {
   ws.onclose = () => {
     if (control !== ws) return;
     latency.reset(); // a stale command can no longer be correlated
+    el.latency.textContent = '—'; // no number without a measured frame
     setConnected(false);
     setTimeout(connectControl, backoffMs(attempt++));
   };

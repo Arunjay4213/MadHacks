@@ -13,8 +13,8 @@ Open http://localhost:8787 in Chrome (the live mic needs Chrome's speech recogni
 context: localhost works, a plain `http://<ip>` address does not).
 Push-to-talk: hold the Hold-to-talk button or the backtick key.
 
-The fake server is a mock. It loops an ffmpeg test pattern (a grey pixel if ffmpeg is missing;
-`brew install ffmpeg` for a moving picture), spots a dozen keywords, and says `fake: true` in every
+The fake server is a mock. It loops an ffmpeg test pattern (the committed frames in `test-pattern/` if ffmpeg is missing;
+regenerate them with `python tools/make-test-pattern.py`), spots a dozen keywords, and says `fake: true` in every
 message so the page shows the mock banner. Its wire format follows `contracts/README.md`.
 
 To point the page at another server, such as the engine (`python -m engine.server --backend fake --port 8000`),

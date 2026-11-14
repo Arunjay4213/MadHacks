@@ -47,6 +47,7 @@ It sits in `PROTOCOL` in `lib.js` and in `fake-server.mjs`.
 - Delay: shown only if the server echoes a `t_client` this page sent plus `applies_from_chunk`.
   Value = time the first frame tagged with chunk >= `applies_from_chunk` is drawn onto the canvas, minus `t_client`, both on the page clock.
   That is a chunk-tag proxy, not proof the picture visibly changed, and not proof of paint on screen; `#timing` says so. Otherwise `—`.
+  Each command is measured once: the per-chunk echo of the same `t_client` never produces a second (growing) number.
 - Invalid server messages are ignored (error shown with `textContent`); they never throw out of handlers.
 
 ## Checks
