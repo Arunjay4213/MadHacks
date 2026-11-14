@@ -1,56 +1,19 @@
-"""Fast reader: a keyword table, no model. Turns heard text into one operation dict (PLAN.md section 1)."""
+"""Fast reader: rules pick the operation and pace, the embedded dictionary picks the "what" (PLAN.md section 1).
+
+Vocabulary lives in keywords.json (loaded by dictionary.py). Unknown objects after an add verb pass straight
+through into the prompt; negation and transforms stay unmatched for the slow reader.
+"""
 
 import difflib
 import re
+import unicodedata
 
-_SEASON = {
-    "winter": "winter scenery with snow on the ground",
-    "autumn": "autumn scenery with orange and red leaves",
-    "spring": "spring scenery with fresh blossoms",
-    "summer": "bright summer scenery with lush green grass",
-}
-_WEATHER = {
-    "rain": "steady rain falling",
-    "fog": "a thick fog in the air",
-    "storm": "a dark thunderstorm with lightning",
-    "wind": "strong wind blowing through everything",
-}
-_TIME = {
-    "night": "night time under a full moon",
-    "sunset": "a golden sunset sky",
-    "sunrise": "a soft pink sunrise sky",
-    "noon": "harsh midday sunlight",
-}
-_EXTRA = {
-    "river": "a river running through the scene",
-    "fire": "a crackling campfire",
-    "rainbow": "a rainbow across the sky",
-    "lighthouse": "a tall white lighthouse",
-    "flowers": "colorful wildflowers everywhere",
-    "birds": "a flock of birds flying overhead",
-    "mountains": "snow-capped mountains in the distance",
-    "boat": "a small wooden boat",
-    "house": "a small wooden cabin",
-    "deer": "a deer grazing nearby",
-    "fireflies": "glowing fireflies",
-    "lake": "a calm lake reflecting the sky",
-}
-# Spoken word -> canonical label.
-_ALIASES = {
-    "snow": "winter", "snowy": "winter", "wintry": "winter", "fall": "autumn", "leaves": "autumn",
-    "rainy": "rain", "raining": "rain", "foggy": "fog", "mist": "fog", "misty": "fog",
-    "stormy": "storm", "thunder": "storm", "lightning": "storm", "windy": "wind",
-    "nighttime": "night", "dark": "night", "moon": "night", "dusk": "sunset", "dawn": "sunrise",
-    "midday": "noon", "stream": "river", "creek": "river", "campfire": "fire", "flames": "fire",
-    "flower": "flowers", "bird": "birds", "mountain": "mountains", "cabin": "house", "pond": "lake",
-}
+from .dictionary import KEYWORD_RX, KEYWORDS, normalize
 
-KEYWORDS: dict[str, dict] = {}
-for _kind, _table in (("season", _SEASON), ("weather", _WEATHER), ("time", _TIME), ("extra", _EXTRA)):
-    for _label, _phrase in _table.items():
-        KEYWORDS[_label] = {"label": _label, "kind": _kind, "phrase": _phrase}
-for _word, _label in _ALIASES.items():
-    KEYWORDS[_word] = KEYWORDS[_label]
+__all__ = ["KEYWORDS", "MAX_CLAUSES", "RAMP", "is_blocked", "read", "remove_target", "resolve", "split_commands", "spot",
+           "style_fallback"]
+
+MAX_CLAUSES = 16  # callers reject a sentence that splits into more
 
 RAMP = {"default": 4, "slow": 12, "sudden": 1, "confirm": 2}  # chunks; settings until the first real run
 
@@ -63,7 +26,6 @@ def _rx(words):
     return re.compile(r"\b(?:" + "|".join(sorted(map(re.escape, words), key=len, reverse=True)) + r")\b")
 
 
-_KEYWORD_RX = _rx(KEYWORDS)
 _UNDO_RX = _rx(["undo", "go back", "revert", "take that back", "never mind", "nevermind"])
 _RESET_RX = _rx(["reset", "start over", "start again", "clear everything", "clear it all"])
 _REMOVE_RX = _rx(["remove", "no more", "get rid of", "take away", "delete", "without", "stop the", "lose the", "drop the"])
@@ -78,42 +40,127 @@ _LOW_RX = _rx(["a little", "a bit", "slightly", "a touch of", "a hint of", "bare
 _HIGH_RX = _rx(["a lot", "lots of", "much more", "way more", "tons of", "heavy", "heavily", "very", "really", "extremely"])
 _MORE_RX = _rx(["more"])
 _LESS_RX = _rx(["less", "fewer", "weaker", "softer"])
+# Pass-through: "add a lion" -> an extra change named by the spoken noun phrase.
+_ADD_RX = re.compile(r"\b(?:add|put|place|bring|include|build|draw|give me|i want|i'd like)\s+(?:(a|an|some|the|another)\s+)?(.+)")
+_PREP_RX = re.compile(r"\s+\b(?:in|on|at|near|by|over|under|to|with|beside|behind|across|next to|around|above|below)\b\s+")
+_FILLER_TAIL_RX = re.compile(r"(?:\s+\b(?:please|too|as well|now|here|there|for me|in the scene|to the scene)\b)+$")
+_NOT_AN_OBJECT = {"a", "an", "the", "another", "it", "that", "this", "them", "these", "those", "something", "anything", "one", "please", "more", "some"}
+_MAX_LABEL_WORDS = 5
+_ING_NOUNS = {"building", "buildings", "painting", "paintings", "ceiling", "evening", "morning", "string", "wedding", "clothing", "swing", "swings", "ring", "rings", "king", "kings", "wing", "wings", "thing", "things"}
+# Words that never pick a change by themselves: articles, pronouns, colours, sizes and generic nouns.
+_STOP = {
+    "a", "an", "the", "of", "with", "on", "in", "and", "to", "it", "its", "that", "this", "those", "these", "them", "then",
+    "some", "all", "one", "please", "thing", "things", "stuff", "bit", "there", "here", "now", "too", "very", "really",
+    "red", "orange", "yellow", "green", "blue", "purple", "pink", "white", "black", "grey", "gray", "brown", "golden", "gold",
+    "silver", "big", "small", "little", "large", "tall", "short", "huge", "tiny", "soft", "bright", "dark", "strong", "thick",
+    "calm", "harsh", "clear", "steady", "fresh", "lush", "colorful", "colourful", "glowing", "wooden", "stone",
+    "whole", "entire", "everything", "something", "anything", "sky", "air", "ground", "weather", "atmosphere",
+    "mood", "vibe", "feel", "feeling", "look", "effect", "lot", "lots", "scene", "picture", "image", "view", "place", "world",
+}
 
 
 def _norm(text: str) -> str:
-    text = text.lower().replace("’", "'").replace("‘", "'")  # dictation and pastes use curly apostrophes
-    return re.sub(r"[^a-z0-9' -]+", " ", text).strip()
+    return normalize(text)
 
 
 def _pace(t: str):
     return "slow" if _SLOW_RX.search(t) else "sudden" if _SUDDEN_RX.search(t) else None
 
 
+def _pick(t: str):
+    """The keyword match to act on: the first object noun if there is one, else the first match.
+
+    Adjective-like aliases ("bright", "dark", "snowy") name a time or weather change on their own,
+    but in "add a bright red car" or "add dark clouds" the object is what the speaker means.
+    """
+    matches = list(KEYWORD_RX.finditer(t))
+    for m in matches:
+        if KEYWORDS[m.group(0)]["kind"] == "extra":
+            return m
+    return matches[0] if matches else None
+
+
 def resolve(query: str, snapshot: dict):
-    """Change id for a spoken name: exact id, label, alias, phrase word, then close match. Most recent wins."""
+    """Change id for a spoken name. Most recent wins.
+
+    A dictionary noun in the query decides alone: if that change is not in the scene the answer is None,
+    never a guess from adjectives or phrase words ("the red car" must not remove the red autumn leaves).
+    Without one: exact id, free-text label, phrase word (stopwords and colours excluded), then a close
+    match on present labels for words of 4+ letters.
+    """
     changes = snapshot.get("changes", [])
+    if not changes:
+        return None
+    raw = query.strip()
+    for c in reversed(changes):
+        if c["id"] == raw:
+            return c["id"]
     q = _norm(query)
-    words = set(q.split())
-    labels = {KEYWORDS[w]["label"] for w in words if w in KEYWORDS}
-    for test in (
-        lambda c: c["id"] == query.strip(),
-        lambda c: c["label"].lower() == q,
-        lambda c: c["label"].lower() in labels or c["label"].lower() in words,
-        lambda c: words & set(_norm(c["phrase"]).split()) - {"a", "the", "of", "with", "on", "in", "and"},
-    ):
-        hits = [c for c in changes if test(c)]
-        if hits:
-            return hits[-1]["id"]
-    for w in words:
-        close = difflib.get_close_matches(w, [c["label"].lower() for c in changes], n=1, cutoff=0.8)
+    # Present labels as whole phrases, longest first: "dark knight" before the "dark" alias of night.
+    named = [c for c in changes if re.search(r"\b" + re.escape(_norm(c["label"])) + r"\b", q)]
+    if named:
+        longest = max(len(_norm(c["label"])) for c in named)
+        return [c for c in named if len(_norm(c["label"])) == longest][-1]["id"]
+    known = {KEYWORDS[m.group(0)]["label"] for m in KEYWORD_RX.finditer(q)}
+    if known:
+        if _names_unknown_object(q):  # "the dark knight": the alias is an adjective on an absent object
+            return None
+        hits = [c for c in changes if c["label"] in known]
+        return hits[-1]["id"] if hits else None
+    words = {w for w in q.split() if w not in _STOP and len(w) >= 3}
+    hits = [c for c in changes if words & (set(_norm(c["phrase"]).split()) - _STOP)]
+    if hits:
+        return hits[-1]["id"]
+    labels = [_norm(c["label"]) for c in changes]
+    for w in sorted(words):
+        if len(w) < 4:
+            continue
+        close = difflib.get_close_matches(w, labels, n=1, cutoff=0.8)
         if close:
-            return [c for c in changes if c["label"].lower() == close[0]][-1]["id"]
+            return [c for c in changes if _norm(c["label"]) == close[0]][-1]["id"]
     return None
 
 
 def _find(snapshot, label):
     hits = [c for c in snapshot.get("changes", []) if c["label"] == label]
     return hits[-1] if hits else None
+
+
+def _pass_through(t: str):
+    """An add op for an object the dictionary does not know, or None."""
+    m = _ADD_RX.search(t)
+    if not m:
+        return None
+    article, rest = m.group(1), m.group(2)
+    rest = _FILLER_TAIL_RX.sub("", _SLOW_RX.sub(" ", _SUDDEN_RX.sub(" ", rest)))
+    rest = " ".join(rest.split())
+    label = _PREP_RX.split(rest, maxsplit=1)[0].strip()
+    words = label.split()
+    if not KEYWORD_RX.search(label):  # never split a known alias ("early morning")
+        for i, w in enumerate(words[1:], 1):  # "dragon flying over..." -> "dragon"
+            if w.endswith("ing") and len(w) > 4 and w not in _ING_NOUNS:
+                label = " ".join(words[:i])
+                break
+    if not label or label in _NOT_AN_OBJECT or len(label.split()) > _MAX_LABEL_WORDS:
+        return None
+    if not set(label.split()) - _STOP:  # "the whole thing", "something big": no real object named
+        return None
+    phrase = f"{article} {rest}" if article in ("a", "an", "some") else rest
+    return {"op": "add", "label": label, "kind": "extra", "phrase": phrase, "strength": 1.0}
+
+
+def _names_unknown_object(label: str) -> bool:
+    """True when an added object is a real noun the dictionary does not know ("bright unicorn", "lion near the river").
+
+    A known concrete object in it wins ("bright red car" -> car). Otherwise drop alias, pace, strength and
+    stopwords: if a real word is left it is the object ("unicorn"); if not, the alias is the meaning ("a little rain").
+    """
+    if any(KEYWORDS[m.group(0)]["kind"] == "extra" for m in KEYWORD_RX.finditer(label)):
+        return False
+    rest = KEYWORD_RX.sub(" ", label)
+    for rx in (_SLOW_RX, _SUDDEN_RX, _LOW_RX, _HIGH_RX, _MORE_RX, _LESS_RX):
+        rest = rx.sub(" ", rest)
+    return any(w not in _STOP and w not in _NOT_AN_OBJECT for w in rest.split())
 
 
 def read(text: str, snapshot: dict) -> dict:
@@ -132,12 +179,16 @@ def read(text: str, snapshot: dict) -> dict:
     m = _SCENE_RX.search(t)
     if m and m.group(1).strip(" .'"):
         return out({"op": "new_scene", "base": m.group(1).strip(" .'")})
-    kw = _KEYWORD_RX.search(t)
+    kw = _pick(t)
     keyword = kw.group(0) if kw else None
     m = _REMOVE_RX.search(t)
     if m:
         target = resolve(t[m.end():] or t, snapshot)
         return out({"op": "remove", "id": target} if target else None, keyword)
+    added = _pass_through(t)
+    if added and _names_unknown_object(added["label"]):
+        # The object itself is unknown ("a lion near the river"): known words in its location do not replace it.
+        return out(added, added["label"])
     if not kw:
         m = _SHOW_RX.search(t)
         if m and m.group(1).strip(" .'"):
@@ -146,13 +197,14 @@ def read(text: str, snapshot: dict) -> dict:
     entry = KEYWORDS[keyword]
     existing = _find(snapshot, entry["label"])
     current = existing["strength"] if existing else 0.0
-    if _LOW_RX.search(t):
+    rest = t[: kw.start()] + " " + t[kw.end():]  # strength words outside the noun itself ("light house" is not "light")
+    if _LOW_RX.search(rest):
         strength = _STRENGTH_LOW
-    elif _HIGH_RX.search(t):
+    elif _HIGH_RX.search(rest):
         strength = _STRENGTH_HIGH
-    elif _MORE_RX.search(t) and existing:
+    elif _MORE_RX.search(rest) and existing:
         strength = min(_STRENGTH_HIGH, round(current + _STEP, 2))
-    elif _LESS_RX.search(t) and existing:
+    elif _LESS_RX.search(rest) and existing:
         strength = max(_STRENGTH_LOW / 3, round(current - _STEP, 2))
     else:
         strength = 1.0
@@ -161,10 +213,116 @@ def read(text: str, snapshot: dict) -> dict:
     return out({"op": "add", "label": entry["label"], "kind": entry["kind"], "phrase": entry["phrase"], "strength": strength}, keyword)
 
 
+# A clause starts with an explicit action (optionally after "also/then/please/now" and a pace word).
+_LEAD = r"^(?:(?:also|then|please|now|and)\s+)*(?:(?:slowly|gradually|gently|suddenly|instantly|quickly|immediately)\s+)?"
+_ACTION_RX = re.compile(_LEAD + r"(?:add|put|place|bring|include|build|draw|give me|i want|i'd like|let's|lets|let it|remove|delete"
+                        r"|get rid of|take away|drop|lose|no more|make|turn|change|set|switch|show me|take me to|go to|go back"
+                        r"|undo|revert|reset|start over|start again|clear|new scene|never mind|nevermind|take that back"
+                        r"|don't|dont|do not|never|a lot more|much more|more|less|a little more|a little less)\b")
+# Verbs that may be repeated over a list of recognized nouns: "add a dog and a cat".
+_VERB_PREFIX_RX = re.compile(_LEAD + r"(?:add|put|place|bring|include|build|give me|remove|delete|get rid of|take away|no more"
+                             r"|make it|turn it to|turn it|turn to)\b")
+_SOFT_SPLIT_RX = re.compile(r"\s+(?:and then|then|and|also)\s+(?=\S)")
+_ARTICLE_RX = re.compile(r"^(?:(?:a|an|the|some|another)\s+)")
+
+
+def _is_alias_list_item(chunk: str) -> bool:
+    """True if a chunk is nothing but one dictionary alias (after an article): 'a cat', 'the lighthouse', 'night'."""
+    return bool(KEYWORD_RX.fullmatch(_ARTICLE_RX.sub("", chunk)))
+
+
+def split_commands(text: str) -> list[str]:
+    """Split one spoken sentence into normalized clauses, one operation each.
+
+    Hard breaks: ; ! ? always. Soft breaks: commas, "and", "then", "also" only when an explicit action follows,
+    so "black and white" or "rock and roll" stay inside their clause. A list of recognized nouns after one verb
+    repeats that verb: "add a dog and a cat" -> ["add a dog", "add a cat"]. Callers reject > MAX_CLAUSES.
+    """
+    clauses: list[str] = []
+    text = unicodedata.normalize("NFKC", text)  # full-width ；！？ and the ellipsis character become ASCII
+    for segment in re.split(r"[;!?]+", text):
+        pieces = []  # (soft connector before it, normalized text)
+        # Commas and full stops are soft: "Make it... winter", "add a St. Bernard" stay one clause.
+        for i, comma_part in enumerate(re.split(r"[,.]+", segment)):
+            part = re.sub(r"^(?:and then|then|and)\s+", "", _norm(comma_part))  # ", then add ..." / ", and add ..."
+            if not part:
+                continue
+            words = _SOFT_SPLIT_RX.split(part)
+            connectors = _SOFT_SPLIT_RX.findall(part)
+            pieces.append((None if i == 0 or not pieces else " ", words[0]))
+            for conn, w in zip(connectors, words[1:]):
+                pieces.append((" " + conn.strip() + " ", w))
+        current: list[str] = []  # clause texts of this segment
+        verb = None  # repeatable verb prefix of the clause that started the current list
+        for conn, chunk in pieces:
+            if not current:
+                current.append(chunk)
+            elif _ACTION_RX.match(chunk):
+                current.append(chunk)
+            elif verb and current[-1] == verb:  # "make it... winter": the verb had no object yet
+                current[-1] = f"{current[-1]} {chunk}"
+                continue
+            elif verb and _is_alias_list_item(chunk):
+                current.append(f"{verb} {chunk}")
+                continue
+            else:
+                current[-1] = f"{current[-1]}{conn or ' '}{chunk}"
+                continue
+            m = _VERB_PREFIX_RX.match(chunk)
+            verb = m.group(0).strip() if m else None
+        clauses.extend(" ".join(c.split()) for c in current if c.strip())
+    return clauses
+
+
+def remove_target(text: str):
+    """The words after a remove verb ("drop the dog" -> "dog"), or None if the text has no remove intent.
+    Shared with the semantic fallback so a remove can never be read back as an add."""
+    t = _norm(text)
+    m = _REMOVE_RX.search(t)
+    if not m:
+        return None
+    return t[m.end():].strip() or None
+
+
+_STYLE_RX = re.compile(r"^(?:please\s+)?(?:make|turn)\s+(?:it|everything|the scene|the whole scene|the world|the picture)\s+"
+                       r"(?:(?:look|feel|seem)\s+)?(?:more\s+)?(like\s+)?(.+)$")
+_MAX_STYLE_WORDS = 4
+# Praise and comparison words describe no look; "make it nice" stays unmatched (red) instead of guessing.
+_VAGUE = {"nice", "good", "better", "best", "cool", "great", "awesome", "amazing", "different", "interesting", "fun",
+          "okay", "ok", "fine", "bad", "worse", "pretty", "beautiful", "work", "happen", "so", "like that", "that way"}
+
+
+def style_fallback(text: str):
+    """Last resort for a look or mood nothing else understood: "make it spooky" -> an extra change
+    "the whole scene looks spooky". None for negation, transforms, dictionary words and long phrases."""
+    t = _norm(text)
+    if is_blocked(t) or KEYWORD_RX.search(t):
+        return None
+    m = _STYLE_RX.match(t)
+    if not m:
+        return None
+    like, what = m.group(1), _FILLER_TAIL_RX.sub("", m.group(2)).strip()
+    if not what or what in _NOT_AN_OBJECT or len(what.split()) > _MAX_STYLE_WORDS:
+        return None
+    if set(what.split()) <= _VAGUE | _STOP - {"black", "white", "red", "orange", "yellow", "green", "blue", "purple", "pink",
+                                              "grey", "gray", "brown", "golden", "gold", "silver", "dark", "bright"}:
+        return None
+    return {"op": "add", "label": what, "kind": "extra", "phrase": "the whole scene looks " + ("like " if like else "") + what,
+            "strength": 1.0}
+
+
+def is_blocked(text: str) -> bool:
+    """True when read() left the text unmatched ON PURPOSE (negation or a transform it cannot express).
+    A local fallback must not turn these into an add; the slow LLM can interpret transforms."""
+    t = _norm(text)
+    return bool(_NEGATION_RX.search(t) or _TRANSFORM_RX.search(t))
+
+
 def spot(partial_text: str):
-    """The KEYWORDS key in partial text, for early steering. None for undo/reset/remove/negation/transform/new-scene wording: never guessed."""
+    """The KEYWORDS key in partial text, for early steering: whole aliases only, never prefixes or pass-through.
+    None for undo/reset/remove/negation/transform/new-scene wording: never guessed."""
     t = _norm(partial_text)
     if any(rx.search(t) for rx in (_UNDO_RX, _RESET_RX, _REMOVE_RX, _NEGATION_RX, _TRANSFORM_RX, _SCENE_RX)):
         return None
-    m = _KEYWORD_RX.search(t)
+    m = _pick(t)
     return m.group(0) if m else None

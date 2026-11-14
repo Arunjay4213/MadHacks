@@ -2,9 +2,10 @@
 
 import copy
 import threading
+import time
 
 from .composer import compose
-from .reader import KEYWORDS, RAMP, read, spot
+from .reader import KEYWORDS, MAX_CLAUSES, RAMP, read, split_commands, spot, style_fallback
 from .state import SceneState
 
 PROVISIONAL_CAP = 0.4
@@ -112,18 +113,39 @@ class CommandService:
 
     def _final(self, text: str):
         self._heard = text
-        snapshot = self._state.snapshot()
-        r = read(text, snapshot)
-        self._keyword = r["keyword"]
-        changed = None
-        if r["op"] is not None:
-            changed = self._apply(r["op"])
-        elif self._slow_reader is not None:
-            op = self._ask_slow(text, snapshot)
-            if op is not None:
-                changed = self._apply(op)
+        clauses = split_commands(text)
+        if not 1 <= len(clauses) <= MAX_CLAUSES:
+            self._keyword = None
+            self._unmatched = True
+            return self._commit(None, RAMP["default"])
+        trial = copy.deepcopy(self._state)
+        operations = []
+        pace = None
+        self._keyword = None
+        deadline = time.monotonic() + self._slow_timeout
+        for clause in clauses:
+            snapshot = trial.snapshot()
+            result = read(clause, snapshot)
+            pace = result["pace"] or pace
+            self._keyword = result["keyword"] or self._keyword
+            op = result["op"]
+            if op is None:
+                if op is None and self._slow_reader is not None:
+                    op = self._ask_slow(clause, snapshot, max(0, deadline - time.monotonic()))
+                if op is None:
+                    op = style_fallback(clause)  # last resort: "make it spooky" -> a "spooky" look
+            if op is None:
+                operations = []
+                break
+            try:
+                trial.apply(op)
+            except (ValueError, TypeError, KeyError):
+                operations = []
+                break
+            operations.append(op)
+        changed = self._apply(operations[0] if len(operations) == 1 else {"op": "batch", "operations": operations}) if operations else None
         self._unmatched = changed is None
-        return self._commit(changed, RAMP.get(r["pace"] or "default", RAMP["default"]))
+        return self._commit(changed, RAMP.get(pace or "default", RAMP["default"]))
 
     def _apply(self, op):
         """True/False from state.apply, or None if the op was rejected as invalid."""
@@ -143,9 +165,9 @@ class CommandService:
             return self._steer(self._committed, ramp)
         return self._steer(self._committed, RAMP["default"]) if guess_prompt is not None else None
 
-    def _ask_slow(self, text: str, snapshot: dict):
+    def _ask_slow(self, text: str, snapshot: dict, timeout=None):
         """One bounded call to the injected slow reader. At most one in flight; a hung one blocks further calls."""
-        if self._slow_thread is not None and self._slow_thread.is_alive():
+        if timeout == 0 or self._slow_thread is not None and self._slow_thread.is_alive():
             return None
         box = {}
 
@@ -157,6 +179,6 @@ class CommandService:
 
         self._slow_thread = threading.Thread(target=run, daemon=True, name="commands-slow-reader")
         self._slow_thread.start()
-        self._slow_thread.join(self._slow_timeout)
+        self._slow_thread.join(self._slow_timeout if timeout is None else timeout)
         op = box.get("op")
         return op if isinstance(op, dict) else None

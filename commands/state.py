@@ -34,6 +34,21 @@ class SceneState:
         if not isinstance(operation, dict):
             raise ValueError("operation must be an object")
         op = operation.get("op")
+        if op == "batch":
+            operations = operation.get("operations")
+            if (not isinstance(operations, list) or not 1 <= len(operations) <= 16
+                    or any(not isinstance(item, dict) or item.get("op") == "batch" for item in operations)):
+                raise ValueError("batch needs 1 to 16 non-nested operations")
+            trial = deepcopy(self)
+            for item in operations:
+                trial.apply(item)
+            if trial._scene == self._scene:
+                return False
+            self._history.append(self._scene)
+            del self._history[:-100]
+            self._scene = trial._scene
+            self._next_id = trial._next_id
+            return True
         if op == "undo":
             if not self._history:
                 return False
