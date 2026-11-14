@@ -14,8 +14,9 @@ PromptSpec: the engine's stand-in below, or commands.rewriter (SYSTEM_PROMPT, va
 The model's reply, JSON: {"blocked": bool, "operations": [op, ...], "details": str}.
 The validator gets {"details": str} only. Details it rejects keep the operations and use the composed prompt.
 
-Places: with commands.state kind "world" (PR #88), "take me to the desert" is one world change that replaces
-the old world and keeps the other changes; without it, a base edit. Only an explicit "new scene of ..." resets.
+Places: "take me to the desert" is one change of kind world (commands/world.py) that replaces the old world and
+keeps the other changes. Only an explicit "new scene of ..." resets. Season, weather and time adds get the
+keyword table's label and kind ("sunny" is day, of kind time).
 
 Content block: a small word list (BLOCKED_WORDS) is checked first, with no call at all; the model also flags
 sexual, violent or hateful requests with "blocked": true in the same reply.
@@ -115,12 +116,14 @@ FORWARD_MOTION = ("speeding forward, driving away from the camera, the camera fo
                   "lane markings rush toward the viewer")
 
 STANDIN_DETAILS = """The "details" field is the WORLD of the new scene, for the Wan2.1 text-to-video model.
-The engine builds the video prompt as SUBJECT + WORLD + STYLE. SUBJECT is the scene's base sentence and STYLE is
-a fixed style sentence; both are added by the engine, so never repeat, rephrase or contradict the subject, and say
+The engine builds the video prompt as SUBJECT + OBJECTS + WORLD + STYLE. SUBJECT is the scene's base sentence,
+OBJECTS are the phrases of the scene's extra changes (objects, animals, people), word for word, and STYLE is a
+fixed style sentence; all three are added by the engine, so never repeat, rephrase or contradict them, and say
 nothing about the camera, shots, lenses or editing.
 Write WORLD in about 50 words (never more than 60), plain present tense, no lists, no line breaks:
 - First the ground or road of that place, then two or three concrete things on both sides, then the light or sky.
-- Every change the new scene names (objects, animals, weather, season, time of day) must appear in WORLD.
+- The season, weather and time of day of the new scene must appear in WORLD. Objects, animals and people are
+  already in OBJECTS: do not describe them again.
 - A place REPLACES the world. It is never added to the old one: "make it a desert" turns the meadow into a
   desert, and nothing of the old landscape (grass, meadow, fields) is described. The objects and animals of the
   scene stay, now in the new place.
@@ -140,9 +143,11 @@ Examples of WORLD:
 """
 
 
-def standin_validate(prompt: str, reply) -> str | None:
-    """SUBJECT + WORLD + STYLE from the canonical prompt of the new scene and the reply's details; the canonical
-    prompt for empty details; None for details that are not one plain paragraph of at most 80 words."""
+def standin_validate(prompt: str, reply, objects=()) -> str | None:
+    """SUBJECT + OBJECTS + WORLD + STYLE from the canonical prompt of the new scene (SUBJECT is its part before the
+    first ";"), the phrases of its extra changes (`objects`, kept word for word right after SUBJECT so a lion
+    stays the same lion in every later prompt) and the reply's details. The canonical prompt for empty details;
+    None for details that are not one plain paragraph of at most 80 words."""
     details = reply.get("details") if isinstance(reply, dict) else None
     if not isinstance(details, str):
         return None
@@ -152,7 +157,7 @@ def standin_validate(prompt: str, reply) -> str | None:
     if "\n" in details or len(details.split()) > 80:
         return None
     base = prompt.split(";")[0].strip()
-    subject = with_forward_motion(base)
+    subject = ", ".join([with_forward_motion(base), *objects])
     subject = subject[:1].upper() + subject[1:]
     world = details if details.endswith(".") else details + "."
     return f"{subject}, {world} {VEHICLE_STYLE if is_vehicle(base) else STYLE}"
@@ -173,14 +178,35 @@ def with_forward_motion(subject: str) -> str:
 
 @dataclasses.dataclass(frozen=True)
 class PromptSpec:
-    """How the prompt part is asked for and checked. `validate(prompt, reply)` gets the canonical prompt of the
-    new scene and the parsed reply, and gives the text the model sees, or None to reject the reply."""
+    """How the prompt part is asked for and checked. `validate(scene, reply)` gets the snapshot of the new scene
+    and {"details": str}, and gives the text the model sees, or None to reject the details."""
     name: str
     details_instructions: str
-    validate: Callable[[str, dict], str | None]
+    validate: Callable[[dict, dict], str | None]
 
 
-STANDIN = PromptSpec("engine stand-in", STANDIN_DETAILS, standin_validate)
+def _scene_objects(scene: dict) -> list[str]:
+    """The phrases of the scene's extra changes that are on (strength above 0), in the order they were added."""
+    return [c["phrase"] for c in scene["changes"] if c["kind"] == "extra" and c["strength"] > 0]
+
+
+def _standin_spec_validate(scene: dict, reply: dict) -> str | None:
+    from commands.composer import compose
+    return standin_validate(compose(scene), reply, _scene_objects(scene))
+
+
+STANDIN = PromptSpec("engine stand-in", STANDIN_DETAILS, _standin_spec_validate)
+
+
+def rewriter_validate(validate_rewrite: Callable[[str, dict], str | None]) -> Callable[[dict, dict], str | None]:
+    """commands.rewriter.validate_rewrite on the composed prompt of the scene, with FORWARD_MOTION in its subject
+    (the part before the first ";") when that subject is a vehicle that does not say how it moves yet, as the
+    stand-in does. The order of the composed prompt is the commands/ composer's."""
+    def validate(scene: dict, reply: dict) -> str | None:
+        from commands.composer import compose
+        subject, sep, rest = compose(scene).partition(";")
+        return validate_rewrite(with_forward_motion(subject.strip()) + sep + rest, reply)
+    return validate
 
 
 def prompt_spec(import_rules: Callable[[], object] = lambda: importlib.import_module("commands.rewriter")) -> PromptSpec:
@@ -195,26 +221,16 @@ def prompt_spec(import_rules: Callable[[], object] = lambda: importlib.import_mo
     """
     try:
         rules = import_rules()
-        return PromptSpec("commands.rewriter", rules.SYSTEM_PROMPT, rules.validate_rewrite)
+        return PromptSpec("commands.rewriter", rules.SYSTEM_PROMPT, rewriter_validate(rules.validate_rewrite))
     except Exception as exc:  # not there yet, or not the agreed shape
         log.info("final reader: commands.rewriter not usable (%r); using the engine's stand-in prompt", exc)
         return STANDIN
 
 
-class PlaceRule(enum.Enum):
-    """How the model is told to handle a place command ("take me to the desert", "make it a desert")."""
-    WORLD = "world"          # commands.state has kind "world" (PR #88): one singleton world change
-    BASE_EDIT = "base_edit"  # an older commands/ without it: rewrite the base's place, keep the changes
-
-
-_PLACE_RULES = {
-    PlaceRule.WORLD: """- A PLACE or setting ("take me to the desert", "make it a desert", "go to Mars", "switch to a
+_PLACE_RULE = """- A PLACE or setting ("take me to the desert", "make it a desert", "go to Mars", "switch to a
   neon city") is ONE add of kind world: label = the place in 1 to 3 words, phrase = a short description of that
   place. It replaces the old world and KEEPS every other change: a red car added before stays in the desert.
-  Known places, use exactly these labels when one fits: {places}.""",
-    PlaceRule.BASE_EDIT: """- A PLACE or setting ("take me to the desert", "make it a desert") is a base edit: use edit_base
-  with the place of the base sentence rewritten. It KEEPS every change: a red car added before stays.""",
-}
+  Known places, use exactly these labels when one fits: {places}."""
 
 _OPERATIONS = """You read one spoken sentence that edits a video scene, and reply with one JSON object only:
 {{"blocked": <true or false>, "operations": [<operation>, ...], "details": "<text>"}}
@@ -231,8 +247,15 @@ Operations, applied in order (a sentence with several edits gives several operat
 {{"op": "new_scene", "base": "<one sentence describing the whole new scene>"}}
 
 Rules for operations:
-- Write phrases as concrete visual descriptions, under 12 words, for example "a lion standing in the grass".
+- Write phrases as concrete visual descriptions, under 20 words.
+- A new object, animal or person (kind extra) gets explicit size and position words in its phrase that a video
+  model obeys, for example "a large male lion standing in the foreground at the left of the frame, facing the
+  camera". The engine keeps that phrase word for word in every later prompt.
 {place_rule}
+- Seasons, weather and times of day use the keyword table's labels and kinds, so a sentence gives the same
+  change however it is read: label (kind): words that mean it.
+{vocabulary}
+  "sunny" is the time change day: it replaces night. Use one of these labels whenever the words fit.
 - A BASE EDIT turns something the base sentence names into something else and KEEPS every change ("turn the
   tree into a lighthouse"): use edit_base. The engine keeps the changes; never copy them yourself.
 - A NEW SCENE only when the user asks for one in so many words ("new scene of a beach", "start over with a
@@ -248,8 +271,9 @@ hateful content. Otherwise "blocked" is false.
 The user message is JSON: {{"scene": <the scene before the sentence>, "prompt": <its current video prompt>,
 "sentence": <what the user said>}}.
 
-The rules for "details" follow. Where they speak of the scene or the description, that is the NEW scene, after
-your operations. Whatever reply format they name, you reply with the one JSON object above.
+For the "details" field, follow the rules below. Where they speak of the scene or the description, that is the
+NEW scene, after your operations. Any reply format they name is only the shape of that one field: you always
+reply with the one JSON object above, {{"blocked", "operations", "details"}}.
 """
 
 _KIND_HELP = {"world": "world (the place: desert, neon city, Mars, ...)", "season": "season (winter, autumn, ...)",
@@ -257,29 +281,35 @@ _KIND_HELP = {"world": "world (the place: desert, neon city, Mars, ...)", "seaso
               "extra": "extra (any object, animal, person or effect)"}
 
 
-def place_rule() -> PlaceRule:
-    from commands.state import KINDS
-    return PlaceRule.WORLD if "world" in KINDS else PlaceRule.BASE_EDIT
-
-
 def _known_worlds() -> dict:
-    """commands.world.WORLDS (normalized alias -> {"label", "kind", "phrase"}), or {} without PR #88."""
-    try:
-        from commands.world import WORLDS
-        return WORLDS
-    except ImportError:
-        return {}
+    """commands.world.WORLDS: normalized alias -> {"label", "kind", "phrase"}."""
+    from commands.world import WORLDS
+    return WORLDS
+
+
+def _vocabulary() -> dict[str, dict]:
+    """commands.dictionary.KEYWORDS restricted to season, weather and time: normalized alias -> entry."""
+    from commands.dictionary import KEYWORDS
+    return {alias: e for alias, e in KEYWORDS.items() if e["kind"] in ("season", "weather", "time")}
+
+
+def _vocabulary_lines() -> str:
+    words: dict[tuple[str, str], list[str]] = {}
+    for alias, e in _vocabulary().items():
+        words.setdefault((e["label"], e["kind"]), [])
+        if alias != e["label"]:
+            words[(e["label"], e["kind"])].append(alias)
+    return "\n".join(f"  {label} ({kind}): {', '.join(aliases) or label}" for (label, kind), aliases in words.items())
 
 
 def operations_instructions() -> str:
     """The operations part of the system prompt, for the kinds this commands/ has."""
     from commands.state import KINDS
-    rule = place_rule()
     places = ", ".join(sorted({w["label"] for w in _known_worlds().values()})) or "none"
     singletons = [k for k in KINDS if k != "extra"]
     return _OPERATIONS.format(kinds_help=", ".join(_KIND_HELP.get(k, k) for k in KINDS), kinds="|".join(KINDS),
                               singletons=", ".join(singletons[:-1]) + " or " + singletons[-1],
-                              place_rule=_PLACE_RULES[rule].format(places=places))
+                              place_rule=_PLACE_RULE.format(places=places), vocabulary=_vocabulary_lines())
 
 
 # --- the cache file -------------------------------------------------------------------------------------
@@ -554,6 +584,14 @@ class FinalReader:
                      _short(entry.prompt), ms)
         return entry
 
+    def _plain(self, after: dict, canonical: str) -> str:
+        """The spec's prompt with no details (the composed prompt, plus forward motion with commands.rewriter)."""
+        try:
+            prompt = self.spec.validate(after, {"details": ""})
+        except Exception:  # noqa: BLE001 - the composed prompt is always usable
+            prompt = None
+        return prompt if isinstance(prompt, str) and prompt.strip() else canonical
+
     def _check(self, reply, snapshot: dict) -> tuple[Entry, str]:
         if not isinstance(reply, dict):
             return Entry(Outcome.FALLBACK), "not an object"
@@ -576,7 +614,7 @@ class FinalReader:
             return Entry(Outcome.FALLBACK), f"the new scene does not compose: {exc!r}"
         details = reply.get("details")
         try:  # only {"details"}: commands.rewriter.validate_rewrite rejects any other key
-            prompt = self.spec.validate(canonical, {"details": details if isinstance(details, str) else ""})
+            prompt = self.spec.validate(after, {"details": details if isinstance(details, str) else ""})
         except Exception as exc:
             prompt = None
             log.info("final reader: validate raised %r", exc)
@@ -585,7 +623,7 @@ class FinalReader:
             with self._lock:
                 self.details_rejected += 1
             log.info("final reader: details rejected, using the composed prompt: %s", _short(details))
-            prompt = canonical
+            prompt = self._plain(after, canonical)
         return Entry(Outcome.SONNET, tuple(clean), prompt), "ok"
 
 
@@ -619,8 +657,19 @@ def expand_operations(ops: list, snapshot: dict) -> list[dict] | None:
         if clean is None or clean["op"] in ("undo", "reset") or (rebuilt and "id" in clean):
             return None
         rebuilt = rebuilt or clean["op"] == "new_scene"
-        out.append(canonical_world(clean))
+        out.append(canonical_change(canonical_world(clean)))
     return out if len(out) <= BATCH_LIMIT else None
+
+
+def canonical_change(op: dict) -> dict:
+    """An add whose label is a season, weather or time word of the keyword table ("sunny", "snow") gets that
+    table's label and kind (day of kind time, winter of kind season), so it replaces the right earlier change,
+    as the keyword table's edit would. The model's phrase is kept. Other operations are returned as they are."""
+    if op.get("op") != "add" or op.get("kind") == "world":
+        return op
+    from commands.dictionary import normalize
+    entry = _vocabulary().get(normalize(op["label"]))
+    return {**op, "label": entry["label"], "kind": entry["kind"]} if entry else op
 
 
 def canonical_world(op: dict) -> dict:
@@ -628,10 +677,7 @@ def canonical_world(op: dict) -> dict:
     the same change the keyword table makes for that place. Any other operation is returned as it is."""
     if op.get("op") != "add" or op.get("kind") != "world":
         return op
-    try:
-        from commands.dictionary import normalize
-    except ImportError:
-        return op
+    from commands.dictionary import normalize
     known = _known_worlds().get(normalize(op["label"]))
     return {**op, "label": known["label"], "phrase": known["phrase"]} if known else op
 

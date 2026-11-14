@@ -19,7 +19,8 @@ OPS = {
                        "strength": 1.0}],
     "add a lion": [{"op": "add", "label": "lion", "kind": "extra", "phrase": "a lion standing in the snow",
                     "strength": 1.0}],
-    "sunny": [{"op": "add", "label": "sunny", "kind": "weather", "phrase": "bright sunshine", "strength": 1.0}],
+    # "sunny" is the keyword table's time change day: it replaces night
+    "sunny": [{"op": "add", "label": "day", "kind": "time", "phrase": "bright sunshine", "strength": 1.0}],
 }
 
 
@@ -68,7 +69,7 @@ def test_the_draft_script_hits_every_pinned_entry_with_no_call(tmp_path):
         assert out["steer"]["prompt"] == pinned_prompt(sentence)
         assert not out["state"]["unmatched"]
     assert chat.calls == []
-    assert [c["label"] for c in out["state"]["changes"]] == ["winter", "car", "night", "lion", "sunny"]
+    assert [c["label"] for c in out["state"]["changes"]] == ["winter", "car", "lion", "day"]
     stats = r.stats()
     assert (stats["pinned"], stats["pinned_hits"], stats["calls"]) == (5, 5, 0)
     # played a second time after a reset: the same words again
