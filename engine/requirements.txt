@@ -7,7 +7,7 @@ pillow
 starlette>=0.40
 uvicorn[standard]>=0.30
 jsonschema>=4.20
+httpx               # the slow reader's LLM call (engine/slow_reader.py)
 # tests and tools
 pytest
-httpx
 websockets>=13
