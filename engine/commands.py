@@ -12,6 +12,11 @@ Stamps (monotonic clock, reported as integer ms after `heard`):
     embedded   the embedding was ready and the steering Controller applied it (it calls steerer.set_target)
     generated  the first chunk whose get_cond came after set_target finished generating
     shown      the first frame of that chunk was sent on the /frames socket
+A command the reader found no operation for (DROPPED from HEARD) has only `heard`.
+
+The most recent command, whose t_client, stamps and applies_from_chunk contract 4 carries, is the newest one the
+reader read: a final, a tap or a POST /target, with or without an operation, and a partial only when it got a steer.
+A reader rejection or error, and a partial with no steer, do not replace it.
 
 The CommandBook lock is also the lock that orders Controller.handle (and so set_target) against get_cond, so
 "the first get_cond after set_target" is exact. handle is only called under this lock once the embedding is in
@@ -119,7 +124,17 @@ class CommandBook:
             self._move(rec, CommandStage.DECIDED, time.monotonic_ns())
             self._latest = rec
 
+    def no_operation(self, rec: CommandRecord, reason: str) -> None:
+        """The reader read the command and found no operation (an unmatched final, a tap with nothing to do, a reset
+        to the starting prompt). It is still the most recent command, so contract 4 carries its t_client and its
+        stamps, which are only `heard`: nothing was decided, embedded, generated or shown for it."""
+        with self._lock:
+            self._move(rec, CommandStage.DROPPED, time.monotonic_ns(), reason)
+            self._latest = rec
+
     def drop(self, rec: CommandRecord, reason: str) -> None:
+        """Drop a command without making it the most recent one (a reader rejection or error, a partial with no
+        steer, a reset), or drop the most recent one where it stands."""
         with self._lock:
             if rec.stage not in TERMINAL:
                 self._move(rec, CommandStage.DROPPED, time.monotonic_ns(), reason)
@@ -197,7 +212,8 @@ class CommandBook:
     # --- reading -----------------------------------------------------------------------------
 
     def latest_fields(self) -> dict:
-        """The contract 4 fields the engine fills from the most recent command (the newest that got a steer)."""
+        """The contract 4 fields the engine fills from the most recent command: the newest one the reader read
+        (a final, a tap, a partial that got a steer, or a POST /target), with or without an operation."""
         with self._lock:
             rec = self._latest
             if rec is None:
