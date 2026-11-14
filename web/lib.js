@@ -127,6 +127,14 @@ export function splitKeyword(text, keyword) {
 
 export const backoffMs = (attempt) => Math.min(5000, 250 * 2 ** attempt);
 
+// What the words line says around the sentence: a label before it ("hearing…" while you type or speak,
+// "heard" once the server has it) and, for the server's version, what it understood.
+export function wordsLabels({ local, keyword, unmatched }) {
+  if (local) return { label: 'hearing…', understood: '' };
+  if (unmatched) return { label: 'heard', understood: '→ not understood' };
+  return { label: 'heard', understood: keyword ? `→ understood: ${keyword}` : '' };
+}
+
 // How long without a frame, while connected, before the page says the video has paused.
 export const STALL_MS = 2000;
 

@@ -113,6 +113,23 @@ body {
 .words[data-kind="partial"] { color: var(--muted); font-style: italic; }
 .words[data-unmatched="true"] { color: var(--bad); }
 .words mark { background: var(--mark); color: #111; border-radius: 4px; padding: 0 4px; }
+.words-label {
+  font-size: 0.55em;
+  font-style: normal;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-right: 0.6em;
+  vertical-align: middle;
+}
+.words-understood {
+  font-size: 0.6em;
+  font-style: normal;
+  color: var(--muted);
+  margin-left: 0.6em;
+  vertical-align: middle;
+}
+.words[data-unmatched="true"] .words-understood { color: var(--bad); }
 
 /* One chip per active change */
 .chips {
