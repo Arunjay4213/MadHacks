@@ -323,6 +323,10 @@ contract 1 on `/control` -> reader worker thread: `reader.handle` -> `steer` (co
   The engine first encodes `prompt` and `without_prompt` in its encoder service, so `handle` never waits for encoding.
 - A reset tap also resets the engine: RESETTING, `backend.reset()` to clear the frame cache, then `steering.Controller.reset(prompt, strength, without_prompt)` with the reset's `steer` (or the starting prompt if `steer` is None).
   That jumps the steerer to the new target with no ramp, honours a strength pair, and keeps the controller's prompt cache.
+- Commands are ordered against a reset by when they were heard.
+  A command heard before the reset tap is dropped by it.
+  A command heard after it (for example "make it winter" a few ms after Reset) waits on the steer worker until the reset is done (`ResetTicket`, stage `requested` then `done`), then applies to the new video, so it gets its own `applies_from_chunk` and all five stamps.
+  Its `embedded` stamp includes that wait, which is at most about one chunk.
 - The encoder service runs on its own thread with a priority queue, caches embeddings and token ids by exact prompt text (LRU, 512 entries), shares one encoding between identical requests, and logs cache hits, misses and encode ms.
 - The reader's `likely_prompts()` are encoded at startup, and after every command they are queued again at background priority, behind any command's encoding.
   Each new set replaces the background prompts still queued from the last one, because those belong to an older scene.
