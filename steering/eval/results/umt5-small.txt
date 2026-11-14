@@ -1,0 +1,107 @@
+model=google/umt5-small max_length=512 dim=512
+prompts:
+  base                 (20 tok) a wide shot of a meadow with a single oak tree, gentle wind, cinematic
+  winter               (29 tok) a wide shot of a meadow with a single oak tree, gentle wind, cinematic, in deep winter with snow on the ground
+  night                (27 tok) a wide shot of a meadow with a single oak tree, gentle wind, cinematic, at night under a full moon
+  rain                 (24 tok) a wide shot of a meadow with a single oak tree, gentle wind, cinematic, in heavy rain
+  golden               (26 tok) a wide shot of a meadow with a single oak tree, gentle wind, cinematic, at golden hour sunset
+  fog                  (24 tok) a wide shot of a meadow with a single oak tree, gentle wind, cinematic, in thick fog
+  stack                (40 tok) a wide shot of a meadow with a single oak tree, gentle wind, cinematic, in deep winter with snow on the ground, at night under a full moon, in heavy rain
+  stack_minus_middle   (33 tok) a wide shot of a meadow with a single oak tree, gentle wind, cinematic, in deep winter with snow on the ground, in heavy rain
+
+== base -> winter
+  tokens: from=20 to=29 | positions real in both=20, one only=9, padding in both=483
+  angle deg (real in both)  min/med/max: 12.44 / 21.90 / 110.41
+  norm from (real)          min/med/max: 4.47 / 7.83 / 8.67
+  norm to   (real)          min/med/max: 4.62 / 7.87 / 8.69
+  blend path (eps=1e-4): both: 20 spherical/0 linear; one: 0 spherical/9 linear; neither: 0 spherical/483 linear
+  midpoint |blend(a,b,.5)| / mean(|a|,|b|) min/med/max: 1.00 / 1.00 / 1.00
+  midpoint |lerp(a,b,.5)|  / mean(|a|,|b|) min/med/max: 0.60 / 0.98 / 0.99
+
+== base -> night
+  tokens: from=20 to=27 | positions real in both=20, one only=7, padding in both=485
+  angle deg (real in both)  min/med/max: 4.98 / 13.81 / 110.39
+  norm from (real)          min/med/max: 4.47 / 7.83 / 8.67
+  norm to   (real)          min/med/max: 4.42 / 7.90 / 8.80
+  blend path (eps=1e-4): both: 20 spherical/0 linear; one: 0 spherical/7 linear; neither: 0 spherical/485 linear
+  midpoint |blend(a,b,.5)| / mean(|a|,|b|) min/med/max: 1.00 / 1.00 / 1.00
+  midpoint |lerp(a,b,.5)|  / mean(|a|,|b|) min/med/max: 0.60 / 0.99 / 1.00
+
+== base -> rain
+  tokens: from=20 to=24 | positions real in both=20, one only=4, padding in both=488
+  angle deg (real in both)  min/med/max: 5.00 / 12.05 / 109.43
+  norm from (real)          min/med/max: 4.47 / 7.83 / 8.67
+  norm to   (real)          min/med/max: 4.40 / 7.97 / 8.79
+  blend path (eps=1e-4): both: 20 spherical/0 linear; one: 0 spherical/4 linear; neither: 0 spherical/488 linear
+  midpoint |blend(a,b,.5)| / mean(|a|,|b|) min/med/max: 1.00 / 1.00 / 1.00
+  midpoint |lerp(a,b,.5)|  / mean(|a|,|b|) min/med/max: 0.62 / 0.99 / 1.00
+
+== base -> golden
+  tokens: from=20 to=26 | positions real in both=20, one only=6, padding in both=486
+  angle deg (real in both)  min/med/max: 4.98 / 11.97 / 110.32
+  norm from (real)          min/med/max: 4.47 / 7.83 / 8.67
+  norm to   (real)          min/med/max: 4.40 / 7.77 / 8.48
+  blend path (eps=1e-4): both: 20 spherical/0 linear; one: 0 spherical/6 linear; neither: 0 spherical/486 linear
+  midpoint |blend(a,b,.5)| / mean(|a|,|b|) min/med/max: 1.00 / 1.00 / 1.00
+  midpoint |lerp(a,b,.5)|  / mean(|a|,|b|) min/med/max: 0.60 / 0.99 / 1.00
+
+== base -> fog
+  tokens: from=20 to=24 | positions real in both=20, one only=4, padding in both=488
+  angle deg (real in both)  min/med/max: 5.29 / 11.42 / 110.95
+  norm from (real)          min/med/max: 4.47 / 7.83 / 8.67
+  norm to   (real)          min/med/max: 4.39 / 7.85 / 8.56
+  blend path (eps=1e-4): both: 20 spherical/0 linear; one: 0 spherical/4 linear; neither: 0 spherical/488 linear
+  midpoint |blend(a,b,.5)| / mean(|a|,|b|) min/med/max: 1.00 / 1.00 / 1.00
+  midpoint |lerp(a,b,.5)|  / mean(|a|,|b|) min/med/max: 0.60 / 1.00 / 1.00
+
+== stack -> stack_minus_middle
+  tokens: from=40 to=33 | positions real in both=33, one only=7, padding in both=472
+  angle deg (real in both)  min/med/max: 0.69 / 9.34 / 107.90
+  norm from (real)          min/med/max: 4.57 / 8.01 / 9.00
+  norm to   (real)          min/med/max: 4.56 / 7.91 / 8.54
+  blend path (eps=1e-4): both: 33 spherical/0 linear; one: 0 spherical/7 linear; neither: 0 spherical/472 linear
+  midpoint |blend(a,b,.5)| / mean(|a|,|b|) min/med/max: 1.00 / 1.00 / 1.00
+  midpoint |lerp(a,b,.5)|  / mean(|a|,|b|) min/med/max: 0.64 / 1.00 / 1.00
+  token shift (stack -> stack_minus_middle):
+    the 4 tokens after the removed phrase move by 7 positions
+    positions holding the tail in either prompt: 4 real in both (4 with different token ids), 4 paired with padding
+    angle, same position  (what blend mixes) min/med/max: 39.25 / 58.44 / 107.90
+    angle, same word (aligned by offset)     min/med/max: 0.52 / 10.85 / 19.97
+    VERDICT: yes, a per-token blend mixes unrelated words here: 4 tail positions pair different words, and 4 pair a word with zeroed padding (that word fades out at its old position while it fades in at its new one).
+
+== winter -> night
+  tokens: from=29 to=27 | positions real in both=27, one only=2, padding in both=483
+  angle deg (real in both)  min/med/max: 9.09 / 17.83 / 98.34
+  norm from (real)          min/med/max: 4.62 / 7.87 / 8.69
+  norm to   (real)          min/med/max: 4.42 / 7.90 / 8.80
+  blend path (eps=1e-4): both: 27 spherical/0 linear; one: 0 spherical/2 linear; neither: 0 spherical/483 linear
+  midpoint |blend(a,b,.5)| / mean(|a|,|b|) min/med/max: 1.00 / 1.00 / 1.00
+  midpoint |lerp(a,b,.5)|  / mean(|a|,|b|) min/med/max: 0.66 / 0.99 / 1.00
+
+== night -> rain
+  tokens: from=27 to=24 | positions real in both=24, one only=3, padding in both=485
+  angle deg (real in both)  min/med/max: 5.88 / 12.99 / 107.30
+  norm from (real)          min/med/max: 4.42 / 7.90 / 8.80
+  norm to   (real)          min/med/max: 4.40 / 7.97 / 8.79
+  blend path (eps=1e-4): both: 24 spherical/0 linear; one: 0 spherical/3 linear; neither: 0 spherical/485 linear
+  midpoint |blend(a,b,.5)| / mean(|a|,|b|) min/med/max: 1.00 / 1.00 / 1.00
+  midpoint |lerp(a,b,.5)|  / mean(|a|,|b|) min/med/max: 0.64 / 0.99 / 1.00
+
+== rain -> golden
+  tokens: from=24 to=26 | positions real in both=24, one only=2, padding in both=486
+  angle deg (real in both)  min/med/max: 5.66 / 12.54 / 104.85
+  norm from (real)          min/med/max: 4.40 / 7.97 / 8.79
+  norm to   (real)          min/med/max: 4.40 / 7.77 / 8.48
+  blend path (eps=1e-4): both: 24 spherical/0 linear; one: 0 spherical/2 linear; neither: 0 spherical/486 linear
+  midpoint |blend(a,b,.5)| / mean(|a|,|b|) min/med/max: 1.00 / 1.00 / 1.00
+  midpoint |lerp(a,b,.5)|  / mean(|a|,|b|) min/med/max: 0.65 / 0.99 / 1.00
+
+== golden -> fog
+  tokens: from=26 to=24 | positions real in both=24, one only=2, padding in both=486
+  angle deg (real in both)  min/med/max: 2.94 / 11.90 / 104.98
+  norm from (real)          min/med/max: 4.40 / 7.77 / 8.48
+  norm to   (real)          min/med/max: 4.39 / 7.85 / 8.56
+  blend path (eps=1e-4): both: 24 spherical/0 linear; one: 0 spherical/2 linear; neither: 0 spherical/486 linear
+  midpoint |blend(a,b,.5)| / mean(|a|,|b|) min/med/max: 1.00 / 1.00 / 1.00
+  midpoint |lerp(a,b,.5)|  / mean(|a|,|b|) min/med/max: 0.65 / 0.99 / 1.00
+

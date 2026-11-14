@@ -31,6 +31,30 @@ linear fallback for zero or (anti)parallel tokens; w in [0, 1.3]),
 `apply_strength(without, with_change, s)` (same as `blend`, for "a little" /
 "a lot more"), and `ease(r)` (min-jerk pacing curve).
 
+## Controller (contract 2 -> steerer)
+
+```python
+from steering import Controller
+
+ctl = Controller(steerer, encode)          # encode: prompt str -> embedding tensor
+ctl.precompute(keyword_prompts)            # early-steering targets, encoded up front
+ctl.handle({"prompt": p, "ramp_chunks": 4, "provisional": True, "cap": 0.4})
+ctl.handle({"prompt": p, "ramp_chunks": 4})  # final: confirm, or replace a wrong guess
+# -> {"applied": bool, "kind": "provisional"|"confirm"|"final"|None,
+#     "reason": None|"unchanged"|"stale", "cache_hit": bool}
+```
+
+- Embeddings are cached (LRU, `cache_size=64`) by exact prompt string.
+  `cache_size` must be >= the number of precomputed prompts.
+- `encode` runs outside the controller's lock. When messages race, the one
+  whose `handle` started last wins; an older one that finishes later is
+  dropped with `reason: "stale"`.
+- A final message equal to the committed prompt (nothing pending), or a
+  provisional one equal to the committed or pending prompt, is a no-op
+  (`reason: "unchanged"`).
+- Bad messages raise ValueError (a final message must have cap 1.0); on any
+  error nothing changes.
+
 ## Tests
 
 ```
