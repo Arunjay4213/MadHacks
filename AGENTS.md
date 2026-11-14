@@ -91,14 +91,31 @@ It will be split into three separate folders, one owner each, as soon as the ide
 Ani's area is not decided yet.
 Ani asked for frontend first and data + AI second.
 
-## 5. Target track: Databricks
+## 5. Tracks and theme
 
-Decided by the lead on 2026-11-14: we are going for the Databricks track.
-The project must use Databricks services in a way that matters to the product, not as an add-on.
-Good test: if Databricks were removed, the main demo should stop working.
+The main track theme is: go deep into something and do deep research.
+We enter the main track, and we may also enter one sponsor track: Databricks or Qualcomm.
+Entering no sponsor track is also allowed.
 
-We use Databricks Free Edition, and Arunjay's account is already signed up.
-The project idea is not set yet.
+Status on 2026-11-14: the sponsor track and the project idea are both open.
+An earlier note said Databricks was decided. The lead reopened that choice after the theme and the Qualcomm kit were known.
+The candidate ideas are on the board.
+
+Whichever sponsor we pick, its product must do work the demo depends on, not sit beside it as an add-on.
+Good test: if the sponsor's product were removed, the main demo should stop working.
+
+### Qualcomm kit we have
+
+- Arduino UNO Q (a small Linux computer with a Qualcomm chip, plus a microcontroller for sensors)
+- Logitech Brio 105 webcam and a multiport adapter
+- Arduino distance sensor, movement sensor, and thermal sensor
+- USB power brick
+
+There is one board, so only one person can work on the hardware at a time.
+
+### Databricks
+
+If we pick Databricks, we use Databricks Free Edition, and Arunjay's account is already signed up.
 
 ### Free Edition limits that affect design
 
