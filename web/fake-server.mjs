@@ -4,6 +4,7 @@
 // /frames. Every message also says fake: true (an extra field the schemas allow).
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { readdirSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -34,8 +35,12 @@ function makeFrames() {
     }
   }
   if (frames.length) return frames;
-  // No ffmpeg: one 1x1 grey JPEG, so the page and tests still run.
-  return [Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==', 'base64')];
+  // No ffmpeg: the committed moving test pattern (web/tools/make-test-pattern.py writes it).
+  return loadTestPattern();
+}
+
+export function loadTestPattern(dir = join(here, 'test-pattern')) {
+  return readdirSync(dir).filter((f) => f.endsWith('.jpg')).sort().map((f) => readFileSync(join(dir, f)));
 }
 
 export function createState() {

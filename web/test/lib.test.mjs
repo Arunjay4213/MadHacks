@@ -5,6 +5,7 @@ import {
   makeFrameGate, makeLatencyTracker, makeTranscriber, changesKey, commandKey, makeInputClassifier,
   PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
 } from '../lib.js';
+import { loadTestPattern } from '../fake-server.mjs';
 
 test('push-to-talk: the set key alone; never with Ctrl (Wispr Flow), Cmd or Alt; never Ctrl itself', () => {
   const key = (code, mods = {}) => ({ code, ctrlKey: false, metaKey: false, altKey: false, ...mods });
@@ -115,6 +116,35 @@ test('latency is unavailable without correlation, and only for t_client this pag
   l.onServer({ t_client: 1000, applies_from_chunk: 7 });
   l.reset(); // disconnect
   assert.equal(l.onFrameDrawn(8, 2000), null);
+});
+
+test('latency: the per-chunk echo of the same t_client is measured once, never again', () => {
+  const l = makeLatencyTracker();
+  l.sent(1000);
+  // The server repeats the most recent command in every per-chunk message.
+  l.onServer({ t_client: 1000, applies_from_chunk: 5 });
+  l.onServer({ t_client: 1000, applies_from_chunk: 6 }); // a repeat must not move the target chunk
+  assert.deepEqual(l.onFrameDrawn(5, 1400), { ms: 400, stamps: undefined });
+  // 35 s later the same command is still being echoed: no new number (this was the 35578 ms bug).
+  for (let chunk = 6; chunk < 10; chunk++) l.onServer({ t_client: 1000, applies_from_chunk: 5 });
+  assert.equal(l.onFrameDrawn(140, 36578), null);
+  // The next command is measured normally.
+  l.sent(40000);
+  l.onServer({ t_client: 40000, applies_from_chunk: 150 });
+  assert.equal(l.onFrameDrawn(149, 40100), null);
+  assert.deepEqual(l.onFrameDrawn(150, 40300), { ms: 300, stamps: undefined });
+});
+
+test('fake server test pattern: real JPEG frames bigger than one pixel', () => {
+  const frames = loadTestPattern();
+  assert.ok(frames.length >= 16);
+  for (const f of frames) {
+    assert.deepEqual([...f.subarray(0, 2)], [0xff, 0xd8]); // JPEG start-of-image
+    // Find the frame header (SOF0, 0xFFC0) and read the height and width stored in it.
+    const i = f.indexOf(Buffer.from([0xff, 0xc0]));
+    assert.ok(i > 0);
+    assert.ok(f.readUInt16BE(i + 5) > 100 && f.readUInt16BE(i + 7) > 100);
+  }
 });
 
 const R = (transcript, isFinal = false) => ({ transcript, isFinal });
