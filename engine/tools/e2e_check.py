@@ -101,7 +101,7 @@ async def command(client: Client, check: Check, text: str, label: str, labels: l
     if not check.that(msg is not None, f"{label}: a contract 4 message with all five stamps arrived"):
         return None
     s = msg["stamps"]
-    print(f"     stamps ms after heard: " + ", ".join(f"{k} {s[k]}" for k in STAMPS))
+    print("     stamps ms after heard: " + ", ".join(f"{k} {s[k]}" for k in STAMPS))
     check.that([s[k] for k in STAMPS] == sorted(s[k] for k in STAMPS), f"{label}: stamps are in order")
     check.that(s["heard"] == 0 and s["shown"] < 5000, f"{label}: heard is 0 and shown is under 5 s")
     check.that(msg["heard"] == text, f"{label}: heard text echoed")
