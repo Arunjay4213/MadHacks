@@ -129,11 +129,36 @@ export const backoffMs = (attempt) => Math.min(5000, 250 * 2 ** attempt);
 
 // What the words line says around the sentence: a label before it ("hearing…" while you type or speak,
 // "heard" once the server has it) and, for the server's version, what it understood.
-export function wordsLabels({ local, keyword, unmatched }) {
+// `confirmed` is true only for a final this page sent: the server also reports partial text with
+// unmatched false, so a no-keyword "understood" is claimed only after a confirmed final.
+export function wordsLabels({ local, keyword, unmatched, confirmed = false }) {
   if (local) return { label: 'hearing…', understood: '' };
   if (unmatched) return { label: 'heard', understood: '→ not understood' };
-  // No keyword when the AI reader (or another fallback) understood it: still say it was understood.
-  return { label: 'heard', understood: keyword ? `→ understood: ${keyword}` : '→ understood' };
+  if (keyword) return { label: 'heard', understood: `→ understood: ${keyword}` };
+  // No keyword when the AI reader (or another fallback) understood it: say so, but only for a confirmed final.
+  return { label: 'heard', understood: confirmed ? '→ understood' : '' };
+}
+
+// Tells whether the server's "heard" is this page's own partial (still being said or typed), this
+// page's own final (confirmed), or something else (another viewer's command, or the starting state).
+export function makeHeardTracker(max = 50) {
+  let partials = new Set();
+  const finals = [];
+  return {
+    sentPartial(text) {
+      partials.add(text);
+    },
+    sentFinal(text, t) {
+      partials = new Set(); // the sentence is done; its partials no longer count as pending
+      finals.push({ text, t });
+      if (finals.length > max) finals.shift();
+    },
+    classify(heard, tClient) {
+      if (finals.some((f) => f.t === tClient && f.text === heard)) return 'confirmed';
+      if (partials.has(heard)) return 'pending';
+      return 'other';
+    },
+  };
 }
 
 // How long without a frame, while connected, before the page says the video has paused.

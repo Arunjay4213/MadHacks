@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseFrame, parseServerMessage, splitKeyword, backoffMs, isWholeInsert,
   makeFrameGate, makeLatencyTracker, makeTranscriber, changesKey, commandKey, makeInputClassifier,
-  PUSH_TO_TALK_CODE, isPushToTalk, micErrorText, looksUnfinished, finalizeDelay, wordsLabels,
+  PUSH_TO_TALK_CODE, isPushToTalk, micErrorText, looksUnfinished, finalizeDelay, wordsLabels, makeHeardTracker,
 } from '../lib.js';
 import { loadTestPattern } from '../fake-server.mjs';
 import { wsBaseUrl, fitSize, videoNotice, formatStamps, STALL_MS, isResetShortcut } from '../lib.js';
@@ -232,8 +232,21 @@ test('wordsLabels: hearing while local, heard + what was understood once the ser
   assert.deepEqual(wordsLabels({ local: true }), { label: 'hearing…', understood: '' });
   assert.deepEqual(wordsLabels({ keyword: 'car', unmatched: false }), { label: 'heard', understood: '→ understood: car' });
   assert.deepEqual(wordsLabels({ keyword: null, unmatched: true }), { label: 'heard', understood: '→ not understood' });
-  // Understood by the AI reader or another fallback: no keyword, but the scene changed.
-  assert.deepEqual(wordsLabels({ keyword: null, unmatched: false }), { label: 'heard', understood: '→ understood' });
+  // No keyword: claim "understood" only for a confirmed final (the AI reader accepted it), not for
+  // partial text the server also reports with unmatched false.
+  assert.deepEqual(wordsLabels({ keyword: null, unmatched: false, confirmed: true }), { label: 'heard', understood: '→ understood' });
+  assert.deepEqual(wordsLabels({ keyword: null, unmatched: false }), { label: 'heard', understood: '' });
+});
+
+test('heard tracker: own partials are pending, own finals confirmed, anything else other', () => {
+  const h = makeHeardTracker();
+  h.sentPartial('make it');
+  h.sentPartial('make it night');
+  assert.equal(h.classify('make it', 7), 'pending'); // server echoed a partial: not a command yet
+  h.sentFinal('make it night', 8);
+  assert.equal(h.classify('make it night', 8), 'confirmed');
+  assert.equal(h.classify('make it', 7), 'other'); // after the final, old partials are not pending
+  assert.equal(h.classify('add a lion', 99), 'other'); // another viewer's command
 });
 
 const R = (transcript, isFinal = false) => ({ transcript, isFinal });
