@@ -13,7 +13,7 @@ class DictionaryTests(unittest.TestCase):
     def test_every_alias_can_add_and_remove_its_canonical_change(self):
         for alias, entry in KEYWORDS.items():
             with self.subTest(alias=alias):
-                state = SceneState()
+                state = SceneState("an empty scene")
                 result = read(f"please add {alias}", state.snapshot())
                 self.assertIsNotNone(result["op"])
                 self.assertEqual(result["op"]["label"], entry["label"])

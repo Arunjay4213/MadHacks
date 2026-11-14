@@ -9,13 +9,14 @@ import re
 import unicodedata
 
 from .dictionary import KEYWORD_RX, KEYWORDS, normalize
+from .world import WORLDS, world_op
 
 __all__ = ["KEYWORDS", "MAX_CLAUSES", "RAMP", "is_blocked", "read", "remove_target", "resolve", "split_commands", "spot",
            "style_fallback"]
 
 MAX_CLAUSES = 16  # callers reject a sentence that splits into more
 
-RAMP = {"default": 4, "slow": 12, "sudden": 1, "confirm": 2}  # chunks; settings until the first real run
+RAMP = {"default": 1, "slow": 12, "sudden": 1, "confirm": 1, "provisional": 4}  # anchor fires at full target
 
 _STRENGTH_LOW = 0.3
 _STRENGTH_HIGH = 1.3  # "a lot": heavy wording in the composer
@@ -45,6 +46,35 @@ _ADD_RX = re.compile(r"\b(?:add|put|place|bring|include|build|draw|give me|i wan
 _PREP_RX = re.compile(r"\s+\b(?:in|on|at|near|by|over|under|to|with|beside|behind|across|next to|around|above|below)\b\s+")
 _FILLER_TAIL_RX = re.compile(r"(?:\s+\b(?:please|too|as well|now|here|there|for me|in the scene|to the scene)\b)+$")
 _NOT_AN_OBJECT = {"a", "an", "the", "another", "it", "that", "this", "them", "these", "those", "something", "anything", "one", "please", "more", "some"}
+_MOTION_FORMS = {"drive": "driving", "move": "moving", "walk": "walking", "run": "running",
+                 "fly": "flying", "swim": "swimming", "reverse": "reversing", "stop": "stopped"}
+_MOTION_FORMS.update({verb + "s": participle for verb, participle in list(_MOTION_FORMS.items()) if verb != "fly"})
+_MOTION_FORMS["flies"] = "flying"
+_MOTION_RX = re.compile(r"\b(?:driv(?:es?|ing)|mov(?:es?|ing)|walk(?:s|ing)?|run(?:s|ning)?|fly(?:ing)?|flies|swim(?:s|ming)?|revers(?:es?|ing)|stop(?:s|ped)?|parked|standing|sitting)\b")
+
+
+def _motion_tail(text):
+    tail = re.sub(r"^(?:is|are|should be|must be)\s+", "", text.strip())
+    if re.match(r"^(?:near|beside|by|behind|on|at|in front of)\b", tail):
+        motion = _MOTION_RX.search(tail)
+        if motion:
+            return tail[motion.start():]
+    return tail
+
+
+def _additional(phrase, entry, keyword, snapshot):
+    if not any(KEYWORDS[m.group(0)]["label"] == entry["label"]
+               for m in KEYWORD_RX.finditer(normalize(snapshot.get("base", "")))):
+        return phrase
+    # Distinguish a requested addition from an object already present in the base scene.
+    if phrase.startswith(("a ", "an ")):
+        phrase = "a second " + phrase.split(" ", 1)[1]
+    else:
+        phrase = "additional " + phrase
+    position = "alongside" if entry["label"] == "car" else "beside"
+    return f"{phrase}, {position} the existing {keyword}"
+
+_POSITION_RX = re.compile(r"^(?:please\s+)?(?:move|position|reposition)\b")
 _MAX_LABEL_WORDS = 5
 _ING_NOUNS = {"building", "buildings", "painting", "paintings", "ceiling", "evening", "morning", "string", "wedding", "clothing", "swing", "swings", "ring", "rings", "king", "kings", "wing", "wings", "thing", "things"}
 # Words that never pick a change by themselves: articles, pronouns, colours, sizes and generic nouns.
@@ -67,13 +97,29 @@ def _pace(t: str):
     return "slow" if _SLOW_RX.search(t) else "sudden" if _SUDDEN_RX.search(t) else None
 
 
+def strength_for(text, current=0.0):
+    """Shared intensity rules for dictionary, vector and style paths."""
+    if _HIGH_RX.search(text):
+        return _STRENGTH_HIGH
+    if current and _MORE_RX.search(text):
+        return min(_STRENGTH_HIGH, round(current + _STEP, 2))
+    if current and _LESS_RX.search(text):
+        return max(_STRENGTH_LOW / 3, round(current - _STEP, 2))
+    if _LOW_RX.search(text):
+        return _STRENGTH_LOW
+    return 1.0
+
+
 def _pick(t: str):
     """The keyword match to act on: the first object noun if there is one, else the first match.
 
     Adjective-like aliases ("bright", "dark", "snowy") name a time or weather change on their own,
     but in "add a bright red car" or "add dark clouds" the object is what the speaker means.
     """
-    matches = list(KEYWORD_RX.finditer(t))
+    add = _ADD_RX.search(t)
+    end = add.start(2) + len(_PREP_RX.split(add.group(2), maxsplit=1)[0]) if add else len(t)
+    start = add.start(2) if add else 0
+    matches = list(KEYWORD_RX.finditer(t, start, end))
     for m in matches:
         if KEYWORDS[m.group(0)]["kind"] == "extra":
             return m
@@ -97,13 +143,22 @@ def resolve(query: str, snapshot: dict):
             return c["id"]
     q = _norm(query)
     # Present labels as whole phrases, longest first: "dark knight" before the "dark" alias of night.
-    named = [c for c in changes if re.search(r"\b" + re.escape(_norm(c["label"])) + r"\b", q)]
+    aliases = list(KEYWORD_RX.finditer(q))
+    named = []
+    for change in changes:
+        for match in re.finditer(r"\b" + re.escape(_norm(change["label"])) + r"\b", q):
+            if not any(a.start() <= match.start() and match.end() <= a.end()
+                       and KEYWORDS[a.group()]["label"] != change["label"] for a in aliases):
+                named.append(change)
+                break
     if named:
         longest = max(len(_norm(c["label"])) for c in named)
         return [c for c in named if len(_norm(c["label"])) == longest][-1]["id"]
     known = {KEYWORDS[m.group(0)]["label"] for m in KEYWORD_RX.finditer(q)}
+    known |= {entry["label"] for alias, entry in WORLDS.items()
+              if re.search(r"\b" + re.escape(alias) + r"\b", q)}
     if known:
-        if _names_unknown_object(q):  # "the dark knight": the alias is an adjective on an absent object
+        if _names_unknown_object(q) and not any(c["label"] in known and c["kind"] == "world" for c in changes):  # "the dark knight": the alias is an adjective on an absent object
             return None
         hits = [c for c in changes if c["label"] in known]
         return hits[-1]["id"] if hits else None
@@ -170,8 +225,17 @@ def read(text: str, snapshot: dict) -> dict:
     out = lambda op, keyword=None: {"op": op, "keyword": keyword, "pace": pace}  # noqa: E731
     if _NEGATION_RX.search(t) or _TRANSFORM_RX.search(t):
         return out(None)
+    setting = world_op(t)
+    if setting:
+        return out(setting, setting["label"])
+    if _POSITION_RX.search(t):
+        return out(None)
     m = _UNDO_RX.search(t)
     if m:
+        tail = t[m.end():].strip()
+        if m.group(0) == "undo" and tail and tail not in ("it", "that", "please", "that change", "the last change"):
+            target = resolve(tail, snapshot)
+            return out({"op": "remove", "id": target} if target else None, m.group(0))
         return out({"op": "undo"}, m.group(0))
     m = _RESET_RX.search(t)
     if m:
@@ -197,26 +261,68 @@ def read(text: str, snapshot: dict) -> dict:
     entry = KEYWORDS[keyword]
     existing = _find(snapshot, entry["label"])
     current = existing["strength"] if existing else 0.0
+    motion = _MOTION_RX.match(_motion_tail(t[kw.end():]))
+    if (entry["kind"] == "extra" and motion and not _ADD_RX.search(t)
+            and (kw.start() == 0 or _ACTION_RX.match(t) or re.match(r"^(?:now\s+)?the\b", t))):
+        if existing is None:
+            return out(None, keyword)
+        old_phrase = normalize(existing["phrase"])
+        noun = next((m for m in KEYWORD_RX.finditer(old_phrase)
+                     if KEYWORDS[m.group(0)]["label"] == entry["label"]), None)
+        old_motion = _MOTION_RX.search(old_phrase, noun.end() if noun else 0)
+        subject = old_phrase[:old_motion.start()].strip() if old_motion else old_phrase
+        subject = " ".join(_MOTION_RX.sub(" ", subject).split())
+        action = _motion_tail(t[kw.end():])
+        action = _MOTION_FORMS.get(motion.group(0), motion.group(0)) + action[motion.end():]
+        if old_motion:
+            tail = old_phrase[old_motion.end():].strip()
+            location = _PREP_RX.search(" " + tail)
+            split = max(0, location.start()) if location else len(tail)
+            manner, placement = tail[:split], tail[split:].strip()
+            manner = re.sub(r"\b(?:forwards?|backwards?|ahead|in reverse)\b", " ", manner)
+            if re.search(r"\b(?:fast|slow|slowly|quickly|rapidly)\b", action):
+                manner = re.sub(r"\b(?:fast|slow|slowly|quickly|rapidly)\b", " ", manner)
+            if re.search(r"\b(?:towards?|away from)\b", action):
+                manner = re.sub(r"\b(?:towards?|away from)\b.*$", "", manner)
+            if _PREP_RX.search(" " + action):
+                placement = ""
+            action = " ".join((action + " " + manner + " " + placement).split())
+        return out({"op": "add", **entry, "phrase": f"{subject} {action}",
+                    "strength": existing["strength"]}, keyword)
     rest = t[: kw.start()] + " " + t[kw.end():]  # strength words outside the noun itself ("light house" is not "light")
-    if _LOW_RX.search(rest):
-        strength = _STRENGTH_LOW
-    elif _HIGH_RX.search(rest):
-        strength = _STRENGTH_HIGH
-    elif _MORE_RX.search(rest) and existing:
-        strength = min(_STRENGTH_HIGH, round(current + _STEP, 2))
-    elif _LESS_RX.search(rest) and existing:
-        strength = max(_STRENGTH_LOW / 3, round(current - _STEP, 2))
-    else:
-        strength = 1.0
+    add_verb = _ADD_RX.search(t)
+    bare = (entry["kind"] == "extra" and not _ACTION_RX.match(t)
+            and not re.match(r"^(?:what|why|how|when|where|who|can|could|would|should|is|are|do|does)\b", t))
+    description_match = add_verb or (_ADD_RX.search("add " + t) if bare else None)
+    if entry["kind"] == "extra" and description_match:
+        rest = t[:add_verb.start()] if add_verb else ""  # noun descriptions carry attributes, not strength
+        if _MORE_RX.search(description_match.group(2)):
+            rest += " more"
+        elif _LESS_RX.search(description_match.group(2)):
+            rest += " less"
+    strength = strength_for(rest, current)
+    if entry["kind"] == "extra":
+        if description_match:
+            article, description = description_match.groups()
+            description = _FILLER_TAIL_RX.sub("", description).strip()
+            # Bare aliases keep their stable dictionary phrase; explicit visual details survive.
+            detail = KEYWORD_RX.sub(lambda m: " " if KEYWORDS[m.group()]["label"] == entry["label"] else m.group(), description)
+            for rx in (_LOW_RX, _HIGH_RX, _MORE_RX, _LESS_RX):
+                detail = rx.sub(" ", detail)
+            if detail.strip() and detail.strip() not in _NOT_AN_OBJECT:
+                phrase = f"{article} {description}" if article in ("a", "an", "some") else description
+                if existing is None:
+                    phrase = _additional(phrase, entry, keyword, snapshot)
+                return out({"op": "add", **entry, "phrase": phrase, "strength": strength}, keyword)
     if existing:
         return out({"op": "set_strength", "id": existing["id"], "strength": strength}, keyword)
-    return out({"op": "add", "label": entry["label"], "kind": entry["kind"], "phrase": entry["phrase"], "strength": strength}, keyword)
+    return out({"op": "add", "label": entry["label"], "kind": entry["kind"], "phrase": _additional(entry["phrase"], entry, keyword, snapshot) if entry["kind"] == "extra" else entry["phrase"], "strength": strength}, keyword)
 
 
 # A clause starts with an explicit action (optionally after "also/then/please/now" and a pace word).
 _LEAD = r"^(?:(?:also|then|please|now|and)\s+)*(?:(?:slowly|gradually|gently|suddenly|instantly|quickly|immediately)\s+)?"
 _ACTION_RX = re.compile(_LEAD + r"(?:add|put|place|bring|include|build|draw|give me|i want|i'd like|let's|lets|let it|remove|delete"
-                        r"|get rid of|take away|drop|lose|no more|make|turn|change|set|switch|show me|take me to|go to|go back"
+                        r"|get rid of|take away|drop|lose|no more|stop the|without|make|turn|change|set|switch|show me|take me to|go to|go back"
                         r"|undo|revert|reset|start over|start again|clear|new scene|never mind|nevermind|take that back"
                         r"|don't|dont|do not|never|a lot more|much more|more|less|a little more|a little less)\b")
 # Verbs that may be repeated over a list of recognized nouns: "add a dog and a cat".
@@ -302,26 +408,34 @@ def style_fallback(text: str):
     if not m:
         return None
     like, what = m.group(1), _FILLER_TAIL_RX.sub("", m.group(2)).strip()
+    if len(what.split()) > _MAX_STYLE_WORDS:
+        return None
+    strength = strength_for(what)
+    what = " ".join(_HIGH_RX.sub(" ", _LOW_RX.sub(" ", what)).split())
     if not what or what in _NOT_AN_OBJECT or len(what.split()) > _MAX_STYLE_WORDS:
         return None
     if set(what.split()) <= _VAGUE | _STOP - {"black", "white", "red", "orange", "yellow", "green", "blue", "purple", "pink",
                                               "grey", "gray", "brown", "golden", "gold", "silver", "dark", "bright"}:
         return None
     return {"op": "add", "label": what, "kind": "extra", "phrase": "the whole scene looks " + ("like " if like else "") + what,
-            "strength": 1.0}
+            "strength": strength}
 
 
 def is_blocked(text: str) -> bool:
     """True when read() left the text unmatched ON PURPOSE (negation or a transform it cannot express).
     A local fallback must not turn these into an add; the slow LLM can interpret transforms."""
     t = _norm(text)
-    return bool(_NEGATION_RX.search(t) or _TRANSFORM_RX.search(t))
+    kw = _pick(t)
+    motion_edit = kw and KEYWORDS[kw.group(0)]["kind"] == "extra" and _MOTION_RX.match(_motion_tail(t[kw.end():])) and not _ADD_RX.search(t)
+    return bool(_NEGATION_RX.search(t) or _TRANSFORM_RX.search(t) or motion_edit or _POSITION_RX.search(t))
 
 
 def spot(partial_text: str):
     """The KEYWORDS key in partial text, for early steering: whole aliases only, never prefixes or pass-through.
     None for undo/reset/remove/negation/transform/new-scene wording: never guessed."""
     t = _norm(partial_text)
+    if is_blocked(t) or world_op(t):
+        return None
     if any(rx.search(t) for rx in (_UNDO_RX, _RESET_RX, _REMOVE_RX, _NEGATION_RX, _TRANSFORM_RX, _SCENE_RX)):
         return None
     m = _pick(t)
