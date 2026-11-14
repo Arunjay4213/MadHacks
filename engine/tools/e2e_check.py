@@ -175,7 +175,7 @@ async def main_async(args) -> int:
         await command(client, check, f"a snowy winter forest at dusk {time.time():.0f}", "new prompt")
         await asyncio.sleep(1.0)
         print("\n3. second command (the starting prompt again, a cache hit)")
-        await command(client, check, stats_prompt(base_http), "cached prompt", cached=True)
+        await command(client, check, base_prompt(), "cached prompt", cached=True)
 
     print("\n4. contract 4 messages")
     bad = [e for _, m in client.states for e in errors(4, m)]
@@ -217,7 +217,7 @@ def _try_stats(base: str) -> dict | None:
         return None
 
 
-def stats_prompt(_base: str) -> str:
+def base_prompt() -> str:
     # The server's default base prompt; it was encoded at startup, so this command is a cache hit.
     from engine.engine import EngineConfig
     return EngineConfig.base_prompt
