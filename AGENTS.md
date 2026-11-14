@@ -83,12 +83,12 @@ Two agents should never edit the same folder.
 |---|---|---|
 | Core feature, part 1 | `@Arunjay4213` | TODO once the idea is set |
 | Core feature, part 2 | `@Tactacion` | TODO once the idea is set |
+| Core feature, part 3 | `@prateekraouw` | TODO once the idea is set |
 | TODO | `@anirudhaugile` | TODO |
-| TODO | `@prateekraouw` | TODO |
 
-Decided by the lead on 2026-11-14: the core feature, meaning the main thing the demo shows, goes to Arunjay and Ishaan.
-It will be split into two separate folders, one owner each, as soon as the idea is set.
-The areas for Ani and Prateek are not decided yet.
+Updated at Prateek's instruction on 2026-11-14: the core feature, meaning the main thing the demo shows, goes to Arunjay, Ishaan and Prateek.
+It will be split into three separate folders, one owner each, as soon as the idea is set.
+Ani's area is not decided yet.
 Ani asked for frontend first and data + AI second.
 
 ## 5. Target track: Databricks
