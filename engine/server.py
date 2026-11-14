@@ -21,7 +21,7 @@ from starlette.responses import FileResponse, JSONResponse, PlainTextResponse, R
 from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
-from .engine import Engine, EngineConfig
+from .engine import Engine, EngineConfig, reanchor_config
 from .lifecycle import Lifecycle
 from .messages import BadMessage, parse_json
 
@@ -304,6 +304,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--reanchor", default="off", choices=["off", "on"],
                    help="re-anchor the model at steers and at intervals (steering.reanchor policy); needs a backend "
                         "with reanchor(strength)")
+    p.add_argument("--reanchor-opt", action="append", default=[], metavar="KEY=VALUE",
+                   help="a steering.reanchor.ReanchorConfig field, for example refresh_every_chunks=none; repeatable")
     p.add_argument("--studio-dir", default=str(STUDIO), help="Lucid Studio build folder served at /studio/")
     p.add_argument("--record-dir", default="~/recordings",
                    help="folder for the mp4 of every video (one file per reset); none turns the recorder off")
@@ -324,11 +326,21 @@ def main(argv=None) -> None:
         if not sep or not key:
             raise SystemExit(f"--backend-opt expects KEY=VALUE, got {item!r}")
         options[key] = _option_value(value)
+    reanchor_options = {}
+    for item in args.reanchor_opt:
+        key, sep, value = item.partition("=")
+        if not sep or not key:
+            raise SystemExit(f"--reanchor-opt expects KEY=VALUE, got {item!r}")
+        reanchor_options[key] = value  # converted to the field's type by reanchor_config
+    try:
+        reanchor_config(reanchor_options)  # fail here, before anything loads, not in the middle of the stream
+    except ValueError as exc:
+        raise SystemExit(f"--reanchor-opt: {exc}") from None
     config = EngineConfig(backend=args.backend, reader=args.reader, width=args.width, height=args.height, steps=args.steps,
                           device=args.device, decode_device=args.decode_device, backend_options=options,
                           base_prompt=args.base_prompt, jpeg_quality=args.jpeg_quality,
                           precompute_file=args.precompute_file, lead_margin=args.lead_margin,
-                          reanchor=args.reanchor,
+                          reanchor=args.reanchor, reanchor_options=reanchor_options,
                           record_dir=None if args.record_dir.lower() == "none" else args.record_dir,
                           record_max_bytes=int(args.record_max_gb * 1e9))
     app = build_app(config, studio_dir=Path(args.studio_dir))

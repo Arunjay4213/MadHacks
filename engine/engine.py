@@ -20,7 +20,10 @@ prompt (the model stays loaded), then goes back to GENERATING. After `recovery_l
 """
 
 import collections
+import dataclasses
 import enum
+import types
+import typing
 import logging
 import math
 import queue
@@ -36,7 +39,7 @@ import numpy as np
 from PIL import Image
 
 from steering import Controller, Steerer
-from steering.reanchor import Anchor, ReanchorPolicy
+from steering.reanchor import Anchor, ReanchorConfig, ReanchorPolicy
 
 from .backends import load_backend
 from .commands import CommandBook, CommandRecord
@@ -68,10 +71,49 @@ class EngineConfig:
     lead_margin: float = 1.3        # see LeadGate
     summary_every: int = 20         # chunks between rolling summary log lines
     reanchor: str = "off"           # "off" or "on": see ReanchorState
+    reanchor_options: dict = field(default_factory=dict)  # ReanchorConfig fields to change; see reanchor_config
     record_dir: str | None = None   # where every video is saved as mp4; None turns the recorder off
     record_max_bytes: int = DEFAULT_MAX_BYTES  # the oldest recordings are deleted above this total
     recovery_limit: int = 3         # this many crashes within recovery_window_s -> FAILED
     recovery_window_s: float = 60.0
+
+
+def reanchor_config(options: dict) -> ReanchorConfig:
+    """A ReanchorConfig with `options` applied over its defaults. Raises ValueError with a clear message.
+
+    A string value is converted to the field's type: int, float, or int | None (where "none" gives None).
+    Any other value is passed as it is, and ReanchorConfig checks it.
+    """
+    hints = typing.get_type_hints(ReanchorConfig)
+    names = [f.name for f in dataclasses.fields(ReanchorConfig)]
+    values = {}
+    for key, value in options.items():
+        if key not in names:
+            raise ValueError(f"unknown re-anchor option {key!r}; known options: {', '.join(names)}")
+        values[key] = _convert_option(key, value, hints[key]) if isinstance(value, str) else value
+    try:
+        return ReanchorConfig(**values)
+    except ValueError as exc:
+        raise ValueError(f"bad re-anchor option: {exc}") from None
+
+
+def _convert_option(key: str, text: str, hint) -> object:
+    """`text` as the type `hint`: int, float, or an optional (X | None) of one of them."""
+    args = typing.get_args(hint)
+    if typing.get_origin(hint) in (typing.Union, types.UnionType) and type(None) in args:
+        if text.strip().lower() == "none":
+            return None
+        (hint,) = [a for a in args if a is not type(None)]
+    try:
+        return hint(text)
+    except ValueError:
+        raise ValueError(f"re-anchor option {key}={text!r}: expected {getattr(hint, '__name__', hint)}"
+                         + (" or none" if args else "")) from None
+
+
+def reanchor_changes(config: ReanchorConfig) -> dict:
+    """The fields of `config` that differ from ReanchorConfig's defaults."""
+    return {f.name: getattr(config, f.name) for f in dataclasses.fields(config) if getattr(config, f.name) != f.default}
 
 
 class ReanchorState(enum.Enum):
@@ -228,10 +270,10 @@ class Engine:
         self.backend = None
         self.steerer: Steerer | None = None
         self.controller: Controller | None = None
-        self.base_embedding = None
         self.failure: str | None = None
         if config.reanchor not in ("off", "on"):
             raise ValueError(f"reanchor must be 'off' or 'on', got {config.reanchor!r}")
+        self.reanchor_config = reanchor_config(config.reanchor_options)  # checked here, before the backend loads
         self.reanchor_state = ReanchorState.OFF  # set from config.reanchor once the backend is loaded
         self.policy: ReanchorPolicy | None = None  # exists exactly when reanchor_state is ON
         self.on_fatal: Callable[[str], None] | None = None  # called once on FAILED; the server exits the process
@@ -329,9 +371,9 @@ class Engine:
             committed = self.reader.committed_prompt
             self.base_prompt = committed if committed else cfg.base_prompt
             log.info("starting prompt %r (from %s)", self.base_prompt, "the reader" if committed else "--base-prompt")
-            self.base_embedding = self.encoder.encode(self.base_prompt)
+            base_embedding = self.encoder.encode(self.base_prompt)
             self._precompute()
-            self._new_steerer(self.base_embedding)
+            self._new_steerer(base_embedding)
             for target, name in ((self._decode_loop, "decode"), (self._stream_loop, "streamer")):
                 t = threading.Thread(target=target, name=name, daemon=True)
                 self._threads.append(t)
@@ -445,7 +487,7 @@ class Engine:
         self.steerer = Steerer(embedding)
         self.controller = Controller(self.steerer, self.encoder.encode, cache_size=CONTROLLER_CACHE)
         if self.reanchor_state is ReanchorState.ON:
-            self.policy = ReanchorPolicy()
+            self.policy = ReanchorPolicy(self.reanchor_config)
 
     # --- re-anchor -------------------------------------------------------------------------
 
@@ -454,7 +496,8 @@ class Engine:
         if self.config.reanchor == "off":
             return ReanchorState.OFF
         if callable(getattr(self.backend, "reanchor", None)):
-            log.info("re-anchor on: the policy's anchors go to backend.reanchor(strength)")
+            log.info("re-anchor on: the policy's anchors go to backend.reanchor(strength); options %s",
+                     reanchor_changes(self.reanchor_config) or "default")
             return ReanchorState.ON
         log.warning("re-anchor requested but backend %s cannot re-anchor (no reanchor(strength)); running without it",
                     self.config.backend)
@@ -622,9 +665,10 @@ class Engine:
                     jpegs = [encode_jpeg(f, quality) for f in frames]
                     t2 = time.perf_counter()
                     meta.decode_ms, meta.jpeg_ms, meta.frames = (t1 - t0) * 1e3, (t2 - t1) * 1e3, len(jpegs)
-                    log.info("chunk %d: gen %.0f ms, decode %.0f ms, jpeg %.0f ms, %d frames, decode queue %d",
+                    anchor = f", re-anchor {meta.anchor.reason} {meta.anchor.strength:.2f}" if meta.anchor else ""
+                    log.info("chunk %d: gen %.0f ms, decode %.0f ms, jpeg %.0f ms, %d frames, decode queue %d%s",
                              meta.chunk, meta.gen_ms, meta.decode_ms, meta.jpeg_ms, meta.frames,
-                             self._decode_queue.qsize())
+                             self._decode_queue.qsize(), anchor)
                     if not jpegs:
                         log.warning("chunk %d decoded to 0 frames", meta.chunk)
                         self._gate.add(-meta.est_frames)
@@ -849,6 +893,7 @@ class Engine:
                     "last_strength": None if self.last_anchor is None else self.last_anchor.strength,
                     "last_reason": None if self.last_anchor is None else self.last_anchor.reason,
                     "last_chunk": self.last_anchor_chunk,
+                    "config": reanchor_changes(self.reanchor_config),
                 },
                 "video": self.video,
                 "recovery": {"count": self.recoveries, "last": self.last_recovery,
