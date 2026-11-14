@@ -337,11 +337,13 @@ async def run(args, script: Script) -> int:
         enter(Phase.RUNNING)
         sent: list[Sent] = []
         rec.t0 = t0 = time.monotonic()
+        last_t_client = 0
         for step in script.steps:
             delay = t0 + step.at - time.monotonic()
             if delay > 0:
                 await asyncio.sleep(delay)
-            t_client = int(time.time() * 1000)
+            # Strictly increasing, so two steps at the same second never share a t_client (replies are matched by it).
+            t_client = last_t_client = max(int(time.time() * 1000), last_t_client + 1)
             if step.kind is StepKind.RESET:
                 message = {"type": "tap", "action": "reset", "t_client": t_client}
             else:
@@ -371,7 +373,16 @@ async def run(args, script: Script) -> int:
     print((out / "summary.txt").read_text())
     enter(Phase.DONE)
     print(f"  wrote {out}")
-    return 0 if report["frames_received"] else 1
+    if not report["frames_received"]:
+        return 1
+    last_frame = window[-1][0] if window else t0
+    if t_stop - last_frame > FRAMES_STOPPED_S:
+        print(f"  FAILED: no frame in the last {t_stop - last_frame:.1f} s of the run (the /frames connection dropped?)")
+        return 1
+    return 0
+
+
+FRAMES_STOPPED_S = 2.0  # a run fails if the last frame arrived more than this before the end
 
 
 # --- saving ------------------------------------------------------------------------------------------------------
@@ -455,7 +466,10 @@ def summary_text(r: dict) -> str:
 
 
 def font(size: int) -> ImageFont.ImageFont:
-    return ImageFont.load_default(size=size)
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:  # Pillow older than 10.1 has no size argument
+        return ImageFont.load_default()
 
 
 def thumb(path: Path, width: int) -> Image.Image:
