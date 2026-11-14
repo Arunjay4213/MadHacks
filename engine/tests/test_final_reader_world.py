@@ -42,14 +42,17 @@ class FakeChat:
         return self.replies.get(user["sentence"], reply())
 
 
+# Each reply follows the stand-in rule that every change of the new scene appears in its details.
 SONNET = {
     "add a red car": reply([CAR], "a green meadow with soft grass and an oak tree, bright midday sun"),
     "take me to the desert": reply([world("desert", "a sandy desert with dunes")],
-                                   "a long desert highway between sandstone mesas, heat haze, orange sunset sky"),
+                                   "a long desert highway between sandstone mesas with a red car on it, heat haze, "
+                                   "orange sunset sky"),
     "make it a desert": reply([world("desert", "a sandy desert")],
-                              "a long desert highway between sandstone mesas, heat haze, orange sunset sky"),
+                              "a long desert highway between sandstone mesas with a red car on it, heat haze, "
+                              "orange sunset sky"),
     "go to mars": reply([world("mars", "the red surface of mars")],
-                        "a dusty road across red rocks and craters, a pale pink sky"),
+                        "a dusty road across red rocks and craters with a red car on it, a pale pink sky"),
     "new scene of a beach": reply([{"op": "new_scene", "base": "a wide shot of a sandy beach with gentle waves"}],
                                   "warm sand, turquoise water, a clear sky"),
 }
