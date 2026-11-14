@@ -37,7 +37,10 @@ It sits in `PROTOCOL` in `lib.js` and in `fake-server.mjs`.
 - Chips render only from the last valid server `changes`. Clicking never changes chips locally.
 - Commands are sent only while the control socket is open; otherwise they are dropped and the error says so. Nothing is replayed after a reconnect.
 - Text box: paste / drop / replacement / multi-character insert sends one `final` with the whole value and clears the box.
-  Typing sends `partial` per input and `final` on Enter or after 1500 ms idle.
+  Typing sends `partial` per input and `final` on Enter or after 1500 ms idle (`TYPING_IDLE_MS`).
+  Machine-fast keys (4 in a row, each within 30 ms: a tool simulating keystrokes) become final after 200 ms (`BURST_IDLE_MS`).
+  Input during IME composition is ignored until the composed text lands.
+  `?debug=1` logs each input's `inputType` to the console, to check how Wispr Flow inserts on the demo laptop.
 - Speech: interim results send `partial` (only when the text changed). Each final result is sent once, tracked by its index.
   Stopping (mic off or PTT release) flushes leftover interim text as one `final`, once.
 - Frames: each received frame gets a sequence number; after async decode it is drawn only if its sequence number is newer than the last drawn one.
@@ -54,7 +57,7 @@ It sits in `PROTOCOL` in `lib.js` and in `fake-server.mjs`.
 ## Status (PLAN.md "Teammate 2" items)
 
 1. Page against the fake server: done. Text box keeps focus (buttons never take it; blur and window focus refocus).
-2. Text box sends: next.
+2. Text box sends: done (paste at once, simulated keys after 200 ms, typing after 1.5 s; no Enter needed).
 3. Live mic: push-to-talk key becomes one setting, never Ctrl (Wispr Flow's hotkey on the demo laptop).
 4. to 6.: chips and undo on real state, delay and highlight polish, big-screen layout.
 

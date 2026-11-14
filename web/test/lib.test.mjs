@@ -2,8 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseFrame, parseServerMessage, splitKeyword, backoffMs, isWholeInsert,
-  makeFrameGate, makeLatencyTracker, makeTranscriber, changesKey, commandKey,
+  makeFrameGate, makeLatencyTracker, makeTranscriber, changesKey, commandKey, makeInputClassifier,
 } from '../lib.js';
+
+test('input classifier: paste is whole, machine-fast keys are a burst, human keys are typing', () => {
+  const c = makeInputClassifier();
+  assert.equal(c.classify('insertFromPaste', null, 0), 'whole');
+  // Human typing: about 120 ms between keys.
+  assert.deepEqual([0, 120, 240, 360, 480].map((t) => c.classify('insertText', 'x', t)), ['typing', 'typing', 'typing', 'typing', 'typing']);
+  c.reset();
+  // Simulated keys 5 ms apart: a burst once four have arrived.
+  assert.deepEqual([1000, 1005, 1010, 1015, 1020].map((t) => c.classify('insertText', 'x', t)), ['typing', 'typing', 'typing', 'burst', 'burst']);
+  // One slow key ends the burst.
+  assert.equal(c.classify('insertText', 'x', 1500), 'typing');
+});
 
 test('parseFrame reads big-endian chunk, frame index and JPEG bytes; rejects short or non-buffer input', () => {
   const buf = new Uint8Array([0, 0, 1, 2, 0, 3, 0xff, 0xd8]).buffer;
