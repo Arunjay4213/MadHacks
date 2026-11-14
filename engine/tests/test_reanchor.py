@@ -67,13 +67,32 @@ def test_sudden_final_reanchors_once_at_full_strength(engine_on, ramp):
     assert e.backend.reanchor_calls == 1 and e.backend.last_reanchor_strength == 1.0
 
 
-def test_refresh_after_60_idle_chunks(engine_on):
+def test_refresh_after_24_idle_chunks_from_the_clean_anchor(engine_on):
     e = engine_on
     assert wait(lambda: e.stats()["reanchor"]["count"] >= 1, timeout=20)
     r = e.stats()["reanchor"]
-    # The policy is built before chunk 0, so its 60th next_chunk call is chunk 59.
-    assert (r["last_reason"], r["last_strength"], r["last_chunk"]) == ("refresh", 0.25, 59)
-    assert e.backend.reanchor_calls >= 1
+    # The policy is built before chunk 0, so its 24th next_chunk call is chunk 23.
+    assert (r["last_reason"], r["last_strength"], r["last_chunk"]) == ("refresh", 0.5, 23)
+    assert e.backend.reanchor_calls >= 1 and e.backend.last_reanchor_source == "clean"
+
+
+def test_steer_anchor_goes_to_the_backend_from_the_last_latent(engine_on):
+    e = engine_on
+    assert wait(lambda: e.chunk_generated >= 10)
+    rec = e.handle_target(winter(1), time.monotonic_ns())
+    assert wait(lambda: rec.stage is CommandStage.SHOWN)
+    assert wait(lambda: e.stats()["reanchor"]["last_reason"] == "steer")
+    assert e.backend.last_reanchor_source == "last"
+
+
+def test_refresh_source_option_reaches_the_backend():
+    e = start("on", {"refresh_every_chunks": "10", "refresh_source": "last"})
+    try:
+        assert wait(lambda: e.stats()["reanchor"]["count"] >= 1, timeout=20)
+        assert e.stats()["reanchor"]["config"] == {"refresh_every_chunks": 10, "refresh_source": "last"}
+        assert e.backend.last_reanchor_source == "last"
+    finally:
+        e.stop()
 
 
 def test_reset_calls_on_reset(engine_on):
@@ -126,6 +145,7 @@ def test_reanchor_options_convert_to_the_field_types():
     ({"min_gap_chunks": "eight"}, "expected int"),
     ({"refresh_every_chunks": "often"}, "expected int or none"),
     ({"steer_strength": "1.5"}, "steer_strength must be a number in (0, 1]"),
+    ({"refresh_source": "golden"}, "refresh_source must be one of"),
 ])
 def test_bad_reanchor_option_fails(options, message):
     with pytest.raises(ValueError, match=re.escape(message)):

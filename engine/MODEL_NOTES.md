@@ -116,6 +116,50 @@ Counters for logs and tests: `rebases`, `recached_frames`, `auto_rebases`, `last
 With everything off, the calls, the RNG draws and their order are exactly as before (checked by `engine/tests/test_causal_forcing.py` against a recording of the old code).
 The experiment driver is `python -m steering.eval.follow_probe` (see `steering/eval/README.md`).
 
+### Re-anchor and the clean anchor (the periodic refresh)
+
+`reanchor(strength, source="last")` queues `Rebase(keep=0, anchor_step=anchor_step_for_strength(strength))` for the next chunk: a first frame made with an empty frame cache.
+With the 4-step first-frame schedule: strength >= 0.76 gives step 0 (full repaint from noise), 0.51-0.75 step 1, 0.26-0.5 step 2, <= 0.25 step 3.
+
+The backend also keeps a **clean anchor**: the latent of the chunk `clean_anchor_after` (3) chunks after `reset()` or after any rebase that does not start from the clean anchor (a steer re-anchor).
+`reanchor(strength, source="clean")` starts the first frame from the clean anchor noised to the anchor step instead of from the last latent, and keeps the clean anchor as it is.
+If there is no clean anchor yet (the first 3 chunks of a video or of a steer), it falls back to the last latent and changes nothing.
+If the cond is no longer the one the clean anchor was made under (the scene changed with no steer re-anchor: a provisional, or a steer scaled below `min_strength`), the refresh starts from the last latent and works like a steer: the clean anchor is dropped and saved again 3 chunks later. Otherwise the refresh would bring the old scene back.
+`clean_anchor_chunk` says which chunk the current clean anchor came from; `last_rebase.from_clean` says whether the last rebase used it.
+`ReanchorPolicy` sends steers with source "last" and refreshes with `refresh_source` ("clean").
+
+Why: a refresh started from the last latent starts from a picture that has already drifted, so each refresh bakes the damage in (over-contrast, blocky neon grass).
+Measured over 360 chunks with no commands (672x384, 2 steps, taehv, `quick_gold.py` on the GPU box):
+
+| Refresh | Result |
+|---|---|
+| from the last latent, anchor step 1 every 40 chunks | degrades from about chunk 180 |
+| full restart from noise (step 0) every 60 chunks | the scene and colours jump on every restart; unusable |
+| from the clean anchor (saved at chunk 3), step 1 or 2, every 24 or 40 chunks | clean and the same scene for all 360 chunks |
+| from the clean anchor, step 2 every 24 chunks | the steadiest; now the default (`refresh_every_chunks=24`, `refresh_strength=0.5`, `refresh_source="clean"`) |
+
+Checked with this code (real backend + real `ReanchorPolicy` at the defaults, 360 chunks, 672x384, 2 steps, taehv, about 290 ms per chunk on the shared L40S):
+`engine/samples/refresh_clean_anchor.jpg` (meadow and car, no commands) stays the same clean scene for all 360 chunks; mean saturation and RMS contrast per 60 chunks stay flat (meadow 0.30-0.33 / 0.28-0.30, car 0.20-0.23 / 0.26-0.27).
+`engine/samples/refresh_clean_anchor_steer.jpg` (meadow, "deep winter" steer sent at chunk 60, anchor at chunk 63): the clean anchor is saved again at chunk 66 and every later refresh stays winter; nothing pulls back to summer.
+Still open: **the refresh chunk itself is visibly bad**, a washed-out, ghosted frame with horizontal streaks, for one chunk (0.25 s), slightly soft on the next, clean on the one after, every 24 chunks (6 s).
+The mean absolute change from the last frame of the previous chunk is 23-28 (0-255) on refresh chunks against 7-9 on other chunks.
+`quick_gold.py` never sampled a refresh chunk, so it did not show this. A steer re-anchor (step 0) has the same one-chunk glitch.
+
+**Fixed by restarting the decoder on a first frame.** A keep-0 rebase makes a first-frame latent, which the VAE decodes as 1 frame with a fresh decoder state, but the streaming decoder kept the old scene's context (TAEHV: the last 3 latents; Wan: the feature cache) and decoded it as a 4-frame continuation.
+`ChunkLatents.start` is now `ChunkStart.FIRST_FRAME` on the first chunk of a video and on every keep-0 rebase (every re-anchor), else `CONTINUE`.
+On `FIRST_FRAME` mid-video the decoder restarts its stream state exactly as for a new video (same "drop the first 3 frames" rule, so 1 frame) but keeps `video_id` and the chunk count, so the engine's ordering does not change. Rebases with keep >= 1 make continuation latents and do not restart the decoder.
+Backend option `first_frame_pad` (`--backend-opt first_frame_pad=...`): `hold` (default) repeats that 1 clean frame to the usual 4 frames, so every chunk still has 4 frames; `none` emits the true 1 frame, as the first chunk of a video already does. Switch to `none` once the streamer handles short chunks.
+Measured on the meadow, 360 chunks, refresh every 24 at step 2, mean over the refreshes (sharpness = variance of the Laplacian; change = mean absolute difference, 0-255, between a chunk's first frame and the previous chunk's last frame):
+
+| Chunk | sharpness before | sharpness after | change before | change after |
+|---|---|---|---|---|
+| refresh - 1 | 2049 | 2049 | 6.4 | 6.4 |
+| refresh | 498 | 1871 | 23.6 | 32.8 |
+| refresh + 1 | 1448 | 2046 | 38.8 | 7.8 |
+| refresh + 2 | 1598 | 2074 | 14.7 | 6.7 |
+
+The refresh chunk is now as sharp as its neighbours and not washed out. What remains is one cut: the change on the refresh chunk (about 33) is the jump to the clean anchor's composition, and on the car the trees and road jump back to the saved layout every refresh.
+
 ## Using the backend from a plain Python script
 
 Run from `~/madhacks` with `~/engine-venv` active:

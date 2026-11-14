@@ -572,7 +572,7 @@ class Engine:
         if self.config.reanchor == "off":
             return ReanchorState.OFF
         if callable(getattr(self.backend, "reanchor", None)):
-            log.info("re-anchor on: the policy's anchors go to backend.reanchor(strength); options %s",
+            log.info("re-anchor on: the policy's anchors go to backend.reanchor(strength, source); options %s",
                      reanchor_changes(self.reanchor_config) or "default")
             return ReanchorState.ON
         log.warning("re-anchor requested but backend %s cannot re-anchor (no reanchor(strength)); running without it",
@@ -582,7 +582,7 @@ class Engine:
     def _generate(self, cond, anchor: Anchor | None):
         """The one backend call per chunk. `anchor` is None unless reanchor_state is ON."""
         if anchor is not None:
-            self.backend.reanchor(anchor.strength)  # takes effect on this generate_chunk
+            self.backend.reanchor(anchor.strength, source=anchor.source)  # takes effect on this generate_chunk
         return self.backend.generate_chunk(cond)
 
     def _take_cond(self) -> tuple[object, float, Anchor | None]:
@@ -642,8 +642,8 @@ class Engine:
                     self.reanchors += 1
                     self.last_anchor, self.last_anchor_chunk = anchor, chunk
             if anchor is not None:
-                log.info("chunk %d: re-anchor %s at strength %.2f (progress %.2f)", chunk, anchor.reason,
-                         anchor.strength, progress)
+                log.info("chunk %d: re-anchor %s at strength %.2f from %s (progress %.2f)", chunk, anchor.reason,
+                         anchor.strength, anchor.source, progress)
             est = backend.frames_per_chunk
             self._gate.add(est)
             meta = ChunkMeta(chunk=chunk, progress=progress, gen_ms=gen_ms, est_frames=est, anchor=anchor,

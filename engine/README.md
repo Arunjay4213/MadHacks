@@ -171,6 +171,7 @@ Press Reset (or send the reset tap) to start a clean video.
 Steering works with `--reanchor on`: Gate 2 passed live after PR #57, with full winter about 2 s after "make it winter" (`engine/samples/gate2_live_make_it_winter_pass.jpg`).
 The policy's periodic refresh (every 60 chunks at strength 0.25) visibly breaks the picture on the refresh chunk (`engine/samples/refresh_breaks_picture.jpg`).
 The live engine therefore runs with the refresh off: `--reanchor-opt refresh_every_chunks=none`.
+Now the refresh starts from the clean anchor (every 24 chunks, strength 0.5): no long-run drift over 360 chunks, but a one-chunk glitch on every refresh chunk remains (`engine/samples/refresh_clean_anchor.jpg`, MODEL_NOTES.md).
 
 ## Command line
 
@@ -285,7 +286,7 @@ With `--reanchor off`, the default, no policy exists and every chunk is exactly 
 - `on_target(msg, result)` runs right after every `Controller.handle`, in `Engine._apply_target`, under the CommandBook lock.
 - `next_chunk(progress, is_moving)` runs once per chunk in `Engine._take_cond`, under the same lock and right after `get_cond`.
 - `on_reset()` runs on every reset, right after `Controller.reset`.
-- `Engine._generate(cond, anchor)` is the one backend call: with an anchor it calls `backend.reanchor(strength)` and then `backend.generate_chunk(cond)`.
+- `Engine._generate(cond, anchor)` is the one backend call: with an anchor it calls `backend.reanchor(strength, source=anchor.source)` and then `backend.generate_chunk(cond)`.
 - The state is an enum, `ReanchorState`: `off`, `on`, or `unsupported` when `--reanchor on` is given but the backend has no `reanchor(strength)` (logged once at load, then the engine runs as with `off`).
 - The real backend (`causal_forcing`) has `reanchor(strength)` since PR #52, so it reports `on`.
   It cuts the frame cache and starts the next chunk from the last picture noised by an amount set by the strength.
