@@ -99,14 +99,14 @@ def _pace(t: str):
 
 def strength_for(text, current=0.0):
     """Shared intensity rules for dictionary, vector and style paths."""
-    if _LOW_RX.search(text):
-        return _STRENGTH_LOW
     if _HIGH_RX.search(text):
         return _STRENGTH_HIGH
     if current and _MORE_RX.search(text):
         return min(_STRENGTH_HIGH, round(current + _STEP, 2))
     if current and _LESS_RX.search(text):
         return max(_STRENGTH_LOW / 3, round(current - _STEP, 2))
+    if _LOW_RX.search(text):
+        return _STRENGTH_LOW
     return 1.0
 
 
@@ -230,6 +230,10 @@ def read(text: str, snapshot: dict) -> dict:
         return out(setting, setting["label"])
     m = _UNDO_RX.search(t)
     if m:
+        tail = t[m.end():].strip()
+        if m.group(0) == "undo" and tail and tail not in ("it", "that", "please", "that change", "the last change"):
+            target = resolve(tail, snapshot)
+            return out({"op": "remove", "id": target} if target else None, m.group(0))
         return out({"op": "undo"}, m.group(0))
     m = _RESET_RX.search(t)
     if m:
