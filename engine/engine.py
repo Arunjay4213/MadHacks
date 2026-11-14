@@ -266,40 +266,52 @@ class PrefetchPacer:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self.state = PrefetchState.HELD
+        self._state = PrefetchState.HELD
         self._saved_ms = 0.0
+
+    @property
+    def state(self) -> PrefetchState:
+        with self._lock:
+            return self._state
 
     def hold(self) -> None:
         """A command arrived: hold background encodes until it is shown."""
         with self._lock:
-            self.state = PrefetchState.HELD
+            self._state = PrefetchState.HELD
             self._saved_ms = 0.0
 
-    def chunk_done(self, idle_ms: float, in_flight: bool, cost_ms: float | None) -> bool:
-        """Generation thread, after each chunk. Returns True when the state became READY."""
+    def chunk_done(self, idle_ms: float, in_flight: Callable[[], bool], cost_ms: float | None) -> bool:
+        """Generation thread, after each chunk. Returns True when the state became READY.
+
+        `in_flight` (CommandBook.in_flight) is called under this pacer's lock, not read by the caller beforehand.
+        A command thread calls hold() before it records its command, so a hold either lands before this call
+        (and in_flight() then sees the command) or waits for the lock and lands after it (and wins). Reading
+        in_flight outside the lock let a hold land between the read and this call, and the stale False then
+        moved HELD back to SAVING or READY, so a background encode could start while the command was in flight.
+        """
         with self._lock:
-            if in_flight:
-                self.state = PrefetchState.HELD
+            if in_flight():
+                self._state = PrefetchState.HELD
                 self._saved_ms = 0.0
                 return False
-            if self.state is PrefetchState.HELD:
-                self.state = PrefetchState.SAVING
-            if self.state is PrefetchState.READY:
+            if self._state is PrefetchState.HELD:
+                self._state = PrefetchState.SAVING
+            if self._state is PrefetchState.READY:
                 return False  # one turn at a time; it waits for the encoder
             self._saved_ms += idle_ms
             cost = self.DEFAULT_COST_MS if cost_ms is None else cost_ms
             if self._saved_ms < cost:
                 return False
             self._saved_ms -= cost
-            self.state = PrefetchState.READY
+            self._state = PrefetchState.READY
             return True
 
     def take(self) -> bool:
         """Encoder thread, before a background encode: True (and back to SAVING) when it may start now."""
         with self._lock:
-            if self.state is not PrefetchState.READY:
+            if self._state is not PrefetchState.READY:
                 return False
-            self.state = PrefetchState.SAVING
+            self._state = PrefetchState.SAVING
             return True
 
 
@@ -662,7 +674,7 @@ class Engine:
             latents = self._generate(cond, anchor)
             gen_ms = (time.perf_counter() - t0) * 1e3
             self.book.chunk_generated(chunk)
-            if self.prefetch.chunk_done(idle_ms, self.book.in_flight(), self.encoder.work_ms):
+            if self.prefetch.chunk_done(idle_ms, self.book.in_flight, self.encoder.work_ms):
                 self.encoder.wake()
             with self._stats_lock:
                 self.gen_ms.add(gen_ms)
