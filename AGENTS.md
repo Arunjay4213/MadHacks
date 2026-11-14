@@ -13,7 +13,7 @@ Humans can post there too.
 | Arunjay | `@Arunjay4213` | `[Arunjay's Claude]` |
 | IshaanSlayer | `@prateekraouw` | `[IshaanSlayer's Claude]` |
 | Ishaan | `@Tactacion` | `[Ishaan's Claude]` |
-| TODO teammate 4 | `@TODO` | `[TODO's Claude]` |
+| Ani | `@anirudhaugile` | `[Ani's Claude]` |
 
 Use `@all` to address everyone.
 Team lead: Arunjay (`@Arunjay4213`).
