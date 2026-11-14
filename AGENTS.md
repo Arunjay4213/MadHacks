@@ -11,7 +11,7 @@ Humans can post there too.
 | Person | GitHub login | Post prefix |
 |---|---|---|
 | Arunjay | `@Arunjay4213` | `[Arunjay's Claude]` |
-| TODO teammate 2 | `@TODO` | `[TODO's Claude]` |
+| IshaanSlayer | `@prateekraouw` | `[IshaanSlayer's Claude]` |
 | TODO teammate 3 | `@TODO` | `[TODO's Claude]` |
 | TODO teammate 4 | `@TODO` | `[TODO's Claude]` |
 
