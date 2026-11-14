@@ -132,3 +132,46 @@ python3 -m venv ../.venv-steering
 ```
 
 Run from the repo root.
+
+## Re-anchor policy (`steering/reanchor.py`)
+
+Moving the embedding is not enough on the real model: it keeps copying the
+frames it already made (ask for winter and snow falls on a green meadow). A
+**re-anchor** makes the backend drop its memory of old frames and regenerate
+the next frame from a noised copy of the last one under the current
+conditioning. Strength is in (0, 1]: 1 keeps only the rough layout, small
+keeps almost everything. It breaks motion a little, so it must be rare.
+`ReanchorPolicy` decides when and how hard; it has no model code.
+
+| Case | Anchor |
+|---|---|
+| Result not applied (stale, unchanged) | nothing; a pending steer is kept |
+| `final` / `confirm`, `ramp_chunks <= sudden_max_ramp` (2) | `sudden_strength` (1.0) once |
+| `final` / `confirm`, ramp 3 to 9 | `steer_strength` (0.85) once |
+| `final` / `confirm`, `ramp_chunks >= slow_min_ramp` (10) | `slow_anchors` (3) x `slow_strength` (0.5) at progress i/(n+1) |
+| message `strength` s | strength x min(s, 1) |
+| `provisional` | `provisional_strength` (0, so never) x min(cap, 1) |
+| scaled strength < `min_strength` (0.05) | nothing, and it cancels a pending steer |
+| single anchor timing | first chunk with progress >= `fire_at_progress` (0.5) |
+| newer applied target before it fires | replaces it (latest wins) |
+| ramp ended before a threshold | fires on the next allowed chunk |
+| any two anchors | at least `min_gap_chunks` (8) apart; a blocked steer waits, thresholds due together fire once |
+| idle (not moving, nothing pending) for `refresh_every_chunks` (60) | `refresh_strength` (0.25), reason "refresh" |
+| `on_reset()` (new video) | drops pending; gap and refresh count from the reset |
+
+All numbers are **untuned guesses** awaiting real-model clips. With the default
+gap of 8, a slow ramp shorter than about 32 chunks gets 2 anchors, not 3.
+
+```python
+from steering.reanchor import ReanchorPolicy
+policy = ReanchorPolicy()                      # ReanchorConfig(...) to tune
+
+# control thread
+result = controller.handle(msg); policy.on_target(msg, result)
+# generation thread, once per chunk
+cond = steerer.get_cond(); a = policy.next_chunk(steerer.progress, steerer.is_moving)
+if a: backend.reanchor(a.strength)             # takes effect on this chunk
+latents = backend.generate_chunk(cond)
+# new video
+controller.reset(prompt); policy.on_reset()
+```
