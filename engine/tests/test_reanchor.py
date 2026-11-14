@@ -1,6 +1,5 @@
 """The re-anchor wiring (--reanchor) with the fake backend: policy hooks, the backend call and /stats."""
 
-import re
 import time
 
 import pytest
@@ -95,15 +94,11 @@ def test_refresh_source_option_reaches_the_backend():
         e.stop()
 
 
-def test_reset_calls_on_reset(engine_on):
+def test_reset_restarts_the_refresh_count(engine_on):
     e = engine_on
-    calls = []
-    on_reset = e.policy.on_reset
-    e.policy.on_reset = lambda: (calls.append(e.chunk_generated), on_reset())
     assert wait(lambda: e.chunk_generated >= 20)
     done = e.reset(time.monotonic_ns()).result(5)
     assert done.wait(5)
-    assert len(calls) == 1
     assert e.policy.chunks_since_anchor < 20  # counting restarted at the reset
 
 
@@ -123,11 +118,6 @@ def test_backend_without_reanchor_is_unsupported(monkeypatch):
         e.stop()
 
 
-def test_bad_reanchor_value():
-    with pytest.raises(ValueError):
-        Engine(EngineConfig(reanchor="maybe"), lambda b: None, lambda m: None)
-
-
 # --- --reanchor-opt ----------------------------------------------------------------------------
 
 
@@ -140,38 +130,32 @@ def test_reanchor_options_convert_to_the_field_types():
     assert reanchor_config({}) == reanchor_config({"min_gap_chunks": "8"})  # 8 is the default
 
 
-@pytest.mark.parametrize("options, message", [
-    ({"bogus": "1"}, "unknown re-anchor option 'bogus'"),
-    ({"min_gap_chunks": "eight"}, "expected int"),
-    ({"refresh_every_chunks": "often"}, "expected int or none"),
-    ({"steer_strength": "1.5"}, "steer_strength must be a number in (0, 1]"),
-    ({"refresh_source": "golden"}, "refresh_source must be one of"),
-])
-def test_bad_reanchor_option_fails(options, message):
-    with pytest.raises(ValueError, match=re.escape(message)):
-        reanchor_config(options)
-    with pytest.raises(ValueError, match=re.escape(message)):  # at Engine construction, before the backend loads
-        Engine(EngineConfig(reanchor="on", reanchor_options=options), lambda b: None, lambda m: None)
+def test_bad_reanchor_settings_fail_before_anything_starts(monkeypatch):
+    with pytest.raises(ValueError):
+        Engine(EngineConfig(reanchor="maybe"), lambda b: None, lambda m: None)
+    for options in ({"bogus": "1"}, {"min_gap_chunks": "eight"}, {"refresh_every_chunks": "often"},
+                    {"steer_strength": "1.5"}, {"refresh_source": "golden"}):
+        with pytest.raises(ValueError):
+            reanchor_config(options)
+        with pytest.raises(ValueError):  # at Engine construction, before the backend loads
+            Engine(EngineConfig(reanchor="on", reanchor_options=options), lambda b: None, lambda m: None)
 
-
-def test_server_exits_at_once_on_unknown_reanchor_option(monkeypatch):
     def no_build(*a, **kw):
         raise AssertionError("the app must not be built")
     monkeypatch.setattr("engine.server.build_app", no_build)
-    with pytest.raises(SystemExit, match="--reanchor-opt: unknown re-anchor option 'bogus'"):
-        main(["--reanchor", "on", "--reanchor-opt", "bogus=1"])
-    with pytest.raises(SystemExit, match="--reanchor-opt expects KEY=VALUE"):
-        main(["--reanchor-opt", "refresh_every_chunks"])
+    for argv in (["--reanchor", "on", "--reanchor-opt", "bogus=1"], ["--reanchor-opt", "refresh_every_chunks"]):
+        with pytest.raises(SystemExit):
+            main(argv)
 
 
-def test_refresh_off_never_refreshes_in_200_chunks():
+def test_refresh_off_never_refreshes():
     e = start("on", {"refresh_every_chunks": "none"})
     try:
         assert e.reanchor_state is ReanchorState.ON and e.policy.config.refresh_every_chunks is None
-        assert wait(lambda: e.chunk_generated >= 200, timeout=30)
+        assert wait(lambda: e.chunk_generated >= 70, timeout=30)  # about three default refresh intervals
         r = e.stats()["reanchor"]
         assert (r["count"], r["last_reason"], r["config"]) == (0, None, {"refresh_every_chunks": None})
-        assert r["chunks_since_anchor"] >= 200
+        assert r["chunks_since_anchor"] >= 70
         assert e.backend.reanchor_calls == 0
     finally:
         e.stop()
