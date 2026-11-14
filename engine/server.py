@@ -315,6 +315,9 @@ def parse_args(argv=None) -> argparse.Namespace:
                    help="JSON file of the Sonnet results, kept across restarts; none keeps them in memory only")
     p.add_argument("--short-chunk", default=EngineConfig.short_chunk, choices=[m.value for m in ShortChunkMode],
                    help="how a chunk with fewer than frames_per_chunk frames (after a rebase) is padded before playout")
+    p.add_argument("--demo-prompts", default=EngineConfig.demo_prompts, metavar="PATH",
+                   help="JSON file of pinned final reader results for the demo sentences (never regenerated); "
+                        "none turns it off")
     p.add_argument("--studio-dir", default=str(STUDIO), help="Lucid Studio build folder served at /studio/")
     p.add_argument("--record-dir", default="~/recordings",
                    help="folder for the mp4 of every video (one file per reset); none turns the recorder off")
@@ -353,6 +356,7 @@ def main(argv=None) -> None:
                           final_reader=args.final_reader, final_timeout_s=args.final_timeout_s,
                           final_cache=None if args.final_cache.lower() == "none" else args.final_cache,
                           short_chunk=args.short_chunk,
+                          demo_prompts=None if args.demo_prompts.lower() == "none" else args.demo_prompts,
                           record_dir=None if args.record_dir.lower() == "none" else args.record_dir,
                           record_max_bytes=int(args.record_max_gb * 1e9))
     app = build_app(config, studio_dir=Path(args.studio_dir))

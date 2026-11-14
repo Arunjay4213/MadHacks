@@ -48,6 +48,7 @@ from .backends import load_backend
 from .commands import CommandBook, CommandRecord
 from .encoder import EncoderService
 from .final_reader import DEFAULT_CACHE_FILE as FINAL_CACHE_FILE
+from .final_reader import DEFAULT_DEMO_PROMPTS
 from .final_reader import DEFAULT_TIMEOUT_S as FINAL_TIMEOUT_S
 from .final_reader import FinalReader
 from .final_reader import load as load_final_reader
@@ -82,6 +83,7 @@ class EngineConfig:
     final_reader: str = "off"       # "off" or "sonnet": one Sonnet call per final sentence (final_reader.py)
     final_timeout_s: float = FINAL_TIMEOUT_S  # how long a final waits for Sonnet before the dictionary result
     final_cache: str | None = FINAL_CACHE_FILE  # Sonnet results kept across restarts; None: in memory only
+    demo_prompts: str | None = DEFAULT_DEMO_PROMPTS  # pinned final reader results; None: none
     record_dir: str | None = None   # where every video is saved as mp4; None turns the recorder off
     record_max_bytes: int = DEFAULT_MAX_BYTES  # the oldest recordings are deleted above this total
     recovery_limit: int = 3         # this many crashes within recovery_window_s -> FAILED
@@ -355,7 +357,7 @@ class Engine:
         self.publish_frame = publish_frame
         self.publish_control = publish_control
         self.final_reader = final_reader if final_reader is not None else load_final_reader(
-            config.final_reader, config.final_timeout_s, config.final_cache)
+            config.final_reader, config.final_timeout_s, config.final_cache, demo_prompts=config.demo_prompts)
         # An injected reader (tests) does not use the final reader; load_reader marks it UNAVAILABLE if it cannot.
         self.reader = reader if reader is not None else load_reader(config.reader, self.final_reader)
         self.base_prompt: str | None = None
