@@ -5,41 +5,31 @@ did not work in rehearsal; replace bracketed measurements with real results.
 
 ## Pitch
 
-This builds on Training-Free Interactive World Models and its published method of
-blending prompt conditioning during generation, using a pretrained video model.
-We credit that model and method before describing what our team added.
+A video that never stops generating and changes within a fraction of a second
+when you speak.
 
-We are building a generated world that responds to spoken changes. A command like
-“make it winter” changes the target scene. “Also add a river” keeps winter and adds
-a river. The user can remove a specific change, undo an operation, and control
-the transition's pace and descriptive strength.
+You say "make it winter" and it snows. You say "also add a river" and a river
+appears while the snow stays. You say "remove the river" and only the river goes.
 
-Our command layer tracks a base scene, named changes and undo history. A fast
-keyword reader handles common commands; an optional injected language-model reader
-handles other requests. Partial speech can propose a capped change without
-committing it. Revised speech or an unmatched final rolls that guess back.
+Nothing is trained. All of it happens while the model is running.
 
-The video model and the idea of smoothly blending text conditioning are reused.
-Our work connects explicit scene operations, reversible state and partial-speech
-handling to the team's interruptible steering and live interface. No model is
-trained by this command subsystem.
+Your changes stay on screen as named chips. Undo takes you back a step. Say
+"slowly" to ease into a change, or "a little" to keep it subtle. The video keeps
+moving while you shape the scene.
 
 ## Three slides: content
 
-1. **Building on Training-Free Interactive World Models.** Credit its published
-   blending method and the exact upstream pretrained model first. Then show winter → winter + river → winter + river
+1. **Speak, and the video changes.** Show winter → winter + river → winter + river
    + night. Use captured demo images only once those changes work visibly.
 2. **Words to state to pixels.** Text/mic → keyword or slow reader → reversible
    scene state → deterministic prompt → steerer → engine → browser. Mark the
-   inherited model and blending method, and highlight the team's added modules.
+   video model and highlight the command, state and steering modules.
 3. **What we measured and what remains.** Report [actual GPU], [resolution/FPS],
    [command-to-frame proxy], [visible switch behavior], and [failure cases]. List
    typed and voice results separately. CPU unit tests are not GPU benchmarks.
 
 ## Submission outline
 
-- **Credit first:** this project builds on Training-Free Interactive World Models'
-  conditioning-blend method and the pretrained model named in our final engine configuration.
 - **Inspiration:** interactive visual storytelling controlled by speech.
 - **What it does:** include only features demonstrated on the final integrated system.
 - **How we built it:** Python command/state layer, the team's steering and engine,
@@ -50,17 +40,17 @@ trained by this command subsystem.
 - **Limitations:** keyword vocabulary, optional slow-reader setup, semantic edits
   that disturb other content, and actual latency/failure results.
 
-## Credits and provenance
+## Internal preparation notes
 
 - The team's architecture, gates and role split are in the root `PLAN.md` and
   `AGENTS.md`; accepted messages are in `contracts/`.
-- The root plan credits [Training-Free Interactive World Models](https://hrdlabs.org/research/interactive-world-models/)
-  for the conditioning-blend method. Attribute that method in the spoken pitch
-  and submission. Check the source's claims before quoting its timings or prizes.
+- Prior-project comparisons in the root plan are research references, not pitch copy.
 - The engine team selects and verifies the upstream model, code and weight
   licenses. Copy their final exact model identifiers and source links here before
   submitting. Do not copy unlicensed SPED project files into this repository.
-- Do not claim the first real-time video generator/editor. Do not quote inherited
+- Check "within a fraction of a second" against our end-to-end measurements before
+  presenting it as an achieved result. The pitch above is the intended experience.
+- Do not claim the first real-time video generator/editor or use another project's
   latency numbers as our measurements.
 
 No submission or external publication has been made by these drafts.

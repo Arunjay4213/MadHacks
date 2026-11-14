@@ -42,3 +42,17 @@ python3 -m unittest discover -s commands/tests -t .   # from the repo root
 
 `tests/fixtures/phrases.json` holds the phrase cases (format in `PLAN.md`); `test_phrases.py` runs them through the reader.
 If `jsonschema` is installed, every contract-2 message the service produces is also checked against `contracts/`.
+
+## Integrated engine check
+
+With the engine's verification dependencies installed, start the CPU fake backend
+in one terminal and run the command scenarios in another:
+
+```sh
+python -m engine.server --backend fake --reader commands --port 8000
+python -m commands.check_engine --url http://127.0.0.1:8000
+```
+
+The check resets the session, sends partial/final text and taps over the real
+websockets, checks stacking/removal/undo/rollback, and validates the streamed state.
+It does not measure real-model semantic quality or microphone latency.

@@ -17,7 +17,6 @@ the same model, settings and machine used for judging.
 
 | Time | Command / action | Check before saying it works |
 |---|---|---|
-| Before the run | “We build on Training-Free Interactive World Models' published blending method and a pretrained video model.” | Name the upstream model used by the final engine; then explain our added state, commands and interruptible controls. |
 | 0:00 | Start at the meadow | Moving video is coming from the real engine; show mock status if using a mock. |
 | 0:15 | “Make it winter.” | Winter appears without a cut; a winter chip appears. |
 | 0:30 | “Also add a river.” | River appears and winter stays. |
@@ -27,7 +26,7 @@ the same model, settings and machine used for judging.
 | 1:20 | “Go back.” | River returns: undo also reverses a removal. |
 | 1:30 | Let someone outside the team speak | Unknown commands either reach the configured slow reader or are shown as unmatched. |
 | 2:15 | Try “make it winter” on the live mic | Early steering is provisional; only describe it as faster after measuring it. |
-| 2:30 | Show credits and explain our contribution | Name the reused model and method before describing our command/state work. |
+| 2:30 | “Nothing is trained. All of it happens while the model is running.” | Explain how commands, named changes and undo let the audience shape a continuous video. |
 | 2:50 | Return to the live video | Do not describe a backup recording as live. |
 
 Use the text field for a Wispr Flow command only after checking its actual paste
