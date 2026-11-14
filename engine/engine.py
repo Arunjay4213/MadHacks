@@ -44,6 +44,10 @@ from steering.reanchor import Anchor, ReanchorConfig, ReanchorPolicy
 from .backends import load_backend
 from .commands import CommandBook, CommandRecord
 from .encoder import EncoderService
+from .final_reader import DEFAULT_CACHE_FILE as FINAL_CACHE_FILE
+from .final_reader import DEFAULT_TIMEOUT_S as FINAL_TIMEOUT_S
+from .final_reader import FinalReader
+from .final_reader import load as load_final_reader
 from .framing import pack_frame
 from .lifecycle import Lifecycle, LifecycleMachine
 from .messages import BadMessage, check
@@ -72,6 +76,9 @@ class EngineConfig:
     summary_every: int = 20         # chunks between rolling summary log lines
     reanchor: str = "off"           # "off" or "on": see ReanchorState
     reanchor_options: dict = field(default_factory=dict)  # ReanchorConfig fields to change; see reanchor_config
+    final_reader: str = "off"       # "off" or "sonnet": one Sonnet call per final sentence (final_reader.py)
+    final_timeout_s: float = FINAL_TIMEOUT_S  # how long a final waits for Sonnet before the dictionary result
+    final_cache: str | None = FINAL_CACHE_FILE  # Sonnet results kept across restarts; None: in memory only
     record_dir: str | None = None   # where every video is saved as mp4; None turns the recorder off
     record_max_bytes: int = DEFAULT_MAX_BYTES  # the oldest recordings are deleted above this total
     recovery_limit: int = 3         # this many crashes within recovery_window_s -> FAILED
@@ -258,11 +265,14 @@ def _round(v: float | None) -> float | None:
 
 class Engine:
     def __init__(self, config: EngineConfig, publish_frame: Callable[[bytes], None],
-                 publish_control: Callable[[dict], None], reader=None) -> None:
+                 publish_control: Callable[[dict], None], reader=None, final_reader: FinalReader | None = None) -> None:
         self.config = config
         self.publish_frame = publish_frame
         self.publish_control = publish_control
-        self.reader = reader if reader is not None else load_reader(config.reader)
+        self.final_reader = final_reader if final_reader is not None else load_final_reader(
+            config.final_reader, config.final_timeout_s, config.final_cache)
+        # An injected reader (tests) does not use the final reader; load_reader marks it UNAVAILABLE if it cannot.
+        self.reader = reader if reader is not None else load_reader(config.reader, self.final_reader)
         self.base_prompt: str | None = None
         self.lifecycle = LifecycleMachine()
         self.book = CommandBook()
@@ -335,6 +345,7 @@ class Engine:
         self._steer_pool.shutdown(wait=False, cancel_futures=True)
         if self.encoder:
             self.encoder.stop()
+        self.final_reader.stop()
         self.recorder.stop()
         if self.lifecycle.state is not Lifecycle.STOPPED:
             self.lifecycle.transition(Lifecycle.STOPPED, "shutdown")
@@ -907,6 +918,7 @@ class Engine:
             out["encoder"] = {"cache_size": self.encoder.cache_size, "pending": self.encoder.pending, "hits": self.encoder.hits,
                               "misses": self.encoder.misses, "last_encode_ms": _round(self.encoder.last_encode_ms),
                               "prefetch": self.prefetch.state.value}
+        out["final_reader"] = self.final_reader.stats()
         out["recorder"] = self.recorder.stats()
         out["clients"] = self.client_counts()
         return out
