@@ -98,6 +98,17 @@ All on one origin; the message shapes are in `contracts/README.md`.
 | `POST /reset` | Same as a `{"type":"tap","action":"reset"}` on `/control`: goes through the reader, then starts a new video; returns when done. |
 | `GET /stats` | JSON: lifecycle state, backend, reader, last generated and shown chunk, last and average generation, decode and JPEG ms, measured fps, queue depths, encoder cache and pending encodes, clients. |
 | `GET /healthz` | 200 with the state, or 503 when FAILED or STOPPED. |
+| `GET /app/` | The demo page from `web/` (see "The demo page at /app/"). |
+
+## The demo page at /app/
+
+The server also serves the demo page from the repo's `web/` folder at `/app/`, so the page and the engine share one origin.
+On the https tunnel, `https://<address>/app/` gives the live mic with no extra setup, because the page connects to `/control` and `/frames` on the host it was loaded from when there is no `?server=`.
+Only four files are served, from an explicit allow-list: `index.html` (at `/app/`), `style.css`, `app.js` and `lib.js`.
+Every other path under `/app/` returns 404, including the rest of `web/` (`node_modules/`, `fake-server.mjs`, `test/`, `tools/`, `test-pattern/`, `package*.json`) and any path traversal.
+`/app` redirects to `/app/` and keeps the query string.
+The files are read from disk on each request with `Cache-Control: no-cache`, so an rsync of `web/` takes effect without a restart.
+If `web/` is missing, `/app/` returns a 404 that says so, and the rest of the server works as usual.
 
 ## Backend interface
 

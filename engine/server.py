@@ -16,7 +16,7 @@ from pathlib import Path
 import uvicorn
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import FileResponse, JSONResponse
+from starlette.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
@@ -26,6 +26,17 @@ from .messages import BadMessage, parse_json
 
 log = logging.getLogger("engine.server")
 STATIC = Path(__file__).resolve().parent / "static"
+WEB = Path(__file__).resolve().parent.parent / "web"
+
+# The demo page in web/ served under /app/. Only these four files; the rest of web/ (node_modules, the fake
+# server, tests, tools, package files) is never served. Read from disk on each request so a sync of web/
+# takes effect without a restart.
+APP_FILES = {
+    "index.html": "text/html",
+    "style.css": "text/css",
+    "app.js": "text/javascript",
+    "lib.js": "text/javascript",
+}
 
 FRAME_CLIENT_QUEUE = 8     # frames buffered per /frames client before that client drops frames
 CONTROL_CLIENT_QUEUE = 64  # messages buffered per /control client before that client drops messages
@@ -89,7 +100,7 @@ async def _serve(ws: WebSocket, q: asyncio.Queue, send, on_receive) -> None:
                 await t
 
 
-def build_app(config: EngineConfig) -> Starlette:
+def build_app(config: EngineConfig, web_dir: Path = WEB) -> Starlette:
     hub = Hub()
     engine = Engine(config, hub.publish_frame, hub.publish_control)
     engine.client_counts = hub.counts
@@ -144,6 +155,22 @@ def build_app(config: EngineConfig) -> Starlette:
     async def index(_request: Request):
         return FileResponse(STATIC / "index.html")
 
+    async def app_redirect(request: Request):
+        query = request.url.query
+        return RedirectResponse("/app/" + (f"?{query}" if query else ""))
+
+    def app_file(request: Request):  # sync: Starlette runs it in a worker thread, so the disk read never blocks the loop
+        name = request.path_params["name"] or "index.html"
+        if name not in APP_FILES:
+            return PlainTextResponse("not found", status_code=404)
+        if not web_dir.is_dir():
+            return PlainTextResponse(f"the demo page is not on this machine: {web_dir} is missing", status_code=404)
+        try:
+            body = (web_dir / name).read_bytes()
+        except FileNotFoundError:
+            return PlainTextResponse(f"web/{name} is missing on this machine", status_code=404)
+        return Response(body, media_type=APP_FILES[name], headers={"Cache-Control": "no-cache"})
+
     async def stats(_request: Request):
         return JSONResponse(engine.stats())
 
@@ -184,6 +211,8 @@ def build_app(config: EngineConfig) -> Starlette:
     app = Starlette(
         routes=[
             Route("/", index),
+            Route("/app", app_redirect),
+            Route("/app/{name:path}", app_file),
             Route("/stats", stats),
             Route("/healthz", healthz),
             Route("/reset", reset, methods=["POST"]),
