@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/4-server-to-page",
+  "title": "Contract 4: server to page",
+  "description": "Current state and delay stamps, one message per chunk, sent as JSON text on the /control websocket when the chunk's first frame is sent.",
+  "type": "object",
+  "required": ["chunk", "changes", "progress", "stamps", "t_client", "applies_from_chunk", "heard", "keyword", "unmatched"],
+  "properties": {
+    "chunk": {"type": "integer", "minimum": 0},
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "strength"],
+        "properties": {
+          "id": {"type": "string"},
+          "label": {"type": "string"},
+          "strength": {"type": "number"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "progress": {"type": "number", "minimum": 0, "maximum": 1},
+    "stamps": {
+      "type": "object",
+      "description": "Integer ms after heard, for the most recent command. A field appears once it is known; {} before the first command.",
+      "properties": {
+        "heard": {"type": "integer", "minimum": 0},
+        "decided": {"type": "integer", "minimum": 0},
+        "embedded": {"type": "integer", "minimum": 0},
+        "generated": {"type": "integer", "minimum": 0},
+        "shown": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": true
+    },
+    "t_client": {"type": ["integer", "null"], "description": "Echo of the most recent command's t_client; null if none."},
+    "applies_from_chunk": {"type": ["integer", "null"], "minimum": 0, "description": "First chunk generated with the most recent command's target; null until known."},
+    "heard": {"type": ["string", "null"], "description": "Text of the most recent command; null if none."},
+    "keyword": {"type": ["string", "null"], "description": "Key word to highlight in heard; null if none."},
+    "unmatched": {"type": "boolean", "description": "True when no operation was found for the most recent command."}
+  },
+  "additionalProperties": true
+}

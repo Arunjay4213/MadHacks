@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/2-command-to-steerer",
+  "title": "Contract 2: command reader to steerer",
+  "description": "A target prompt and a ramp length. provisional is true for an early-steering guess; cap is how far the move may go before it is confirmed.",
+  "type": "object",
+  "required": ["prompt", "ramp_chunks", "provisional", "cap"],
+  "properties": {
+    "prompt": {"type": "string", "minLength": 1},
+    "ramp_chunks": {"type": "integer", "minimum": 1},
+    "provisional": {"type": "boolean"},
+    "cap": {"type": "number", "exclusiveMinimum": 0, "maximum": 1}
+  },
+  "additionalProperties": true
+}

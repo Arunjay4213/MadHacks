@@ -1,0 +1,11 @@
+{
+  "chunk": 412,
+  "changes": [{"id": "c1", "label": "winter", "strength": 1.0}],
+  "progress": 0.5,
+  "stamps": {"heard": 0, "decided": 4, "embedded": 61, "generated": 790, "shown": 1010},
+  "t_client": 1731612345890,
+  "applies_from_chunk": 410,
+  "heard": "make it winter",
+  "keyword": "winter",
+  "unmatched": false
+}

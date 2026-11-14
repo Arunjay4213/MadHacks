@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/1-page-to-server",
+  "title": "Contract 1: page to server",
+  "description": "Heard text (partial or final) or a tap on the page. Sent as JSON text on the /control websocket.",
+  "type": "object",
+  "required": ["type"],
+  "properties": {
+    "type": {"enum": ["partial", "final", "tap"]},
+    "text": {"type": "string"},
+    "t_client": {"type": "integer", "description": "Client clock, ms since the Unix epoch. Required for partial and final, optional for tap."},
+    "action": {"enum": ["remove", "undo", "reset"]},
+    "id": {"type": "string", "minLength": 1, "description": "The change to remove. Required when action is remove."}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"type": {"enum": ["partial", "final"]}}, "required": ["type"]},
+      "then": {"required": ["text", "t_client"]}
+    },
+    {
+      "if": {"properties": {"type": {"const": "tap"}}, "required": ["type"]},
+      "then": {"required": ["action"]}
+    },
+    {
+      "if": {"properties": {"type": {"const": "tap"}, "action": {"const": "remove"}}, "required": ["type", "action"]},
+      "then": {"required": ["id"]}
+    }
+  ],
+  "additionalProperties": true
+}
