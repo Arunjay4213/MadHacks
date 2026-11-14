@@ -46,7 +46,26 @@ Stack: React 18, TypeScript, Vite, Three/R3F/drei, Framer Motion, Lenis, Tailwin
 
 Replace full-screen scroll takeover with a preserved hero and natural scroll into
 a contained editor. Show original prompt and server-authoritative scene memory,
-with a fixed bottom-right voice agent. Use one WebGL renderer, a first-frame hero
+with a reserved bottom-right rail dock. Use one WebGL renderer, a first-frame hero
 poster, localized FFT updates, lazy GPU components and the 700k procedural pixel
 budget. Browser-check the revised editor and keep production asset base `./` for
 the engine owner's `/studio/` route.
+
+## Authorized resume, 2026-11-14
+
+Prateek lifted the pause and explicitly authorized completing this design and
+merging #40. Resume in the managed worktree; modify only `lucid-studio/`.
+
+- [x] Input parity: regress leftover speech flush, whole insert/burst classification,
+  shortcut modifiers; update input hook, both text inputs, voice dock and App.
+- [x] Engine parity: regress optional strengths, heard/keyword/kind/fake/stamps,
+  invalid payloads, URL aliases, stall states and one-shot latency. Update stream
+  hook and keyed server words; disable mutations while disconnected.
+- [x] QA: reproduce shader failures on a fresh browser; desktop/mobile contained
+  layout, denied mic, restart, IME/Wispr, cleanup and local CPU fake engine.
+- [ ] Delivery: tests/build/audit, whole-branch review, scoped commits, fetch/rebase,
+  PR `Closes #40`, merge and notify board/engine owner and lauda.
+
+Keep local procedural output explicitly labeled; label an engine fake only when
+its message says `fake: true`. Keep source props distinct from a requested engine.
+Use native scroll and the existing rail rather than a second editor implementation.

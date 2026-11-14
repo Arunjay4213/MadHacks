@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { speechConstructor, TranscriptGate } from '../input';
+import { speechConstructor, TranscriptGate, micErrorText } from '../input';
 import type { SpeechRecognizer } from '../input';
 import { emptyWorld, evolve, parseIntent } from '../world';
 import type { ActiveModifier, MutationImpulse, SpatialCoords, WorldStreamAdapter } from '../types';
@@ -24,13 +24,13 @@ export function useGenerativeWorld(options: Options) {
   const [pin, setPin] = useState<SpatialCoords | null>(null);
   const opts = useRef(options);
   opts.current = options;
-  const desired = useRef(false);
+  const desired = useRef<'toggle' | 'ptt' | null>(null);
+  const voiceGeneration = useRef(0);
   const recognition = useRef<SpeechRecognizer | null>(null);
   const restart = useRef<ReturnType<typeof setTimeout>>();
   const dissolve = useRef<ReturnType<typeof setTimeout>>();
   const pinTimer = useRef<ReturnType<typeof setTimeout>>();
   const gate = useRef(new TranscriptGate());
-  const partialText = useRef(false);
   const pinRef = useRef(pin);
   pinRef.current = pin;
   const activeModifiers = options.remoteModifiers ?? world.modifiers;
@@ -39,13 +39,12 @@ export function useGenerativeWorld(options: Options) {
     clearTimeout(dissolve.current);
     setTranscript(text);
     setInterim(partial);
-    partialText.current = partial;
     if (!partial) dissolve.current = setTimeout(() => setTranscript(''), 1100);
   }, []);
 
   const commit = useCallback(async (prompt: string, simulate = true) => {
     const text = prompt.trim();
-    if (!text) return;
+    if (!text) return false;
     showWords(text);
     if (simulate) setSimulateUntil(performance.now() + 1500);
     const intent = parseIntent(text, opts.current.remoteModifiers ?? worldRef.current.modifiers);
@@ -59,78 +58,97 @@ export function useGenerativeWorld(options: Options) {
           spatialCoords: coords, timestamp: Date.now() });
       } catch (error) {
         opts.current.notify(error instanceof Error ? error.message : 'The command could not be sent');
-        return;
+        return false;
       }
     }
     if (opts.current.remoteModifiers === undefined) {
-      if (!intent) { opts.current.notify('Try “make it winter”, “add a river”, or “turn to night”.'); return; }
+      if (!intent) { opts.current.notify('Try “make it winter”, “add a river”, or “turn to night”.'); return false; }
       worldRef.current = next;
       setWorld(next);
     }
     setImpulse({ id: Date.now(), startedAt: performance.now(), localized: intent?.kind === 'remove' || intent?.kind === 'add' && intent.label === 'river', center: coords ?? undefined });
     setPin(null);
+    return true;
+  }, [showWords]);
+
+  const partial = useCallback((text: string) => {
+    showWords(text, true);
+    try { opts.current.partial?.(text); }
+    catch (error) { opts.current.notify(error instanceof Error ? error.message : 'The partial could not be sent'); }
   }, [showWords]);
 
   const stopVoice = useCallback(() => {
-    desired.current = false;
+    voiceGeneration.current++;
+    desired.current = null;
     clearTimeout(restart.current);
-    recognition.current?.abort();
-    recognition.current = null;
-    if (partialText.current) { setTranscript(''); setInterim(false); partialText.current = false; }
+    recognition.current?.stop(); // onend flushes the last interim after any final result.
     setListening(false);
     opts.current.stopAudio();
   }, []);
 
-  const startVoice = useCallback(async () => {
-    if (desired.current) { stopVoice(); return; }
-    const Recognition = speechConstructor();
-    if (!Recognition || !navigator.mediaDevices?.getUserMedia) {
-      opts.current.notify('Voice is unavailable here. Press / to type, or 1–5 to try a change.');
+  const startVoice = useCallback(async (mode: 'toggle' | 'ptt' = 'toggle') => {
+    if (desired.current) {
+      if (mode === 'toggle' && desired.current === 'toggle') stopVoice();
       return;
     }
-    desired.current = true;
+    if (recognition.current) return;
+    const Recognition = speechConstructor();
+    if (!Recognition || !navigator.mediaDevices?.getUserMedia || !window.isSecureContext) {
+      opts.current.notify('Voice needs Chrome on HTTPS or localhost. Use the text box or Wispr Flow.');
+      return;
+    }
+    desired.current = mode;
+    const generation = ++voiceGeneration.current;
     try {
-      if (!await opts.current.requestAudio() || !desired.current) return;
+      const available = await opts.current.requestAudio();
+      if (generation !== voiceGeneration.current) return;
+      if (!available || !desired.current) { stopVoice(); return; }
       const begin = () => {
         if (!desired.current) return;
         const rec = new Recognition();
         recognition.current = rec;
-        gate.current.reset();
+        gate.current.reset(desired.current === 'ptt');
         rec.continuous = true;
         rec.interimResults = true;
         rec.lang = 'en-US';
+        const started = performance.now();
+        let lastInterim = '';
         rec.onresult = event => {
+          if (recognition.current !== rec) return;
           for (let i = event.resultIndex; i < event.results.length; i++) {
             const result = event.results[i];
             const text = result[0].transcript.trim();
             const accepted = gate.current.accept(i, text, result.isFinal);
             if (accepted === 'final') void commit(text, false);
-            if (accepted === 'partial') {
-              showWords(text, true);
-              try { opts.current.partial?.(text); } catch { /* reconnect notice is owned by the stream hook */ }
-            }
           }
+          const interim = gate.current.interim();
+          if (interim && interim !== lastInterim) partial(interim);
+          lastInterim = interim;
         };
         rec.onerror = event => {
-          if (event.error === 'no-speech' || event.error === 'aborted') return;
-          opts.current.notify(event.error === 'not-allowed'
-            ? 'Microphone blocked. Press / to type; 1–5 simulate voice.'
-            : 'Speech service unavailable. Press / to type; V tries voice again.');
-          stopVoice();
+          const message = micErrorText(event.error);
+          if (message) { opts.current.notify(message); stopVoice(); }
         };
         rec.onend = () => {
-          if (partialText.current) { setTranscript(''); setInterim(false); partialText.current = false; }
-          if (desired.current) restart.current = setTimeout(begin, 250);
+          if (recognition.current !== rec) return;
+          recognition.current = null;
+          const leftover = gate.current.flush();
+          if (leftover) void commit(leftover, false);
+          if (desired.current === 'toggle' && performance.now() - started > 500) restart.current = setTimeout(begin, 250);
+          else stopVoice();
         };
         try { rec.start(); setListening(true); }
-        catch { opts.current.notify('Voice could not start. Press / to type.'); stopVoice(); }
+        catch { recognition.current = null; opts.current.notify('Voice could not start. Use the text box.'); stopVoice(); }
       };
       begin();
     } catch {
-      opts.current.notify('Microphone unavailable. Press / to type; 1–5 simulate voice.');
+      if (generation !== voiceGeneration.current) return;
+      opts.current.notify('Microphone unavailable. Allow it for this site, or use the text box.');
       stopVoice();
     }
-  }, [commit, showWords, stopVoice]);
+  }, [commit, partial, stopVoice]);
+
+  const stopPushToTalk = useCallback(() => { if (desired.current === 'ptt') stopVoice(); }, [stopVoice]);
 
   const placePin = useCallback((coords: SpatialCoords) => {
     setPin(coords);
@@ -165,9 +183,16 @@ export function useGenerativeWorld(options: Options) {
   }, [commit, showWords]);
 
   useEffect(() => () => {
-    stopVoice(); clearTimeout(dissolve.current); clearTimeout(pinTimer.current);
+    desired.current = null;
+    voiceGeneration.current++;
+    clearTimeout(restart.current);
+    const rec = recognition.current;
+    if (rec) { rec.onend = null; rec.onresult = null; rec.onerror = null; rec.abort(); }
+    recognition.current = null;
+    opts.current.stopAudio();
+    clearTimeout(dissolve.current); clearTimeout(pinTimer.current);
   }, [stopVoice]);
 
   return { activeModifiers, transcript, interim, listening, impulse, simulateUntil, pin,
-    commit, startVoice, stopVoice, placePin, remove, scrub, undo, reset };
+    commit, partial, startVoice, stopVoice, stopPushToTalk, placePin, remove, scrub, undo, reset };
 }

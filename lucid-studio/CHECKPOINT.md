@@ -1,54 +1,52 @@
-# Frontend paused at Prateek's request
+# Lucid Studio delivery checkpoint
 
-Paused 2026-11-14. Resume this work only when Prateek asks; current priority is
-commands keyword recognition / embedded dictionary (issue #59).
+Prateek explicitly lifted the pause on 2026-11-14 and authorized completion,
+PR and merge for issue #40. Work is isolated at
+`/Users/prateek/.codex/worktrees/3210/MadHacks` on `40-lucid-studio`.
+The shared `74-continuity-prompts` checkout was not switched, stashed or reset.
 
-Branch: `40-lucid-studio`, issue #40. Do not merge or deploy this checkpoint.
+## Completed
 
-## User's current design
+- Preserved editorial hero with a real Enter Studio button; natural scrolling into
+  a contained editor, original prompt and generation, scene memory, and a reserved
+  bottom-right voice rail. Short laptops and mobile use normal document scrolling.
+- Ani web parity, including #82: backtick/button push-to-talk, one final per held
+  utterance, leftover interim flush, deduped/restarting toggle voice, text partials,
+  Wispr whole inserts, 2.5s/600ms typing/burst pauses, unfinished sentence guard,
+  IME, focus restoration and Option/Alt+R reset.
+- Server-authoritative keyed chips and highlighted/unmatched words; disabled
+  disconnected mutations with editable retained text; persistent connection and
+  >2s frame-stall notices; `?server=` and `?engine=` aliases.
+- One-shot local-command latency and stage stamps captured from the same sample;
+  six-byte frame parser, intrinsic size, async decode ordering and epoch cleanup.
+- Shader reserved name remains `pulseActive`; fresh Chromium world/particle
+  compilation is clean. Both WebGL contexts have independent fallbacks.
+- External sources provide the poster immediately; a send-only custom adapter
+  preserves the labeled procedural simulator. Simulation is never labeled AI video.
+- Permission races cannot cancel a newer microphone request; late tracks are stopped.
 
-- Preserve the editorial hero. Enter Studio must be a real button.
-- Natural scroll into a clean Adobe-style editor; no scroll zoom or full-screen takeover.
-- Contained current-generation canvas, original prompt, and separated controls.
-- Voice agent in a reserved bottom-right rail dock, not overlapping inputs or memory.
-- All functionality of Ani's `web/`, with the improved styling. This parity pass is unfinished.
-- Keep the procedural simulator and typed/external stream support; never call simulation live AI output.
+## Verification, 2026-11-14
 
-## Implemented checkpoint
+- `npm test`: 20 passing.
+- `npm run build`: passes (known lazy Three bundle size warning).
+- `npm audit`: zero vulnerabilities.
+- `LUCID_ENGINE_URL=http://127.0.0.1:8100 npm run test:browser`: 13 passing.
+  Covers 1440x900, 1280x720, 390x844, 375x667; real production `/studio/`
+  against a local CPU fake engine (winter/river/remove/undo/reset/unmatched),
+  controlled speech, WebGL denial, source attribution, async decode and mic cleanup.
+- Independent code review: four Important findings fixed and covered by browser or
+  unit regressions (particle fallback, focus, send-only adapter, correlated stages).
+- Real OS Wispr insertion and actual spoken recognition need a demo-machine check;
+  browser tests use controlled speech/audio fixtures. Shared GPU engine was untouched.
 
-React/TypeScript/Vite app, Lenis natural scrolling, shader alpine world with
-composable weather/river/light layers, R3F optical pulses, 6000 voice particles,
-FFT + synthetic envelope, speech/text state hook, transient captions and pinning,
-scene memory and undo/reset, source and websocket adapters. Shader reserved-word
-bug `active` was fixed to `pulseActive` in `src/shaders/post.ts`; a fresh browser
-load rendered the valley. Last recorded tests/build: 11 Vitest tests pass and Vite
-production build passes, before the final rail-spacing changes.
+## Backend handoff
 
-Performance work: ~105KB gzip initial UI chunk with lazy GPU modules; procedural
-target capped at 700k pixels, off-screen demand rendering, world pass bypass for
-live textures, frame-version uploads, pointer refs and FFT state local to agent.
+Output remains `lucid-studio/dist`, Vite base `./`. Engine owner builds/copies dist
+from main to serve `/studio/`; no frontend build artifacts are committed.
+A non-default original prompt must be supplied as `initialPrompt` because contract 4
+has no base-prompt field. Spatial edits remain simulator-only for the shared socket.
 
-## Resume checklist
-
-1. Fresh browser/console QA of latest rail spacing and Enter Studio button. Check
-   hero poster, editor layout at laptop/mobile sizes, voice particles, mic errors.
-2. Complete parity against current `web/app.js`, `web/lib.js`, `web/README.md`:
-   hold-to-talk button/backtick (never Ctrl), leftover-interim final flush, text
-   partials and focus retention for Wispr, whole inserts/IME handling, keyed server
-   words with keyword highlight and unmatched styling, persistent connection/video
-   stall notice after 2s, once-per-command delay + server stamp breakdown, disabled
-   disconnected actions, `?server=` host:port/HTTPS/WSS aliases, reset shortcut.
-3. Read Ani's latest reviews on board. Engine lookahead and unmatched-final
-   t_client are engine-owned; they were flagged to Arunjay. Do not silently edit
-   `web/`, `engine/` or `contracts/`.
-4. Recheck async frame generation guards, source cleanup, mic cleanup, and failed
-   WebGL fallback. Independent review caught stuck interim text and loading overlay;
-   both were addressed, but the parity/refactor still needs end-to-end verification.
-5. Run `npm test`, `npm run build`, `npm audit`; local fake-engine integration;
-   then code review, PR and merge. No frontend PR has been opened yet.
-
-Hosting: output `lucid-studio/dist`, Vite base `./`. `/studio/` defaults to page
-origin; standalone Vite root simulates unless `?engine=<full-url>` is supplied.
-Engine owner must build source before serving dist. Current preview was on port
-5178; it is stopped for this pause. Third-party noise notice lives in
-`public/THIRD_PARTY_NOTICES.txt`.
+Local fake-engine reset followed immediately by a final can acknowledge state but
+leave `applies_from_chunk` null. Reported to Arunjay on board #6885926316; no backend
+edit made. The UI keeps “—” rather than inventing a delay. The integration test waits
+for Reset to be scheduled before sending its next final.

@@ -8,11 +8,12 @@ interface Props {
   onEnter: () => void;
   onVisibility: (visible: boolean) => void;
   live: boolean;
+  sourceLabel: string;
   preview?: string;
   panel: ReactNode;
 }
 
-export default function ThresholdShell({ children, reducedMotion, onEnter, onVisibility, live, preview, panel }: Props) {
+export default function ThresholdShell({ children, reducedMotion, onEnter, onVisibility, live, sourceLabel, preview, panel }: Props) {
   const editor = useRef<HTMLElement>(null);
   const entered = useRef(false);
   const enterRef = useRef(onEnter);
@@ -55,15 +56,15 @@ export default function ThresholdShell({ children, reducedMotion, onEnter, onVis
       </div>
       <button className="hero-preview" onClick={enter} aria-label="Open the Lucid editor" style={preview ? { backgroundImage: `url(${preview})` } : {}}>
         <span className="preview-atmosphere" />
-        <span className="portal-caption"><span>THE WORLD IS LISTENING</span><span>ALPINE STUDY / PREVIEW</span></span>
+        <span className="portal-caption"><span>THE WORLD IS LISTENING</span><span>{live ? 'ENGINE / PREVIEW' : 'ALPINE STUDY / PREVIEW'}</span></span>
       </button>
-      <footer className="threshold-footer"><span className="entry-mode">{live ? 'CONNECTED WORLD ENGINE' : 'PROCEDURAL WORLD SIMULATION'}</span>
+      <footer className="threshold-footer"><span className="entry-mode">{live ? sourceLabel : 'PROCEDURAL WORLD SIMULATION'}</span>
         <button className="entry-trigger" onClick={enter}>Enter the studio <span aria-hidden="true">↓</span></button>
         <span className="entry-footnote">YOUR VOICE. AN INFINITE CANVAS.</span></footer>
     </section>
     <section className="editor-section" ref={editor} id="studio" aria-label="Generative video editor">
       <header className="editor-heading"><div><span className="eyebrow">LUCID STUDIO</span><h2>A landscape in progress.</h2></div>
-        <span className="editor-source">{live ? 'ENGINE STREAM' : 'PROCEDURAL STUDY'} <i /></span></header>
+        <span className="editor-source">{sourceLabel} <i /></span></header>
       <div className="editor-grid"><div className="generation-column">
         <div className="generation-heading"><span>CURRENT GENERATION</span><span>CONTINUOUS / 001</span></div>
         <main className="world-portal" aria-label="Current video generation">{children}</main>

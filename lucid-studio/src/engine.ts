@@ -2,23 +2,36 @@ import { useEffect, useRef, useState } from 'react';
 import type { ActiveModifier, WorldStreamAdapter } from './types';
 
 export interface EngineState {
-  modifiers: ActiveModifier[];
+  modifiers?: ActiveModifier[];
   unmatched: boolean;
   heard: string | null;
+  keyword: string;
+  kind: 'partial' | 'final' | 'server';
+  fake: boolean;
+  stamps: Record<string, number>;
   tClient: number | null;
   appliesFromChunk: number | null;
 }
+const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const chunk = (v: unknown): v is number => finite(v) && Number.isInteger(v) && v >= 0;
 export function parseEngineState(value: unknown): EngineState | null {
-  if (!value || typeof value !== 'object') return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const m = value as Record<string, unknown>;
-  if (!Array.isArray(m.changes) || !m.changes.every(c => c && typeof c.id === 'string'
-    && typeof c.label === 'string' && typeof c.strength === 'number' && Number.isFinite(c.strength))) return null;
+  let modifiers: ActiveModifier[] | undefined;
+  if ('changes' in m) {
+    if (!Array.isArray(m.changes) || !m.changes.every(c => c && typeof c.id === 'string' && typeof c.label === 'string')) return null;
+    modifiers = m.changes.map(c => ({ id: c.id, label: c.label, intensity: finite(c.strength) ? c.strength : 1 }));
+  }
   return {
-    modifiers: m.changes.map(c => ({ id: c.id, label: c.label, intensity: c.strength })),
-    unmatched: m.unmatched === true,
+    modifiers, unmatched: m.unmatched === true,
     heard: typeof m.heard === 'string' ? m.heard : null,
-    tClient: typeof m.t_client === 'number' ? m.t_client : null,
-    appliesFromChunk: typeof m.applies_from_chunk === 'number' ? m.applies_from_chunk : null,
+    keyword: typeof m.keyword === 'string' ? m.keyword : '',
+    kind: m.kind === 'partial' || m.kind === 'final' ? m.kind : 'server',
+    fake: m.fake === true,
+    stamps: m.stamps && typeof m.stamps === 'object' && !Array.isArray(m.stamps)
+      ? Object.fromEntries(Object.entries(m.stamps).filter(([, v]) => finite(v))) : {},
+    tClient: finite(m.t_client) ? m.t_client : null,
+    appliesFromChunk: chunk(m.applies_from_chunk) ? m.applies_from_chunk : null,
   };
 }
 export function parseFrame(buffer: ArrayBuffer) {
@@ -29,124 +42,161 @@ export function parseFrame(buffer: ArrayBuffer) {
   return { chunk: view.getUint32(0), index: view.getUint16(4), jpeg: buffer.slice(6) };
 }
 
+export function engineBaseUrl(server: string | null, location: { protocol: string; host: string }) {
+  const secure = location.protocol === 'https:';
+  const address = server || `${secure ? 'wss' : 'ws'}://${location.host}`;
+  const base = new URL(address.includes('://') ? address : `${secure ? 'wss' : 'ws'}://${address}`);
+  if (!['http:', 'https:', 'ws:', 'wss:'].includes(base.protocol) || base.username || base.password) throw new Error('Invalid engine URL');
+  base.protocol = ['https:', 'wss:'].includes(base.protocol) ? 'wss:' : 'ws:';
+  if (secure && base.protocol === 'ws:') throw new Error('HTTPS requires a secure engine URL');
+  return base.origin;
+}
+interface Link { controlOpen: boolean; framesOpen: boolean; lastFrameAt: number | null; everConnected: boolean }
+export function videoNotice(link: Link, now: number) {
+  if (!link.controlOpen || !link.framesOpen) return link.everConnected ? 'Connection lost, reconnecting…' : 'Connecting to the video server…';
+  if (link.lastFrameAt === null) return 'Waiting for the first frame…';
+  return now - link.lastFrameAt > 2000 ? 'Video paused: no frames from the server' : null;
+}
+export function makeLatencyTracker() {
+  const sent = new Set<number>();
+  let pending: { t: number; chunk: number; stamps: Record<string, number> } | null = null;
+  return {
+    sent(t: number) { sent.add(t); if (sent.size > 100) sent.delete(sent.values().next().value!); },
+    onServer(m: Pick<EngineState, 'tClient' | 'appliesFromChunk' | 'unmatched'> & { stamps?: Record<string, number> }) {
+      if (m.tClient === null || m.appliesFromChunk === null || !sent.has(m.tClient) || m.unmatched) return;
+      if (pending?.t === m.tClient) pending.stamps = m.stamps ?? {};
+      else pending = { t: m.tClient, chunk: m.appliesFromChunk, stamps: m.stamps ?? {} };
+    },
+    onFrameDrawn(chunk: number, now = Date.now()) {
+      if (!pending || chunk < pending.chunk) return null;
+      const sample = { ms: Math.round(now - pending.t), stamps: { ...pending.stamps } };
+      sent.delete(pending.t);
+      pending = null;
+      return sample;
+    },
+    reset() { sent.clear(); pending = null; },
+  };
+}
+
 export function useEngineStream(endpoint: string | null, notify: (text: string) => void) {
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
   const [state, setState] = useState<EngineState | null>(null);
   const [connected, setConnected] = useState(false);
-  const [latency, setLatency] = useState<number | null>(null);
+  const [sample, setSample] = useState<{ ms: number; stamps: Record<string, number> } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const control = useRef<WebSocket | null>(null);
   const notifyRef = useRef(notify);
   notifyRef.current = notify;
-  const sent = useRef(new Map<number, number>());
+  const timing = useRef(makeLatencyTracker());
 
   useEffect(() => {
-    if (!endpoint) return;
+    setCanvas(null); setState(null); setConnected(false); setSample(null);
+    if (!endpoint) { setNotice(null); return; }
     let active = true;
     let retry: ReturnType<typeof setTimeout>;
     let attempts = 0;
     let frames: WebSocket | null = null;
-    let latest: EngineState | null = null;
-    let lastFrame = -1;
     let frameGeneration = 0;
+    const link: Link = { controlOpen: false, framesOpen: false, lastFrameAt: null, everConnected: false };
+    const renderNotice = () => setNotice(videoNotice(link, performance.now()));
     const target = document.createElement('canvas');
     const context = target.getContext('2d');
-    let base: URL;
-    try {
-      base = new URL(endpoint);
-      if (!['http:', 'https:', 'ws:', 'wss:'].includes(base.protocol)) throw new Error();
-      base.protocol = ['https:', 'wss:'].includes(base.protocol) ? 'wss:' : 'ws:';
-      if (window.location.protocol === 'https:' && base.protocol === 'ws:') throw new Error();
-    } catch {
-      notifyRef.current('Engine address unavailable. Use an http(s) or ws(s) address; HTTPS requires WSS.');
+    let base: string;
+    try { base = engineBaseUrl(endpoint, window.location); }
+    catch {
+      setNotice('Engine address unavailable. Use a host:port or HTTP(S)/WS(S) address; HTTPS requires WSS.');
       return;
     }
-    const url = (path: string) => new URL(path, base).toString();
+    renderNotice();
+    const poll = setInterval(renderNotice, 250);
     const open = () => {
       if (!active) return;
-      const ws = new WebSocket(url('/control'));
+      const ws = new WebSocket(base + '/control');
       control.current = ws;
+      const epoch = ++frameGeneration;
+      let received = 0;
+      let drawn = 0;
       ws.onopen = () => {
         if (!active) return ws.close();
         attempts = 0;
+        link.controlOpen = true;
         setConnected(true);
-        const epoch = ++frameGeneration;
-        lastFrame = -1;
-        notifyRef.current('Live engine connected');
-        frames = new WebSocket(url('/frames'));
+        frames = new WebSocket(base + '/frames');
         frames.binaryType = 'arraybuffer';
+        frames.onopen = () => { if (!active || epoch !== frameGeneration) return; link.framesOpen = true; link.everConnected = true; renderNotice(); };
         frames.onmessage = async event => {
           if (!(event.data instanceof ArrayBuffer)) return;
           const frame = parseFrame(event.data);
           if (!frame || !context) return;
-          const sequence = frame.chunk * 65536 + frame.index;
+          const sequence = ++received;
           try {
             const bitmap = await createImageBitmap(new Blob([frame.jpeg], { type: 'image/jpeg' }));
-            if (active && epoch === frameGeneration && sequence > lastFrame) {
-              lastFrame = sequence;
+            if (active && epoch === frameGeneration && sequence > drawn) {
+              drawn = sequence;
               if (target.width !== bitmap.width || target.height !== bitmap.height) {
                 target.width = bitmap.width; target.height = bitmap.height;
               }
               context.drawImage(bitmap, 0, 0);
-              target.dataset.frameVersion = String(sequence);
+              target.dataset.frameVersion = `${epoch}-${sequence}`;
               setCanvas(previous => previous ?? target);
-              const started = latest?.tClient != null ? sent.current.get(latest.tClient) : undefined;
-              if (started !== undefined && latest?.appliesFromChunk != null && frame.chunk >= latest.appliesFromChunk) {
-                setLatency(Math.round(performance.now() - started));
-                sent.current.delete(latest.tClient!);
-              }
+              link.lastFrameAt = performance.now();
+              const measured = timing.current.onFrameDrawn(frame.chunk);
+              if (measured !== null) setSample(measured);
+              renderNotice();
             }
             bitmap.close();
-          } catch { notifyRef.current('A video frame could not be decoded'); }
+          } catch { /* Keep the last good frame; the stall notice covers repeated decode failures. */ }
         };
-        frames.onclose = () => { if (active && ws.readyState === WebSocket.OPEN) ws.close(); };
+        frames.onclose = () => {
+          if (!active || epoch !== frameGeneration) return;
+          frameGeneration++;
+          link.framesOpen = false; link.lastFrameAt = null;
+          renderNotice();
+          if (ws.readyState === WebSocket.OPEN) ws.close();
+        };
       };
       ws.onmessage = event => {
         try {
           const data = JSON.parse(event.data);
-          if (typeof data.error === 'string') { notifyRef.current(data.error); return; }
+          if (data && typeof data.error === 'string') { notifyRef.current(data.error); return; }
           const incoming = parseEngineState(data);
-          if (incoming) {
-            latest = incoming;
-            setState(previous => JSON.stringify(previous) === JSON.stringify(incoming) ? previous : incoming);
-            if (incoming.unmatched) notifyRef.current('That change was not understood. Try a simpler description.');
-          }
+          if (!incoming) { notifyRef.current('Ignored an invalid engine message'); return; }
+          timing.current.onServer(incoming);
+          setState(previous => {
+            const next = { ...incoming, modifiers: incoming.modifiers ?? previous?.modifiers };
+            return JSON.stringify(previous) === JSON.stringify(next) ? previous : next;
+          });
         } catch { notifyRef.current('An engine message could not be read'); }
       };
       ws.onclose = () => {
+        frameGeneration++;
         frames?.close();
         if (!active) return;
-        setConnected(false);
-        frameGeneration++;
-        sent.current.clear();
-        notifyRef.current('Connection lost. Reconnecting; unsent commands are discarded.');
-        retry = setTimeout(open, Math.min(5000, 500 * 2 ** attempts++));
+        link.controlOpen = false; link.framesOpen = false; link.lastFrameAt = null;
+        setConnected(false); setSample(null); timing.current.reset();
+        renderNotice();
+        retry = setTimeout(open, Math.min(5000, 250 * 2 ** attempts++));
       };
     };
     open();
     return () => {
-      active = false;
-      clearTimeout(retry);
-      control.current?.close();
-      frames?.close();
-      control.current = null;
-      sent.current.clear();
+      active = false; frameGeneration++;
+      clearTimeout(retry); clearInterval(poll);
+      control.current?.close(); frames?.close(); control.current = null;
+      timing.current.reset();
     };
   }, [endpoint]);
 
-  const sendText = (type: 'partial' | 'final', text: string, spatialCoords?: { x: number; y: number } | null) => {
+  const sendText = (type: 'partial' | 'final', text: string) => {
     if (control.current?.readyState !== WebSocket.OPEN) throw new Error('Engine disconnected. Command was not queued.');
     const timestamp = Date.now();
-    if (type === 'final') setLatency(null);
-    sent.current.set(timestamp, performance.now());
-    if (sent.current.size > 100) sent.current.delete(sent.current.keys().next().value!);
-    control.current.send(JSON.stringify({ type, text, t_client: timestamp, ...(spatialCoords ? { spatialCoords } : {}) }));
+    if (type === 'final') { setSample(null); timing.current.sent(timestamp); }
+    control.current.send(JSON.stringify({ type, text, t_client: timestamp }));
   };
-  const adapter: WorldStreamAdapter = {
-    sendMutation: async payload => sendText('final', payload.prompt, payload.spatialCoords),
-  };
+  const adapter: WorldStreamAdapter = { sendMutation: async payload => sendText('final', payload.prompt) };
   const tap = (action: 'remove' | 'undo' | 'reset', id?: string) => {
     if (control.current?.readyState !== WebSocket.OPEN) throw new Error('Engine disconnected. Command was not queued.');
-    control.current.send(JSON.stringify({ type: 'tap', action, ...(id ? { id } : {}), t_client: Date.now() }));
+    control.current.send(JSON.stringify({ type: 'tap', action, ...(id ? { id } : {}) }));
   };
-  return { source: canvas, remoteState: state, connected, latency, adapter, sendText, tap };
+  return { source: canvas, remoteState: state, connected, latency: sample?.ms ?? null, stamps: sample?.stamps ?? {}, notice, adapter, sendText, tap };
 }

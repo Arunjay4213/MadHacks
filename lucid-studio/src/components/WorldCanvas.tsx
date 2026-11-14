@@ -110,10 +110,12 @@ function Scene({ modifiers, source, impulse, pointer, reducedMotion, active, onR
 
   // External source: a MediaStream through a muted inline <video>, or a canvas. The parent owns the stream.
   const sourceTex = useRef<THREE.Texture | null>(null);
+  const sourceVideo = useRef<HTMLVideoElement | null>(null);
   const sourceCanvas = useRef<HTMLCanvasElement | null>(null);
   const uploadedVersion = useRef<string | undefined>(undefined);
   useEffect(() => {
     sourceCanvas.current = null;
+    sourceVideo.current = null;
     uploadedVersion.current = undefined;
     if (!source) return;
     let tex: THREE.Texture;
@@ -127,6 +129,7 @@ function Scene({ modifiers, source, impulse, pointer, reducedMotion, active, onR
       setAspect(source.width, source.height);
     } else {
       video = document.createElement('video');
+      sourceVideo.current = video;
       video.muted = true;
       video.playsInline = true;
       video.autoplay = true;
@@ -141,9 +144,12 @@ function Scene({ modifiers, source, impulse, pointer, reducedMotion, active, onR
     tex.generateMipmaps = false;
     sourceTex.current = tex;
     post.material.uniforms.uSource.value = tex;
+    post.material.uniforms.uSourceMix.value = 1; // An actual source never starts as a procedural frame.
     invalidate();
     return () => {
       post.material.uniforms.uSource.value = placeholder;
+      post.material.uniforms.uSourceMix.value = 0;
+      sourceVideo.current = null;
       sourceTex.current = null;
       sourceCanvas.current = null;
       tex.dispose();
@@ -180,6 +186,7 @@ function Scene({ modifiers, source, impulse, pointer, reducedMotion, active, onR
 
   useFrame((_, rawDt) => {
     const { goal: g, pointer: p, impulse: imp, reducedMotion: still, demand: onDemand, onReady: ready_ } = latest.current;
+    if (source && !sourceTex.current) { invalidate(); return; }
     const dt = Math.min(rawDt, 0.1);
     const u = world.material.uniforms;
     const k = still ? 1 : 1 - Math.exp(-dt * EASE_RATE);
@@ -214,6 +221,7 @@ function Scene({ modifiers, source, impulse, pointer, reducedMotion, active, onR
       if (version === undefined || version !== uploadedVersion.current) {
         uploadedVersion.current = version;
         sourceTex.current.needsUpdate = true;
+        if (cnv.width > 0 && cnv.height > 0) pu.uSourceAspect.value = cnv.width / cnv.height;
       }
     }
     const age = imp ? (performance.now() - imp.startedAt) / 1000 : 99;
@@ -229,7 +237,7 @@ function Scene({ modifiers, source, impulse, pointer, reducedMotion, active, onR
     }
     gl.render(post.scene, camera);
 
-    if (!ready.current) {
+    if (!ready.current && (!source || sourceTex.current) && (!sourceVideo.current || sourceVideo.current.readyState >= 2)) {
       // One-time poster of the first real frame, read right after drawing (no preserveDrawingBuffer needed).
       ready.current = true;
       let preview: string | undefined;

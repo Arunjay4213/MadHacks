@@ -201,3 +201,33 @@ button:focus-visible, input:focus-visible { outline: 1px solid #d3e6e0; outline-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
 }
+
+button:disabled { cursor: default; opacity: 0.35; }
+.server-words { min-height: 2.8em; font: 16px/1.5 var(--serif); color: #d6e2d1; overflow-wrap: anywhere; margin: 18px 0 0; }
+.server-words[data-kind="partial"] { opacity: 0.65; }
+.server-words[data-unmatched="true"] { color: #efa6a0; }
+.server-words mark { color: #e5f3d9; background: #9eb58c30; border-radius: 2px; }
+.server-words[data-unmatched="true"] mark { color: inherit; background: #bc726c24; }
+.server-timing { color: #899b8a; font-size: 9px; line-height: 1.8; margin: 0; }
+.voice-dock { flex-basis: 208px; }
+.voice-controls { height: 208px; display: flex; flex-direction: column; align-items: center; }
+.voice-agent { flex: 0 0 170px; }
+.push-to-talk { min-height: 34px; padding: 8px 18px; border: 1px solid #9eb58c35; border-radius: 5px; font-size: 10px; color: #b1c6a7; touch-action: none; user-select: none; }
+.push-to-talk kbd { margin-left: 16px; }
+.engine-awaiting { pointer-events: none; padding: 24px; text-align: center; font-size: clamp(15px, 2vw, 23px); }
+.editor-modifier > span { overflow-wrap: anywhere; min-width: 0; flex: 1; }
+.editor-modifier .live-strength { flex: 0 0 auto; }
+@media (max-width: 1050px) and (min-width: 701px) { .editor-grid { gap: 24px; grid-template-columns: minmax(0,1fr) 300px; } .prompt-column { padding-left: 20px; } }
+@media (max-width: 700px) {
+  .editor-section .world-portal { height: auto; min-height: 240px; aspect-ratio: 4/3; }
+  .voice-dock { width: min(270px, 100%); }
+  .hero-preview { top: max(320px, 43dvh); height: max(240px, 39dvh); }
+  .hero-section { min-height: max(700px, 100dvh); }
+  .editor-source { max-width: 100px; line-height: 1.8; }
+}
+
+/* Keep the rail in document flow: short laptops can scroll to every control. */
+.prompt-column { height: auto; min-height: max(660px, calc(100dvh - 210px)); }
+.prompt-scroll { overflow: visible; }
+@media (min-width: 701px) { .generation-column { position: sticky; top: 24px; } }
+@media (max-width: 700px) { .prompt-column { min-height: 0; } }

@@ -14,7 +14,7 @@ state. No invented GPU latency or semantic spatial-edit capability is claimed.
 User revision: preserve the hero, remove scroll zoom and the full-screen takeover.
 Normal Lenis scrolling (lerp 0.065) leads into an editor with a contained generation
 canvas, original prompt, scene memory and quick command input. The voice agent
-lives at the bottom right of the screen. A one-time shader poster preserves the
+lives in a reserved bottom-right rail dock, in document flow. A one-time shader poster preserves the
 hero preview without a second continuously running renderer. Audio particles,
 transcripts and spatial optics remain ephemeral; Tab reveals optical memory.
 `/` opens typing; 1–5 simulate commands; V enables mic. Undo/reset are also visible
