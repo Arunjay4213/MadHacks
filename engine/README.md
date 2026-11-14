@@ -31,6 +31,43 @@ Unit tests:
 .venv-engine/bin/python -m pytest engine/tests -q
 ```
 
+## The live engine on the GPU machine
+
+The live engine runs on `madhacks-engine` (one NVIDIA L40S) in two tmux sessions: `engine` (the server) and `tunnel` (a Cloudflare quick tunnel).
+The model is Causal Forcing++ framewise 2-step at 672x384 with the TAEHV decoder; see `engine/MODEL_NOTES.md` for the model, licenses and timing table.
+One chunk is one latent frame, which is 4 video frames (0.25 s at 16 fps), so real time needs generation plus decode under 250 ms per chunk.
+Measured while serving: generation about 210 ms and decode about 21 ms per chunk, 16.0 fps out, no stalls.
+At 832x480 one chunk takes about 443 ms on this GPU, so that size is not real time on one L40S.
+
+Start the server (first time on a new machine: `bash engine/setup_gpu.sh`, then `uv pip install -r engine/requirements.txt -r steering/requirements.txt` into `~/engine-venv`):
+
+```
+tmux new-session -d -s engine "cd ~/madhacks && source ~/engine-venv/bin/activate && python -m engine.server --backend causal_forcing --reader commands --width 672 --height 384 --backend-opt vae=taehv --host 127.0.0.1 --port 8000 2>&1 | tee -a ~/runs/engine-server.log"
+```
+
+Loading takes about 70 s; `curl -s localhost:8000/stats | jq .state` prints `GENERATING` when it is up.
+The repo on the machine is a copy made with `rsync -a --delete --exclude .git ./ madhacks-engine:madhacks/` from a laptop clone, because the machine has no GitHub credentials.
+
+Start the tunnel, which gives every teammate an https address without an open port:
+
+```
+tmux new-session -d -s tunnel "cloudflared tunnel --url http://127.0.0.1:8000 2>&1 | tee ~/runs/tunnel.log"
+rg -o "https://[a-z0-9-]+\.trycloudflare\.com" ~/runs/tunnel.log | tail -1
+```
+
+Open the printed address for the engine test viewer, or give it to the web page as `?server=https://<address>`.
+The address changes each time the tunnel restarts; restarting only the server keeps the address.
+The engine has no login, so anyone who has the address can watch and send commands; keep it inside the team.
+It is one shared video: every viewer sees every command and reset, so run automated checks against a local `--backend fake` server.
+Without the tunnel, use an SSH port forward from a machine that has SSH access: `ssh -N -L 8000:127.0.0.1:8000 madhacks-engine`, then open http://127.0.0.1:8000/.
+
+### Known problems on the real model (2026-11-14)
+
+The picture degrades when a video runs long without a reset: it is clean for about 20 s, over-contrasted by about 30 s and broken by about 60 s.
+Press Reset (or send the reset tap) to start a clean video.
+A new prompt is read by the model but the frame history holds the old scene, so a command such as "make it winter" does not visibly change the scene yet.
+Both are being worked on in the backend (re-anchoring the frame history at a command and at intervals).
+
 ## Command line
 
 ```
