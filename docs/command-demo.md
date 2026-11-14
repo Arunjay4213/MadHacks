@@ -17,6 +17,7 @@ the same model, settings and machine used for judging.
 
 | Time | Command / action | Check before saying it works |
 |---|---|---|
+| Before the run | “We build on Training-Free Interactive World Models' published blending method and a pretrained video model.” | Name the upstream model used by the final engine; then explain our added state, commands and interruptible controls. |
 | 0:00 | Start at the meadow | Moving video is coming from the real engine; show mock status if using a mock. |
 | 0:15 | “Make it winter.” | Winter appears without a cut; a winter chip appears. |
 | 0:30 | “Also add a river.” | River appears and winter stays. |

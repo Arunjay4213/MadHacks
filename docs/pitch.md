@@ -5,6 +5,10 @@ did not work in rehearsal; replace bracketed measurements with real results.
 
 ## Pitch
 
+This builds on Training-Free Interactive World Models and its published method of
+blending prompt conditioning during generation, using a pretrained video model.
+We credit that model and method before describing what our team added.
+
 We are building a generated world that responds to spoken changes. A command like
 “make it winter” changes the target scene. “Also add a river” keeps winter and adds
 a river. The user can remove a specific change, undo an operation, and control
@@ -22,7 +26,8 @@ trained by this command subsystem.
 
 ## Three slides: content
 
-1. **Say a change, keep the rest.** Show winter → winter + river → winter + river
+1. **Building on Training-Free Interactive World Models.** Credit its published
+   blending method and the exact upstream pretrained model first. Then show winter → winter + river → winter + river
    + night. Use captured demo images only once those changes work visibly.
 2. **Words to state to pixels.** Text/mic → keyword or slow reader → reversible
    scene state → deterministic prompt → steerer → engine → browser. Mark the
@@ -33,6 +38,8 @@ trained by this command subsystem.
 
 ## Submission outline
 
+- **Credit first:** this project builds on Training-Free Interactive World Models'
+  conditioning-blend method and the pretrained model named in our final engine configuration.
 - **Inspiration:** interactive visual storytelling controlled by speech.
 - **What it does:** include only features demonstrated on the final integrated system.
 - **How we built it:** Python command/state layer, the team's steering and engine,

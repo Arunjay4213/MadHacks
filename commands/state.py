@@ -1,7 +1,6 @@
 """Scene operations and bounded undo history; no model or network work."""
 
 from copy import deepcopy
-import math
 
 
 DEFAULT_BASE = "a wide shot of a meadow with a single oak tree"
@@ -15,7 +14,7 @@ def _text(value, field):
 
 
 def _strength(value):
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not 0 <= value <= 1.3:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 1.3:
         raise ValueError("strength must be a finite number between 0 and 1.3")
     return value
 

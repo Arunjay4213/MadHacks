@@ -78,7 +78,8 @@ class StateTests(unittest.TestCase):
         before = state.snapshot()
         invalid = [None, {}, {"op": "wrong"}, {"op": "add", "label": "x"},
                    change("x", kind="unknown"), change(""), change("x", strength=True),
-                   change("x", strength=float("nan")), change("x", strength=1.4),
+                   change("x", strength=float("nan")), change("x", strength=float("inf")),
+                   change("x", strength=10**400), change("x", strength=1.4),
                    {"op": "new_scene", "base": " "}, {"op": "remove", "id": 1},
                    {"op": "set_strength", "id": "c1", "strength": -1}]
         for op in invalid:
