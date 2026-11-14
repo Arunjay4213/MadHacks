@@ -1,7 +1,9 @@
 # commands/: understanding commands
 
 Owner `@prateekraouw`. Turns heard text (contract 1) into a target prompt for the steerer (contract 2) and the
-scene-state fields of contract 4. Python 3, standard library only. Interfaces and rules: `PLAN.md` here.
+scene-state fields of contract 4. The dictionary path uses the Python standard
+library. Interfaces
+and rules: `PLAN.md` here.
 
 ## Use from the engine
 
@@ -29,10 +31,36 @@ because the engine restarts the video on it.
 | `state.py` | `SceneState`: base + changes + bounded undo history |
 | `composer.py` | `compose(snapshot)`: one prompt in a fixed order with stable wording |
 | `reader.py` | fast reader: keyword table, pace and strength words, name matching, partial-text spotting |
+| `keywords.json`, `dictionary.py` | embedded canonical vocabulary, aliases, validated loader and compiled whole-word matching |
 | `service.py` | `CommandService`: ties them together, early-steering guesses and rollback, optional slow reader |
 
 The slow reader is an injected callable `fn(text, snapshot) -> op dict | None`, off by default.
-No LLM provider is configured yet, so phrases the keyword table misses show as unmatched (red on the page).
+The engine configures its existing Azure LLM reader for dictionary misses.
+
+## Dictionary and open vocabulary
+
+`keywords.json` contains 39 canonical scene changes and 281 spellings/aliases,
+including day/daytime/morning/sunny/bright and common objects. Existing canonical
+phrases are unchanged, so steering keeps stable wording. To extend it, add a
+canonical `label`, `kind`, stable `phrase`, and `aliases`. Conflicting aliases fail
+at startup rather than choosing an arbitrary meaning.
+
+Matching normalizes Unicode spaces, full-width letters, dashes, punctuation and
+curly apostrophes. Multiword aliases win over their substrings. Object nouns win
+over generic adjective aliases: “add a bright red car” selects car, not daytime.
+An explicit new object such as “add a glowing unicorn” is preserved as a named
+change, even when it is absent from the dictionary; retrieval never substitutes
+the nearest familiar animal. Whole-word partial matching stays deterministic.
+
+## Multiple commands per sentence
+
+“Add a dog and remove the lighthouse” applies both operations in order against a
+temporary state, then emits one composed target. Undo restores the entire state
+before that sentence. Explicit actions can be joined by and/then/semicolon, and
+unambiguous noun lists can repeat an action (“add a dog and a cat”). Descriptions
+such as “black and white” remain one phrase. A rejected clause rolls back the
+whole sentence, including any provisional guess. A sentence is limited to 16
+operations; nested batches are rejected. The external contracts remain unchanged.
 
 ## Tests
 
