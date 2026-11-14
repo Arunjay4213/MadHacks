@@ -1,32 +1,45 @@
-"""Stand-in command reader, used until the commands/ owner's reader is merged.
+"""Stand-in command reader, used until the commands/ owner's `commands.service.CommandService` is merged.
 
-The boundary is one function, `read_command(message, scene) -> contract 2 dict or None`.
-Here a `final` text is taken as the complete new prompt; `partial` and `tap` give no operation.
-The scene keeps an empty changes list and no keyword.
+It has the same API (see engine/reader.py). A `final` text is taken as the complete new prompt with a 4-chunk ramp;
+`partial` and `tap` give no steer. The changes list stays empty and there is no keyword.
 """
 
 import logging
+import threading
 
 log = logging.getLogger("engine.standin_reader")
 
 DEFAULT_RAMP_CHUNKS = 4
 
 
-class StandinScene:
-    """The part of the scene state the engine reads for contract 4."""
-
+class StandinService:
     def __init__(self) -> None:
-        self.changes: list[dict] = []    # each {"id", "label", "strength"}
-        self.keyword: str | None = None  # the key word of the last command, for highlighting
+        self._lock = threading.Lock()
+        self._heard: str | None = None
+        self.committed_prompt: str | None = None  # None: the engine starts from --base-prompt
 
+    def handle(self, message: dict) -> dict:
+        kind = message.get("type")
+        if kind not in ("partial", "final", "tap"):
+            raise ValueError(f"unknown message type {kind!r}")
+        steer = None
+        with self._lock:
+            if kind == "final":
+                text = str(message.get("text", "")).strip()
+                self._heard = text
+                if text:
+                    steer = {"prompt": text, "ramp_chunks": DEFAULT_RAMP_CHUNKS, "provisional": False, "cap": 1.0}
+                    self.committed_prompt = text
+            elif kind == "tap":
+                log.info("stand-in reader: no operation for tap %s", message.get("action"))
+            return {"steer": steer, "state": self._state()}
 
-def read_command(message: dict, scene: StandinScene) -> dict | None:
-    kind = message["type"]
-    if kind == "final":
-        text = message["text"].strip()
-        if not text:
-            return None
-        return {"prompt": text, "ramp_chunks": DEFAULT_RAMP_CHUNKS, "provisional": False, "cap": 1.0}
-    if kind == "tap":
-        log.info("stand-in reader: ignoring tap %s", message.get("action"))
-    return None
+    def state_fields(self) -> dict:
+        with self._lock:
+            return self._state()
+
+    def likely_prompts(self) -> list[str]:
+        return []
+
+    def _state(self) -> dict:
+        return {"changes": [], "heard": self._heard, "keyword": None, "unmatched": False}

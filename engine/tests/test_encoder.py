@@ -69,3 +69,29 @@ def test_error_reaches_caller_and_service_survives():
         svc.encode("bad")
     assert svc.encode("good") == "good"
     svc.stop()
+
+
+def test_prefetch_runs_behind_urgent_requests():
+    order = []
+    gate = threading.Event()
+
+    def enc(prompt):
+        if prompt == "first":
+            gate.wait(2)
+        order.append(prompt)
+        return prompt, []
+
+    svc = EncoderService(enc)
+    svc.start()
+    first = svc.request("first")  # occupies the encoder thread
+    time.sleep(0.05)
+    assert svc.prefetch(["bg1", "bg2", "first"]) == 2  # "first" is already in flight
+    urgent = svc.request("now")
+    promoted = svc.request("bg2")  # was queued for prefetch, becomes urgent
+    gate.set()
+    for f in (first, urgent, promoted):
+        f.result(2)
+    svc.encode("bg1")
+    assert order == ["first", "now", "bg2", "bg1"]
+    assert svc.prefetch(["now"]) == 0
+    svc.stop()

@@ -2,7 +2,8 @@ import pytest
 
 from engine.engine import check_target
 from engine.messages import BadMessage, check, parse_json
-from engine.standin_reader import StandinScene, read_command
+from engine.reader import load_reader
+from engine.standin_reader import StandinService
 
 
 @pytest.mark.parametrize("msg", [
@@ -39,16 +40,29 @@ def test_contract_2_and_final_cap_rule():
     ok = {"prompt": "p", "ramp_chunks": 4, "provisional": False, "cap": 1.0}
     assert check_target(ok) == ok
     assert check_target({**ok, "provisional": True, "cap": 0.4})["cap"] == 0.4
-    for bad in ({**ok, "ramp_chunks": 0}, {**ok, "cap": 0.5}, {"prompt": "p"}):
+    with_strength = {**ok, "strength": 0.3, "without_prompt": "w", "later_field": 1}
+    assert check_target(with_strength) is with_strength  # passed through untouched
+    for bad in ({**ok, "ramp_chunks": 0}, {**ok, "cap": 0.5}, {"prompt": "p"}, {**ok, "strength": 0.3},
+                {**ok, "strength": 1.5, "without_prompt": "w"}):
         with pytest.raises(BadMessage):
             check_target(bad)
 
 
-def test_standin_reader():
-    scene = StandinScene()
-    target = read_command({"type": "final", "text": " make it winter ", "t_client": 1}, scene)
-    assert target == {"prompt": "make it winter", "ramp_chunks": 4, "provisional": False, "cap": 1.0}
-    check_target(target)
-    assert read_command({"type": "partial", "text": "make it", "t_client": 1}, scene) is None
-    assert read_command({"type": "tap", "action": "undo"}, scene) is None
-    assert scene.changes == [] and scene.keyword is None
+def test_standin_service():
+    svc = StandinService()
+    assert svc.committed_prompt is None and svc.likely_prompts() == []
+    out = svc.handle({"type": "final", "text": " make it winter ", "t_client": 1})
+    assert out["steer"] == {"prompt": "make it winter", "ramp_chunks": 4, "provisional": False, "cap": 1.0}
+    check_target(out["steer"])
+    assert out["state"] == {"changes": [], "heard": "make it winter", "keyword": None, "unmatched": False}
+    assert svc.state_fields() == out["state"] and svc.committed_prompt == "make it winter"
+    assert svc.handle({"type": "partial", "text": "make it", "t_client": 1})["steer"] is None
+    assert svc.handle({"type": "tap", "action": "undo"})["steer"] is None
+    with pytest.raises(ValueError):
+        svc.handle({"type": "bogus"})
+
+
+def test_load_reader():
+    assert isinstance(load_reader("standin"), StandinService)
+    with pytest.raises(ValueError):
+        load_reader("nope")

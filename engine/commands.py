@@ -77,8 +77,6 @@ class CommandRecord:
     stage: CommandStage = CommandStage.HEARD
     stamps_ns: dict[str, int] = field(default_factory=dict)
     target: dict | None = None    # the contract 2 message
-    keyword: str | None = None
-    unmatched: bool = False
     applies_from_chunk: int | None = None
 
     def stamps_ms(self) -> dict[str, int]:
@@ -114,19 +112,12 @@ class CommandBook:
         log.info("command %d: HEARD %s %r", rec.seq, source, text)
         return rec
 
-    def decided(self, rec: CommandRecord, target: dict, keyword: str | None = None) -> None:
+    def decided(self, rec: CommandRecord, target: dict) -> None:
+        """The reader returned a steer (contract 2). This record becomes the most recent command."""
         with self._lock:
-            rec.target, rec.keyword, rec.unmatched = target, keyword, False
+            rec.target = target
             self._move(rec, CommandStage.DECIDED, time.monotonic_ns())
             self._latest = rec
-
-    def no_operation(self, rec: CommandRecord, reason: str, report: bool) -> None:
-        """The reader returned nothing. With `report`, this record becomes the latest, with unmatched true."""
-        with self._lock:
-            rec.unmatched = report
-            self._move(rec, CommandStage.DROPPED, time.monotonic_ns(), reason)
-            if report:
-                self._latest = rec
 
     def drop(self, rec: CommandRecord, reason: str) -> None:
         with self._lock:
@@ -187,28 +178,31 @@ class CommandBook:
                         and rec.applies_from_chunk <= chunk:
                     self._move(rec, CommandStage.SHOWN, now)
 
-    def reset(self, replace_steerer: Callable[[], None]) -> None:
+    def reset(self, replace_steerer: Callable[[], None], rec: CommandRecord | None = None) -> None:
         """Drop every command still in flight and replace the steerer and controller, atomically with respect to
-        get_cond and handle."""
+        get_cond and handle.
+
+        `rec` is the reset command itself when it carries a prompt: the new steerer starts on its embedding, so it
+        moves to EMBEDDED here and the first chunk of the new video counts as its generated chunk.
+        """
         with self._lock:
             now = time.monotonic_ns()
-            for rec in self._records:
-                if rec.stage not in TERMINAL:
-                    self._move(rec, CommandStage.DROPPED, now, "reset")
+            for other in self._records:
+                if other is not rec and other.stage not in TERMINAL:
+                    self._move(other, CommandStage.DROPPED, now, "reset")
             replace_steerer()
+            if rec is not None and rec.stage is CommandStage.DECIDED:
+                self._move(rec, CommandStage.EMBEDDED, time.monotonic_ns(), "new video starts on it")
 
     # --- reading -----------------------------------------------------------------------------
 
     def latest_fields(self) -> dict:
-        """The contract 4 fields that describe the most recent command."""
+        """The contract 4 fields the engine fills from the most recent command (the newest that got a steer)."""
         with self._lock:
             rec = self._latest
             if rec is None:
-                return {"stamps": {}, "t_client": None, "applies_from_chunk": None,
-                        "heard": None, "keyword": None, "unmatched": False}
-            return {"stamps": rec.stamps_ms(), "t_client": rec.t_client,
-                    "applies_from_chunk": rec.applies_from_chunk, "heard": rec.text,
-                    "keyword": rec.keyword, "unmatched": rec.unmatched}
+                return {"stamps": {}, "t_client": None, "applies_from_chunk": None}
+            return {"stamps": rec.stamps_ms(), "t_client": rec.t_client, "applies_from_chunk": rec.applies_from_chunk}
 
     def latest(self) -> CommandRecord | None:
         with self._lock:
