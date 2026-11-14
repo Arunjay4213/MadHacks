@@ -26,7 +26,7 @@ cond = steerer.get_cond()
   target to confirm, or a different one to cancel.
 - `steerer.progress` (0 to 1) and `steerer.is_moving` report the current move.
 
-Also exported: `blend(a, b, w)` (per-token slerp of direction, lerp of norm,
+Also exported: `Aligner` (see below), `blend(a, b, w)` (per-token slerp of direction, lerp of norm,
 linear fallback for zero or (anti)parallel tokens; w in [0, 1.3]),
 `apply_strength(without, with_change, s)` (same as `blend`, for "a little" /
 "a lot more"), and `ease(r)` (min-jerk pacing curve).
@@ -54,6 +54,39 @@ ctl.handle({"prompt": p, "ramp_chunks": 4})  # final: confirm, or replace a wron
   (`reason: "unchanged"`).
 - Bad messages raise ValueError (a final message must have cap 1.0); on any
   error nothing changes.
+
+## Aligner (keep shared tokens at the same positions)
+
+Prompts are encoded and zero-padded after the real tokens, so appending or
+removing a phrase shifts later tokens and a per-position blend mixes
+unrelated rows (a word with a comma, a word with padding). The video model's
+text cross-attention has no positional information for text tokens and
+padding rows are zero anywhere, so row order does not matter to it (read
+from the model code; still to be confirmed on the real model). `Aligner`
+moves each real token row so tokens shared with the previous prompt keep
+their position; new tokens take free positions, preferring ones the previous
+prompt did not use, so they fade in from zero.
+
+```python
+from steering import Aligner, Controller, Steerer
+
+aligner = Aligner(length=512)
+# encode: prompt -> (embedding [1, 512, D] with padding zeroed, real token ids)
+emb, ids = encode(initial_prompt)
+steerer = Steerer(aligner.place(emb, ids))   # REQUIRED: initial cond in the aligner's layout
+ctl = Controller(steerer, encode, aligner=aligner)
+```
+
+- `aligner.place(emb, ids)` returns a new tensor and remembers the layout.
+  First call (or after `reset()`) is the identity. Output = the real rows
+  permuted plus exact zeros; nothing lost or duplicated.
+- `prepare(emb, ids)` -> `(placed, layout)` without committing; `commit(layout)`.
+- With an aligner, `encode` must return `(emb, ids)` (TypeError otherwise).
+  The cache keeps that raw pair; placement happens in `handle` just before
+  `set_target`, only for applied messages, and the layout is committed only
+  if `set_target` succeeds. `Controller` raises ValueError if the aligner has
+  no layout yet (the initial prompt was not placed).
+- Without an aligner nothing changes: `encode` returns a tensor.
 
 ## Tests
 
