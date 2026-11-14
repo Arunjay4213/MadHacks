@@ -31,6 +31,22 @@ class MotionFormsTests(unittest.TestCase):
         send(service, 'add a red car parked beside the road')
         self.assertIn('red car parked beside the road', service.committed_prompt)
 
+    def test_direction_edit_keeps_speed_and_placement(self):
+        service = CommandService()
+        send(service, 'add a red car driving fast on a road beside the lake')
+        send(service, 'make the car drive backwards')
+        for detail in ('red car', 'backwards', 'fast', 'on a road beside the lake'):
+            self.assertIn(detail, service.committed_prompt)
+        self.assertNotIn('driving forward', service.committed_prompt)
+
+    def test_more_is_not_lost_inside_an_add_description(self):
+        service = CommandService()
+        send(service, 'add birds')
+        send(service, 'add more birds')
+        self.assertEqual(service.state_fields()['changes'][0]['strength'], 1.3)
+        send(service, 'add more birds')
+        self.assertEqual(service.state_fields()['changes'][0]['strength'], 1.3)
+
     def test_second_object_is_distinct_from_subject_in_base(self):
         service = CommandService(base='a red car driving forward away from the camera')
         send(service, 'add a blue car')

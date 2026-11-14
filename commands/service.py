@@ -114,15 +114,17 @@ class CommandService:
                 return {"steer": self._commit(None, RAMP["default"]), "state": self._fields()}
             changed = self._apply(op)
             self._unmatched = False
+            pace = read(text, self._state.snapshot())["pace"] if isinstance(text, str) else None  # "slowly ..." = 12
+            ramp = RAMP.get(pace or "default", RAMP["default"])
             if prompt is None:
-                return {"steer": self._commit(changed, RAMP["default"]), "state": self._fields()}
+                return {"steer": self._commit(changed, ramp), "state": self._fields()}
             guess_prompt = self._guess_prompt
             self._guess = self._guess_prompt = None
             if prompt == self._committed and guess_prompt is None:
                 steer = None  # same scene, same words: nothing to send
             else:
                 self._committed = prompt
-                steer = self._steer(prompt, RAMP["confirm"] if prompt == guess_prompt else RAMP["default"])
+                steer = self._steer(prompt, RAMP["confirm"] if prompt == guess_prompt and ramp == RAMP["default"] else ramp)
             return {"steer": steer, "state": self._fields()}
 
     def handle(self, msg: dict) -> dict:
@@ -216,7 +218,8 @@ class CommandService:
             except (ValueError, TypeError, KeyError):
                 operations = []
                 break
-            operations.append(op)
+            # A world-with-time phrase is itself a batch: flatten it so the sentence stays one non-nested batch.
+            operations.extend(op["operations"] if op.get("op") == "batch" else [op])
         changed = self._apply(operations[0] if len(operations) == 1 else {"op": "batch", "operations": operations}) if operations else None
         self._unmatched = changed is None
         return self._commit(changed, RAMP.get(pace or "default", RAMP["default"]))

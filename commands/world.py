@@ -7,7 +7,7 @@ Pure stdlib. Imports only dictionary.py, so reader.py can import this module wit
 
 import re
 
-from .dictionary import KEYWORD_RX, normalize
+from .dictionary import KEYWORD_RX, KEYWORDS, normalize
 from .state import DEFAULT_BASE
 
 # Ishaan's template: prompt = SUBJECT + world phrase + STYLE (plain concatenation). Direction wording not final.
@@ -59,9 +59,13 @@ DEFAULT_WORLD = WORLDS["country road"]
 
 # Setting verbs only. "make it" needs an article ("make it a desert"), so "make it night" never matches.
 _SETTING_RX = re.compile(
-    r"^(?:please\s+)?(?:make it(?=\s+an?\b)|take me (?:back )?to|go (?:back )?to|switch to|"
+    r"^(?:please\s+)?(?P<verb>make it(?=\s+an?\b)|take me (?:back )?to|go (?:back )?to|switch to|"
     r"set (?:it|the scene|everything) (?:in|on|at)|move (?:it|us|me|the scene|everything) (?:back )?to|"
     r"change the (?:scene|setting|world|location|background|place|scenery) to)\s+(?:(a|an|the)\s+)?(.+)$")
+# "take me to the beach at night": a known place plus season/weather/time words only.
+_PLACE_RX = re.compile(r"^(?P<place>" + "|".join(sorted(map(re.escape, WORLDS), key=len, reverse=True)) +
+                       r")\s+(?:at|during|in|with|under)\s+(?P<rest>.+)$")
+_REST_STOP = {"a", "an", "the", "and", "of", "full", "heavy", "light", "some"}
 _BLOCKED_RX = re.compile(r"\b(?:don't|dont|do not|not|never|instead of|into|replace|swap)\b")
 _FILLER_TAIL_RX = re.compile(r"(?:\s+\b(?:please|now|instead|for me|again)\b)+$")
 _VAGUE = {"it", "one", "nice", "something", "somewhere", "place", "there", "here", "that", "this", "good", "cool"}
@@ -80,11 +84,16 @@ def world_op(text: str) -> dict | None:
     m = _SETTING_RX.match(t)
     if not m:
         return None
-    article, place = m.group(1), _FILLER_TAIL_RX.sub("", m.group(2)).strip()
+    article, place = m.group(2), _FILLER_TAIL_RX.sub("", m.group(3)).strip()
     if not place:
         return None
     if place in WORLDS:
         return {"op": "add", **WORLDS[place], "strength": 1.0}
+    combo = _place_with_conditions(place)
+    if combo:
+        return combo
+    if m.group("verb").startswith("make it"):
+        return None  # "make it a little spooky" is a mood, not a place: only known places after "make it a"
     words = place.split()
     if KEYWORD_RX.search(place) or len(words) > _MAX_PLACE_WORDS or set(words) <= _VAGUE:
         return None  # "make it a dog", "a desert at night", "misty grove": the reader handles dictionary words
@@ -92,9 +101,28 @@ def world_op(text: str) -> dict | None:
     return {"op": "add", "label": place, "kind": "world", "phrase": phrase, "strength": 1.0}
 
 
+def _place_with_conditions(place: str):
+    """{"op": "batch", ...} for a known place plus season/weather/time words ("beach at night"), else None.
+    Carries "label" so callers can show the world as the keyword; the batch is one undo step."""
+    m = _PLACE_RX.match(place)
+    if not m:
+        return None
+    rest = m.group("rest")
+    matches = list(KEYWORD_RX.finditer(rest))
+    leftover = KEYWORD_RX.sub(" ", rest).split()
+    if not matches or any(w not in _REST_STOP for w in leftover):
+        return None
+    entries = [KEYWORDS[x.group(0)] for x in matches]
+    if any(e["kind"] not in ("time", "weather", "season") for e in entries):
+        return None
+    world = WORLDS[m.group("place")]
+    ops = [{"op": "add", **world, "strength": 1.0}] + [{"op": "add", **e, "strength": 1.0} for e in entries]
+    return {"op": "batch", "operations": ops, "label": world["label"]}
+
+
 def world_phrase(snapshot: dict) -> str:
     """The active world's phrase (most recent world change), else the default world."""
-    worlds = [c for c in snapshot.get("changes", []) if c.get("kind") == "world"]
+    worlds = [c for c in snapshot.get("changes", []) if c.get("kind") == "world" and c.get("strength", 1.0) > 0]
     return worlds[-1]["phrase"] if worlds else DEFAULT_WORLD["phrase"]
 
 
@@ -111,7 +139,8 @@ def world_with_overrides(world_change: dict | None, changes: list) -> str | None
     segments = _SEGMENTS.get(_PHRASES.get(phrase))
     if segments is None:
         return phrase
-    explicit = {c["kind"]: c["label"] for c in changes if c.get("kind") in ("time", "weather", "season")}
+    explicit = {c["kind"]: c["label"] for c in changes
+                if c.get("kind") in ("time", "weather", "season") and c.get("strength", 1.0) > 0}  # zero = no effect
     kept = [text for text, tags in segments if all(explicit.get(k, v) == v for k, v in tags.items())]
     return "".join(kept) + "."
 

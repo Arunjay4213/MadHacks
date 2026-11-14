@@ -272,6 +272,19 @@ def read(text: str, snapshot: dict) -> dict:
         subject = " ".join(_MOTION_RX.sub(" ", subject).split())
         action = _motion_tail(t[kw.end():])
         action = _MOTION_FORMS.get(motion.group(0), motion.group(0)) + action[motion.end():]
+        if old_motion:
+            tail = old_phrase[old_motion.end():].strip()
+            location = _PREP_RX.search(" " + tail)
+            split = max(0, location.start()) if location else len(tail)
+            manner, placement = tail[:split], tail[split:].strip()
+            manner = re.sub(r"\b(?:forwards?|backwards?|ahead|in reverse)\b", " ", manner)
+            if re.search(r"\b(?:fast|slow|slowly|quickly|rapidly)\b", action):
+                manner = re.sub(r"\b(?:fast|slow|slowly|quickly|rapidly)\b", " ", manner)
+            if re.search(r"\b(?:towards?|away from)\b", action):
+                manner = re.sub(r"\b(?:towards?|away from)\b.*$", "", manner)
+            if _PREP_RX.search(" " + action):
+                placement = ""
+            action = " ".join((action + " " + manner + " " + placement).split())
         return out({"op": "add", **entry, "phrase": f"{subject} {action}",
                     "strength": existing["strength"]}, keyword)
     rest = t[: kw.start()] + " " + t[kw.end():]  # strength words outside the noun itself ("light house" is not "light")
@@ -281,6 +294,10 @@ def read(text: str, snapshot: dict) -> dict:
     description_match = add_verb or (_ADD_RX.search("add " + t) if bare else None)
     if entry["kind"] == "extra" and description_match:
         rest = t[:add_verb.start()] if add_verb else ""  # noun descriptions carry attributes, not strength
+        if _MORE_RX.search(description_match.group(2)):
+            rest += " more"
+        elif _LESS_RX.search(description_match.group(2)):
+            rest += " less"
     strength = strength_for(rest, current)
     if entry["kind"] == "extra":
         if description_match:

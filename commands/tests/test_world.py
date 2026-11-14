@@ -56,8 +56,11 @@ class RecognitionTest(unittest.TestCase):
 
     def test_season_weather_time_and_objects_are_not_hijacked(self):
         for text in ["make it winter", "make it a winter wonderland", "make it night", "make it a dog", "make it a red car",
-                     "make it rainy", "make it a desert at night", "make it a sunny beach"]:
+                     "make it rainy", "make it a sunny beach"]:
             self.assertIsNone(world_op(text), text)
+        # A known place plus time words is one world + time batch (PR #88), not None.
+        combo = world_op("make it a desert at night")
+        self.assertEqual([o["label"] for o in combo["operations"]], ["desert", "night"])
 
     def test_arbitrary_places_fall_back_to_the_spoken_place(self):
         self.assertEqual(world_op("take me to an abandoned train station"),

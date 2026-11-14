@@ -5,7 +5,7 @@ from .world import compose_base, world_with_overrides
 
 
 def compose(snapshot):
-    worlds = [c for c in snapshot['changes'] if c['kind'] == 'world']
+    worlds = [c for c in snapshot['changes'] if c['kind'] == 'world' and c['strength'] > 0]  # zero strength: no effect
     base, world, style = snapshot['base'], None, ''
     if worlds:
         world = world_with_overrides(worlds[-1], snapshot['changes'])
