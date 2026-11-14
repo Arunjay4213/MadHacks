@@ -478,3 +478,86 @@ def test_clean_anchor_after_option(no_cuda):
     assert b._clean_anchor is out.latents and b.clean_anchor_chunk == 0
     with pytest.raises(ValueError):
         make_backend(clean_anchor_after=-1)
+
+
+# ---------------------------------------------------------------- chunk start and decoder restart
+
+
+def test_chunk_start_marks_first_frames(no_cuda):
+    b = make_backend()
+    a = torch.full((1, 3, 8), 1.0)
+    b.reset(seed=0)
+    starts = [b.generate_chunk(a).start for _ in range(10)]
+    starts.append(b.generate_chunk(a, rebase=cf.Rebase(keep=0, anchor_step=2)).start)
+    starts.append(b.generate_chunk(a).start)
+    starts.append(b.generate_chunk(a, rebase=cf.Rebase(keep=2)).start)
+    b.reanchor(0.5, source="clean")
+    starts.append(b.generate_chunk(a).start)
+    F, C = cf.ChunkStart.FIRST_FRAME, cf.ChunkStart.CONTINUE
+    assert starts == [F] + [C] * 9 + [F, C, C, F]
+    b.reset(seed=0)
+    assert b.generate_chunk(a).start is F
+
+
+class StubTaehv:
+    """decode_video stand-in: 4 frames per latent, each frame's value is its latent's mean."""
+
+    def __init__(self):
+        self.inputs = []
+
+    def decode_video(self, x, parallel=False):
+        self.inputs.append([round(float(v), 3) for v in x[0].float().mean(dim=(1, 2, 3))])
+        vals = x[0].float().mean(dim=(1, 2, 3)).repeat_interleave(4)
+        return vals.reshape(1, -1, 1, 1, 1).expand(1, len(vals), 3, 2, 2).clone()
+
+
+def make_decoder(monkeypatch, pad="hold"):
+    monkeypatch.setattr(torch.Tensor, "record_stream", lambda self, s: None, raising=False)
+    d = cf._Decoder.__new__(cf._Decoder)
+    d.vae_type = cf.VaeType.TAEHV
+    d.device = torch.device("cpu")
+    d.dtype = torch.float32
+    d.first_frame_pad = cf.FirstFramePad(pad)
+    d.frames_per_chunk = 4
+    d.restarts = 0
+    d.stream = _Null()
+    d.stream.wait_event = lambda e: None
+    d.model = StubTaehv()
+    d.video_id = None
+    d._start_video(0)
+    return d
+
+
+def chunk(i, value, start=cf.ChunkStart.CONTINUE, video=1):
+    return cf.ChunkLatents(latents=torch.full((1, 1, 2, 2, 2), value), video_id=video, chunk_index=i,
+                           ready=None, start=start)
+
+
+@pytest.mark.parametrize("pad, cut_frames", [("hold", 4), ("none", 1)])
+def test_decoder_restarts_on_a_first_frame_mid_video(no_cuda, monkeypatch, pad, cut_frames):
+    d = make_decoder(monkeypatch, pad)
+    F = cf.ChunkStart.FIRST_FRAME
+    # Values in (0, 1) map to pixels (2v - 1 + 1) * 127.5 = 255 v.
+    outs = [d.decode(chunk(0, 0.1, F))] + [d.decode(chunk(i, 0.1 * (i + 1))) for i in range(1, 5)]
+    assert [len(o) for o in outs] == [1, 4, 4, 4, 4]  # the first chunk of a video: 1 frame, as before
+    cut = d.decode(chunk(5, 0.8, F))
+    nxt = d.decode(chunk(6, 0.9))
+    # The cut is decoded alone (no old context), like a first chunk; the next one with only the cut as context.
+    assert d.model.inputs[-2] == [0.8] and d.model.inputs[-1] == [0.8, 0.9]
+    assert len(cut) == cut_frames and (cut == round(0.8 * 255)).all()
+    assert len(nxt) == 4 and (nxt == round(0.9 * 255)).all()
+    assert d.restarts == 1 and d.video_id == 1 and d.next_chunk_index == 7
+    assert d.decode(chunk(7, 0.5)).shape[0] == 4 and d.model.inputs[-1] == [0.8, 0.9, 0.5]
+
+
+def test_decoder_first_frame_of_a_new_video_is_not_a_restart(no_cuda, monkeypatch):
+    d = make_decoder(monkeypatch)
+    assert len(d.decode(chunk(0, 0.1, cf.ChunkStart.FIRST_FRAME, video=3))) == 1
+    assert d.restarts == 0
+
+
+def test_first_frame_pad_option_is_checked():
+    with pytest.raises(ValueError):
+        cf.FirstFramePad("repeat")
+    with pytest.raises(ValueError):
+        cf.Backend(64, 64, None, "cpu", "cpu", first_frame_pad="repeat")

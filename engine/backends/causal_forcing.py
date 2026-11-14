@@ -104,6 +104,16 @@ class GenState(enum.Enum):
     STREAMING = "streaming"  # frame cache holds past frames; next call continues the video
 
 
+class ChunkStart(enum.Enum):
+    CONTINUE = "continue"  # the latent continues the previous one (decoded with the stream's context)
+    FIRST_FRAME = "first_frame"  # a first-frame latent: the first chunk of a video, or a hard cut (keep-0 rebase)
+
+
+class FirstFramePad(str, enum.Enum):
+    HOLD = "hold"  # a hard cut mid-video emits its 1 clean frame repeated to the usual chunk length
+    NONE = "none"  # a hard cut mid-video emits its 1 frame, as the first chunk of a video does
+
+
 class DecoderState(enum.Enum):
     EMPTY = "empty"  # no chunk of the current video decoded yet
     STREAMING = "streaming"  # streaming decode state holds the previous chunks of this video
@@ -117,6 +127,7 @@ class ChunkLatents:
     video_id: int  # increases on every reset(); the decoder starts fresh when it changes
     chunk_index: int  # 0 for the first chunk of a video
     ready: torch.cuda.Event  # recorded on the generation stream after `latents` was written
+    start: ChunkStart = ChunkStart.CONTINUE  # FIRST_FRAME: the decoder restarts its stream state for it
 
 
 @dataclasses.dataclass(frozen=True)
@@ -181,8 +192,12 @@ def _timestep_list(scheduler, steps_1000: list[int], warp: bool) -> torch.Tensor
 class _Decoder:
     """Streaming VAE decode. Owns all of its state; only ChunkLatents cross the boundary."""
 
-    def __init__(self, repo_dir: str, vae_type: VaeType, device: torch.device, latent_hw: tuple[int, int], dtype=torch.float16):
+    def __init__(self, repo_dir: str, vae_type: VaeType, device: torch.device, latent_hw: tuple[int, int], dtype=torch.float16,
+                 first_frame_pad: FirstFramePad = FirstFramePad.HOLD, frames_per_chunk: int = VIDEO_FRAMES_PER_LATENT):
         self.vae_type = vae_type
+        self.first_frame_pad = FirstFramePad(first_frame_pad)
+        self.frames_per_chunk = frames_per_chunk
+        self.restarts = 0  # mid-video stream restarts (hard cuts), for tests and logs
         self.device = device
         self.dtype = dtype
         self.latent_hw = latent_hw
@@ -220,6 +235,10 @@ class _Decoder:
     def _start_video(self, video_id: int):
         self.video_id = video_id
         self.next_chunk_index = 0
+        self._restart_stream()
+
+    def _restart_stream(self):
+        """Forget the decoded past (as for a new video), keeping video_id and the chunk count."""
         self.state = DecoderState.EMPTY
         self._wan_cache = None
         self._taehv_context = None
@@ -230,6 +249,13 @@ class _Decoder:
             self._start_video(chunk.video_id)
         if chunk.chunk_index != self.next_chunk_index:
             raise ValueError(f"decode_chunk got chunk {chunk.chunk_index}, expected {self.next_chunk_index} (chunks must be decoded in order)")
+        # A hard cut makes a first-frame latent. Decoding it as a continuation, with the old scene's
+        # context, gives a washed-out, ghosted chunk and a soft next one; decode it as a new video's
+        # first chunk instead (1 frame), padded to the usual length unless first_frame_pad is "none".
+        cut = chunk.start is ChunkStart.FIRST_FRAME and self.state is DecoderState.STREAMING
+        if cut:
+            self._restart_stream()
+            self.restarts += 1
 
         with torch.cuda.device(self.device), torch.cuda.stream(self.stream):
             self.stream.wait_event(chunk.ready)
@@ -258,6 +284,8 @@ class _Decoder:
             frames = ((pixels[0].float().clamp_(-1, 1) + 1.0) * 127.5).round_().to(torch.uint8).permute(0, 2, 3, 1).contiguous()
             out = frames.cpu().numpy()  # waits for this stream only
 
+        if cut and self.first_frame_pad is FirstFramePad.HOLD and 0 < len(out) < self.frames_per_chunk:
+            out = np.concatenate([out, np.repeat(out[-1:], self.frames_per_chunk - len(out), axis=0)])
         self.state = DecoderState.STREAMING
         self.next_chunk_index += 1
         return out
@@ -283,12 +311,14 @@ class Backend:
         text_encoder_device: Optional[str] = None,
         compile: bool = False,
         seed: int = 0,
+        first_frame_pad: str = "hold",
         **auto_rebase,
     ):
         if width % 16 or height % 16:
             raise ValueError("width and height must be multiples of 16 (VAE x8, then patch x2)")
         if variant not in VARIANTS:
             raise ValueError(f"unknown variant {variant}; choose from {sorted(VARIANTS)}")
+        first_frame_pad = FirstFramePad(first_frame_pad)  # fails before any weights load
         self.width, self.height = width, height
         self.variant = variant
         self.device = torch.device(device)
@@ -362,7 +392,8 @@ class Backend:
             self._text_lock = threading.Lock()
             self._text_stream = torch.cuda.Stream(device=self.text_device)
 
-            self.decoder = _Decoder(repo_dir, VaeType(vae), self.decode_device, self.latent_hw)
+            self.decoder = _Decoder(repo_dir, VaeType(vae), self.decode_device, self.latent_hw,
+                                    first_frame_pad=FirstFramePad(first_frame_pad), frames_per_chunk=self.frames_per_chunk)
 
         if compile:
             self.generator.model.compile(mode="max-autotune-no-cudagraphs")
@@ -641,6 +672,7 @@ class Backend:
             lh, lw = self.latent_hw
             noisy = torch.randn([1, f, LATENT_CHANNELS, lh, lw], device=self.device, dtype=self.dtype, generator=self._rng)
             schedule = self.first_chunk_steps if self.state is GenState.EMPTY else self.denoising_steps
+            start = ChunkStart.FIRST_FRAME if self.state is GenState.EMPTY else ChunkStart.CONTINUE
             if plan is not None:
                 x_last = self._history[-1] if self._history else None
                 from_clean = plan.from_clean and self._clean_anchor is not None
@@ -654,6 +686,7 @@ class Backend:
                 keep = self._rebase(plan, cond_dict)
                 if keep == 0:
                     schedule = self.first_chunk_steps  # a hard cut: this is a first frame again
+                    start = ChunkStart.FIRST_FRAME  # and the decoder restarts for it
                 n = plan.anchor_step
                 if n is not None:
                     if reason is not None:
@@ -712,7 +745,7 @@ class Backend:
 
             ready = torch.cuda.Event()
             ready.record(self._gen_stream)
-            out = ChunkLatents(latents=denoised, video_id=self.video_id, chunk_index=self.chunk_index, ready=ready)
+            out = ChunkLatents(latents=denoised, video_id=self.video_id, chunk_index=self.chunk_index, ready=ready, start=start)
             self.frame_index += f
             self.chunk_index += 1
             self.state = GenState.STREAMING
@@ -739,6 +772,8 @@ def load(width: int, height: int, steps: Optional[int] = None, device: str = "cu
     steer_fire_on_change (1), refresh_every (0 = off), refresh_keep (6), refresh_memory_noise (0).
     clean_anchor_after (3): chunks after a reset or a steer re-anchor at which the clean anchor is
     saved; reanchor(strength, source="clean") starts from it.
+    first_frame_pad ("hold" or "none"): a hard cut (keep-0 rebase, every re-anchor) is decoded as a
+    new video's first chunk, 1 frame; "hold" repeats it to the usual chunk length, "none" emits 1.
     """
     # Options may arrive as strings from the server's --backend-opt KEY=VALUE.
     flag = lambda v: v if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes", "on")  # noqa: E731
