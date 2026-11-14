@@ -13,6 +13,8 @@ appears while the snow stays. You say "remove the river" and only the river goes
 
 Nothing is trained. All of it happens while the model is running.
 
+We build on interactive world models to let you shape the scene as it unfolds.
+
 Your changes stay on screen as named chips. Undo takes you back a step. Say
 "slowly" to ease into a change, or "a little" to keep it subtle. The video keeps
 moving while you shape the scene.
@@ -23,7 +25,7 @@ moving while you shape the scene.
    + night. Use captured demo images only once those changes work visibly.
 2. **Words to state to pixels.** Text/mic → keyword or slow reader → reversible
    scene state → deterministic prompt → steerer → engine → browser. Mark the
-   video model and highlight the command, state and steering modules.
+   interactive world model and highlight the command, state and steering modules.
 3. **What we measured and what remains.** Report [actual GPU], [resolution/FPS],
    [command-to-frame proxy], [visible switch behavior], and [failure cases]. List
    typed and voice results separately. CPU unit tests are not GPU benchmarks.
@@ -32,7 +34,7 @@ moving while you shape the scene.
 
 - **Inspiration:** interactive visual storytelling controlled by speech.
 - **What it does:** include only features demonstrated on the final integrated system.
-- **How we built it:** Python command/state layer, the team's steering and engine,
+- **How we built it:** built on interactive world models, with a Python command/state layer, the team's steering and engine,
   and Ani's browser interface. Name the exact pretrained model and version used.
 - **Challenges:** provisional speech revisions, stable phrases across prompt
   changes, coherent removals, and running generation within the compute budget.
