@@ -58,7 +58,10 @@ It sits in `PROTOCOL` in `lib.js` and in `fake-server.mjs`.
 
 1. Page against the fake server: done. Text box keeps focus (buttons never take it; blur and window focus refocus).
 2. Text box sends: done (paste at once, simulated keys after 200 ms, typing after 1.5 s; no Enter needed).
-3. Live mic: push-to-talk key becomes one setting, never Ctrl (Wispr Flow's hotkey on the demo laptop).
+3. Live mic: done. Push-to-talk key is `PUSH_TO_TALK_CODE` in `lib.js` (default backtick), ignored with Ctrl/Cmd/Alt
+   so it never clashes with Wispr Flow's Ctrl hotkey, and never types into the box. The mic toggle restarts Chrome's
+   recognizer when it ends by itself; blocked-mic and network errors are explained; the mic is disabled outside a
+   secure context (HTTPS or localhost). Needs a real voice test on the demo laptop.
 4. to 6.: chips and undo on real state, delay and highlight polish, big-screen layout.
 
 ## Open

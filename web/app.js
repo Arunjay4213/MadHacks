@@ -2,7 +2,7 @@
 import {
   PROTOCOL, TYPING_IDLE_MS, BURST_IDLE_MS, partialMsg, finalMsg, tapMsg, parseFrame, parseServerMessage,
   splitKeyword, backoffMs, makeFrameGate, makeLatencyTracker, makeTranscriber,
-  changesKey, commandKey, makeInputClassifier,
+  changesKey, commandKey, makeInputClassifier, PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
 } from './lib.js';
 
 const $ = (id) => document.getElementById(id);
@@ -202,7 +202,9 @@ el.form.addEventListener('submit', (e) => {
 const refocus = () => setTimeout(() => document.activeElement !== el.command && el.command.focus(), 0);
 // Buttons never take focus: blocking mousedown keeps focus in the box, and the click still fires.
 document.addEventListener('mousedown', (e) => e.target.closest('button') && e.preventDefault());
-el.command.addEventListener('blur', refocus); // anything else that steals it gives it straight back
+// Anything else on the page that takes focus gives it straight back. When focus leaves the page
+// (address bar, another app) do not fight for it: the window focus handler restores it on return.
+el.command.addEventListener('blur', () => document.hasFocus() && refocus());
 window.addEventListener('focus', refocus); // returning from another app
 document.addEventListener('pointerup', refocus);
 
@@ -212,30 +214,47 @@ el.undo.addEventListener('click', () => send(tapMsg('undo')));
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const transcriber = makeTranscriber(send);
 let rec = null;
-let listening = null; // 'toggle' | 'ptt' | null
+let listening = null; // what the user asked for: 'toggle' | 'ptt' | null
+let startedAt = 0;
 
 function startListening(mode) {
   if (!Recognition || listening) return;
   listening = mode;
+  begin();
+  renderMic();
+}
+
+function begin() {
   rec = new Recognition();
   rec.continuous = true;
   rec.interimResults = true;
   rec.lang = 'en-US';
   transcriber.start();
+  startedAt = performance.now();
   rec.onresult = (e) => transcriber.handle(Array.from(e.results, (r) => ({ transcript: r[0].transcript, isFinal: r.isFinal })));
-  rec.onerror = (e) => e.error !== 'no-speech' && e.error !== 'aborted' && showError(`Mic: ${e.error}`);
+  rec.onerror = (e) => {
+    const text = micErrorText(e.error);
+    if (!text) return;
+    showError(text);
+    listening = null; // a real failure: do not restart into it
+  };
   rec.onend = () => {
     transcriber.flush(); // leftover interim text becomes one final, once
     rec = null;
+    // Chrome ends recognition by itself after a pause; keep listening while the mic toggle is on,
+    // unless it ended at once (then restarting would just spin).
+    if (listening === 'toggle' && performance.now() - startedAt > 500) return begin();
     listening = null;
     renderMic();
   };
   rec.start();
-  renderMic();
 }
 
 function stopListening(mode) {
-  if (rec && listening === mode) rec.stop(); // onend flushes
+  if (listening !== mode) return;
+  listening = null; // so onend does not restart
+  renderMic();
+  rec?.stop(); // onend flushes the last words
 }
 
 function renderMic() {
@@ -243,25 +262,34 @@ function renderMic() {
   el.ptt.setAttribute('aria-pressed', String(listening === 'ptt'));
 }
 
-if (!Recognition) {
+const micUnavailable = !Recognition
+  ? 'This browser has no speech recognition; use Chrome'
+  : !window.isSecureContext
+    ? 'The mic needs HTTPS or localhost; open the page through an HTTPS tunnel or an SSH port-forward'
+    : null;
+const keyLabel = { Backquote: '`' }[PUSH_TO_TALK_CODE] ?? PUSH_TO_TALK_CODE;
+
+if (micUnavailable) {
   for (const b of [el.mic, el.ptt]) {
     b.disabled = true;
-    b.title = 'This browser has no speech recognition; use Chrome';
+    b.title = micUnavailable;
   }
 } else {
+  el.ptt.title = `Hold to talk (or hold the ${keyLabel} key)`;
   el.mic.addEventListener('click', () => (listening === 'toggle' ? stopListening('toggle') : startListening('toggle')));
   el.ptt.addEventListener('pointerdown', (e) => {
     el.ptt.setPointerCapture(e.pointerId);
     startListening('ptt');
   });
   for (const ev of ['pointerup', 'pointercancel']) el.ptt.addEventListener(ev, () => stopListening('ptt'));
-  // Backtick is push-to-talk: it never types into the box.
+  // Push-to-talk key (PUSH_TO_TALK_CODE in lib.js): never with Ctrl, which is Wispr Flow's hotkey,
+  // and it never types into the box.
   document.addEventListener('keydown', (e) => {
-    if (e.key !== '`') return;
+    if (!isPushToTalk(e)) return;
     e.preventDefault();
     if (!e.repeat) startListening('ptt');
   });
-  document.addEventListener('keyup', (e) => e.key === '`' && stopListening('ptt'));
+  document.addEventListener('keyup', (e) => e.code === PUSH_TO_TALK_CODE && stopListening('ptt'));
   window.addEventListener('blur', () => stopListening('ptt'));
 }
 
