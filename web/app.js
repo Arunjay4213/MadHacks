@@ -3,7 +3,7 @@ import {
   PROTOCOL, TYPING_IDLE_MS, BURST_IDLE_MS, partialMsg, finalMsg, tapMsg, parseFrame, parseServerMessage,
   splitKeyword, backoffMs, makeFrameGate, makeLatencyTracker, makeTranscriber,
   changesKey, commandKey, makeInputClassifier, PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
-  wsBaseUrl, fitSize,
+  wsBaseUrl, fitSize, videoNotice, formatStamps,
 } from './lib.js';
 
 const $ = (id) => document.getElementById(id);
@@ -11,6 +11,7 @@ const el = {
   video: $('video'), connection: $('connection'), banner: $('mode-banner'), words: $('words'),
   changes: $('changes'), form: $('command-form'), command: $('command'), mic: $('mic'),
   ptt: $('ptt'), undo: $('undo'), latency: $('latency'), timing: $('timing'), error: $('error'),
+  notice: $('video-notice'),
 };
 const ctx = el.video.getContext('2d');
 // Same origin by default; `?server=host:port` points the page at another server (e.g. the engine on :8000).
@@ -21,6 +22,16 @@ const wsBase = wsBaseUrl(params.get('server'), location);
 const DEBUG = params.get('debug') === '1';
 const latency = makeLatencyTracker();
 const PROXY_NOTE = 'command sent → first frame tagged with its chunk drawn to the canvas (page clock; chunk-tag proxy, not proof the picture changed or was painted)';
+el.latency.title = PROXY_NOTE;
+
+// What the notice over the video says: connecting, connection lost, or paused (no frames).
+const link = { controlOpen: false, framesOpen: false, lastFrameAt: null, everConnected: false };
+function renderNotice() {
+  const text = videoNotice({ ...link, now: performance.now() });
+  el.notice.textContent = text || '';
+  el.notice.hidden = !text;
+}
+setInterval(renderNotice, 250);
 
 function showError(text) {
   el.error.textContent = text || '';
@@ -56,6 +67,8 @@ function connectControl() {
   control = ws;
   ws.onopen = () => {
     attempt = 0;
+    link.controlOpen = true;
+    link.everConnected = true;
     setConnected(true);
     showError('');
   };
@@ -68,6 +81,8 @@ function connectControl() {
   };
   ws.onclose = () => {
     if (control !== ws) return;
+    link.controlOpen = false;
+    renderNotice();
     latency.reset(); // a stale command can no longer be correlated
     el.latency.textContent = '—'; // no number without a measured frame
     setConnected(false);
@@ -144,7 +159,10 @@ let frameAttempt = 0;
 function connectFrames() {
   const ws = new WebSocket(wsBase + PROTOCOL.framesPath);
   ws.binaryType = 'arraybuffer';
-  ws.onopen = () => (frameAttempt = 0);
+  ws.onopen = () => {
+    frameAttempt = 0;
+    link.framesOpen = true;
+  };
   ws.onmessage = async (e) => {
     const f = parseFrame(e.data);
     if (!f) return;
@@ -167,16 +185,24 @@ function connectFrames() {
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(bmp, 0, 0, size.width, size.height);
     bmp.close();
+    link.lastFrameAt = performance.now();
     const r = latency.onFrameDrawn(f.chunk);
     if (r) renderLatency(r);
   };
-  ws.onclose = () => setTimeout(connectFrames, backoffMs(frameAttempt++));
+  ws.onclose = () => {
+    link.framesOpen = false;
+    link.lastFrameAt = null;
+    renderNotice();
+    setTimeout(connectFrames, backoffMs(frameAttempt++));
+  };
 }
 
+// The big number is command -> first new frame on screen; the line under it is the server's own
+// stamps, shortened. The full definition is in the number's tooltip.
 function renderLatency({ ms, stamps }) {
   el.latency.textContent = `${ms} ms`;
-  const s = stamps ? ` · server stamps (ms after heard): ${Object.entries(stamps).map(([k, v]) => `${k} ${v}`).join(', ')}` : '';
-  el.timing.textContent = PROXY_NOTE + s;
+  const s = formatStamps(stamps);
+  el.timing.textContent = s ? `voice → video · server: ${s}` : 'voice → video';
 }
 
 // ---------- text box (Wispr Flow pastes here) ----------
@@ -306,7 +332,7 @@ setConnected(false);
 el.connection.dataset.state = 'connecting';
 el.connection.textContent = 'Connecting…';
 el.latency.textContent = '—';
-el.timing.textContent = 'Delay unavailable until the server correlates a command with a chunk.';
+el.timing.textContent = 'voice → video: measured after your first command';
 connectControl();
 connectFrames();
 el.command.focus();

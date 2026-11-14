@@ -105,6 +105,23 @@ export function splitKeyword(text, keyword) {
 
 export const backoffMs = (attempt) => Math.min(5000, 250 * 2 ** attempt);
 
+// How long without a frame, while connected, before the page says the video has paused.
+export const STALL_MS = 2000;
+
+// The notice shown over the video, or null when the video is live.
+export function videoNotice({ controlOpen, framesOpen, lastFrameAt, now, everConnected }) {
+  if (!controlOpen || !framesOpen) return everConnected ? 'Connection lost, reconnecting…' : 'Connecting to the video server…';
+  if (lastFrameAt === null) return 'Waiting for the first frame…';
+  if (now - lastFrameAt > STALL_MS) return 'Video paused: no frames from the server';
+  return null;
+}
+
+// Server stamps (ms after the server heard the command) as one short line, in pipeline order.
+export function formatStamps(stamps) {
+  if (!stamps) return '';
+  return ['decided', 'embedded', 'generated', 'shown'].filter((k) => isNum(stamps[k])).map((k) => `${k} ${stamps[k]}`).join(' · ');
+}
+
 // Websocket base URL from the page location and an optional `?server=` value: either `host:port`
 // (ws, or wss on an https page) or a full `ws://` / `wss://` / `http(s)://` URL, e.g. an HTTPS tunnel.
 export function wsBaseUrl(server, location) {
