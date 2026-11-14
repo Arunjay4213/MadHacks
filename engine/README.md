@@ -59,7 +59,81 @@ Open the printed address for the engine test viewer, or give it to the web page 
 The address changes each time the tunnel restarts; restarting only the server keeps the address.
 The engine has no login, so anyone who has the address can watch and send commands; keep it inside the team.
 It is one shared video: every viewer sees every command and reset, so run automated checks against a local `--backend fake` server.
+With the systemd units (next section) the server and the tunnel restart on their own; the tmux commands above are the manual way.
 Without the tunnel, use an SSH port forward from a machine that has SSH access: `ssh -N -L 8000:127.0.0.1:8000 madhacks-engine`, then open http://127.0.0.1:8000/.
+
+### Process supervision (systemd)
+
+`engine/deploy/` holds two systemd units and a helper script:
+
+- `madhacks-engine.service` runs the server with the live command line above (plus `--record-dir /home/ubuntu/recordings`), with `Restart=always`, `RestartSec=2` and no start limit.
+- `madhacks-tunnel.service` runs `cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8000` with `Restart=always`.
+- `tunnel-address.sh` prints the current trycloudflare address from the tunnel unit's journal (only the current run, so never an old address); it waits up to 30 s for it.
+
+They are system units with `User=ubuntu`, not user units.
+A system unit starts at boot and keeps running with nobody logged in, with no `loginctl enable-linger` step, and its log is in the system journal, which the `ubuntu` user (group `adm`) can read.
+Install them once (needs sudo), after stopping the tmux sessions `engine` and `tunnel` so port 8000 is free:
+
+```
+sudo cp ~/madhacks/engine/deploy/madhacks-engine.service ~/madhacks/engine/deploy/madhacks-tunnel.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now madhacks-engine madhacks-tunnel
+bash ~/madhacks/engine/deploy/tunnel-address.sh
+journalctl -u madhacks-engine -f     # the server log
+```
+
+The tunnel unit expects `cloudflared` in `/usr/local/bin` or `/usr/bin`; if it is elsewhere, change `ExecStart` to its full path.
+A quick tunnel gets a NEW address every time cloudflared restarts (a crash, `systemctl restart madhacks-tunnel`, or a reboot), so after that run `tunnel-address.sh` and post the new address again.
+Restarting only the engine keeps the tunnel and its address.
+The engine unit uses `KillMode=mixed`: `systemctl stop` sends SIGTERM to the server only, which finalizes the open recording before it exits.
+With the default mode ffmpeg would get SIGTERM at the same moment and cut the file short.
+
+## Crash recovery
+
+A crash is handled in two layers, because loading the model takes 70 to 90 s and a crash should cost under 10 s.
+
+1. In-process recovery.
+   If the generation or decode thread raises, the engine logs the traceback and the generation thread moves GENERATING (or RESETTING) -> RECOVERING.
+   It drops every chunk waiting for decode and every frame waiting to be sent, calls `backend.reset()`, and restarts the steerer on the starting prompt through `Controller.reset`, the same as a reset to the starting prompt.
+   The model stays loaded.
+   Then RECOVERING -> GENERATING, and a new video (and a new recording file) starts.
+   The log says `recovery: video resumed N ms after the crash`, and `/stats` shows `recovery.count` and `recovery.last.resumed_ms`.
+   With the fake backend the video resumes about 230 ms after the crash.
+2. Process restart.
+   If 3 crashes happen within 60 s (counting a crash during recovery itself), the engine moves to FAILED, finalizes the recording and exits with code 70.
+   An error before generation starts (for example while loading the model) also ends in FAILED and exit code 70.
+   systemd starts a fresh process 2 s later, which then loads the model again (70 to 90 s with the real model, about 3.5 s with the fake one).
+   A crash that kills the process outright (`kill -9`, out of memory) goes straight to this layer.
+
+The fake backend can inject crashes for testing: `--backend-opt fail_on_chunk=N` raises in `generate_chunk` from chunk N on, `fail_count` times in total (default 1); `--backend-opt fail_in=decode` raises in `decode_chunk` instead.
+For example, `fail_on_chunk=40` shows one in-process recovery, and `fail_on_chunk=40 fail_count=3` shows the FAILED exit and, under systemd, the restart.
+
+## Recorder
+
+Every video the engine streams is saved as an mp4 on the engine machine, in `--record-dir` (default `~/recordings`; `--record-dir none` turns it off).
+A video, and so a file, runs from server start, a reset or a recovery to the next reset, recovery or stop.
+Files are named by their UTC start time and the session number in this process, for example `20261114T220704Z-s001.mp4`.
+
+- The recorder takes the same JPEG frames the streamer sends, at `backend.fps`.
+  The streamer only puts each frame on a bounded queue (64 frames); when the queue is full the frame is dropped and counted, so recording never slows streaming or generation.
+- The recorder thread pipes the JPEGs into an `ffmpeg` subprocess (mjpeg in, libx264 `veryfast`, CRF 23, yuv420p, at `nice` 10, 2 threads), so encoding runs in another process.
+  `engine/setup_gpu.sh` installs ffmpeg; if it is missing, the server logs one warning and the recorder stays DISABLED.
+- On a reset and on a clean stop the file is finalized (ffmpeg's input is closed and it finishes the file).
+- Files are fragmented mp4 with a fragment every 2 s, written to disk as each fragment finishes, so a file whose process was killed with `kill -9` still plays up to its last 2 s.
+- When the folder holds more than `--record-max-gb` (default 20), the oldest `.mp4` files are deleted before a new file starts.
+- If ffmpeg fails, the recorder logs it, moves to ERROR and drops that video's frames; the next video tries a new file.
+
+| Recorder state | Meaning | Next |
+|---|---|---|
+| DISABLED | no record dir, or ffmpeg missing; frames are ignored | none |
+| IDLE | running, no file open | RECORDING, ERROR, STOPPED |
+| RECORDING | writing one video into one file | FINALIZING, ERROR |
+| FINALIZING | ffmpeg's input is closed; waiting for it to finish the file | IDLE, ERROR, STOPPED |
+| ERROR | ffmpeg failed for the current video | RECORDING (next video), ERROR, STOPPED |
+| STOPPED | stopped; the last file is finalized | none |
+
+`/stats` reports it under `recorder`: `state`, `file`, `frames_written` (in the current file), `frames_dropped` (whole run), `sessions` and `error`.
+Check a recording with `ffprobe -v error -show_entries format=duration:stream=width,height,avg_frame_rate -of compact=p=0 FILE`.
 
 ### Known problems on the real model (2026-11-14)
 
@@ -73,7 +147,8 @@ Both are being worked on in the backend (re-anchoring the frame history at a com
 ```
 python -m engine.server --backend fake|causal_forcing --reader standin|commands --host 127.0.0.1 --port 8000 --width 832 --height 480 \
     --steps 0 --base-prompt "..." --jpeg-quality 80 --precompute-file prompts.txt \
-    --device cuda:0 --decode-device cuda:0 --backend-opt key=value --lead-margin 1.3 --reanchor off --log-level info
+    --device cuda:0 --decode-device cuda:0 --backend-opt key=value --lead-margin 1.3 --reanchor off --log-level info \
+    --record-dir ~/recordings --record-max-gb 20
 ```
 
 - `--steps 0` (the default) runs the denoising schedule the backend's checkpoint was distilled for; the real model is distilled for 2 steps, so any other number changes the schedule.
@@ -81,10 +156,12 @@ python -m engine.server --backend fake|causal_forcing --reader standin|commands 
 - The starting prompt is the reader's `committed_prompt` when it has one, else `--base-prompt`.
 - `--precompute-file` is a text file with one prompt per line; each is encoded at startup, so a known prompt needs no encoding time.
 - `--backend-opt key=value` is passed to the backend's `load()` and may be repeated; numbers and true/false are converted.
-- The fake backend's options are `gen_ms` (170), `decode_ms` (60), `encode_ms` (80), `frames_per_chunk` (4), `first_chunk_frames` (1) and `fps` (16).
+- The fake backend's options are `gen_ms` (170), `decode_ms` (60), `encode_ms` (80), `frames_per_chunk` (4), `first_chunk_frames` (1) and `fps` (16), plus `fail_on_chunk`, `fail_count` and `fail_in` to inject crashes (see "Crash recovery").
 - `--lead-margin` sets how much video generation keeps ready ahead of what is on screen (see "Pipeline").
 - `--reanchor off|on` (default `off`) turns on the steering re-anchor policy (see "Re-anchor").
-- SIGINT or SIGTERM shuts down cleanly and moves the engine to STOPPED.
+- `--record-dir` and `--record-max-gb` control the recorder (see "Recorder"); `--record-dir none` turns it off.
+- SIGINT or SIGTERM shuts down cleanly, finalizes the open recording and moves the engine to STOPPED.
+- The process exits with code 70 when the engine reaches FAILED, so systemd restarts it.
 
 ## Endpoints
 
@@ -97,8 +174,8 @@ All on one origin; the message shapes are in `contracts/README.md`.
 | websocket `/control` | Contract 1 in (JSON text); contract 4 out, one message per chunk; `{"error": "..."}` replies to a bad message. |
 | `POST /target` | Body is a contract 2 message; it skips the command reader and goes unchanged to the encoder and `steering.Controller.handle`. |
 | `POST /reset` | Same as a `{"type":"tap","action":"reset"}` on `/control`: goes through the reader, then starts a new video; returns when done. |
-| `GET /stats` | JSON: lifecycle state, backend, reader, last generated and shown chunk, last and average generation, decode and JPEG ms, measured fps, queue depths, re-anchor state and last anchor, encoder cache and pending encodes, clients. |
-| `GET /healthz` | 200 with the state, or 503 when FAILED or STOPPED. |
+| `GET /stats` | JSON: lifecycle state, backend, reader, last generated and shown chunk, last and average generation, decode and JPEG ms, measured fps, queue depths, re-anchor state and last anchor, encoder cache and pending encodes, current video number, recovery count and last recovery time, recorder, clients. |
+| `GET /healthz` | 200 with the state (RECOVERING included), or 503 when FAILED or STOPPED. |
 | `GET /app/` | The demo page from `web/` (see "The demo page at /app/"). |
 
 ## The demo page at /app/
@@ -177,13 +254,15 @@ contract 1 on `/control` -> reader worker thread: `reader.handle` -> `steer` (co
 |---|---|---|
 | LOADING | `backend.load()` is running | WARMING, STOPPED, FAILED |
 | WARMING | encoding the base prompt and the precompute file | GENERATING, STOPPED, FAILED |
-| GENERATING | producing chunks | RESETTING, STOPPED, FAILED |
-| RESETTING | between chunks: wait for decode to finish, `backend.reset()`, `Controller.reset` on the new video's prompt | GENERATING, STOPPED, FAILED |
-| FAILED | a thread raised; `/stats` shows the error | STOPPED |
+| GENERATING | producing chunks | RESETTING, RECOVERING, STOPPED, FAILED |
+| RESETTING | between chunks: wait for decode to finish, `backend.reset()`, `Controller.reset` on the new video's prompt | GENERATING, RECOVERING, STOPPED, FAILED |
+| RECOVERING | generation or decode raised: drop the queued video, `backend.reset()`, `Controller.reset` on the starting prompt | GENERATING, STOPPED, FAILED |
+| FAILED | too many crashes, or an error before generation started; `/stats` shows the error; the server exits with code 70 | STOPPED |
 | STOPPED | shut down | none |
 
 Every change goes through `LifecycleMachine.transition`, which logs it and rejects any change not in this table.
-Chunk numbers keep rising across a reset.
+Chunk numbers keep rising across a reset and a recovery.
+Commands and resets are refused while RECOVERING; it lasts a few ms.
 
 ## Command stages and delay stamps
 
