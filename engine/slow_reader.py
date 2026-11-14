@@ -4,8 +4,8 @@
 matching finds nothing (PLAN.md, "Two readers, fast and slow"). It is the last fallback, not the main reader.
 
 The model is an Azure AI Foundry deployment (Azure OpenAI chat completions), by default `gpt-4.1-nano`, which
-answers in about 0.4 to 0.8 s from the engine machine. Credentials come from the environment:
-FOUNDRY_ENDPOINT, FOUNDRY_KEY and FOUNDRY_DEPLOYMENT (on the engine machine, ~/.madhacks-foundry.env).
+answers in about 0.4 to 0.8 s from the engine machine. The client and its FOUNDRY_* settings are in foundry.py,
+shared with the prompt rewriter (rewriter.py).
 
 The reply is checked against the operation shapes of commands/state.py before it is returned. A bad reply,
 an HTTP error or a timeout gives None, which the service shows as unmatched (red words).
@@ -20,10 +20,10 @@ import httpx
 
 from commands.state import KINDS
 
+from .foundry import DEFAULT_DEPLOYMENT, FoundryChat, settings_from_env
+
 log = logging.getLogger("engine.slow_reader")
 
-API_VERSION = "2024-10-21"
-DEFAULT_DEPLOYMENT = "gpt-4.1-nano"
 HTTP_TIMEOUT_S = 2.0      # a bit above the service's wait, so a slow call ends soon after the service gives up
 SERVICE_TIMEOUT_S = 1.5   # how long CommandService waits for the answer; nano measured 0.4 to 0.8 s
 MAX_TOKENS = 120
@@ -115,9 +115,7 @@ class FoundrySlowReader:
     def __init__(self, endpoint: str, key: str, deployment: str = DEFAULT_DEPLOYMENT,
                  client: httpx.Client | None = None) -> None:
         self.deployment = deployment
-        self._url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions"
-        # One client keeps the TLS connection open between commands, which saves a handshake per call.
-        self._client = client or httpx.Client(timeout=HTTP_TIMEOUT_S, headers={"api-key": key})
+        self._chat = FoundryChat(endpoint, key, deployment, timeout_s=HTTP_TIMEOUT_S, client=client)
 
     def __call__(self, text: str, snapshot: dict) -> dict | None:
         start = time.monotonic()
@@ -133,32 +131,23 @@ class FoundrySlowReader:
         return op
 
     def _ask(self, text: str, snapshot: dict):
-        body = {
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": json.dumps({"scene": _scene_for_model(snapshot), "command": text})},
-            ],
-            "temperature": 0,
-            "max_tokens": MAX_TOKENS,
-            "response_format": {"type": "json_object"},
-        }
-        r = self._client.post(self._url, params={"api-version": API_VERSION}, json=body)
-        r.raise_for_status()
-        content = r.json()["choices"][0]["message"]["content"]
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": json.dumps({"scene": _scene_for_model(snapshot), "command": text})},
+        ]
+        content = self._chat.complete(messages, MAX_TOKENS, json_object=True)
         return json.loads(content)  # ValueError on bad JSON
 
 
 def from_env(environ=os.environ) -> FoundrySlowReader | None:
     """The slow reader from FOUNDRY_* variables, or None (logged once) when they are missing."""
-    endpoint, key = environ.get("FOUNDRY_ENDPOINT", "").strip(), environ.get("FOUNDRY_KEY", "").strip()
-    if not endpoint or not key:
+    settings = settings_from_env(environ)
+    if settings is None:
         log.warning("slow reader off: FOUNDRY_ENDPOINT or FOUNDRY_KEY is not set, so commands the keyword table "
                     "does not know stay unmatched")
         return None
-    deployment = environ.get("FOUNDRY_DEPLOYMENT", "").strip() or DEFAULT_DEPLOYMENT
-    logging.getLogger("httpx").setLevel(logging.WARNING)  # our own line per call is enough; no URL per request
-    log.info("slow reader on: Azure Foundry deployment %s, wait up to %.1f s", deployment, SERVICE_TIMEOUT_S)
-    return FoundrySlowReader(endpoint, key, deployment)
+    log.info("slow reader on: Azure Foundry deployment %s, wait up to %.1f s", settings.deployment, SERVICE_TIMEOUT_S)
+    return FoundrySlowReader(settings.endpoint, settings.key, settings.deployment)
 
 
 class StateCachingReader:
