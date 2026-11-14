@@ -101,10 +101,8 @@ def _is_undo_or_reset(text: str, snapshot: dict) -> bool:
 
 
 # --- the CommandService shim ------------------------------------------------------------------------------
-# CommandService has no public way yet to read the full scene or to apply operations decided elsewhere.
-# The two methods below were asked of the commands/ owner (board, 2026-11-14): `snapshot()` and
-# `apply_final(text, operations, prompt)`. When they exist they are used; until then these functions do the
-# same through the service's private fields. engine/tests/test_final_reader.py runs them against the real
+# PR #88 adds CommandService.snapshot() and apply_final(text, operations, prompt); when they exist they are
+# used. On a CommandService without them, these functions do the same through the service's private fields. engine/tests/test_final_reader.py runs them against the real
 # CommandService, so a change to those fields fails a test, not the live demo.
 
 def service_snapshot(svc) -> dict:
@@ -119,6 +117,9 @@ def apply_final(svc, text: str, operations: list[dict]) -> dict:
     """A FINAL read by the final reader: `operations` as one edit (a batch if several; none for a block), heard
     set to `text`, and {"steer", "state"} as CommandService.handle returns them."""
     if hasattr(svc, "apply_final"):
+        # prompt None: the service steers to the composed prompt and FinalReadingService maps it to the rich one.
+        # Passing the rich prompt would make an undo back to this state steer to the composed prompt (another
+        # embedding for the same scene), and a second sentence reaching the same state could pick other wording.
         return svc.apply_final(text, operations, None)
     from commands.reader import RAMP
     with svc._lock:
