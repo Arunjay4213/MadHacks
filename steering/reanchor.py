@@ -42,7 +42,14 @@ def _check_unit(name: str, value: object, allow_zero: bool = False) -> None:
 
 @dataclass(frozen=True)
 class ReanchorConfig:
-    """Tuning knobs. The defaults are untuned guesses awaiting real-model clips."""
+    """Tuning knobs.
+
+    Fire timing is measured on the real model, not guessed: an anchor repaints
+    with the conditioning current on its chunk and the scene stays locked to it,
+    so the (last) anchor must fire once the ramp has reached the full target
+    (progress 1.0). Firing mid-ramp repaints toward a half-blended prompt.
+    The strengths, gap and refresh period are still untuned.
+    """
 
     steer_strength: float = 0.85  # for a normal final/confirm
     sudden_strength: float = 1.0  # when ramp_chunks <= sudden_max_ramp
@@ -50,7 +57,7 @@ class ReanchorConfig:
     slow_min_ramp: int = 10  # ramp_chunks >= this is a "slow" steer
     slow_strength: float = 0.5  # each anchor of a slow steer
     slow_anchors: int = 3  # anchors spread over a slow ramp
-    fire_at_progress: float = 0.5  # single anchor fires on the first chunk with progress >= this
+    fire_at_progress: float = 1.0  # single anchor fires on the first chunk with progress >= this (1.0: the full target)
     provisional_strength: float = 0.0  # 0 means provisional targets never re-anchor
     refresh_every_chunks: int | None = 60  # None disables the refresh
     refresh_strength: float = 0.25
@@ -180,7 +187,8 @@ class ReanchorPolicy:
         elif ramp >= cfg.slow_min_ramp:
             n = cfg.slow_anchors
             strength = cfg.slow_strength * scale
-            thresholds = [i / (n + 1) for i in range(1, n + 1)]
+            # Evenly spaced, last one at 1.0: the final repaint uses the full target.
+            thresholds = [i / n for i in range(1, n + 1)]
         elif ramp <= cfg.sudden_max_ramp:
             strength, thresholds = cfg.sudden_strength * scale, single
         else:

@@ -148,19 +148,28 @@ keeps almost everything. It breaks motion a little, so it must be rare.
 | Result not applied (stale, unchanged) | nothing; a pending steer is kept |
 | `final` / `confirm`, `ramp_chunks <= sudden_max_ramp` (2) | `sudden_strength` (1.0) once |
 | `final` / `confirm`, ramp 3 to 9 | `steer_strength` (0.85) once |
-| `final` / `confirm`, `ramp_chunks >= slow_min_ramp` (10) | `slow_anchors` (3) x `slow_strength` (0.5) at progress i/(n+1) |
+| `final` / `confirm`, `ramp_chunks >= slow_min_ramp` (10) | `slow_anchors` (3) x `slow_strength` (0.5) at progress i/n, so the last is at 1.0 (the full target) |
 | message `strength` s | strength x min(s, 1) |
 | `provisional` | `provisional_strength` (0, so never) x min(cap, 1) |
 | scaled strength < `min_strength` (0.05) | nothing, and it cancels a pending steer |
-| single anchor timing | first chunk with progress >= `fire_at_progress` (0.5) |
+| single anchor timing | first chunk with progress >= `fire_at_progress` (1.0, the full target) |
 | newer applied target before it fires | replaces it (latest wins) |
 | ramp ended before a threshold | fires on the next allowed chunk |
 | any two anchors | at least `min_gap_chunks` (8) apart; a blocked steer waits, thresholds due together fire once |
 | idle (not moving, nothing pending) for `refresh_every_chunks` (60) | `refresh_strength` (0.25), reason "refresh" |
 | `on_reset()` (new video) | drops pending; gap and refresh count from the reset |
 
-All numbers are **untuned guesses** awaiting real-model clips. With the default
-gap of 8, a slow ramp shorter than about 32 chunks gets 2 anchors, not 3.
+Fire timing is **measured**, not guessed: on the real model the anchor
+repaints with whatever conditioning is current on its chunk, and the scene then
+stays locked to it. Firing half-way through the ramp (the old 0.5) repainted
+with a half-blended prompt, so "make it winter" gave a new green meadow; firing
+once the ramp has reached the full target works. So a single anchor waits for
+progress 1.0, and a slow steer's last anchor is at 1.0. The strengths, gap and
+refresh period are still untuned.
+
+With the default gap of 8, a slow ramp shorter than 14 chunks gets 2 anchors,
+not 3, and below 24 chunks the gap pushes later anchors back (the last one can
+land a few chunks after the ramp ends, still on the full target).
 
 ```python
 from steering.reanchor import ReanchorPolicy

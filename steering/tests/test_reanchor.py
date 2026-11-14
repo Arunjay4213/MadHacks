@@ -147,7 +147,7 @@ def test_unchanged_leaves_pending_alone() -> None:
     e.step()
     assert e.send(_msg("winter", 4))["reason"] == "unchanged"
     assert e.policy.pending
-    assert e.run(4) == [(1, Anchor(0.85, "steer"))]  # the original ramp's chunk 2
+    assert e.run(4) == [(3, Anchor(0.85, "steer"))]  # the original ramp's chunk 4
 
 
 # --- rule 2: final / confirm strengths --------------------------------------
@@ -198,7 +198,7 @@ def test_confirm_schedules_a_steer() -> None:
     assert not e.policy.pending  # provisional_strength 0
     e.step()
     assert e.send(_msg("winter", 4))["kind"] == "confirm"
-    assert e.run(6) == [(2, Anchor(0.85, "steer"))]
+    assert e.run(6) == [(4, Anchor(0.85, "steer"))]  # a confirm restarts the ramp
 
 
 # --- rule 3: provisional ----------------------------------------------------
@@ -213,7 +213,7 @@ def test_provisional_strength_times_cap() -> None:
     cfg = ReanchorConfig(provisional_strength=0.4)
     e = Engine(cfg)
     e.send(_msg("winter", 4, provisional=True, cap=0.5))
-    assert e.run(4) == [(2, Anchor(pytest.approx(0.2), "steer"))]
+    assert e.run(4) == [(4, Anchor(pytest.approx(0.2), "steer"))]
     # Same cap below min_strength: skipped.
     e2 = Engine(cfg)
     e2.send(_msg("winter", 4, provisional=True, cap=0.1))  # 0.04 < 0.05
@@ -225,7 +225,7 @@ def test_provisional_then_confirm_replaces() -> None:
     e.send(_msg("winter", 4, provisional=True, cap=0.5))
     e.step()  # progress 0.25: not fired
     e.send(_msg("winter", 4))
-    assert e.run(6) == [(2, Anchor(0.85, "steer"))]
+    assert e.run(6) == [(4, Anchor(0.85, "steer"))]
 
 
 # --- rule 4: single-anchor timing with real progress ------------------------
@@ -240,7 +240,7 @@ def test_provisional_then_confirm_replaces() -> None:
         (4, 0.75, [3]),
         (4, 1.0, [4]),
         (2, 1.0, [2]),
-        (12, 0.5, [3, 11]),  # slow: 0.25 at chunk 3; 0.5 and 0.75 deferred by the gap, fire once
+        (12, 0.5, [4, 12]),  # slow ignores fire_at: 1/3 at 4; 2/3 deferred by the gap to 12, fires once with 1.0
     ],
 )
 def test_fires_at_real_progress(ramp: int, fire_at: float, chunks: list[int]) -> None:
@@ -259,7 +259,35 @@ def test_progress_at_fire_matches_steerer() -> None:
             a = e.step()
             seen.append((e.steerer.progress, a is not None))
         fired = [p for p, f in seen if f]
-        assert fired == [min(p for p, _ in seen if p >= 0.5)]
+        fire_at = ReanchorConfig().fire_at_progress
+        assert fired == [min(p for p, _ in seen if p >= fire_at)]
+
+
+def test_default_single_anchor_fires_on_full_target_never_earlier() -> None:
+    # Measured on the real model: the repaint locks the scene to the cond of its
+    # chunk, so it must use the full target, not a half-blended one.
+    e = Engine()
+    e.send(_msg("winter", 4))
+    seen = []
+    for _ in range(4 + GAP):
+        a = e.step()
+        seen.append((e.steerer.progress, a))
+    fired = [i for i, (_, a) in enumerate(seen) if a is not None]
+    first_full = next(i for i, (p, _) in enumerate(seen) if p == 1.0)
+    assert fired == [first_full] == [3]
+    assert all(a is None for p, a in seen if p < 1.0)
+
+
+@pytest.mark.parametrize("ramp", [10, 12, 40])
+def test_slow_steer_last_anchor_is_at_full_target(ramp: int) -> None:
+    e = Engine()
+    e.send(_msg("winter", ramp))
+    fired = []
+    for _ in range(ramp + GAP):
+        if e.step() is not None:
+            fired.append(e.steerer.progress)
+    assert fired and fired[-1] == 1.0
+    assert all(p < 1.0 for p in fired[:-1])
 
 
 def test_latest_target_wins() -> None:
@@ -268,7 +296,7 @@ def test_latest_target_wins() -> None:
     e.step()  # 0.25
     e.send(_msg("night", 6, strength=0.5))
     anchors = e.run(10)
-    assert anchors == [(3, Anchor(pytest.approx(0.425), "steer"))]  # 3/6 of the new ramp
+    assert anchors == [(6, Anchor(pytest.approx(0.425), "steer"))]  # the new ramp's end
 
 
 def test_applied_target_that_schedules_nothing_cancels_pending() -> None:
@@ -285,11 +313,11 @@ def test_applied_target_that_schedules_nothing_cancels_pending() -> None:
 @pytest.mark.parametrize(
     "n, ramp, chunks",
     [
-        (3, 12, [3, 6, 9]),
-        (3, 10, [3, 5, 8]),  # 0.3, 0.5, 0.8
-        (4, 20, [4, 8, 12, 16]),  # i/5
-        (1, 10, [5]),
-        (2, 30, [10, 20]),
+        (3, 12, [4, 8, 12]),
+        (3, 10, [4, 7, 10]),  # first chunks with progress >= 1/3, 2/3, 1
+        (4, 20, [5, 10, 15, 20]),  # i/4
+        (1, 10, [10]),
+        (2, 30, [15, 30]),
     ],
 )
 def test_slow_thresholds_without_gap(n: int, ramp: int, chunks: list[int]) -> None:
@@ -303,19 +331,19 @@ def test_slow_thresholds_without_gap(n: int, ramp: int, chunks: list[int]) -> No
 def test_slow_long_ramp_gets_all_anchors_with_gap() -> None:
     e = Engine()
     e.send(_msg("winter", 40))
-    assert [k for k, _ in e.run(45)] == [10, 20, 30]
+    assert [k for k, _ in e.run(45)] == [14, 27, 40]  # 40/3 -> 14, 80/3 -> 27, 40
 
 
 def test_slow_thresholds_landing_on_one_chunk_fire_once() -> None:
     p = _warm_policy(ReanchorConfig(min_gap_chunks=1))
     p.on_target(_msg("winter", 12), _applied("final"))
     assert p.next_chunk(1 / 12, True) is None
-    # A reading that passes two thresholds at once (0.25, 0.5) fires once.
-    assert p.next_chunk(6 / 12, True) is None  # capped by chunks seen: 2/12
+    # A reading past two thresholds (1/3, 2/3) is capped by chunks seen: 2/12.
+    assert p.next_chunk(9 / 12, True) is None
     p2 = _warm_policy(ReanchorConfig(min_gap_chunks=1, slow_anchors=3))
     p2.on_target(_msg("winter", 10), _applied("final"))
     got = [p2.next_chunk(k / 10, k < 10) for k in range(1, 11)]
-    assert [k + 1 for k, a in enumerate(got) if a] == [3, 5, 8]
+    assert [k + 1 for k, a in enumerate(got) if a] == [4, 7, 10]
 
 
 # --- rule 6: min gap --------------------------------------------------------
@@ -388,7 +416,7 @@ def test_steer_restarts_refresh_count() -> None:
     e.send(_msg("winter", 4))
     anchors = e.run(200)
     assert [(k, a.reason) for k, a in anchors] == [
-        (2, "steer"), (62, "refresh"), (122, "refresh"), (182, "refresh")]
+        (4, "steer"), (64, "refresh"), (124, "refresh"), (184, "refresh")]
 
 
 # --- rule 8: reset ----------------------------------------------------------
@@ -428,19 +456,21 @@ def test_slow_thresholds_deferred_by_gap_collapse() -> None:
     e.step()  # anchor; gap starts
     e.send(_msg("night", 10))
     anchors = e.run(30)
-    # 0.25 (chunk 3), 0.5 (5) and 0.75 (8) all wait for the gap, which ends at
-    # chunk 8: they fire once there, and nothing is left.
-    assert anchors == [(GAP, Anchor(0.5, "steer"))]
+    # 1/3 (chunk 4) and 2/3 (7) wait for the gap, which ends at chunk 8: they
+    # fire once there. 1.0 (chunk 10) then waits for the next gap, so the last
+    # repaint still uses the full target.
+    assert anchors == [(GAP, Anchor(0.5, "steer")), (2 * GAP, Anchor(0.5, "steer"))]
     assert not e.policy.pending
 
 
 def test_slow_leftover_fires_after_ramp_end() -> None:
-    p = _warm_policy(ReanchorConfig(min_gap_chunks=4))
+    p = _warm_policy(ReanchorConfig(min_gap_chunks=5))
     p.on_target(_msg("winter", 12), _applied("final"))
     got = [p.next_chunk(min(k, 12) / 12, k < 12) for k in range(1, 20)]
-    # 0.25 at 3; 0.5 due at 6 but the gap ends at 7; 0.75 due at 9, fires at 11;
-    # nothing left by the ramp end.
-    assert [k + 1 for k, a in enumerate(got) if a] == [3, 7, 11]
+    # 1/3 at 4; 2/3 due at 8 but the gap ends at 9; 1.0 due at 12, the ramp
+    # end, but the gap holds it to 14, when it fires as a leftover.
+    assert [k + 1 for k, a in enumerate(got) if a] == [4, 9, 14]
+    assert not p.pending
     p2 = _warm_policy(ReanchorConfig(min_gap_chunks=8))
     p2.on_target(_msg("winter", 12), _applied("final"))
     got2 = [p2.next_chunk(1 / 12, True), p2.next_chunk(2 / 12, True),
@@ -456,16 +486,17 @@ def test_stale_finished_reading_on_first_chunk_is_ignored() -> None:
     # Progress read before the steerer saw the new target (old move finished).
     assert p.next_chunk(1.0, False) is None
     assert p.next_chunk(1 / 4, True) is None
-    assert p.next_chunk(2 / 4, True) == Anchor(0.85, "steer")
+    assert p.next_chunk(2 / 4, True) is None
+    assert p.next_chunk(3 / 4, True) is None
+    assert p.next_chunk(1.0, False) == Anchor(0.85, "steer")
 
 
 def test_progress_ahead_of_chunks_seen_is_not_trusted() -> None:
     p = _warm_policy()
     p.on_target(_msg("winter", 8), _applied("final"))
-    assert p.next_chunk(0.9, True) is None  # 1/8 chunks seen
-    assert p.next_chunk(0.9, True) is None
-    assert p.next_chunk(0.9, True) is None
-    assert p.next_chunk(0.9, True) == Anchor(0.85, "steer")  # 4/8
+    for _ in range(7):  # 1/8 .. 7/8 chunks seen
+        assert p.next_chunk(1.0, True) is None
+    assert p.next_chunk(1.0, True) == Anchor(0.85, "steer")  # 8/8
 
 
 # --- rule 10 and fuzz -------------------------------------------------------
@@ -511,9 +542,9 @@ def test_storm_of_finals_never_fires_mid_ramp_then_fires_once() -> None:
     e = Engine()
     for k in range(100):
         e.send(_msg("ab"[k % 2] + "x", 4))
-        assert e.step() is None  # each ramp is replaced before reaching 0.5
+        assert e.step() is None  # each ramp is replaced before reaching 1.0
     e.send(_msg("calm", 4))
-    assert e.run(30) == [(2, Anchor(0.85, "steer"))]
+    assert e.run(30) == [(4, Anchor(0.85, "steer"))]
 
 
 @pytest.mark.parametrize("ramp", [1, 2, 3])
@@ -524,9 +555,9 @@ def test_storm_respects_gap_and_fires_after(ramp: int) -> None:
         e.send(_msg("ab"[k % 2] + "x", ramp))
         if e.step() is not None:
             storm.append(e.chunk)
-    # Ramps of 1-2 fire on their first chunk, so the gap is the only limit;
-    # a ramp of 3 is always replaced before reaching 0.5.
-    assert len(storm) == (len(range(1, 101, GAP)) if ramp <= 2 else 0)
+    # A ramp of 1 reaches the target on its first chunk, so the gap is the only
+    # limit; ramps of 2-3 are always replaced before reaching 1.0.
+    assert len(storm) == (len(range(1, 101, GAP)) if ramp == 1 else 0)
     e.send(_msg("calm", ramp))
     after = []
     for _ in range(GAP + ramp):

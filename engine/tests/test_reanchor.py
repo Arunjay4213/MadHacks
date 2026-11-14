@@ -55,10 +55,11 @@ def test_sudden_final_reanchors_once_at_full_strength(engine_on, ramp):
     assert wait(lambda: e.chunk_generated >= 10)  # past the policy's minimum gap since the start
     rec = e.handle_target(winter(ramp), time.monotonic_ns())
     assert wait(lambda: rec.stage is CommandStage.SHOWN)
+    # The anchor fires once the ramp reaches the full target: the ramp's last chunk.
+    assert wait(lambda: e.stats()["reanchor"]["count"] >= 1)
     r = e.stats()["reanchor"]
     assert (r["state"], r["count"], r["last_strength"], r["last_reason"]) == ("on", 1, 1.0, "steer")
-    # The first chunk generated under the new target is the re-anchor chunk.
-    assert r["last_chunk"] == rec.applies_from_chunk
+    assert r["last_chunk"] == rec.applies_from_chunk + ramp - 1
     assert e.backend.reanchor_calls == 1 and e.backend.last_reanchor_strength == 1.0
 
 
