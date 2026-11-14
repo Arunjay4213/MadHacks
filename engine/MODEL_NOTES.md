@@ -84,7 +84,7 @@ The Wan model caches the text cross-attention keys and values per block (`crossa
 If that cache is not reset, a new `cond` is ignored.
 `generate_chunk` resets it (sets `is_init=False` in all 30 blocks) whenever `cond is not self._last_cond`, so the steerer must hand over a new tensor object when the conditioning changes and the same object when it does not, and must never modify a tensor in place after handing it over.
 Recomputing the text K/V is 30 small linear layers on 512 tokens, which is too small to see in the per-call timing.
-The frame cache is never touched by a conditioning change.
+The frame cache is not touched by a conditioning change (unless a rebase is asked for, see below).
 
 Test (384x672, TAEHV, threaded): prompt A "a red fox walking through a snowy pine forest at sunrise" for calls 0 to 29, then prompt B "the same at night under a full moon, dark blue moonlight" from call 30 on, as a hard switch.
 The video kept the same fox, trees and snow and did not restart.
@@ -93,6 +93,28 @@ The slow response is expected, because the frame cache still holds 21 frames (ab
 The median call time of that run (230 ms) was close to the run without a switch (226 ms); the single call that recomputed the text K/V was not timed on its own.
 
 Seeding: `reset(seed=N)` reseeds all noise of the new video; two runs with the same seed and the same `cond` gave bit-identical latents (checked on 4 calls).
+
+## Rebase: restarting the frame cache (experimental, off by default)
+
+Two problems were measured on this model: after a prompt switch the new text is read but the scene barely changes, because every new frame attends to the cached clean frames made under the old prompt; and the picture decays after 20 to 50 s while the frame position grows without bound.
+The training-free fix is the KV recache of LongLive (Yang et al., "LongLive: Real-time Interactive Long Video Generation", arXiv 2509.22622, Apache-2.0): at the switch, rebuild the frame cache from the last few clean frames re-encoded under the new prompt.
+Our version also restarts the positions at 0, so a periodic rebase keeps positions inside the trained 21-frame range.
+
+`generate_chunk(cond, rebase=Rebase(keep=3, memory_noise=0, anchor_step=None))` (or a dict with those keys), framewise variants only:
+
+1. The text K/V cache is reset, and the frame cache is cleared the same way `reset()` does it (end indices to 0). The RNG stream, the decoder, the chunk counter and the video id are kept.
+2. The last `keep` clean latents (a ring buffer of references, at most `attn_window_frames - 1`) are re-encoded oldest first, one frame per pass, at positions 0..keep-1, under the current cond, with the normal context pass (timestep `context_noise`). With `memory_noise=t` (0-1000) each is first noised to timestep t and passed with timestep t, which loosens how strongly the old frames pin the scene. t is warped onto the shifted grid like the denoising steps, so `memory_noise=500` is the noise level of the schedule's "500" step.
+3. The new frame is made at position `keep`. With `keep=0` it is a first frame again (the 4-step first-frame schedule): a hard cut. `anchor_step=n` starts it from the last clean latent noised to step n of its schedule and denoises with `schedule[n:]` (n=0 is pure noise; larger n keeps more of the old picture). With `keep>0` the anchor uses the normal 2-step schedule (experimental).
+4. Generation then continues normally and the window refills by itself.
+
+Decoding is not restarted: the chunk keeps its place in the stream, and both decoders (`wan` with its feature cache, `taehv` with 3 latents of context) still give 4 video frames for it.
+After `keep=0` that latent is a first-frame latent, which the Wan VAE normally decodes as 1 frame; here it is decoded as a 4-frame latent with the old scene in the decoder's temporal context.
+Expect a short (about 0.25 s) blend or near-freeze, and possibly a one-chunk brightness or colour pop; this has not been looked at on the GPU yet.
+
+Automatic mode, for the live server with no engine change (`--backend-opt k=v`): `steer_rebase=1` fires on the first chunk whose cond differs from the previous one (`steer_fire_on_change=1`, default) and again when the cond stops changing (the end of a ramp), never on the first chunk of a video and never within `steer_min_gap` chunks (8) of the last rebase or reset; it uses `steer_keep` (3), `steer_memory_noise` (0) and `steer_anchor_step` (-1 = none). `refresh_every=N` (0 = off) rebases with `refresh_keep` (6) and `refresh_memory_noise` (0) every N chunks to keep positions small. An explicit `rebase=` always wins for that chunk.
+Counters for logs and tests: `rebases`, `recached_frames`, `auto_rebases`, `last_rebase`; `first_frame_steps` and `anchor_step_for_strength(s)` map a 0..1 strength to an anchor step.
+With everything off, the calls, the RNG draws and their order are exactly as before (checked by `engine/tests/test_causal_forcing.py` against a recording of the old code).
+The experiment driver is `python -m steering.eval.follow_probe` (see `steering/eval/README.md`).
 
 ## Using the backend from a plain Python script
 
