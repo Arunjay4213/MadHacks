@@ -561,3 +561,31 @@ def test_first_frame_pad_option_is_checked():
         cf.FirstFramePad("repeat")
     with pytest.raises(ValueError):
         cf.Backend(64, 64, None, "cpu", "cpu", first_frame_pad="repeat")
+
+
+def test_clean_refresh_after_a_scene_change_without_steer_recaptures(no_cuda):
+    """A cond change with no steer re-anchor (e.g. a provisional): the refresh must not bring the old scene back."""
+    b = make_backend()
+    a, c = torch.full((1, 3, 8), 1.0), torch.full((1, 3, 8), 2.0)
+    b.reset(seed=0)
+    outs = [b.generate_chunk(a) for _ in range(6)]
+    assert b.clean_anchor_chunk == 3
+    outs += [b.generate_chunk(c) for _ in range(4)]  # the scene changed, no re-anchor
+    out, calls, rng = reanchored_chunk(b, c, 0.5, "clean")  # chunk 10
+    assert torch.allclose(calls[0]["x"], start_latent(b, outs[-1].latents, 2, rng))  # from the last latent
+    assert b.last_rebase == cf.Rebase(0, 0, 2, False)
+    assert b._clean_anchor is None
+    outs += [out] + [b.generate_chunk(c) for _ in range(3)]  # chunk 13 = 10 + 3: saved again, under c
+    assert b.clean_anchor_chunk == 13 and b._clean_anchor is outs[13].latents
+    _, calls, rng = reanchored_chunk(b, c, 0.5, "clean")
+    assert torch.allclose(calls[0]["x"], start_latent(b, outs[13].latents, 2, rng))
+    assert b.last_rebase.from_clean
+
+
+def test_clean_refresh_accepts_an_equal_cond_object(no_cuda):
+    b = make_backend()
+    b.reset(seed=0)
+    outs = [b.generate_chunk(torch.full((1, 3, 8), 1.0)) for _ in range(6)]
+    _, calls, rng = reanchored_chunk(b, torch.full((1, 3, 8), 1.0), 0.5, "clean")  # equal values, new object
+    assert torch.allclose(calls[0]["x"], start_latent(b, outs[3].latents, 2, rng))
+    assert b.last_rebase.from_clean

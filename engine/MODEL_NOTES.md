@@ -124,6 +124,7 @@ With the 4-step first-frame schedule: strength >= 0.76 gives step 0 (full repain
 The backend also keeps a **clean anchor**: the latent of the chunk `clean_anchor_after` (3) chunks after `reset()` or after any rebase that does not start from the clean anchor (a steer re-anchor).
 `reanchor(strength, source="clean")` starts the first frame from the clean anchor noised to the anchor step instead of from the last latent, and keeps the clean anchor as it is.
 If there is no clean anchor yet (the first 3 chunks of a video or of a steer), it falls back to the last latent and changes nothing.
+If the cond is no longer the one the clean anchor was made under (the scene changed with no steer re-anchor: a provisional, or a steer scaled below `min_strength`), the refresh starts from the last latent and works like a steer: the clean anchor is dropped and saved again 3 chunks later. Otherwise the refresh would bring the old scene back.
 `clean_anchor_chunk` says which chunk the current clean anchor came from; `last_rebase.from_clean` says whether the last rebase used it.
 `ReanchorPolicy` sends steers with source "last" and refreshes with `refresh_source` ("clean").
 

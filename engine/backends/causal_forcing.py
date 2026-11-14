@@ -436,6 +436,7 @@ class Backend:
             raise ValueError(f"clean_anchor_after must be >= 0, got {clean_anchor_after}")
         self._clean_anchor_after = int(clean_anchor_after)
         self._clean_anchor: Optional[torch.Tensor] = None
+        self._clean_anchor_cond: Optional[torch.Tensor] = None  # the cond the clean anchor was made under
         self._clean_capture_chunk: Optional[int] = self._clean_anchor_after  # chunk_index to save, or None
         self.clean_anchor_chunk: Optional[int] = None  # chunk_index the clean anchor was saved from
         # Last clean latents of this video, oldest first (references to the returned latents, no
@@ -527,6 +528,7 @@ class Backend:
             self._pending_reanchor = None
             self._last_rebase_chunk = 0
             self._clean_anchor = None
+            self._clean_anchor_cond = None
             self._clean_capture_chunk = self._clean_anchor_after
             self.clean_anchor_chunk = None
 
@@ -590,6 +592,13 @@ class Backend:
         if explicit is not None:
             return explicit, None
         return auto, reason
+
+    @staticmethod
+    def _same_cond(a: torch.Tensor, b: Optional[torch.Tensor]) -> bool:
+        """Is `a` the conditioning `b`? The steerer returns the same object once a move has ended."""
+        if b is None:
+            return False
+        return a is b or (a.shape == b.shape and a.dtype == b.dtype and bool(torch.equal(a, b)))
 
     def _timestep(self, t_1000: int) -> torch.Tensor:
         """A 0-1000 timestep in the backend's convention (warped like the denoising steps)."""
@@ -676,11 +685,16 @@ class Backend:
             if plan is not None:
                 x_last = self._history[-1] if self._history else None
                 from_clean = plan.from_clean and self._clean_anchor is not None
+                if from_clean and not self._same_cond(cond, self._clean_anchor_cond):
+                    # The scene changed without a steer re-anchor (a provisional or a steer too weak
+                    # to repaint): the clean anchor shows the old scene, so this refresh is a steer.
+                    from_clean = False
                 if from_clean:
                     x_last = self._clean_anchor  # a refresh: the clean anchor stays as it is
-                elif not plan.from_clean:
+                elif not plan.from_clean or self._clean_anchor is not None:
                     # A steer (or any other rebase): the old clean anchor shows the old scene.
                     self._clean_anchor = None
+                    self._clean_anchor_cond = None
                     self.clean_anchor_chunk = None
                     self._clean_capture_chunk = self.chunk_index + self._clean_anchor_after
                 keep = self._rebase(plan, cond_dict)
@@ -740,6 +754,7 @@ class Backend:
                 self._history.append(denoised)  # a reference, for a later rebase
             if self.chunk_index == self._clean_capture_chunk:
                 self._clean_anchor = denoised  # a reference; returned latents are never modified
+                self._clean_anchor_cond = cond
                 self.clean_anchor_chunk = self.chunk_index
                 self._clean_capture_chunk = None
 

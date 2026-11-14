@@ -196,7 +196,7 @@ policy = ReanchorPolicy()                      # ReanchorConfig(...) to tune
 result = controller.handle(msg); policy.on_target(msg, result)
 # generation thread, once per chunk
 cond = steerer.get_cond(); a = policy.next_chunk(steerer.progress, steerer.is_moving)
-if a: backend.reanchor(a.strength)             # takes effect on this chunk
+if a: backend.reanchor(a.strength, source=a.source)  # takes effect on this chunk
 latents = backend.generate_chunk(cond)
 # new video
 controller.reset(prompt); policy.on_reset()
