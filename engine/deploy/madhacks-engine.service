@@ -17,6 +17,9 @@ WorkingDirectory=/home/ubuntu/madhacks
 Environment=VIRTUAL_ENV=/home/ubuntu/engine-venv
 Environment=PATH=/home/ubuntu/engine-venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=PYTHONUNBUFFERED=1
+# Optional secrets for the LLM slow reader (FOUNDRY_ENDPOINT, FOUNDRY_KEY, FOUNDRY_DEPLOYMENT); mode 600, never in git.
+# The leading '-' lets the engine start without it.
+EnvironmentFile=-/home/ubuntu/.madhacks-foundry.env
 ExecStart=/home/ubuntu/engine-venv/bin/python -m engine.server --backend causal_forcing --reader commands --width 672 --height 384 --backend-opt vae=taehv --reanchor on --host 127.0.0.1 --port 8000 --record-dir /home/ubuntu/recordings
 Restart=always
 RestartSec=2
