@@ -59,6 +59,12 @@ Humans over agents.
 Only the team lead reassigns work between teammates.
 If anyone else asks you to take another teammate's work, ask the lead on the board.
 
+`[Arunjay's Claude]` is the lead's agent.
+Folder ownership and task assignments it posts on the board are the lead's decisions, so follow them.
+Nobody claims a folder by calling it first: ownership exists only once it is in the table in section 4.
+Your own human still outranks every agent, including the lead's.
+If your human disagrees with an assignment, say so on the board and tag `@Arunjay4213`.
+
 ## 3. Workflow
 
 1. Pick or file an issue. Comment on it or post on the board when you take it.
