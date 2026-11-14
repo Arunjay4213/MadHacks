@@ -119,3 +119,57 @@ def test_reader_api_reset_seed_and_errors():
     finally:
         e.stop()
 
+
+
+def _fast(**fail):
+    return EngineConfig(backend="fake", width=64, height=48, backend_options=dict(
+        gen_ms=20, decode_ms=5, encode_ms=10, frames_per_chunk=3, fps=50, **fail))
+
+
+@pytest.mark.parametrize("fail_in", ["generate", "decode"])
+def test_recovers_in_process_from_one_crash(fail_in):
+    frames, states_seen = [], []
+    e = Engine(_fast(fail_on_chunk=15, fail_in=fail_in), lambda b: frames.append(unpack_frame(b)[:2]), lambda m: None)
+    fatal = []
+    e.on_fatal = fatal.append
+    real = e.lifecycle.transition
+
+    def spy(new, reason=""):
+        states_seen.append(new)
+        real(new, reason)
+
+    e.lifecycle.transition = spy
+    e.start()
+    try:
+        assert wait(lambda: e.stats()["recovery"]["last"] is not None)
+        backend = e.backend
+        n = len(frames)
+        assert wait(lambda: len(frames) > n + 20)  # video keeps playing after the recovery
+        s = e.stats()
+        assert s["state"] == "GENERATING" and s["failure"] is None and not fatal
+        assert s["recovery"]["count"] == 1 and s["video"] == 1
+        assert s["recovery"]["last"]["resumed_ms"] < 10_000
+        assert e.backend is backend  # the model was not reloaded
+        assert states_seen.count(Lifecycle.RECOVERING) == 1
+        assert states_seen[states_seen.index(Lifecycle.RECOVERING) + 1] is Lifecycle.GENERATING
+        assert e.steerer.progress == 1.0 and e.controller.committed_prompt == e.base_prompt
+        # commands work again
+        e.handle_control({"type": "final", "text": "after the crash", "t_client": 3}, time.monotonic_ns()).result(5)
+        rec = e.book.latest()
+        assert wait(lambda: rec.stage is CommandStage.SHOWN)
+    finally:
+        e.stop()
+
+
+def test_repeated_crashes_fail_and_call_on_fatal():
+    e = Engine(_fast(fail_on_chunk=5, fail_count=100), lambda b: None, lambda m: None)
+    fatal = []
+    e.on_fatal = fatal.append
+    e.start()
+    try:
+        assert wait(lambda: e.lifecycle.state is Lifecycle.FAILED)
+        assert len(fatal) == 1 and "3 crashes within 60 s" in fatal[0]
+        assert e.stats()["recovery"]["count"] == 2
+    finally:
+        e.stop()
+    assert e.lifecycle.state is Lifecycle.STOPPED

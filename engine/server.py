@@ -10,6 +10,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import os
 import time
 from pathlib import Path
 
@@ -270,6 +271,16 @@ def _option_value(text: str):
     return text
 
 
+EXIT_FAILED = 70  # the engine reached FAILED; systemd (Restart=always) starts a fresh process
+
+
+def _exit_for_supervisor(failure: str) -> None:
+    """The engine gave up recovering in-process. Exit non-zero at once so the supervisor restarts the server."""
+    log.critical("engine FAILED (%s); exiting with code %d so the supervisor restarts it", failure, EXIT_FAILED)
+    logging.shutdown()
+    os._exit(EXIT_FAILED)
+
+
 def parse_args(argv=None) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="python -m engine.server", description=__doc__.splitlines()[0])
     p.add_argument("--backend", default="fake", help="fake or causal_forcing")
@@ -295,6 +306,10 @@ def parse_args(argv=None) -> argparse.Namespace:
                    help="re-anchor the model at steers and at intervals (steering.reanchor policy); needs a backend "
                         "with reanchor(strength)")
     p.add_argument("--studio-dir", default=str(STUDIO), help="Lucid Studio build folder served at /studio/")
+    p.add_argument("--record-dir", default="~/recordings",
+                   help="folder for the mp4 of every video (one file per reset); none turns the recorder off")
+    p.add_argument("--record-max-gb", type=float, default=20.0,
+                   help="delete the oldest recordings when the folder holds more than this")
     p.add_argument("--log-level", default="info")
     return p.parse_args(argv)
 
@@ -314,8 +329,11 @@ def main(argv=None) -> None:
                           device=args.device, decode_device=args.decode_device, backend_options=options,
                           base_prompt=args.base_prompt, jpeg_quality=args.jpeg_quality,
                           precompute_file=args.precompute_file, lead_margin=args.lead_margin,
-                          reanchor=args.reanchor)
+                          reanchor=args.reanchor,
+                          record_dir=None if args.record_dir.lower() == "none" else args.record_dir,
+                          record_max_bytes=int(args.record_max_gb * 1e9))
     app = build_app(config, studio_dir=Path(args.studio_dir))
+    app.state.engine.on_fatal = _exit_for_supervisor
     uvicorn.run(app, host=args.host, port=args.port, log_level=args.log_level, timeout_graceful_shutdown=2)
 
 

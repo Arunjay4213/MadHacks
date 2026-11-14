@@ -12,6 +12,7 @@ class Lifecycle(enum.Enum):
     WARMING = "WARMING"        # encoding the base prompt and the precompute file
     GENERATING = "GENERATING"  # the loop is producing chunks
     RESETTING = "RESETTING"    # between chunks: backend.reset() and a new steerer
+    RECOVERING = "RECOVERING"  # a generation or decode error: clear the queues, backend.reset(), base prompt
     STOPPED = "STOPPED"        # clean shutdown finished or in progress
     FAILED = "FAILED"          # an unrecoverable error; see the log
 
@@ -19,8 +20,9 @@ class Lifecycle(enum.Enum):
 ALLOWED: dict[Lifecycle, frozenset[Lifecycle]] = {
     Lifecycle.LOADING: frozenset({Lifecycle.WARMING, Lifecycle.STOPPED, Lifecycle.FAILED}),
     Lifecycle.WARMING: frozenset({Lifecycle.GENERATING, Lifecycle.STOPPED, Lifecycle.FAILED}),
-    Lifecycle.GENERATING: frozenset({Lifecycle.RESETTING, Lifecycle.STOPPED, Lifecycle.FAILED}),
-    Lifecycle.RESETTING: frozenset({Lifecycle.GENERATING, Lifecycle.STOPPED, Lifecycle.FAILED}),
+    Lifecycle.GENERATING: frozenset({Lifecycle.RESETTING, Lifecycle.RECOVERING, Lifecycle.STOPPED, Lifecycle.FAILED}),
+    Lifecycle.RESETTING: frozenset({Lifecycle.GENERATING, Lifecycle.RECOVERING, Lifecycle.STOPPED, Lifecycle.FAILED}),
+    Lifecycle.RECOVERING: frozenset({Lifecycle.GENERATING, Lifecycle.STOPPED, Lifecycle.FAILED}),
     Lifecycle.FAILED: frozenset({Lifecycle.STOPPED}),
     Lifecycle.STOPPED: frozenset(),
 }
