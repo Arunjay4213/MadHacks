@@ -144,6 +144,21 @@ Still open: **the refresh chunk itself is visibly bad**, a washed-out, ghosted f
 The mean absolute change from the last frame of the previous chunk is 23-28 (0-255) on refresh chunks against 7-9 on other chunks.
 `quick_gold.py` never sampled a refresh chunk, so it did not show this. A steer re-anchor (step 0) has the same one-chunk glitch.
 
+**Fixed by restarting the decoder on a first frame.** A keep-0 rebase makes a first-frame latent, which the VAE decodes as 1 frame with a fresh decoder state, but the streaming decoder kept the old scene's context (TAEHV: the last 3 latents; Wan: the feature cache) and decoded it as a 4-frame continuation.
+`ChunkLatents.start` is now `ChunkStart.FIRST_FRAME` on the first chunk of a video and on every keep-0 rebase (every re-anchor), else `CONTINUE`.
+On `FIRST_FRAME` mid-video the decoder restarts its stream state exactly as for a new video (same "drop the first 3 frames" rule, so 1 frame) but keeps `video_id` and the chunk count, so the engine's ordering does not change. Rebases with keep >= 1 make continuation latents and do not restart the decoder.
+Backend option `first_frame_pad` (`--backend-opt first_frame_pad=...`): `hold` (default) repeats that 1 clean frame to the usual 4 frames, so every chunk still has 4 frames; `none` emits the true 1 frame, as the first chunk of a video already does. Switch to `none` once the streamer handles short chunks.
+Measured on the meadow, 360 chunks, refresh every 24 at step 2, mean over the refreshes (sharpness = variance of the Laplacian; change = mean absolute difference, 0-255, between a chunk's first frame and the previous chunk's last frame):
+
+| Chunk | sharpness before | sharpness after | change before | change after |
+|---|---|---|---|---|
+| refresh - 1 | 2049 | 2049 | 6.4 | 6.4 |
+| refresh | 498 | 1871 | 23.6 | 32.8 |
+| refresh + 1 | 1448 | 2046 | 38.8 | 7.8 |
+| refresh + 2 | 1598 | 2074 | 14.7 | 6.7 |
+
+The refresh chunk is now as sharp as its neighbours and not washed out. What remains is one cut: the change on the refresh chunk (about 33) is the jump to the clean anchor's composition, and on the car the trees and road jump back to the saved layout every refresh.
+
 ## Using the backend from a plain Python script
 
 Run from `~/madhacks` with `~/engine-venv` active:
