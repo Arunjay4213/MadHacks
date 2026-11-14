@@ -89,7 +89,12 @@ model on CPU: indicative only, not the umt5-xxl encoder Wan actually uses.
 contract-2 messages through a real `Steerer` + `Controller` and scores the
 clip with `metrics.py`. `default_scenarios(ramp)` mirrors the PLAN.md checks
 (single, hard_swap, interrupt, pace_1..12, stack_remove_middle, early_right,
-early_wrong). `python -m steering.eval.scenarios --fake` runs them all on a
+early_wrong), plus strength checks: `strength_low` (base -> winter at
+`strength` 0.3, `without_prompt` = base), `strength_full` (the same at 1.0,
+which must end on the same cond as `single`) and `strength_steps` (finals
+for the same prompt at 0.3, 0.6, 1.0, 1.3, spaced ramp + 2 steps apart).
+`run` passes every message to `Controller.handle` unchanged.
+`python -m steering.eval.scenarios --fake` runs them all on a
 built-in fake model (a smoke test only: its cut threshold is tuned, not real).
 Add `--align` to run them with a `steering.align.Aligner` and
 `fake_encode_ids` (word/punctuation tokens plus an end token, one fixed row

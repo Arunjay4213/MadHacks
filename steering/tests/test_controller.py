@@ -499,3 +499,231 @@ def test_aligner_new_tokens_avoid_rows_still_fading():
             assert p not in nonzero, (p, i)
     assert [p for p, _ in al.layout][:4] == [7, 8, 9, 10]
     assert al.layout[-1] == (3, b_ids[-1])  # the end token is matched
+
+
+# --- strength ---------------------------------------------------------------
+
+def _smsg(prompt: str, strength: float, without: str = "meadow", **kw) -> dict:
+    return {**_msg(prompt, **kw), "strength": strength, "without_prompt": without}
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"strength": 0.3},
+        {"without_prompt": "meadow"},
+        {"strength": 0.0, "without_prompt": "meadow"},
+        {"strength": -0.1, "without_prompt": "meadow"},
+        {"strength": 1.31, "without_prompt": "meadow"},
+        {"strength": float("nan"), "without_prompt": "meadow"},
+        {"strength": True, "without_prompt": "meadow"},
+        {"strength": "0.3", "without_prompt": "meadow"},
+        {"strength": 0.3, "without_prompt": ""},
+        {"strength": 0.3, "without_prompt": 3},
+    ],
+)
+def test_bad_strength_raises_and_changes_nothing(extra):
+    s, enc, c = _setup()
+    c.handle(_msg("winter", 2))
+    with pytest.raises(ValueError):
+        c.handle({**_msg("snow"), **extra})
+    assert enc.calls == ["winter"] and c.committed_prompt == "winter"
+
+
+@pytest.mark.parametrize("strength", [1e-6, 1, 1.3])
+def test_strength_range_edges_accepted(strength):
+    _, _, c = _setup()
+    assert c.handle(_smsg("winter", strength))["applied"]
+
+
+def test_strength_one_equals_plain_prompt():
+    s, _, c = _setup()
+    c.handle(_smsg("winter", 1.0, ramp=1))
+    assert torch.equal(s.get_cond(), _emb("winter"))
+
+
+def test_strength_target_is_blend_of_without_and_prompt():
+    s, enc, c = _setup()
+    r = c.handle(_smsg("winter", 0.3, without="summer", ramp=1))
+    assert r["applied"] and r["kind"] == "final"
+    assert sorted(enc.calls) == ["summer", "winter"]
+    assert torch.equal(s.get_cond(), blend(_emb("summer"), _emb("winter"), 0.3))
+    assert c.committed_prompt == "winter"
+
+
+def test_provisional_strength_applies_cap_on_top():
+    s, _, c = _setup()
+    start = s.current
+    c.handle(_smsg("winter", 0.6, provisional=True, cap=0.4, ramp=2))
+    target = blend(_emb("meadow"), _emb("winter"), 0.6)
+    assert torch.allclose(_run(s, 4)[-1], blend(start, target, 0.4), atol=1e-6)
+    assert c.pending_prompt == "winter"
+
+
+def test_strength_identity_rules():
+    _, _, c = _setup()
+    assert c.handle(_smsg("winter", 0.3))["kind"] == "final"
+    assert c.handle(_smsg("winter", 0.3))["reason"] == "unchanged"
+    assert c.handle(_smsg("winter", 0.6))["kind"] == "final"         # new strength
+    assert c.handle(_smsg("winter", 0.6, without="x"))["kind"] == "final"  # new base
+    assert c.handle(_msg("winter"))["kind"] == "final"               # plain is another target
+    assert c.handle(_smsg("snow", 0.3, provisional=True, cap=0.4))["kind"] == "provisional"
+    assert c.handle(_smsg("snow", 0.3, provisional=True, cap=0.4))["reason"] == "unchanged"
+    assert c.handle(_smsg("snow", 0.3))["kind"] == "confirm"
+    c.handle(_smsg("rain", 0.3, provisional=True, cap=0.4))
+    assert c.handle(_smsg("rain", 0.5))["kind"] == "final"           # not the guessed target
+
+
+def test_strength_cache_hit_needs_both_prompts():
+    _, _, c = _setup()
+    c.precompute(["winter"])
+    assert c.handle(_smsg("winter", 0.3, without="summer"))["cache_hit"] is False
+    assert c.handle(_smsg("winter", 0.5, without="summer"))["cache_hit"] is True
+    c.precompute(["snow"])
+    assert c.handle(_smsg("snow", 0.5, without="autumn"))["cache_hit"] is False
+    assert c.handle(_smsg("hail", 0.5, without="autumn"))["cache_hit"] is False
+
+
+def test_strength_with_aligner_blends_per_token():
+    s, enc, al, c = _aligned_setup()
+    r = c.handle(_smsg("oak tree snow wind", 0.3, without="oak tree wind", ramp=1))
+    assert r["applied"]
+    out = s.get_cond()[0]
+    ids = _word_ids("oak tree snow wind")
+    # The committed layout is the prompt's: wind/end keep 2/3, snow takes 4.
+    assert al.layout == tuple(zip([0, 1, 4, 2, 3], ids))
+    for p, i in al.layout:
+        want = _VOCAB[i] * (0.3 if p == 4 else 1.0)  # shared rows blend with themselves
+        assert torch.allclose(out[p], want, atol=1e-6)
+    assert torch.count_nonzero(out[5:]) == 0
+    # Same as blending the prompt and the without_prompt placed against it.
+    ref = Aligner(AL_LEN)
+    ref.place(*PairEncode()("oak tree wind"))
+    placed, layout = ref.prepare(*PairEncode()("oak tree snow wind"))
+    base, _ = ref.prepare(*PairEncode()("oak tree wind"), against=layout)
+    assert torch.equal(out, blend(base, placed, 0.3)[0])
+
+
+def test_without_prompt_only_tokens_take_free_positions_and_never_commit():
+    s, _, al, c = _aligned_setup()
+    c.handle(_smsg("oak tree snow wind", 0.5, without="oak tree rain wind", ramp=1))
+    out = s.get_cond()[0]
+    rain = _word_ids("rain")[0]
+    rain_rows = [p for p in range(AL_LEN) if torch.allclose(out[p], _VOCAB[rain] * 0.5, atol=1e-6)]
+    assert rain_rows == [5]  # lowest position not used by the prompt's layout
+    assert rain not in {i for _, i in al.layout}
+
+
+# --- reset ------------------------------------------------------------------
+
+def test_steerer_reset_is_idle_at_new_cond_any_shape():
+    s = Steerer(_emb("meadow"))
+    s.set_target(_emb("winter"), 4)
+    s.get_cond()
+    new = torch.randn(1, 3, 5)
+    s.reset(new)
+    assert s.progress == 1.0 and not s.is_moving
+    assert s.current is new and s.get_cond() is new
+    s.set_target(torch.zeros(1, 3, 5), 1)
+    assert torch.equal(s.get_cond(), torch.zeros(1, 3, 5))
+
+
+def test_steerer_reset_under_concurrent_get_cond():
+    s = Steerer(_emb("meadow"))
+    stop = threading.Event()
+    errors: list[BaseException] = []
+    conds = [_emb(f"r{i}") for i in range(4)]
+
+    def loop() -> None:
+        try:
+            while not stop.is_set():
+                assert torch.isfinite(s.get_cond()).all()
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    gen = threading.Thread(target=loop)
+    gen.start()
+    for i in range(200):
+        s.reset(conds[i % 4])
+        s.set_target(conds[(i + 1) % 4], 3)
+    s.reset(conds[0])
+    stop.set()
+    gen.join(10)
+    assert not errors and s.get_cond() is conds[0] and s.progress == 1.0
+
+
+def test_controller_reset_sets_state():
+    s, enc, c = _setup()
+    c.handle(_msg("winter", 4))
+    c.handle(_msg("snow", 4, provisional=True, cap=0.4))
+    s.get_cond()
+    out = c.reset("night")
+    assert torch.equal(out, _emb("night")) and s.current is out
+    assert s.progress == 1.0 and not s.is_moving
+    assert c.committed_prompt == "night" and c.pending_prompt is None
+    assert c.handle(_msg("night"))["reason"] == "unchanged"
+    assert c.handle(_msg("snow", provisional=True, cap=0.4))["kind"] == "provisional"
+
+
+def test_controller_reset_with_strength():
+    s, _, c = _setup()
+    out = c.reset("winter", 0.3, "summer")
+    assert torch.equal(out, blend(_emb("summer"), _emb("winter"), 0.3))
+    assert c.handle(_smsg("winter", 0.3, without="summer"))["reason"] == "unchanged"
+    with pytest.raises(ValueError):
+        c.reset("winter", 0.3)
+    with pytest.raises(ValueError):
+        c.reset("")
+
+
+def test_controller_reset_with_aligner_uses_identity_layout():
+    s, _, al, c = _aligned_setup()
+    c.handle(_msg("oak tree snow wind", 1))
+    s.get_cond()
+    out = c.reset("snow falls on hills")
+    emb, ids = PairEncode()("snow falls on hills")
+    assert al.layout == tuple(enumerate(ids))
+    assert torch.equal(out, emb)
+
+
+def test_reset_drops_in_flight_handle_as_stale():
+    s = Steerer(_emb("meadow"))
+    release = threading.Event()
+    entered = threading.Event()
+    base = FakeEncode()
+
+    def encode(prompt: str) -> torch.Tensor:
+        if prompt == "slow":
+            entered.set()
+            assert release.wait(5)
+        return base(prompt)
+
+    c = Controller(s, encode)
+    results: dict[str, dict] = {}
+    t = threading.Thread(target=lambda: results.update(old=c.handle(_msg("slow", 1))))
+    t.start()
+    assert entered.wait(5)
+    c.reset("night")
+    release.set()
+    t.join(5)
+    assert results["old"]["reason"] == "stale"
+    assert c.committed_prompt == "night" and s.get_cond() is s.current
+    assert torch.equal(s.current, _emb("night"))
+    assert c.handle(_msg("winter", 1))["applied"]  # later messages still apply
+
+
+def test_reset_encode_error_changes_nothing():
+    s, enc, c = _setup()
+    c.handle(_msg("winter", 4))
+    c.handle(_msg("snow", 4, provisional=True, cap=0.4))
+    s.get_cond()
+    before = s.current
+
+    def boom(prompt: str) -> torch.Tensor:
+        raise RuntimeError("encoder down")
+
+    c._encode = boom
+    with pytest.raises(RuntimeError):
+        c.reset("night")
+    assert s.current is before and s.progress == 0.25
+    assert c.committed_prompt == "winter" and c.pending_prompt == "snow"

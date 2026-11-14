@@ -25,6 +25,8 @@ cond = steerer.get_cond()
 - With `cap < 1` the move stops part way. Call `set_target` again with the same
   target to confirm, or a different one to cancel.
 - `steerer.progress` (0 to 1) and `steerer.is_moving` report the current move.
+- `steerer.reset(cond)` jumps to `cond` with no move (a new stream; the shape
+  may change).
 - `steerer.current` is the tensor `get_cond` last returned (the initial one
   before any call), read without advancing the move.
 
@@ -56,6 +58,24 @@ ctl.handle({"prompt": p, "ramp_chunks": 4})  # final: confirm, or replace a wron
   (`reason: "unchanged"`).
 - Bad messages raise ValueError (a final message must have cap 1.0); on any
   error nothing changes.
+- Optional `strength` (number in (0, 1.3]) and `without_prompt` (non-empty
+  str), both or neither: the target is
+  `blend(E(without_prompt), E(prompt), strength)`; 1.0 is exactly `E(prompt)`.
+  Both prompts go through the same cache; `cache_hit` is True only if both
+  were hits. A provisional message may carry them too (`cap` applies on top).
+- "Unchanged" and "confirm" compare the full target
+  `(prompt, strength, without_prompt)`: the same prompt at a new strength is
+  a new "final". `committed_prompt` / `pending_prompt` return the prompt only.
+
+```python
+cond = ctl.reset(prompt, strength=None, without_prompt=None)  # reset tap: new video
+```
+
+- Encodes outside the lock, then `steerer.reset(cond)` (jump, no ramp; idle,
+  progress 1.0; shape may differ), commits that target, clears any pending
+  guess, and makes every `handle` call already in flight "stale". With an
+  aligner the prompt is placed in the identity layout. On any error nothing
+  changes. Returns the tensor now in the steerer.
 
 ## Aligner (keep shared tokens at the same positions)
 
@@ -90,6 +110,12 @@ ctl = Controller(steerer, encode, aligner=aligner)
   not occupied; unused by the previous layout; any. Matched tokens and the
   first call ignore it. `Controller` passes the rows of `steerer.current`
   that have any non-zero element.
+- `prepare(..., against=layout)` matches against `layout` instead of the
+  committed one and leaves the committed one alone. `Controller` places
+  `without_prompt` against the prompt's new layout, so shared tokens blend
+  with themselves and prompt-only tokens with zero rows; only the prompt's
+  layout is ever committed. `against=()` is the identity placement (used by
+  `Controller.reset`).
 - With an aligner, `encode` must return `(emb, ids)` (TypeError otherwise).
   The cache keeps that raw pair; placement happens in `handle` just before
   `set_target`, only for applied messages, and the layout is committed only

@@ -132,6 +132,8 @@ def _label(msg: Mapping, base: str, width: int = 44) -> str:
     tag = f" r{msg['ramp_chunks']}"
     if msg.get("provisional"):
         tag += f" prov cap{msg.get('cap', 1.0):g}"
+    if msg.get("strength") is not None:
+        tag += f" s{msg['strength']:g}"
     p = p if len(p) + len(tag) <= width else p[: width - len(tag) - 1] + "~"
     return p + tag
 
@@ -223,8 +225,18 @@ def _metrics(
 # ---------------------------------------------------------------- scenarios
 
 
-def _msg(prompt: str, ramp: int, provisional: bool = False, cap: float = 1.0) -> dict:
-    return {"prompt": prompt, "ramp_chunks": ramp, "provisional": provisional, "cap": cap}
+def _msg(
+    prompt: str,
+    ramp: int,
+    provisional: bool = False,
+    cap: float = 1.0,
+    strength: float | None = None,
+    without: str | None = None,
+) -> dict:
+    msg = {"prompt": prompt, "ramp_chunks": ramp, "provisional": provisional, "cap": cap}
+    if strength is not None:
+        msg.update(strength=strength, without_prompt=without)
+    return msg
 
 
 def _sequence(name: str, prompts: list[str], ramp: int, lead: int) -> Scenario:
@@ -261,6 +273,15 @@ def default_scenarios(ramp: int = 4) -> list[Scenario]:
         )
         return Scenario(name, BASE, events, lead + ramp + tail)
 
+    def strength(name: str, values: tuple[float, ...]) -> Scenario:
+        # Successive finals for the same prompt, spaced like _sequence.
+        gap = ramp + 2
+        events = tuple(
+            Event(lead + i * gap, _msg(winter, ramp, strength=v, without=BASE))
+            for i, v in enumerate(values)
+        )
+        return Scenario(name, BASE, events, lead + len(values) * gap)
+
     return [
         _sequence("single", [BASE, winter], ramp, lead),
         _sequence("hard_swap", [BASE, winter], 1, lead),
@@ -280,6 +301,9 @@ def default_scenarios(ramp: int = 4) -> list[Scenario]:
         ),
         early("early_right", winter),
         early("early_wrong", night),
+        strength("strength_low", (0.3,)),
+        strength("strength_full", (1.0,)),
+        strength("strength_steps", (0.3, 0.6, 1.0, 1.3)),
     ]
 
 
