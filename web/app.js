@@ -1,8 +1,8 @@
 // DOM wiring. Logic lives in lib.js. Element ids are listed in PLAN.md.
 import {
-  PROTOCOL, TYPING_IDLE_MS, partialMsg, finalMsg, tapMsg, parseFrame, parseServerMessage,
-  splitKeyword, backoffMs, isWholeInsert, makeFrameGate, makeLatencyTracker, makeTranscriber,
-  changesKey, commandKey,
+  PROTOCOL, TYPING_IDLE_MS, BURST_IDLE_MS, partialMsg, finalMsg, tapMsg, parseFrame, parseServerMessage,
+  splitKeyword, backoffMs, makeFrameGate, makeLatencyTracker, makeTranscriber,
+  changesKey, commandKey, makeInputClassifier,
 } from './lib.js';
 
 const $ = (id) => document.getElementById(id);
@@ -13,7 +13,10 @@ const el = {
 };
 const ctx = el.video.getContext('2d');
 // Same origin by default; `?server=host:port` points the page at another server (e.g. the engine on :8000).
-const serverHost = new URLSearchParams(location.search).get('server') || location.host;
+const params = new URLSearchParams(location.search);
+const serverHost = params.get('server') || location.host;
+// `?debug=1` logs every text-box input to the console, to see how Wispr Flow inserts on this laptop.
+const DEBUG = params.get('debug') === '1';
 const wsBase = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${serverHost}`;
 const latency = makeLatencyTracker();
 const PROXY_NOTE = 'command sent → first frame tagged with its chunk drawn to the canvas (page clock; chunk-tag proxy, not proof the picture changed or was painted)';
@@ -169,21 +172,27 @@ function renderLatency({ ms, stamps }) {
 
 // ---------- text box (Wispr Flow pastes here) ----------
 let idleTimer = 0;
+const inputs = makeInputClassifier();
 
 function sendFinalFromBox() {
   clearTimeout(idleTimer);
+  inputs.reset();
   const text = el.command.value.trim();
   el.command.value = '';
   if (text) send(finalMsg(text));
 }
 
+// No Enter needed: a paste is final at once, typing becomes final after a pause.
 el.command.addEventListener('input', (e) => {
   clearTimeout(idleTimer);
-  if (isWholeInsert(e.inputType, e.data)) return sendFinalFromBox();
+  if (e.isComposing) return; // mid-composition (accents, IME): wait for the composed text
+  const kind = inputs.classify(e.inputType, e.data, performance.now());
+  if (DEBUG) console.info(`[web] input ${e.inputType} chars=${e.data?.length ?? '-'} -> ${kind}`);
+  if (kind === 'whole') return sendFinalFromBox();
   const text = el.command.value.trim();
   if (!text) return;
   send(partialMsg(text));
-  idleTimer = setTimeout(sendFinalFromBox, TYPING_IDLE_MS);
+  idleTimer = setTimeout(sendFinalFromBox, kind === 'burst' ? BURST_IDLE_MS : TYPING_IDLE_MS);
 });
 el.form.addEventListener('submit', (e) => {
   e.preventDefault();

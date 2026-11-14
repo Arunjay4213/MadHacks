@@ -7,7 +7,10 @@ export const PROTOCOL = {
   frameHeaderBytes: 6,
 };
 
+// Typed text becomes final after this pause; machine-fast input (a dictation tool simulating keys)
+// after the much shorter BURST_IDLE_MS, so it is not held back by a pause meant for humans.
 export const TYPING_IDLE_MS = 1500;
+export const BURST_IDLE_MS = 200;
 
 export const partialMsg = (text, t = Date.now()) => ({ type: 'partial', text, t_client: t });
 export const finalMsg = (text, t = Date.now()) => ({ type: 'final', text, t_client: t });
@@ -88,6 +91,27 @@ export const backoffMs = (attempt) => Math.min(5000, 250 * 2 ** attempt);
 export function isWholeInsert(inputType, data) {
   if (['insertFromPaste', 'insertFromDrop', 'insertReplacementText', 'insertFromYank'].includes(inputType)) return true;
   return inputType === 'insertText' && isStr(data) && data.length > 1;
+}
+
+// Tells human typing from a burst of simulated keystrokes: `burstCount` inputs in a row, each within
+// `burstGapMs` of the last, are faster than anyone types. Returns 'whole' | 'burst' | 'typing'.
+export function makeInputClassifier({ burstGapMs = 30, burstCount = 4 } = {}) {
+  let times = [];
+  return {
+    classify(inputType, data, now) {
+      if (isWholeInsert(inputType, data)) {
+        times = [];
+        return 'whole';
+      }
+      times.push(now);
+      if (times.length > burstCount) times.shift();
+      const burst = times.length === burstCount && times.every((t, i) => i === 0 || t - times[i - 1] <= burstGapMs);
+      return burst ? 'burst' : 'typing';
+    },
+    reset() {
+      times = [];
+    },
+  };
 }
 
 // Async JPEG decode can finish out of order; only draw a frame newer than the last drawn one.
