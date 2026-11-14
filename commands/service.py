@@ -5,7 +5,7 @@ import threading
 import time
 
 from .composer import compose
-from .reader import KEYWORDS, MAX_CLAUSES, RAMP, read, split_commands, spot, style_fallback
+from .reader import KEYWORDS, MAX_CLAUSES, RAMP, is_blocked, read, split_commands, spot, style_fallback
 from .state import SceneState
 
 PROVISIONAL_CAP = 0.4
@@ -32,9 +32,13 @@ def _validate(msg) -> None:
 
 
 class CommandService:
-    def __init__(self, base: str | None = None, slow_reader=None, slow_timeout_s: float = 0.4):
+    def __init__(self, base: str | None = None, slow_reader=None, slow_timeout_s: float = 0.4, semantic_reader=None):
         self._state = SceneState() if base is None else SceneState(base)
         self._slow_reader = slow_reader
+        if semantic_reader is None:
+            from .semantic import configured_reader
+            semantic_reader = configured_reader()
+        self._semantic_reader = semantic_reader
         self._slow_timeout = slow_timeout_s
         self._slow_thread: threading.Thread | None = None
         self._lock = threading.Lock()
@@ -130,6 +134,11 @@ class CommandService:
             self._keyword = result["keyword"] or self._keyword
             op = result["op"]
             if op is None:
+                if self._semantic_reader is not None and not is_blocked(clause):
+                    try:
+                        op = self._semantic_reader(clause, snapshot)
+                    except Exception:  # an injected/model failure falls through to the existing slow reader
+                        op = None
                 if op is None and self._slow_reader is not None:
                     op = self._ask_slow(clause, snapshot, max(0, deadline - time.monotonic()))
                 if op is None:
