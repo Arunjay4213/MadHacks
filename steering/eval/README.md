@@ -85,12 +85,20 @@ model on CPU: indicative only, not the umt5-xxl encoder Wan actually uses.
 
 ## scenarios.py: scripted steering runs
 
-`run(scenario, generate, encode, fps, on_cond_changed)` replays timed
+`run(scenario, generate, encode, fps, on_cond_changed=None, aligner=None)` replays timed
 contract-2 messages through a real `Steerer` + `Controller` and scores the
 clip with `metrics.py`. `default_scenarios(ramp)` mirrors the PLAN.md checks
 (single, hard_swap, interrupt, pace_1..12, stack_remove_middle, early_right,
 early_wrong). `python -m steering.eval.scenarios --fake` runs them all on a
 built-in fake model (a smoke test only: its cut threshold is tuned, not real).
+Add `--align` to run them with a `steering.align.Aligner` and
+`fake_encode_ids` (word/punctuation tokens plus an end token, one fixed row
+per token id, `[1, 64, 32]`).
+
+With `aligner`, `encode` returns `(embedding, real token ids)` instead of a
+tensor; `run` calls `aligner.reset()`, builds the Steerer from
+`aligner.place(*encode(initial_prompt))`, and passes the aligner to the
+Controller.
 
 What the engine must provide to run them on the real model:
 
@@ -106,3 +114,28 @@ What the engine must provide to run them on the real model:
 4. `fps` of the decoded video, so reaction times come out in milliseconds.
 
 `Result.report()` prints a table; `Result.save_frames(path)` saves `[T, C, H, W]`.
+
+## run_engine.py / row_order_check.py: on the GPU box
+
+From the repo root, with `engine/` importable (`<name>` = the backend module):
+
+```
+python -m steering.eval.row_order_check --backend engine.backends.<name> --out eval_out/rows
+python -m steering.eval.run_engine --backend engine.backends.<name> --align --out eval_out/scenarios
+```
+
+Defaults: 832x480, `--steps 2`, `--fps 16`, `--ramp 4`, `--seed 0`, all scenarios.
+Add `--save-frames` for `.pt` frames, `--force-cache-reset-hook NAME` to call
+`backend.NAME()` on every conditioning change, `--scenarios single,hard_swap` for a subset.
+
+Send back the whole `eval_out/` folder:
+- `rows/row_order_check.txt`: A2/B/C/D vs A (max/mean abs in 0..255 levels, PSNR,
+  first-chunk mean) and a `VERDICT:` line. Exit code 0 PASS, 1 FAIL, 2 INCONCLUSIVE.
+- `scenarios/summary.txt`: one line per scenario (cuts, `s<step>:<kind>:<reaction ms>/x<peak
+  ratio>` per message, step/gen/decode ms) or `FAILED <error>`; exit code 1 if any failed.
+- `scenarios/<name>.report.txt` and `<name>.mp4` (only if imageio+ffmpeg or torchvision+av).
+
+Verdict: PASS = scattered (B) and reversed (C) rows match A within max(3 x A-vs-A2, 1 level)
+while another prompt (D) clearly differs, so `--align` is safe. FAIL = B or C differs by at
+least half as much as D: do not align. INCONCLUSIVE = seeding is not deterministic (A2 > 1
+level), D barely differs, or B/C sit in between; read the numbers before deciding.

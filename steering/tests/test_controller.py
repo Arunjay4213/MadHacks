@@ -474,3 +474,28 @@ def test_aligner_without_initial_layout_raises():
     al = Aligner(AL_LEN)
     with pytest.raises(ValueError, match="place"):
         Controller(Steerer(torch.zeros(1, AL_LEN, AL_DIM)), PairEncode(), aligner=al)
+
+
+def test_aligner_new_tokens_avoid_rows_still_fading():
+    # Commit C, then a capped guess A moves part way: C's rows are still
+    # non-zero but no longer in the aligner's (A's) layout. B's new tokens
+    # must not land on them (or on A's).
+    c_prompt, a_prompt, b_prompt = "oak tree wind", "snow night rain", "fog mist haze dawn"
+    words = " ".join((c_prompt, a_prompt, b_prompt)).split()
+    assert len({_word_ids(w)[0] for w in words}) == len(words)  # no id collisions
+    s, enc, al, c = _aligned_setup(c_prompt)
+    c.handle(_msg(a_prompt, 4, provisional=True, cap=0.4))
+    _run(s, 2)
+    cur = s.current[0]
+    nonzero = {p for p in range(AL_LEN) if cur[p].ne(0).any()}
+    assert {0, 1, 2} <= nonzero  # C's words, still fading out
+    prev = dict(al.layout)  # A's layout: position -> id
+    progress = s.progress
+    assert c.handle(_msg(b_prompt, 4))["kind"] == "final"
+    assert s.progress == 0.0 and progress == 0.5
+    b_ids = _word_ids(b_prompt)
+    for p, i in al.layout:
+        if prev.get(p) != i:  # a new (unmatched) token
+            assert p not in nonzero, (p, i)
+    assert [p for p, _ in al.layout][:4] == [7, 8, 9, 10]
+    assert al.layout[-1] == (3, b_ids[-1])  # the end token is matched

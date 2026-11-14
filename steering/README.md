@@ -25,6 +25,8 @@ cond = steerer.get_cond()
 - With `cap < 1` the move stops part way. Call `set_target` again with the same
   target to confirm, or a different one to cancel.
 - `steerer.progress` (0 to 1) and `steerer.is_moving` report the current move.
+- `steerer.current` is the tensor `get_cond` last returned (the initial one
+  before any call), read without advancing the move.
 
 Also exported: `Aligner` (see below), `blend(a, b, w)` (per-token slerp of direction, lerp of norm,
 linear fallback for zero or (anti)parallel tokens; w in [0, 1.3]),
@@ -81,6 +83,13 @@ ctl = Controller(steerer, encode, aligner=aligner)
   First call (or after `reset()`) is the identity. Output = the real rows
   permuted plus exact zeros; nothing lost or duplicated.
 - `prepare(emb, ids)` -> `(placed, layout)` without committing; `commit(layout)`.
+- `place`/`prepare` take an optional `occupied` (bool tensor or sequence of
+  `length`): positions still non-zero in the conditioning now, e.g. an older
+  layout fading out after a capped or interrupted move. New tokens take free
+  positions in this order: unused by the previous layout and not occupied;
+  not occupied; unused by the previous layout; any. Matched tokens and the
+  first call ignore it. `Controller` passes the rows of `steerer.current`
+  that have any non-zero element.
 - With an aligner, `encode` must return `(emb, ids)` (TypeError otherwise).
   The cache keeps that raw pair; placement happens in `handle` just before
   `set_target`, only for applied messages, and the layout is committed only

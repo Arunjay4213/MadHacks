@@ -265,3 +265,15 @@ def test_threaded_smoke():
         final = s.get_cond()
     assert torch.equal(final, targets[-1])
     assert not s.is_moving
+
+
+def test_current_does_not_advance():
+    a, b = _vecs(2)
+    s = Steerer(a)
+    assert s.current is a
+    s.set_target(b, 4)
+    for _ in range(3):
+        assert s.current is a  # not advanced by reading
+    assert s.progress == 0.0
+    out = s.get_cond()
+    assert s.current is out and s.progress == 0.25

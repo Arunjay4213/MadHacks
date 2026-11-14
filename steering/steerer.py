@@ -68,6 +68,15 @@ class Steerer:
             return self._now
 
     @property
+    def current(self) -> Tensor:
+        """The tensor `get_cond` last returned (initially the initial cond).
+
+        Read-only: does not advance the move.
+        """
+        with self._lock:
+            return self._now
+
+    @property
     def progress(self) -> float:
         """Fraction of the current move done (k / ramp); 1.0 when idle."""
         with self._lock:
