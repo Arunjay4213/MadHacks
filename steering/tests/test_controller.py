@@ -5,7 +5,7 @@ import threading
 import pytest
 import torch
 
-from steering import Controller, Steerer, blend, ease
+from steering import Aligner, Controller, Steerer, blend, ease
 
 SHAPE = (1, 8, 16)
 
@@ -348,3 +348,154 @@ def test_threaded_smoke():
     assert c.committed_prompt == "final-target" and c.pending_prompt is None
     _run(s, 4)
     assert torch.equal(s.get_cond(), _emb("final-target"))
+
+
+# --- aligner ----------------------------------------------------------------
+
+AL_LEN, AL_DIM = 16, 8
+_VOCAB = torch.randn(64, AL_DIM, generator=torch.Generator().manual_seed(3))
+
+
+def _word_ids(prompt: str) -> list[int]:
+    """One id per word (stable), plus an end token 0."""
+    return [1 + hashlib.sha256(w.encode()).digest()[0] % 63 for w in prompt.split()] + [0]
+
+
+class PairEncode:
+    """(emb [1, AL_LEN, AL_DIM], ids): one fixed row per id, padding zeroed."""
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def __call__(self, prompt: str):
+        self.calls.append(prompt)
+        ids = _word_ids(prompt)
+        emb = torch.zeros(1, AL_LEN, AL_DIM)
+        emb[0, : len(ids)] = _VOCAB[ids]
+        return emb, ids
+
+
+def _aligned_setup(start: str = "oak tree wind"):
+    enc = PairEncode()
+    al = Aligner(AL_LEN)
+    s = Steerer(al.place(*enc(start)))
+    enc.calls.clear()
+    return s, enc, al, Controller(s, enc, aligner=al)
+
+
+def test_aligner_places_target():
+    s, enc, al, c = _aligned_setup()
+    r = c.handle(_msg("oak tree snow wind", 1))
+    assert r["applied"] and r["kind"] == "final"
+    out = s.get_cond()[0]
+    ref = Aligner(AL_LEN)
+    ref.place(*PairEncode()("oak tree wind"))
+    assert torch.equal(out, ref.place(*PairEncode()("oak tree snow wind"))[0])
+    # "wind" and the end token keep positions 2 and 3; "snow" takes position 4.
+    ids = _word_ids("oak tree snow wind")
+    assert [p for p, _ in al.layout] == [0, 1, 4, 2, 3]
+    assert torch.equal(out[2], _VOCAB[ids[3]]) and torch.equal(out[4], _VOCAB[ids[2]])
+
+
+def test_aligner_cache_stores_raw_pair():
+    s, enc, al, c = _aligned_setup()
+    c.handle(_msg("oak tree snow wind", 1))
+    emb, ids = c._cache["oak tree snow wind"]
+    raw_emb, raw_ids = PairEncode()("oak tree snow wind")
+    assert torch.equal(emb, raw_emb) and list(ids) == raw_ids
+    # Same prompt later from a different layout: placed afresh, not reused.
+    c.handle(_msg("snow", 1))
+    r = c.handle(_msg("oak tree snow wind", 1))
+    assert r["cache_hit"] and enc.calls == ["oak tree snow wind", "snow"]
+
+
+def test_aligner_not_advanced_by_unchanged():
+    s, enc, al, c = _aligned_setup()
+    c.handle(_msg("oak tree snow wind", 1))
+    before = al.layout
+    assert c.handle(_msg("oak tree snow wind", 1))["reason"] == "unchanged"
+    assert al.layout == before
+    c.handle(_msg("night", 2, provisional=True, cap=0.4))
+    before = al.layout
+    assert c.handle(_msg("night", 2, provisional=True, cap=0.4))["reason"] == "unchanged"
+    assert al.layout == before
+
+
+def test_aligner_not_advanced_by_stale():
+    al = Aligner(AL_LEN)
+    base = PairEncode()
+    s = Steerer(al.place(*base("oak tree wind")))
+    release, entered = threading.Event(), threading.Event()
+
+    def encode(prompt: str):
+        if prompt == "slow":
+            entered.set()
+            assert release.wait(5)
+        return base(prompt)
+
+    c = Controller(s, encode, aligner=al)
+    results: dict[str, dict] = {}
+    old = threading.Thread(target=lambda: results.update(old=c.handle(_msg("slow", 1))))
+    old.start()
+    assert entered.wait(5)
+    c.handle(_msg("oak fast wind", 1))
+    after_new = al.layout
+    release.set()
+    old.join(5)
+    assert results["old"]["reason"] == "stale"
+    assert al.layout == after_new
+
+
+def test_aligner_unchanged_when_set_target_fails():
+    s, enc, al, c = _aligned_setup()
+    c.handle(_msg("oak tree snow wind", 1))
+    before = al.layout
+
+    def boom(*args, **kwargs):
+        raise ValueError("rejected")
+
+    s.set_target = boom
+    with pytest.raises(ValueError):
+        c.handle(_msg("night rain", 1))
+    assert al.layout == before
+    assert c.committed_prompt == "oak tree snow wind"
+
+
+def test_aligner_requires_pair_from_encode():
+    al = Aligner(AL_LEN)
+    s = Steerer(al.place(*PairEncode()("oak")))
+    c = Controller(s, lambda p: torch.zeros(1, AL_LEN, AL_DIM), aligner=al)
+    with pytest.raises(TypeError, match="token_ids"):
+        c.handle(_msg("winter"))
+    assert c._cache == {} and c.committed_prompt is None
+
+
+def test_aligner_without_initial_layout_raises():
+    al = Aligner(AL_LEN)
+    with pytest.raises(ValueError, match="place"):
+        Controller(Steerer(torch.zeros(1, AL_LEN, AL_DIM)), PairEncode(), aligner=al)
+
+
+def test_aligner_new_tokens_avoid_rows_still_fading():
+    # Commit C, then a capped guess A moves part way: C's rows are still
+    # non-zero but no longer in the aligner's (A's) layout. B's new tokens
+    # must not land on them (or on A's).
+    c_prompt, a_prompt, b_prompt = "oak tree wind", "snow night rain", "fog mist haze dawn"
+    words = " ".join((c_prompt, a_prompt, b_prompt)).split()
+    assert len({_word_ids(w)[0] for w in words}) == len(words)  # no id collisions
+    s, enc, al, c = _aligned_setup(c_prompt)
+    c.handle(_msg(a_prompt, 4, provisional=True, cap=0.4))
+    _run(s, 2)
+    cur = s.current[0]
+    nonzero = {p for p in range(AL_LEN) if cur[p].ne(0).any()}
+    assert {0, 1, 2} <= nonzero  # C's words, still fading out
+    prev = dict(al.layout)  # A's layout: position -> id
+    progress = s.progress
+    assert c.handle(_msg(b_prompt, 4))["kind"] == "final"
+    assert s.progress == 0.0 and progress == 0.5
+    b_ids = _word_ids(b_prompt)
+    for p, i in al.layout:
+        if prev.get(p) != i:  # a new (unmatched) token
+            assert p not in nonzero, (p, i)
+    assert [p for p, _ in al.layout][:4] == [7, 8, 9, 10]
+    assert al.layout[-1] == (3, b_ids[-1])  # the end token is matched

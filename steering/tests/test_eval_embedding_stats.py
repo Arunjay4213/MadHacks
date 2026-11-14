@@ -9,12 +9,15 @@ import torch
 from steering.blend import blend
 from steering.eval.embedding_stats import (
     DEFAULT_PROMPTS,
+    align_pair,
     angles_deg,
     build_pairs,
     build_prompts,
     midpoint_norm_ratios,
+    pair_report,
     position_groups,
     shift_report,
+    shift_report_aligned,
     spherical_mask,
     suffix_alignment,
     token_shift,
@@ -163,3 +166,47 @@ def test_importing_eval_does_not_import_transformers():
         "assert 'transformers' not in sys.modules"
     )
     subprocess.run([sys.executable, "-c", code], cwd=root, check=True)
+
+
+def _shift_case():
+    table = torch.randn(20, D, generator=torch.Generator().manual_seed(2))
+    ids_a = [1, 2, 7, 8, 3, 4, 5, 9]
+    ids_b = [1, 2, 3, 4, 5, 9]
+    a, b = torch.zeros(10, D), torch.zeros(10, D)
+    a[: len(ids_a)] = table[ids_a]
+    b[: len(ids_b)] = table[ids_b]
+    return a, b, ids_a, ids_b
+
+
+def test_align_pair_puts_shared_tail_back_in_place():
+    a, b, ids_a, ids_b = _shift_case()
+    b_al, pos_b = align_pair(a, b, ids_a, ids_b)
+    assert pos_b == [0, 1, 4, 5, 6, 7]
+    assert torch.equal(b_al[pos_b], b[: len(ids_b)])
+    assert torch.count_nonzero(b_al[[2, 3, 8, 9]]) == 0
+
+
+def test_token_shift_after_alignment():
+    a, b, ids_a, ids_b = _shift_case()
+    b_al, pos_b = align_pair(a, b, ids_a, ids_b)
+    r = token_shift(a, b_al, ids_a, ids_b, pos_b)
+    assert r["tail_len"] == 4 and r["moved"] == 0
+    assert r["positional_same_id"] == 4 and r["tail_vs_padding"] == 0
+    assert torch.allclose(r["positional_angles"], torch.zeros(4).double(), atol=1e-4)
+    assert torch.equal(r["positional_angles"], r["aligned_angles"])
+    assert token_shift(a, b, ids_a, ids_b)["moved"] == 4
+
+
+def test_pair_report_aligned_counts():
+    a, b, ids_a, ids_b = _shift_case()
+    b_al, pos_b = align_pair(a, b, ids_a, ids_b)
+    plain = "\n".join(pair_report("x", "y", a, b, ids_a, ids_b))
+    assert "real in both=6, one only=2" in plain and "[aligned]" not in plain
+    text = "\n".join(pair_report("x", "y", a, b_al, ids_a, ids_b, pos_b))
+    assert "[aligned]" in text
+    assert "real in both=6, one only=2, padding in both=2" in text
+    # Survivors are identical rows: angle 0, so blend takes the linear path.
+    assert "both: 0 spherical/6 linear" in text
+    lines = shift_report_aligned(a, b, b_al, ids_a, ids_b, pos_b)
+    moved = next(line for line in lines if "different position" in line)
+    assert moved.split()[-3:] == ["4", "|", "0"]

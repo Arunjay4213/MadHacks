@@ -6,7 +6,7 @@ A change to any file here needs agreement on the board from every owner whose pa
 | # | From, to | Example files | Schema |
 |---|---|---|---|
 | 1 | Page to server | `examples/1-*.json` | `schemas/1-page-to-server.schema.json` |
-| 2 | Command reader to steerer | `examples/2-target.json` | `schemas/2-command-to-steerer.schema.json` |
+| 2 | Command reader to steerer | `examples/2-*.json` | `schemas/2-command-to-steerer.schema.json` |
 | 3 | Steerer to loop | (a Python call, see below) | none |
 | 4 | Server to page | `examples/4-*.json` | `schemas/4-server-to-page.schema.json` |
 
@@ -49,6 +49,18 @@ A `remove` tap needs the `id` of the change; `undo` and `reset` take no `id`.
 ```
 
 `provisional` is true for an early-steering guess, and `cap` is how far the move may go before it is confirmed.
+
+Two optional fields set the strength of a change ("a little", "a lot more"):
+
+```json
+{"prompt": "a wide shot of a meadow..., in deep winter...", "ramp_chunks": 4, "provisional": false, "cap": 1.0,
+ "strength": 0.3, "without_prompt": "a wide shot of a meadow..."}
+```
+
+- `strength` is a number greater than 0 and at most 1.3, and `without_prompt` is a non-empty string.
+- They are both present or both absent.
+- With them, the target is `blend(encode(without_prompt), encode(prompt), strength)`; without them, the target is `encode(prompt)`.
+- The engine passes the whole message unchanged to `steering.Controller.handle`, which does the blend.
 
 ## 3. Steerer to loop
 

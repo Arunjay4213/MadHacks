@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Engine viewer</title>
+<style>
+  :root {
+    --bg: #111418; --panel: #1b1f25; --line: #2c323b; --text: #e6e8eb; --muted: #8b94a1;
+    --accent: #5aa9ff; --ok: #4cc38a; --warn: #e5b84b; --bad: #ef6b6b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
+  main { max-width: 1180px; margin: 0 auto; padding: 16px; display: grid; gap: 16px;
+         grid-template-columns: minmax(0, 1fr) 300px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  h1 { font-size: 16px; margin: 0 0 8px; font-weight: 600; }
+  .video { background: #000; border: 1px solid var(--line); border-radius: 6px; overflow: hidden;
+           aspect-ratio: 832 / 480; display: flex; align-items: center; justify-content: center; }
+  canvas { width: 100%; height: 100%; object-fit: contain; display: block; }
+  form { display: flex; gap: 8px; margin-top: 12px; }
+  input[type=text] { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 6px; border: 1px solid var(--line);
+                     background: var(--panel); color: var(--text); font-size: 15px; }
+  input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button { padding: 10px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel);
+           color: var(--text); cursor: pointer; font-size: 14px; }
+  button:hover { border-color: var(--accent); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
+  .panel + .panel { margin-top: 12px; }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; }
+  dt { color: var(--muted); }
+  dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+  .state { font-weight: 600; }
+  .state.GENERATING { color: var(--ok); } .state.FAILED, .state.STOPPED { color: var(--bad); }
+  .state.LOADING, .state.WARMING, .state.RESETTING { color: var(--warn); }
+  .bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin-top: 6px; }
+  .bar > div { height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .error { color: var(--bad); min-height: 1.4em; margin-top: 6px; font-size: 13px; }
+  .conn { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--bad);
+          margin-right: 6px; vertical-align: middle; }
+  .conn.on { background: var(--ok); }
+</style>
+</head>
+<body>
+<main>
+  <section>
+    <h1>Engine viewer <span class="hint">(test page; the demo page is web/)</span></h1>
+    <div class="video"><canvas id="video" width="832" height="480"></canvas></div>
+    <form id="cmd">
+      <input id="text" type="text" autocomplete="off" placeholder="Type a prompt and press Enter" autofocus>
+      <button type="button" id="reset">Reset</button>
+    </form>
+    <div class="error" id="error"></div>
+  </section>
+  <aside>
+    <div class="panel">
+      <dl>
+        <dt>Engine</dt><dd><span id="state" class="state">-</span></dd>
+        <dt><span class="conn" id="conn-frames"></span>Frames</dt><dd id="fps">-</dd>
+        <dt><span class="conn" id="conn-control"></span>Control</dt><dd id="ctl">-</dd>
+        <dt>Chunk shown</dt><dd id="chunk">-</dd>
+        <dt>Generation</dt><dd id="gen">-</dd>
+        <dt>Decode</dt><dd id="dec">-</dd>
+        <dt>Server fps</dt><dd id="sfps">-</dd>
+      </dl>
+    </div>
+    <div class="panel">
+      <dl>
+        <dt>Last command</dt><dd id="heard">-</dd>
+        <dt>Applies from</dt><dd id="applies">-</dd>
+        <dt>Move progress</dt><dd id="progress">-</dd>
+      </dl>
+      <div class="bar"><div id="progress-bar"></div></div>
+    </div>
+    <div class="panel">
+      <dl id="stamps">
+        <dt>heard</dt><dd>-</dd><dt>decided</dt><dd>-</dd><dt>embedded</dt><dd>-</dd>
+        <dt>generated</dt><dd>-</dd><dt>shown</dt><dd>-</dd>
+      </dl>
+      <div class="hint">ms after the server received the command</div>
+    </div>
+  </aside>
+</main>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const wsBase = (location.protocol === "https:" ? "wss://" : "ws://") + location.host;
+const canvas = $("video"), ctx = canvas.getContext("2d");
+const STAMPS = ["heard", "decided", "embedded", "generated", "shown"];
+let control = null;
+const frameTimes = [];
+
+function connectFrames() {
+  const ws = new WebSocket(wsBase + "/frames");
+  ws.binaryType = "arraybuffer";
+  ws.onopen = () => $("conn-frames").classList.add("on");
+  ws.onclose = () => { $("conn-frames").classList.remove("on"); setTimeout(connectFrames, 1000); };
+  ws.onmessage = async (ev) => {
+    const view = new DataView(ev.data);
+    const chunk = view.getUint32(0), index = view.getUint16(4);
+    const bitmap = await createImageBitmap(new Blob([ev.data.slice(6)], { type: "image/jpeg" }));
+    if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+      canvas.width = bitmap.width; canvas.height = bitmap.height;
+    }
+    ctx.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    $("chunk").textContent = `${chunk} (frame ${index})`;
+    const now = performance.now();
+    frameTimes.push(now);
+    while (frameTimes.length && now - frameTimes[0] > 2000) frameTimes.shift();
+    if (frameTimes.length > 1) {
+      $("fps").textContent = ((frameTimes.length - 1) * 1000 / (now - frameTimes[0])).toFixed(1) + " fps";
+    }
+  };
+}
+
+function connectControl() {
+  const ws = new WebSocket(wsBase + "/control");
+  control = ws;
+  ws.onopen = () => { $("conn-control").classList.add("on"); $("ctl").textContent = "connected"; };
+  ws.onclose = () => {
+    $("conn-control").classList.remove("on"); $("ctl").textContent = "reconnecting";
+    setTimeout(connectControl, 1000);
+  };
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+    if (msg.error) { $("error").textContent = msg.error; return; }
+    $("heard").textContent = msg.heard ?? "-";
+    $("applies").textContent = msg.applies_from_chunk ?? "-";
+    $("progress").textContent = Math.round(msg.progress * 100) + "%";
+    $("progress-bar").style.width = (msg.progress * 100) + "%";
+    const dds = $("stamps").querySelectorAll("dd");
+    STAMPS.forEach((name, i) => {
+      const v = msg.stamps[name];
+      dds[i].textContent = v === undefined ? "-" : v + " ms";
+    });
+  };
+}
+
+$("cmd").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const text = $("text").value.trim();
+  if (!text || !control || control.readyState !== WebSocket.OPEN) return;
+  control.send(JSON.stringify({ type: "final", text, t_client: Date.now() }));
+  $("error").textContent = "";
+  $("text").value = "";
+});
+
+$("reset").addEventListener("click", async () => {
+  $("error").textContent = "";
+  const r = await fetch("/reset", { method: "POST" });
+  if (!r.ok) $("error").textContent = "reset failed: " + (await r.text());
+  $("text").focus();
+});
+
+async function pollStats() {
+  try {
+    const s = await (await fetch("/stats")).json();
+    const st = $("state");
+    st.textContent = s.state; st.className = "state " + s.state;
+    const ms = (t) => t.last === null ? "-" : `${t.last.toFixed(0)} ms (avg ${t.avg.toFixed(0)})`;
+    $("gen").textContent = ms(s.gen_ms);
+    $("dec").textContent = ms(s.decode_ms);
+    $("sfps").textContent = s.fps === null ? "-" : s.fps.toFixed(1);
+    if (s.failure) $("error").textContent = s.failure;
+  } catch (e) {
+    const st = $("state");
+    st.textContent = "unreachable"; st.className = "state FAILED";
+  }
+  setTimeout(pollStats, 1000);
+}
+
+connectFrames();
+connectControl();
+pollStats();
+</script>
+</body>
+</html>

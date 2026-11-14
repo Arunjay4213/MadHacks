@@ -3,11 +3,15 @@
 import math
 import threading
 from collections import OrderedDict
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 
 from torch import Tensor
 
+from .align import Aligner
 from .steerer import Steerer
+
+# What `encode` returns: a tensor, or (tensor, real token ids) with an aligner.
+Encoded = Tensor | tuple[Tensor, Sequence[int]]
 
 
 def _validate(msg: Mapping) -> tuple[str, int, bool, float]:
@@ -43,17 +47,35 @@ class Controller:
     early ones are evicted like any other entry. Cached tensors are never
     modified. `handle` is thread safe; when messages race, the one whose
     `handle` call started last wins and older ones are dropped as "stale".
+
+    With an `aligner`, `encode` must return (embedding, real token ids). The
+    cache keeps that raw pair; each applied message is placed by the aligner
+    right before `set_target`, and the aligner's layout is committed only if
+    `set_target` succeeds. New tokens avoid positions whose row is non-zero
+    in `steerer.current` (see `Aligner`). The aligner must already hold the
+    layout of the steerer's initial conditioning: build the Steerer from
+    `aligner.place(initial_emb, initial_ids)`.
     """
 
     def __init__(
-        self, steerer: Steerer, encode: Callable[[str], Tensor], cache_size: int = 64
+        self,
+        steerer: Steerer,
+        encode: Callable[[str], Encoded],
+        cache_size: int = 64,
+        aligner: Aligner | None = None,
     ) -> None:
         if isinstance(cache_size, bool) or not isinstance(cache_size, int) or cache_size < 1:
             raise ValueError(f"cache_size must be an int >= 1, got {cache_size!r}")
+        if aligner is not None and aligner.layout is None:
+            raise ValueError(
+                "aligner has no layout yet: build the Steerer from "
+                "aligner.place(initial_emb, initial_ids) first"
+            )
         self._steerer = steerer
         self._encode = encode
+        self._aligner = aligner
         self._cache_size = cache_size
-        self._cache: OrderedDict[str, Tensor] = OrderedDict()
+        self._cache: OrderedDict[str, Encoded] = OrderedDict()
         self._lock = threading.Lock()
         self._next_seq = 0  # handed out at entry to `handle`
         self._last_seq = -1  # seq of the newest message that reached a decision
@@ -107,25 +129,47 @@ class Controller:
                 return result(None, "unchanged")
             # set_target may raise (shape mismatch); state changes only after it.
             if provisional:
-                self._steerer.set_target(emb, ramp, cap)
+                self._set_target(emb, ramp, cap)
                 self._last_seq = seq
                 self._pending = prompt
                 return result("provisional")
             kind = "confirm" if prompt == self._pending else "final"
-            self._steerer.set_target(emb, ramp, 1.0)
+            self._set_target(emb, ramp, 1.0)
             self._last_seq = seq
             self._pending = None
             self._committed = prompt
             return result(kind)
 
-    def _embedding(self, prompt: str) -> tuple[Tensor, bool]:
-        """Return (embedding, cache_hit), encoding outside the lock on a miss."""
+    def _set_target(self, emb: Encoded, ramp: int, cap: float) -> None:
+        """Place (with an aligner) and set the target; caller holds the lock."""
+        if self._aligner is None:
+            self._steerer.set_target(emb, ramp, cap)
+            return
+        # New tokens avoid rows still non-zero now (e.g. an older layout fading
+        # out after a capped or interrupted move).
+        cur = self._steerer.current
+        occupied = (cur[0] if cur.dim() == 3 else cur).ne(0).any(-1)
+        placed, layout = self._aligner.prepare(*emb, occupied=occupied)
+        self._steerer.set_target(placed, ramp, cap)
+        self._aligner.commit(layout)  # only once the steerer accepted it
+
+    def _embedding(self, prompt: str) -> tuple[Encoded, bool]:
+        """Return (encoded, cache_hit), encoding outside the lock on a miss."""
         with self._lock:
             emb = self._cache.get(prompt)
             if emb is not None:
                 self._cache.move_to_end(prompt)
                 return emb, True
         emb = self._encode(prompt)
+        if self._aligner is not None and not (
+            isinstance(emb, tuple) and len(emb) == 2 and isinstance(emb[0], Tensor)
+        ):
+            raise TypeError(
+                "with an aligner, encode must return (embedding, token_ids), "
+                f"got {type(emb).__name__}"
+            )
+        if self._aligner is not None:
+            emb = (emb[0], tuple(int(i) for i in emb[1]))  # cached; keep it immutable
         with self._lock:
             self._cache[prompt] = emb
             self._cache.move_to_end(prompt)

@@ -39,6 +39,7 @@ print(summarize(frames, steer_frame=48, fps=16))
 python -m steering.eval.embedding_stats                        # google/umt5-small, CPU
 python -m steering.eval.embedding_stats --model google/umt5-xxl --device cuda
 python -m steering.eval.embedding_stats --prompts my.json --max-length 512
+python -m steering.eval.embedding_stats --align                # also report aligned pairs
 ```
 
 Needs `transformers`, `sentencepiece`, `protobuf` (only when run). Prompts are
@@ -71,5 +72,70 @@ and each change -> the next one. Per pair:
 5. midpoint norm: |blend(a, b, 0.5)| and |lerp(a, b, 0.5)| divided by the mean
    of |a| and |b|, over positions real in both.
 
+With `--align`, every pair is also reported with the "to" embedding placed
+by `steering.align.Aligner` (a fresh one per pair: place "from", then place
+"to"), header marked `[aligned]`: the same counts, angles and blend-path
+numbers, with "real" meaning the positions the aligner put tokens at. For
+stack -> stack minus middle, item 4 is printed as a before | aligned table
+instead. Without `--align` the output is unchanged.
+
 Saved runs are in `results/`. `results/umt5-small.txt` is from the small
 model on CPU: indicative only, not the umt5-xxl encoder Wan actually uses.
+`results/umt5-small-aligned.txt` is the same run with `--align`.
+
+## scenarios.py: scripted steering runs
+
+`run(scenario, generate, encode, fps, on_cond_changed=None, aligner=None)` replays timed
+contract-2 messages through a real `Steerer` + `Controller` and scores the
+clip with `metrics.py`. `default_scenarios(ramp)` mirrors the PLAN.md checks
+(single, hard_swap, interrupt, pace_1..12, stack_remove_middle, early_right,
+early_wrong). `python -m steering.eval.scenarios --fake` runs them all on a
+built-in fake model (a smoke test only: its cut threshold is tuned, not real).
+Add `--align` to run them with a `steering.align.Aligner` and
+`fake_encode_ids` (word/punctuation tokens plus an end token, one fixed row
+per token id, `[1, 64, 32]`).
+
+With `aligner`, `encode` returns `(embedding, real token ids)` instead of a
+tensor; `run` calls `aligner.reset()`, builds the Steerer from
+`aligner.place(*encode(initial_prompt))`, and passes the aligner to the
+Controller.
+
+What the engine must provide to run them on the real model:
+
+1. `encode(prompt: str) -> Tensor`: the conditioning tensor the loop feeds
+   the model (same shape for every prompt), e.g. the umt5 embedding.
+2. `generate(cond: Tensor) -> Tensor`: one generation step (one chunk) with
+   that conditioning, returning the decoded video frames it produced,
+   `[F, C, H, W]` floats in [0, 1], F >= 1. It keeps its own frame cache
+   across calls; `run` calls it once per step, in order.
+3. `on_cond_changed() -> None`: drop the text cross-attention K/V cache.
+   `run` calls it right before any step whose cond is a different tensor
+   from the previous step's. Never touch the frame cache here.
+4. `fps` of the decoded video, so reaction times come out in milliseconds.
+
+`Result.report()` prints a table; `Result.save_frames(path)` saves `[T, C, H, W]`.
+
+## run_engine.py / row_order_check.py: on the GPU box
+
+From the repo root, with `engine/` importable (`<name>` = the backend module):
+
+```
+python -m steering.eval.row_order_check --backend engine.backends.<name> --out eval_out/rows
+python -m steering.eval.run_engine --backend engine.backends.<name> --align --out eval_out/scenarios
+```
+
+Defaults: 832x480, `--steps 2`, `--fps 16`, `--ramp 4`, `--seed 0`, all scenarios.
+Add `--save-frames` for `.pt` frames, `--force-cache-reset-hook NAME` to call
+`backend.NAME()` on every conditioning change, `--scenarios single,hard_swap` for a subset.
+
+Send back the whole `eval_out/` folder:
+- `rows/row_order_check.txt`: A2/B/C/D vs A (max/mean abs in 0..255 levels, PSNR,
+  first-chunk mean) and a `VERDICT:` line. Exit code 0 PASS, 1 FAIL, 2 INCONCLUSIVE.
+- `scenarios/summary.txt`: one line per scenario (cuts, `s<step>:<kind>:<reaction ms>/x<peak
+  ratio>` per message, step/gen/decode ms) or `FAILED <error>`; exit code 1 if any failed.
+- `scenarios/<name>.report.txt` and `<name>.mp4` (only if imageio+ffmpeg or torchvision+av).
+
+Verdict: PASS = scattered (B) and reversed (C) rows match A within max(3 x A-vs-A2, 1 level)
+while another prompt (D) clearly differs, so `--align` is safe. FAIL = B or C differs by at
+least half as much as D: do not align. INCONCLUSIVE = seeding is not deterministic (A2 > 1
+level), D barely differs, or B/C sit in between; read the numbers before deciding.
