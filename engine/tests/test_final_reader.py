@@ -15,7 +15,7 @@ import pytest
 
 from commands.service import CommandService
 from commands.state import SceneState
-from engine.final_reader import (STYLE, CacheFile, FinalReader, FinalReaderState, PromptSpec, expand_operations,
+from engine.final_reader import (FORWARD_MOTION, STYLE, CacheFile, FinalReader, FinalReaderState, PromptSpec, expand_operations,
                                  fingerprint, load, prompt_spec, scene_after)
 from engine.foundry import FoundryMessages
 from engine.reader import FinalReadingService, apply_final, load_reader, service_snapshot
@@ -66,7 +66,7 @@ def test_operations_and_the_standin_prompt():
     r = reader(chat)
     out = r("make it winter", snap())
     assert out["operations"] == [WINTER]
-    assert out["prompt"] == ("A red car driving along a road, a snowy mountain road between pine forests, snow "
+    assert out["prompt"] == ("A red car driving along a road, " + FORWARD_MOTION + ", a snowy mountain road between pine forests, snow "
                              "falling, cold blue light. " + STYLE)
     system, user = chat.calls[0]
     assert "edit_base" in system and "WORLD" in system
@@ -279,3 +279,13 @@ def test_engine_reports_the_final_reader():
     e = Engine(EngineConfig(backend="fake"), lambda b: None, lambda m: None)
     assert e.stats()["final_reader"]["state"] == "off"
     e.stop()
+
+
+def test_standin_subject_gets_forward_motion_for_vehicles_only():
+    from engine.final_reader import FORWARD_MOTION, standin_validate
+    car = standin_validate("a red sports car on a road; winter", {"details": "a snowy mountain road."})
+    assert FORWARD_MOTION in car and car.index(FORWARD_MOTION) < car.index("a snowy mountain road")
+    meadow = standin_validate("a wide shot of a meadow with a single oak tree", {"details": "green grass."})
+    assert FORWARD_MOTION not in meadow
+    told = standin_validate("a red car driving away from the camera", {"details": "a desert highway."})
+    assert told.count("away from the camera") == 1
