@@ -9,7 +9,7 @@ Owner: `@anirudhaugile` (Ani), since the lead's swap on 2026-11-14. Started by `
 | `video` | `<canvas>` | draws decoded JPEG frames, newest only |
 | `connection` | any | `textContent` = status; `data-state` = `connecting` / `open` / `closed` |
 | `mode-banner` | any | shown only while server messages say `fake: true` (the fake server); hidden otherwise, including before the first message, so a real engine that is still loading is never labelled MOCK. |
-| `words` | any, `aria-live="polite"` | children replaced: text nodes plus one `<mark>` around the keyword; `data-unmatched="true"` when no operation; `data-kind` = `partial` / `final` |
+| `words` | any, `aria-live="polite"` | children replaced: a `.words-label` ("hearing…" while local, "heard" from the server), the full sentence in `.words-text` with one `<mark>` around the keyword, and `.words-understood` ("→ understood: <keyword>" or "→ not understood"); `data-unmatched="true"` when no operation; `data-kind` = `partial` / `final` / `server` |
 | `changes` | any (list container) | children replaced from server state; `data-stale="true"` while disconnected |
 | `command-form` | `<form>` | submit is `preventDefault`ed (no reload); submit sends `final` |
 | `command` | `<input type="text">` | kept focused; input events send messages; cleared after `final` |
@@ -37,8 +37,10 @@ It sits in `PROTOCOL` in `lib.js` and in `fake-server.mjs`.
 - Chips render only from the last valid server `changes`. Clicking never changes chips locally.
 - Commands are sent only while the control socket is open; otherwise they are dropped and the error says so. Nothing is replayed after a reconnect.
 - Text box: paste / drop / replacement / multi-character insert sends one `final` with the whole value and clears the box.
-  Typing sends `partial` per input and `final` on Enter or after 1500 ms idle (`TYPING_IDLE_MS`).
-  Machine-fast keys (4 in a row, each within 30 ms: a tool simulating keystrokes) become final after 200 ms (`BURST_IDLE_MS`).
+  Typing sends `partial` per input and `final` on Enter or after 2500 ms idle (`TYPING_IDLE_MS`).
+  Machine-fast keys (4 in a row, each within 30 ms: a tool simulating keystrokes) become final after 600 ms (`BURST_IDLE_MS`).
+  Text that looks unfinished (ends in a comma or a joining word, `looksUnfinished`) is sent only on Enter, never on a pause.
+- Push-to-talk collects Chrome's final segments and sends the whole utterance as one `final` on release.
   Input during IME composition is ignored until the composed text lands.
   `?debug=1` logs each input's `inputType` to the console, to check how Wispr Flow inserts on the demo laptop.
 - Speech: interim results send `partial` (only when the text changed). Each final result is sent once, tracked by its index.

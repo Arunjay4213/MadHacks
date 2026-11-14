@@ -9,8 +9,24 @@ export const PROTOCOL = {
 
 // Typed text becomes final after this pause; machine-fast input (a dictation tool simulating keys)
 // after the much shorter BURST_IDLE_MS, so it is not held back by a pause meant for humans.
-export const TYPING_IDLE_MS = 1500;
-export const BURST_IDLE_MS = 200;
+export const TYPING_IDLE_MS = 2500;
+export const BURST_IDLE_MS = 600;
+
+// Typed text that ends like this is a sentence still being written ("a car," / "make it night and"),
+// so it is never sent on a pause, only on Enter: sending it would split one command into two.
+const CONNECTORS = new Set(['a', 'an', 'the', 'and', 'or', 'but', 'then', 'also', 'plus', 'with', 'on', 'in', 'into',
+  'onto', 'to', 'of', 'at', 'by', 'for', 'from', 'through', 'over', 'under', 'near', 'along', 'across', 'make', 'add',
+  'turn', 'remove', 'it', 'is', 'some', 'more', 'less', 'very', 'really', 'slowly', 'suddenly']);
+export function looksUnfinished(text) {
+  const t = text.trim().toLowerCase();
+  if (!t) return false;
+  if (/[,;:\-–—]$/.test(t)) return true;
+  return CONNECTORS.has(t.split(/\s+/).pop().replace(/[^a-z']/g, ''));
+}
+
+// How long typed text waits before it is sent as a command; null means wait for Enter.
+export const finalizeDelay = (kind, text) =>
+  looksUnfinished(text) ? null : kind === 'burst' ? BURST_IDLE_MS : TYPING_IDLE_MS;
 
 // Push-to-talk for the live mic: hold this key (a KeyboardEvent.code). Change it here.
 // Never Ctrl or a Ctrl combination: Ctrl is Wispr Flow's hotkey on the demo laptop.
@@ -110,6 +126,47 @@ export function splitKeyword(text, keyword) {
 }
 
 export const backoffMs = (attempt) => Math.min(5000, 250 * 2 ** attempt);
+
+// What the words line says around the sentence: a label before it ("hearing…" while you type or speak,
+// "heard" once the server has it) and, for the server's version, what it understood.
+// `confirmed` is true only for a final this page sent: the server also reports partial text with
+// unmatched false, so a no-keyword "understood" is claimed only after a confirmed final.
+export function wordsLabels({ local, keyword, unmatched, confirmed = false }) {
+  if (local) return { label: 'hearing…', understood: '' };
+  if (unmatched) return { label: 'heard', understood: '→ not understood' };
+  if (keyword) return { label: 'heard', understood: `→ understood: ${keyword}` };
+  // No keyword when the AI reader (or another fallback) understood it: say so, but only for a confirmed final.
+  return { label: 'heard', understood: confirmed ? '→ understood' : '' };
+}
+
+// Tells whether the server's "heard" is this page's own partial (still being said or typed), this
+// page's own final (confirmed), or something else (another viewer's command, or the starting state).
+// A partial counts as still being said or typed only for PENDING_MS after it was sent, so an abandoned
+// draft never hides another viewer's identical command.
+export const PENDING_MS = 5000;
+export function makeHeardTracker(max = 50) {
+  let partials = new Map(); // text -> time sent
+  const finals = [];
+  return {
+    sentPartial(text, now = Date.now()) {
+      partials.set(text, now);
+    },
+    sentFinal(text, t) {
+      partials = new Map(); // the sentence is done; its partials no longer count as pending
+      finals.push({ text, t });
+      if (finals.length > max) finals.shift();
+    },
+    clearPartials() {
+      partials = new Map(); // the draft was deleted or abandoned
+    },
+    classify(heard, tClient, now = Date.now()) {
+      if (finals.some((f) => f.t === tClient && f.text === heard)) return 'confirmed';
+      const sentAt = partials.get(heard);
+      if (sentAt !== undefined && now - sentAt < PENDING_MS) return 'pending';
+      return 'other';
+    },
+  };
+}
 
 // How long without a frame, while connected, before the page says the video has paused.
 export const STALL_MS = 2000;
@@ -225,13 +282,20 @@ export function makeLatencyTracker(maxSent = 50) {
 
 // Speech recognition results -> contract-1 messages, with no duplicate finals.
 // `results` is [{transcript, isFinal}] for the current recognition session.
+// With { hold: true } (push-to-talk) Chrome's final segments are kept, not sent: Chrome splits speech
+// at pauses, and one press of the key is one command, so flush() sends the whole utterance once.
+// Partials then show the utterance so far.
 export function makeTranscriber(send) {
   let committed = new Set();
   let lastInterim = '';
+  let hold = false;
+  let held = [];
   return {
-    start() {
+    start({ hold: h = false } = {}) {
       committed = new Set();
       lastInterim = '';
+      hold = h;
+      held = [];
     },
     handle(results) {
       let interim = '';
@@ -240,21 +304,25 @@ export function makeTranscriber(send) {
         if (r.isFinal) {
           if (!committed.has(i)) {
             committed.add(i);
-            if (text) send(finalMsg(text));
+            if (text && hold) held.push(text);
+            else if (text) send(finalMsg(text));
           }
         } else {
           interim += (interim ? ' ' : '') + text;
         }
       });
-      if (interim !== lastInterim) {
-        lastInterim = interim;
-        if (interim) send(partialMsg(interim));
+      const shown = hold ? [...held, interim].filter(Boolean).join(' ') : interim;
+      if (shown !== lastInterim) {
+        lastInterim = shown;
+        if (shown) send(partialMsg(shown));
       }
     },
-    // Called once recognition has stopped: leftover interim text becomes one final.
+    // Called once recognition has stopped: leftover text becomes one final, once. In hold mode the
+    // last partial already is the whole utterance (held finals plus the current interim).
     flush() {
       const text = lastInterim;
       lastInterim = '';
+      held = [];
       if (text) send(finalMsg(text));
     },
   };

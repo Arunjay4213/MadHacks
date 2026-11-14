@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseFrame, parseServerMessage, splitKeyword, backoffMs, isWholeInsert,
   makeFrameGate, makeLatencyTracker, makeTranscriber, changesKey, commandKey, makeInputClassifier,
-  PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
+  PUSH_TO_TALK_CODE, isPushToTalk, micErrorText, looksUnfinished, finalizeDelay, wordsLabels, makeHeardTracker, PENDING_MS,
 } from '../lib.js';
 import { loadTestPattern } from '../fake-server.mjs';
 import { wsBaseUrl, fitSize, videoNotice, formatStamps, STALL_MS, isResetShortcut } from '../lib.js';
@@ -200,6 +200,61 @@ test('fake server test pattern: real JPEG frames bigger than one pixel', () => {
     assert.ok(i > 0);
     assert.ok(f.readUInt16BE(i + 5) > 100 && f.readUInt16BE(i + 7) > 100);
   }
+});
+
+test('looksUnfinished / finalizeDelay: a sentence still being typed is never sent on a pause', () => {
+  for (const t of ['a car,', 'make it night and', 'add a', 'a car racing on', 'make it', 'add a red car -']) {
+    assert.equal(looksUnfinished(t), true, t);
+    assert.equal(finalizeDelay('typing', t), null, t);
+    assert.equal(finalizeDelay('burst', t), null, t);
+  }
+  for (const t of ['a car, car racing on a road', 'make it winter', 'go back', 'add a river.', 'undo']) {
+    assert.equal(looksUnfinished(t), false, t);
+  }
+  assert.equal(finalizeDelay('typing', 'make it winter'), 2500);
+  assert.equal(finalizeDelay('burst', 'make it winter'), 600);
+});
+
+test('transcriber hold mode (push-to-talk): Chrome splitting at a pause still sends ONE final on release', () => {
+  const out = [];
+  const t = makeTranscriber((m) => out.push([m.type, m.text]));
+  t.start({ hold: true });
+  t.handle([R('make it night')]);
+  t.handle([R('make it night', true)]); // Chrome ends a segment at the pause
+  t.handle([R('make it night', true), R('and add a car')]);
+  t.handle([R('make it night', true), R('and add a car racing on a road', true)]);
+  t.flush(); // key released
+  assert.deepEqual(out.filter(([type]) => type === 'final'), [['final', 'make it night and add a car racing on a road']]);
+  assert.deepEqual(out.at(-2), ['partial', 'make it night and add a car racing on a road']); // words line showed it all
+});
+
+test('wordsLabels: hearing while local, heard + what was understood once the server has it', () => {
+  assert.deepEqual(wordsLabels({ local: true }), { label: 'hearing…', understood: '' });
+  assert.deepEqual(wordsLabels({ keyword: 'car', unmatched: false }), { label: 'heard', understood: '→ understood: car' });
+  assert.deepEqual(wordsLabels({ keyword: null, unmatched: true }), { label: 'heard', understood: '→ not understood' });
+  // No keyword: claim "understood" only for a confirmed final (the AI reader accepted it), not for
+  // partial text the server also reports with unmatched false.
+  assert.deepEqual(wordsLabels({ keyword: null, unmatched: false, confirmed: true }), { label: 'heard', understood: '→ understood' });
+  assert.deepEqual(wordsLabels({ keyword: null, unmatched: false }), { label: 'heard', understood: '' });
+});
+
+test('heard tracker: own partials are pending, own finals confirmed, anything else other', () => {
+  const h = makeHeardTracker();
+  h.sentPartial('make it');
+  h.sentPartial('make it night');
+  assert.equal(h.classify('make it', 7), 'pending'); // server echoed a partial: not a command yet
+  h.sentFinal('make it night', 8);
+  assert.equal(h.classify('make it night', 8), 'confirmed');
+  assert.equal(h.classify('make it', 7), 'other'); // after the final, old partials are not pending
+  assert.equal(h.classify('add a lion', 99), 'other'); // another viewer's command
+  // An abandoned draft: deleted, or simply old. Another viewer's identical final then shows normally.
+  const g = makeHeardTracker();
+  g.sentPartial('add a lion', 1000);
+  assert.equal(g.classify('add a lion', 5, 2000), 'pending');
+  assert.equal(g.classify('add a lion', 5, 1000 + PENDING_MS + 1), 'other');
+  g.sentPartial('add a lion', 9000);
+  g.clearPartials();
+  assert.equal(g.classify('add a lion', 5, 9100), 'other');
 });
 
 const R = (transcript, isFinal = false) => ({ transcript, isFinal });

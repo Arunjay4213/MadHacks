@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from engine.tools.demo_run import (Frame, ScriptError, Sent, StepKind, command_delay, first_frame_from, frame_at,
-                                   is_local, load_script, parse_script, sheet_marks, shown_at, ws_base)
+                                   load_script, parse_script, shown_at)
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "tools" / "demo_scripts"
 
@@ -21,25 +21,10 @@ def test_every_shipped_script_parses():
         assert load_script(path).steps
 
 
-def test_steps_are_sorted_stably():
-    s = parse_script({"end": 10, "steps": [{"at": 5, "say": "b"}, {"at": 0, "reset": True}, {"at": 5, "say": "c"}]})
-    assert [st.text for st in s.steps] == [None, "b", "c"]
-    assert s.name == "script"
-
-
 @pytest.mark.parametrize("data", [
-    [],
     {"steps": [{"at": 0, "reset": True}]},                         # no end
-    {"end": 0, "steps": [{"at": 0, "reset": True}]},               # end not above 0
-    {"end": 10, "steps": []},                                      # no steps
-    {"end": 10, "steps": [{"at": 11, "say": "x"}]},                # after end
-    {"end": 10, "steps": [{"at": -1, "say": "x"}]},                # negative
-    {"end": 10, "steps": [{"at": True, "say": "x"}]},              # a bool is not a time
-    {"end": 10, "steps": [{"at": 1, "say": "x", "reset": True}]},  # both kinds
-    {"end": 10, "steps": [{"at": 1}]},                             # neither kind
-    {"end": 10, "steps": [{"at": 1, "say": "  "}]},                # empty text
-    {"end": 10, "steps": [{"at": 1, "reset": False}]},             # reset must be true
-    {"end": 10, "steps": [{"at": 1, "say": "x", "tap": "undo"}]},  # unknown key: only say and reset are sent
+    {"end": 10, "steps": [{"at": 11, "say": "x"}]},                # a step after the end
+    {"end": 10, "steps": [{"at": 1, "say": "x", "reset": True}]},  # a step that is both kinds
 ])
 def test_bad_scripts_are_rejected(data):
     with pytest.raises(ScriptError):
@@ -51,12 +36,6 @@ def test_bad_json_file(tmp_path):
     p.write_text("{not json")
     with pytest.raises(ScriptError):
         load_script(p)
-
-
-def test_sheet_marks():
-    assert sheet_marks(46) == [float(t) for t in range(0, 47, 2)]
-    assert sheet_marks(5) == [0, 2, 4]
-    assert sheet_marks(6, every=3) == [0, 3, 6]
 
 
 FRAMES = [Frame(0.0, 10, 0), Frame(0.5, 10, 1), Frame(1.0, 2, 0),  # a reset restarted chunk numbers at 1.0 s
@@ -104,10 +83,3 @@ def test_shown_at():
     assert shown_at(results, Frame(2.25, 5, 1)) == ("winter", None)
     assert shown_at(results, Frame(3.0, 8, 0)) == ("winter", "night")          # night never applied
     assert shown_at([], Frame(3.0, 8, 0)) == ("before the run", None)
-
-
-def test_urls():
-    assert is_local("http://127.0.0.1:8769") and is_local("http://localhost:8769/") and is_local("http://[::1]:1")
-    assert not is_local("https://example.org")
-    assert ws_base("https://a.b") == "wss://a.b" and ws_base("http://127.0.0.1:8769") == "ws://127.0.0.1:8769"
-

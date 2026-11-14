@@ -179,7 +179,8 @@ Now the refresh starts from the clean anchor (every 24 chunks, strength 0.5): no
 python -m engine.server --backend fake|causal_forcing --reader standin|commands --host 127.0.0.1 --port 8000 --width 832 --height 480 \
     --steps 0 --base-prompt "..." --jpeg-quality 80 --precompute-file prompts.txt \
     --device cuda:0 --decode-device cuda:0 --backend-opt key=value --lead-margin 1.3 --reanchor off --reanchor-opt key=value --log-level info \
-    --record-dir ~/recordings --record-max-gb 20
+    --record-dir ~/recordings --record-max-gb 20 --final-reader off --final-timeout-s 3.0 --final-cache ~/.cache/madhacks/final_reader.json \
+    --short-chunk crossfade
 ```
 
 - `--steps 0` (the default) runs the denoising schedule the backend's checkpoint was distilled for; the real model is distilled for 2 steps, so any other number changes the schedule.
@@ -193,6 +194,9 @@ python -m engine.server --backend fake|causal_forcing --reader standin|commands 
 - `--lead-margin` sets how much video generation keeps ready ahead of what is on screen (see "Pipeline").
 - `--reanchor off|on` (default `off`) turns on the steering re-anchor policy (see "Re-anchor").
 - `--reanchor-opt key=value` sets one field of the policy's `ReanchorConfig` and may be repeated (see "Re-anchor").
+- `--final-reader off|sonnet` (default `off`), `--final-timeout-s` and `--final-cache` control the Sonnet final reader (see "Final reader (Sonnet)").
+- `--short-chunk fill|hold|crossfade` (default `crossfade`) sets how a chunk with fewer frames than `frames_per_chunk` is padded (see "Short chunks").
+- The fake backend's `short_on_chunks=40,80` makes those chunks (numbered across resets, as `fail_on_chunk`) 1 frame long and labels them "short chunk", to test "Short chunks".
 - `--record-dir` and `--record-max-gb` control the recorder (see "Recorder"); `--record-dir none` turns it off.
 - SIGINT or SIGTERM shuts down cleanly, finalizes the open recording and moves the engine to STOPPED.
 - The process exits with code 70 when the engine reaches FAILED, so systemd restarts it.
@@ -208,7 +212,7 @@ All on one origin; the message shapes are in `contracts/README.md`.
 | websocket `/control` | Contract 1 in (JSON text); contract 4 out, one message per chunk; `{"error": "..."}` replies to a bad message. |
 | `POST /target` | Body is a contract 2 message; it skips the command reader and goes unchanged to the encoder and `steering.Controller.handle`. |
 | `POST /reset` | Same as a `{"type":"tap","action":"reset"}` on `/control`: goes through the reader, then starts a new video; returns when done. |
-| `GET /stats` | JSON: lifecycle state, backend, reader, last generated and shown chunk, last and average generation, decode and JPEG ms, measured fps, queue depths, re-anchor state and last anchor, encoder cache and pending encodes, current video number, recovery count and last recovery time, recorder, clients. |
+| `GET /stats` | JSON: lifecycle state, backend, reader, last generated and shown chunk, last and average generation, decode and JPEG ms, measured fps, queue depths, re-anchor state and last anchor, encoder cache and pending encodes, current video number, recovery count and last recovery time, short chunks, recorder, clients. |
 | `GET /healthz` | 200 with the state (RECOVERING included), or 503 when FAILED or STOPPED. |
 | `GET /app/` | The demo page from `web/` (see "The demo page at /app/"). |
 
@@ -250,6 +254,28 @@ One `generate_chunk` call is one chunk in every contract, and it may produce any
 - Lead gate: before each chunk, generation waits until the frames already made but not yet sent are no more than (generation + decode + JPEG time) x fps x `--lead-margin`.
   This keeps the stream fed while keeping as little video queued as possible, because every queued frame adds to the delay of a command.
 - Timing log: one line per chunk with generation, decode and JPEG ms and the decode queue depth, and a summary line every 20 chunks.
+
+## Short chunks
+
+After a rebase the model restarts its frame memory, and the decoder restarts on that chunk, so it decodes to 1 frame instead of `frames_per_chunk` (4).
+Played as it is, the playout runs 3 frames (0.19 s) short and the stream stalls for about 47 ms at the next chunk.
+The decode thread finds such a chunk by its frame count: fewer frames than `frames_per_chunk`, and not the first chunk of a video.
+It pads the chunk to `frames_per_chunk` frames before JPEG encoding, by `--short-chunk` (the enum `ShortChunkMode`):
+
+- `crossfade` (default): the missing slots blend linearly from the last frame decoded before the chunk to the chunk's first frame, ending on that frame.
+  With 1 of 4 frames the slots are 25 %, 50 %, 75 % and then the new frame itself.
+  The blend is integer math in uint16 and takes about 0.7 ms at 672x384 alone, and about 1.9 ms at 832x480 inside a running fake server.
+- `hold`: the missing slots repeat the chunk's first frame.
+- `fill`: no padding, the old behaviour, kept for comparison.
+
+The first chunk of a video (at start, after a reset or after a recovery) is never padded.
+It is a cut to a new picture, so a cross-fade from the old video would blend two unrelated scenes, and padding it would add 0.19 s to every reset.
+The decode thread knows it by the video number in `ChunkMeta`: the last decoded frame belongs to another video, or there is none.
+The decision is the enum `ChunkShape`: `full`, `video_start` or `short`.
+The padding frames count as frames of the chunk, so the lead gate's estimate of `frames_per_chunk` frames stays right.
+Each short chunk logs one line (`chunk 40: short chunk, 1 of 4 frames, mode crossfade: padded to 4 frames in 1.9 ms`).
+`/stats` has `short_chunks`: `mode`, `count`, `last_chunk`, and `last` (`chunk`, decoded `frames`, `pad_ms`).
+When the backend marks a first-frame chunk explicitly (a planned `ChunkStart.FIRST_FRAME` field), the frame count stays a correct test, so nothing here needs to change.
 
 ## Re-anchor
 
@@ -323,6 +349,51 @@ It is the last fallback: the keyword table and any other matching in commands/ r
   On the engine machine they are in `~/.madhacks-foundry.env` (mode 600, never in git), which the systemd unit loads with `EnvironmentFile=`.
   For a manual run, load it first: `set -a; . ~/.madhacks-foundry.env; set +a`.
 - Without the variables the engine runs as before and logs one line: `slow reader off: FOUNDRY_ENDPOINT or FOUNDRY_KEY is not set ...`.
+
+## Final reader (Sonnet)
+
+With `--reader commands --final-reader sonnet`, every `final` sentence goes to one Claude Sonnet 5.5 call before the keyword table, in `engine/final_reader.py`.
+The one reply gives both the scene operations and the rich prompt the video model sees.
+The nano slow reader is not used in this mode; partials, taps and undo or reset sentences still go to the keyword table only.
+
+- The call is the Anthropic Messages API on the team's Foundry resource: `POST https://<resource>.services.ai.azure.com/anthropic/v1/messages`, where `<resource>` is the first label of `FOUNDRY_ENDPOINT`'s host.
+  `FOUNDRY_ANTHROPIC_URL` replaces the whole URL (a local fake endpoint), and `FOUNDRY_REWRITE_DEPLOYMENT` the model (default `claude-sonnet-5-5`).
+- Headers `x-api-key: $FOUNDRY_KEY` and `anthropic-version: 2023-06-01`.
+  Body: `{"model": "claude-sonnet-5-5", "max_tokens": 1024, "system": <system prompt>, "messages": [{"role": "user", "content": <JSON>}], "thinking": {"type": "between_tools"}, "output_config": {"effort": "low"}}`.
+  No `temperature`: the model rejects it, and `between_tools` is how Sonnet 5.5 runs with thinking off.
+- The user message is JSON: `{"scene": {"base", "changes": [{"id", "label", "kind", "phrase", "strength"}]}, "prompt": <the current composed prompt>, "sentence": <what the user said>}`.
+- The reply (```json fences are stripped) is `{"blocked": bool, "operations": [op, ...], "details": str}`.
+  Operations are the shapes of `commands/state.py` (add, remove, set_strength, new_scene), at most 6, each checked with `slow_reader.validate`.
+  `{"op": "edit_base", "base": ...}` is a base edit ("turn the tree into a lighthouse"): the engine expands it into `new_scene` plus one `add` per existing change, applied as one batch, so the changes stay and one undo reverts it.
+  `new_scene` ("take me to the desert") clears the changes.
+  Undo and reset are left to the keyword table.
+- The prompt is SUBJECT + WORLD + STYLE: SUBJECT is the base sentence, WORLD is the model's `details` (about 50 words: the ground of the place, two or three things on both sides, then the light; a place replaces the world), STYLE is a fixed sentence.
+  This is the engine's stand-in (`PromptSpec` "engine stand-in"); when `commands.rewriter` imports, its `SYSTEM_PROMPT` and `validate_rewrite` are used instead with no code change.
+- Content block: a short word list (`BLOCKED_WORDS`) is checked first with no call, and the model sets `blocked: true` for sexual, violent or hateful requests.
+  A blocked final gives no steer: the words show as unmatched, and one log line says why.
+- A timeout (`--final-timeout-s`, 3.0 s), a failed call or a reply that does not validate keeps the keyword table's result and the short prompt.
+- The cache is keyed by (composed prompt before the sentence, sentence).
+  A Sonnet result or a block is chosen once and saved to `--final-cache` (JSON, written atomically, tied to a fingerprint of the system prompt and the model), so a restart gives the same result and nothing is regenerated.
+  A fallback is final for that key for the life of the process, and an answer that arrives after the wait is dropped (`late_dropped`); fallbacks are not saved, so a passing outage does not disable a sentence for good.
+- The model sees one prompt per scene state: the first rich prompt chosen for a composed prompt replaces it in every later steer (an undo back to it, a chip removal), in `likely_prompts` and in `committed_prompt`, so a state always gives the same embedding.
+- `/stats` `final_reader`: `state` (`off`, `on`, `unavailable`), `reason`, `prompt_spec`, `calls`, `cache_hits`, `blocked`, `timeouts`, `late_dropped`, `rejects`, `errors`, `p50_ms`, `last_ms`, `cache_size`, `timeout_s`, `cache_file`.
+- It is `unavailable` (and the engine runs as with `off`, logged once) when `FOUNDRY_ENDPOINT` or `FOUNDRY_KEY` is missing or the reader is not `commands`.
+- `CommandService` has no public way yet to read the full scene or apply operations decided elsewhere, so `engine/reader.py` does both through two shim functions that use its private fields.
+  They switch to `CommandService.snapshot()` and `CommandService.apply_final(text, operations, prompt)` by themselves once those exist (asked of the commands/ owner), and `engine/tests/test_final_reader.py` runs them against the real `CommandService`.
+
+Local end-to-end run with a fake Sonnet endpoint (no key needed):
+
+```
+FOUNDRY_ENDPOINT=https://fake-resource.cognitiveservices.azure.com FOUNDRY_KEY=fake \
+FOUNDRY_ANTHROPIC_URL=http://127.0.0.1:8771/anthropic/v1/messages \
+python -m engine.server --backend fake --reader commands --final-reader sonnet --port 8770 --record-dir none --final-cache none
+```
+
+On the engine machine, load `~/.madhacks-foundry.env` first and add `--final-reader sonnet` to the usual command line.
+
+`engine/demo_prompts.json` holds the real Sonnet prompts for the demo sentences, made by this final reader as one chain from a reset, in script order.
+Each entry is keyed like the cache, by `prompt_before` (the composed prompt of the scene before) and `sentence`, and also has `canonical` (the composed prompt it rewrote), `operations`, `prompt`, `model`, `fingerprint` and `generated_at`.
+Entries are hand-editable: fix a bad `prompt` in place, and keep `prompt_before` and `sentence` unchanged so a loader still matches it.
 
 ## Lifecycle states
 

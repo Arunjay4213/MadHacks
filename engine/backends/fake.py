@@ -10,7 +10,7 @@ and the next chunk's frames get a white border and a "re-anchor" label, so a bro
 
 Options (pass as --backend-opt key=value):
     gen_ms=170, decode_ms=60, encode_ms=80, frames_per_chunk=4, first_chunk_frames=1, fps=16
-    fail_on_chunk=-1, fail_count=1, fail_in=generate, shared_device=false
+    fail_on_chunk=-1, fail_count=1, fail_in=generate, shared_device=false, short_on_chunks=none
 
 shared_device=true models one GPU that runs the text encoder, generation and decode, as on the real machine
 (umT5-xxl and the generator share one GPU). Their simulated work then shares one device by fair time sharing:
@@ -19,6 +19,9 @@ chunk take longer. Without it every job sleeps its full time independently.
 
 fail_on_chunk=N injects a crash to test recovery: from chunk N on (chunks count across resets), generate_chunk
 (fail_in=generate) or decode_chunk (fail_in=decode) raises RuntimeError, fail_count times in total.
+
+short_on_chunks=40,80 makes those chunks (numbered as fail_on_chunk, across resets) 1 frame long, as the real model's
+chunk after a rebase decodes to only its first frame. Their frames say "short chunk", so a recording shows them.
 """
 
 import hashlib
@@ -63,6 +66,21 @@ def load(width: int, height: int, steps: int, device: str = "cpu", decode_device
     return FakeBackend(width, height, steps, **options)
 
 
+def _chunk_numbers(value: str | int | None) -> frozenset[int]:
+    """`short_on_chunks` as a set: None or "none" for no chunks, an int, or comma-separated ints like "40,80"."""
+    if value is None:
+        return frozenset()
+    if isinstance(value, int):
+        return frozenset({value})
+    text = str(value).strip()
+    if text.lower() in ("", "none"):
+        return frozenset()
+    try:
+        return frozenset(int(part) for part in text.split(",") if part.strip())
+    except ValueError:
+        raise ValueError(f"short_on_chunks expects comma-separated chunk numbers, got {value!r}") from None
+
+
 def _rgb(vec: torch.Tensor) -> np.ndarray:
     """Map the first three values of a token vector to a colour, smoothly."""
     return (127.5 + 127.5 * torch.tanh(vec[:3].float() * 1.5)).numpy()
@@ -72,7 +90,7 @@ class FakeBackend:
     def __init__(self, width: int, height: int, steps: int, gen_ms: float = 170, decode_ms: float = 60,
                  encode_ms: float = 80, frames_per_chunk: int = 4, first_chunk_frames: int = 1, fps: int = 16,
                  fail_on_chunk: int = -1, fail_count: int = 1, fail_in: str = "generate",
-                 shared_device: bool = False):
+                 shared_device: bool = False, short_on_chunks: str | int | None = None):
         self.width, self.height, self.steps = int(width), int(height), int(steps)
         self.fps = int(fps)
         self.frames_per_chunk = int(frames_per_chunk)
@@ -90,6 +108,7 @@ class FakeBackend:
             raise ValueError(f"fail_in must be generate or decode, got {fail_in!r}")
         self.fail_on_chunk, self.fail_in = int(fail_on_chunk), fail_in
         self.failures_left = int(fail_count) if self.fail_on_chunk >= 0 else 0
+        self.short_on_chunks = _chunk_numbers(short_on_chunks)
         yy, xx = np.mgrid[0:self.height, 0:self.width]
         self._yy, self._xx = yy.astype(np.float32), xx.astype(np.float32)
         self._shade = (0.75 + 0.25 * (self._yy / max(1, self.height - 1)))[..., None]
@@ -140,8 +159,12 @@ class FakeBackend:
     def generate_chunk(self, cond: torch.Tensor) -> dict:
         self._work(self.gen_s)
         self._maybe_fail("generate", self._chunks_generated)
-        n = self.first_chunk_frames if self._chunks_since_reset == 0 else self.frames_per_chunk
-        latents = {"number": self._chunks_generated, "frames": n,
+        short = self._chunks_since_reset > 0 and self._chunks_generated in self.short_on_chunks
+        if self._chunks_since_reset == 0:
+            n = self.first_chunk_frames
+        else:
+            n = 1 if short else self.frames_per_chunk
+        latents = {"number": self._chunks_generated, "frames": n, "short": short,
                    "background": _rgb(cond[0, 0]), "ball": _rgb(cond[0, 1]), "anchor": self._anchor_next}
         self._anchor_next = None
         self._chunks_generated += 1
@@ -163,7 +186,8 @@ class FakeBackend:
             frame[inside] = latents["ball"].astype(np.uint8)
             img = Image.fromarray(frame)
             draw = ImageDraw.Draw(img)
-            draw.text((12, 10), f"fake chunk {latents['number']}  frame {i}", fill=(255, 255, 255),
+            short = "  short chunk" if latents["short"] else ""
+            draw.text((12, 10), f"fake chunk {latents['number']}  frame {i}{short}", fill=(255, 255, 255),
                       font=self._font, stroke_width=2, stroke_fill=(0, 0, 0))
             if latents["anchor"] is not None:
                 border = max(4, self.height // 40)
