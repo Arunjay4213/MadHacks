@@ -2,10 +2,16 @@
 
 import threading
 
+import torch
 from torch import Tensor
 
 from .blend import blend
 from .ease import ease
+
+
+def _precise(t: Tensor) -> Tensor:
+    """`t` itself if float32/float64, else a float32 copy."""
+    return t if t.dtype in (torch.float32, torch.float64) else t.float()
 
 
 class Steerer:
@@ -15,11 +21,16 @@ class Steerer:
     conditioning is now. `get_cond` (generation thread) advances the move by
     one chunk and returns the tensor for that chunk. Both are thread safe.
     Tensors passed in or returned are never modified in place.
+
+    For bfloat16/float16 conditioning the position is also kept unrounded
+    (float32) between chunks, so a move restarted at every chunk still
+    advances even when one chunk's step is below the dtype's rounding.
     """
 
     def __init__(self, initial_cond: Tensor) -> None:
         self._lock = threading.Lock()
         self._now = initial_cond
+        self._exact = initial_cond  # `_now` before rounding to its dtype
         self._start = initial_cond
         self._target = initial_cond
         self._ramp = 0
@@ -46,7 +57,7 @@ class Steerer:
                     f"target shape {tuple(target.shape)} != {tuple(self._now.shape)}"
                 )
             self._target = target.to(device=self._now.device, dtype=self._now.dtype)
-            self._start = self._now
+            self._start = _precise(self._exact)
             self._ramp = ramp_chunks
             self._k = 0
             self._cap = float(cap)
@@ -58,6 +69,7 @@ class Steerer:
         """
         with self._lock:
             self._now = cond
+            self._exact = cond
             self._start = cond
             self._target = cond
             self._ramp = 0
@@ -74,10 +86,11 @@ class Steerer:
             if self._k < self._ramp:
                 self._k += 1
                 if self._k == self._ramp and self._cap == 1.0:
-                    self._now = self._target
+                    self._now = self._exact = self._target
                 else:
                     w = min(ease(self._k / self._ramp), self._cap)
-                    self._now = blend(self._start, self._target, w)
+                    self._exact = blend(self._start, self._target, w)
+                    self._now = self._exact.to(self._target.dtype)
             return self._now
 
     @property

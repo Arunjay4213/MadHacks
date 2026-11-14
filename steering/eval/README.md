@@ -163,3 +163,25 @@ prints per-frame sim(before), sim(after), score = after - before, then the ms fr
 frame to 10% and 90% of the rise and how often the smoothed score goes down after it.
 `--dir` scores each applied message against the prompt in force before it; strength-only
 changes (same prompt) are listed but not scored. Pass the run's `--ramp` and `--fps`.
+
+## soak.py: long randomized checks of the steering maths
+
+```
+python -m steering.eval.soak --seconds 20 --seed 0              # [1, 16, 64] bf16
+python -m steering.eval.soak --seconds 20 --seed 0 --full-size  # [1, 512, 4096] bf16
+```
+
+CPU only, torch only. Prints one line per check with the worst numbers seen,
+then `RESULT PASS|FAIL`; exit code 1 on any failure.
+
+| Check | What it does | Fails when |
+|---|---|---|
+| `back_and_forth` (40% of the time) | Steerer between prompts A, B (sometimes C), random ramps 1/2/3/4/12, interrupts at random chunks, some capped moves | a frame is non-finite; a token's norm exceeds the largest endpoint norm (+bf16 rounding); a frame leaves the span of the prompts' rows (drift); a step exceeds (ease increment) x (path speed bound); a finished move is not the target object |
+| `aligner` (30%) | sessions of 100-400 prompt edits on `Aligner(512)`: add, insert, remove from the middle, replace, rotate, fill to 509-511 tokens, one-token prompts, runs of one id, random `occupied` masks | a token is lost, duplicated or shares a slot; a matched token moves; an unused row is not exactly zero; a new token takes a worse slot than one left empty; 513 tokens does not raise or changes the layout |
+| `threads` (30%) | `get_cond` in a tight loop vs random `handle` (provisional, strength), `set_target` and `reset` | any exception; a frame of the wrong shape, non-finite, or torn (every prompt's rows are equal, so every valid frame's rows are too) |
+| `memory` | 10,000 messages (mostly new prompts) through `Controller(cache_size=64, aligner=...)` | the cache exceeds its size, live tensors grow, or Python memory grows over 2 MB |
+
+`step/bound` and `first_step/normal` are reported net of bf16 rounding;
+`first_step/normal` <= 1 means the first frame after an interrupt is no
+bigger than a normal first step. The same checks run briefly in
+`steering/tests/test_properties.py`.
