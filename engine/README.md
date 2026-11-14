@@ -31,6 +31,35 @@ Unit tests:
 .venv-engine/bin/python -m pytest engine/tests -q
 ```
 
+## Demo harness
+
+`engine/tools/demo_run.py` plays a timed script of commands against an engine and records what comes back, so a demo can be repeated and two versions of the engine can be compared frame by frame.
+It needs `ffmpeg` on the PATH.
+
+```
+.venv-engine/bin/python -m engine.server --backend fake --reader commands --reanchor on --port 8769
+.venv-engine/bin/python -m engine.tools.demo_run --url http://127.0.0.1:8769 --script engine/tools/demo_scripts/draft.json --out runs/baseline --label baseline
+.venv-engine/bin/python -m engine.tools.demo_run --compare runs/baseline runs/new --out runs/compare
+```
+
+A script is a JSON file in `engine/tools/demo_scripts/`: a `name`, an `end` time in seconds, and `steps` of `{"at": 4, "say": "make it winter"}` or `{"at": 0, "reset": true}`.
+A `say` step is sent on `/control` as a contract 1 `final` message with a fresh `t_client`, the same message the demo page sends for a typed command.
+A `reset` step is a contract 1 reset tap with a `t_client` (optional on a tap), so the engine tracks it like a command and contract 4 tells the first chunk of the new video.
+The harness sends nothing else; it only reads `GET /stats` besides the two sockets.
+
+The output folder gets:
+
+- `video.mp4`: every frame received between script second 0 and `end`, at the engine fps from `/stats` (libx264, CRF 20). A stall shortens the video instead of freezing it, because frames are placed by count, not by arrival time.
+- `sheet.jpg`: one frame every 2 s, each labelled with the time, the chunk, what the frame shows ("before the run" until the first step reaches the screen, "start" after a reset, else the command), and a step that was sent but is not on screen yet.
+- `frames/`: those sheet frames as the JPEGs the engine sent.
+- `timings.json`: per command its `t_client`, the contract 4 stamps, `applies_from_chunk`, `unmatched`, the first frame received with chunk at least `applies_from_chunk` after the send, and `client_delay_ms` (that frame's receive time minus the send time); also `/stats` at start and end (`gen_ms`, `decode_ms`, `fps`, `stalls`, `reanchor`, `recorder`).
+- `summary.txt`: the same as a short table.
+
+`--compare DIR1 DIR2 ... --out OUT` writes `OUT/compare.jpg`: one row per run at the same time marks (every 4 s; `--every 2` for every sheet frame), labelled with each run's `--label` and its delay range.
+
+It works on localhost and through the tunnel (`--url https://<address>`, which uses wss).
+A run against a URL that is not localhost changes the shared live video for every viewer, so the harness prints a warning and waits 5 s before it starts (`--yes` skips the wait).
+
 ## The live engine on the GPU machine
 
 The live engine runs on `madhacks-engine` (one NVIDIA L40S) in two tmux sessions: `engine` (the server) and `tunnel` (a Cloudflare quick tunnel).
