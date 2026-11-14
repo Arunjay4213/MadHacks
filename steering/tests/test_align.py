@@ -217,3 +217,16 @@ def test_occupied_bad_length_raises_and_changes_nothing(occ):
     with pytest.raises(ValueError, match="occupied"):
         al.place(_enc([1, 3]), [1, 3], occupied=occ)
     assert al.layout == ((0, 1), (1, 2))
+
+
+def test_prepare_against_layout_does_not_read_or_commit():
+    al = Aligner(L)
+    al.place(_enc([5, 6, 7]), [5, 6, 7])
+    committed = al.layout
+    against = ((9, 6), (3, 8))
+    _, layout = al.prepare(_enc([6, 8, 4]), [6, 8, 4], against=against)
+    assert layout[:2] == ((9, 6), (3, 8))
+    assert layout[2][0] not in (9, 3)
+    assert al.layout == committed
+    _, ident = al.prepare(_enc([5, 6]), [5, 6], against=())
+    assert ident == ((0, 5), (1, 6))
