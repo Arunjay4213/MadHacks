@@ -256,7 +256,6 @@ def build_app(config: EngineConfig, web_dir: Path = WEB, studio_dir: Path = STUD
         lifespan=lifespan,
     )
     app.state.engine = engine
-    app.state.hub = hub
     return app
 
 
