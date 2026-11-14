@@ -1,7 +1,8 @@
 """The engine: generation thread, decode thread, streamer thread, and the command flow into the steerer.
 
     generation thread   cond = steerer.get_cond(); latents = backend.generate_chunk(cond); decode_queue.put(...)
-    decode thread       decode_queue -> backend.decode_chunk -> JPEG -> playout_queue  (no other shared state)
+    decode thread       decode_queue -> backend.decode_chunk -> pad a short chunk (ShortChunkMode) -> JPEG
+                        -> playout_queue  (no other shared state)
     streamer thread     playout_queue -> paced at backend.fps -> publish(frame); on a chunk's first frame,
                         stamp `shown` and publish one contract 4 message
 
@@ -83,6 +84,63 @@ class EngineConfig:
     record_max_bytes: int = DEFAULT_MAX_BYTES  # the oldest recordings are deleted above this total
     recovery_limit: int = 3         # this many crashes within recovery_window_s -> FAILED
     recovery_window_s: float = 60.0
+    short_chunk: str = "crossfade"  # "fill", "hold" or "crossfade": see ShortChunkMode
+
+
+class ShortChunkMode(enum.Enum):
+    """How the decode thread pads a short chunk (fewer frames than frames_per_chunk) before playout.
+
+    After a rebase the model restarts its frame memory and the decoder restarts on that chunk, which then decodes
+    to 1 frame instead of frames_per_chunk. Played as it is, the playout runs short by the missing frames.
+    """
+    FILL = "fill"            # no padding: the chunk plays with the frames it has (the old behaviour)
+    HOLD = "hold"            # the missing slots repeat the chunk's first frame
+    CROSSFADE = "crossfade"  # the missing slots blend linearly from the last frame before the chunk to its first
+
+
+class ChunkShape(enum.Enum):
+    """What the decode thread found in a decoded chunk. Decides whether it is padded."""
+    FULL = "full"                # frames_per_chunk frames or more: played as it is
+    VIDEO_START = "video_start"  # the first chunk of a video (after start, reset or recovery): played as it is
+    SHORT = "short"              # fewer frames than frames_per_chunk inside a video: padded by ShortChunkMode
+
+
+def chunk_shape(n_frames: int, frames_per_chunk: int, starts_video: bool) -> ChunkShape:
+    if starts_video:
+        return ChunkShape.VIDEO_START
+    return ChunkShape.SHORT if n_frames < frames_per_chunk else ChunkShape.FULL
+
+
+def pad_short_chunk(frames: np.ndarray, previous: np.ndarray, target: int, mode: ShortChunkMode) -> np.ndarray:
+    """`frames` (uint8 [n,H,W,3], n < target) padded to `target` frames, the padding placed before them.
+
+    HOLD repeats frames[0]. CROSSFADE fills slot k (1..m, m = target - n) with
+    previous + (frames[0] - previous) * k / (m + 1), rounded to nearest, so the blend moves evenly from `previous`
+    (the last frame played before this chunk) and lands on frames[0] in the slot after the padding.
+    FILL returns `frames`.
+    """
+    n = len(frames)
+    m = target - n
+    if mode is ShortChunkMode.FILL or m <= 0 or n == 0:
+        return frames
+    out = np.empty((target, *frames.shape[1:]), dtype=np.uint8)
+    out[m:] = frames
+    if mode is ShortChunkMode.HOLD or previous.shape != frames.shape[1:]:
+        out[:m] = frames[0]
+        return out
+    # Integer math in uint16: slot k is (previous * (d - k) + new * k + d // 2) // d with d = m + 1, the same as
+    # rounding the float blend half up. It takes about 0.7 ms at 672x384; float32 math took about 3.4 ms.
+    d = m + 1
+    old, new = previous.astype(np.uint16), frames[0].astype(np.uint16)
+    acc, part = np.empty_like(old), np.empty_like(old)
+    for k in range(1, m + 1):
+        np.multiply(old, d - k, out=acc)
+        np.multiply(new, k, out=part)
+        acc += part
+        acc += d // 2
+        acc //= d
+        out[k - 1] = acc  # at most 255, so the cast to uint8 on assignment is exact
+    return out
 
 
 def reanchor_config(options: dict) -> ReanchorConfig:
@@ -284,6 +342,11 @@ class Engine:
         if config.reanchor not in ("off", "on"):
             raise ValueError(f"reanchor must be 'off' or 'on', got {config.reanchor!r}")
         self.reanchor_config = reanchor_config(config.reanchor_options)  # checked here, before the backend loads
+        try:
+            self.short_chunk_mode = ShortChunkMode(config.short_chunk)
+        except ValueError:
+            raise ValueError(f"short_chunk must be one of {', '.join(m.value for m in ShortChunkMode)}, "
+                             f"got {config.short_chunk!r}") from None
         self.reanchor_state = ReanchorState.OFF  # set from config.reanchor once the backend is loaded
         self.policy: ReanchorPolicy | None = None  # exists exactly when reanchor_state is ON
         self.on_fatal: Callable[[str], None] | None = None  # called once on FAILED; the server exits the process
@@ -325,6 +388,8 @@ class Engine:
         self.reanchors = 0
         self.last_anchor: Anchor | None = None
         self.last_anchor_chunk: int | None = None
+        self.short_chunks = 0                       # short chunks found inside a video (padded unless FILL)
+        self.last_short_chunk: dict | None = None   # {"chunk", "frames" decoded, "pad_ms"} of the latest one
         self.client_counts: Callable[[], dict] = lambda: {}
 
     # --- lifecycle -------------------------------------------------------------------------
@@ -661,6 +726,10 @@ class Engine:
 
     def _decode_loop(self) -> None:
         backend, quality = self.backend, self.config.jpeg_quality
+        # The last frame decoded, and its video. Decode runs in chunk order, so this is the last frame played
+        # before the next chunk; a short chunk cross-fades from it. Only this thread touches it.
+        last_video: int | None = None
+        last_frame: np.ndarray | None = None
         try:
             while not self._stop.is_set():
                 try:
@@ -671,11 +740,19 @@ class Engine:
                     if self._crashed.is_set():
                         continue  # the video is broken; recovery drops it
                     t0 = time.perf_counter()
-                    frames = backend.decode_chunk(latents)
+                    frames = np.asarray(backend.decode_chunk(latents))
                     t1 = time.perf_counter()
-                    jpegs = [encode_jpeg(f, quality) for f in frames]
+                    decoded = len(frames)
+                    shape = chunk_shape(decoded, backend.frames_per_chunk,
+                                        last_frame is None or last_video != meta.video)
+                    if shape is ChunkShape.SHORT:
+                        frames = self._pad_short(frames, last_frame, meta.chunk)
+                    if decoded:
+                        last_video, last_frame = meta.video, frames[-1]
                     t2 = time.perf_counter()
-                    meta.decode_ms, meta.jpeg_ms, meta.frames = (t1 - t0) * 1e3, (t2 - t1) * 1e3, len(jpegs)
+                    jpegs = [encode_jpeg(f, quality) for f in frames]
+                    t3 = time.perf_counter()
+                    meta.decode_ms, meta.jpeg_ms, meta.frames = (t1 - t0) * 1e3, (t3 - t2) * 1e3, len(jpegs)
                     anchor = f", re-anchor {meta.anchor.reason} {meta.anchor.strength:.2f}" if meta.anchor else ""
                     log.info("chunk %d: gen %.0f ms, decode %.0f ms, jpeg %.0f ms, %d frames, decode queue %d%s",
                              meta.chunk, meta.gen_ms, meta.decode_ms, meta.jpeg_ms, meta.frames,
@@ -692,6 +769,22 @@ class Engine:
                     self._decode_queue.task_done()
         except Exception as exc:
             self._fail("decode thread", exc)
+
+    def _pad_short(self, frames: np.ndarray, previous: np.ndarray, chunk: int) -> np.ndarray:
+        """Decode thread: pad a short chunk to frames_per_chunk by the --short-chunk mode; one log line."""
+        mode, target = self.short_chunk_mode, self.backend.frames_per_chunk
+        t0 = time.perf_counter()
+        padded = pad_short_chunk(frames, previous, target, mode)
+        pad_ms = (time.perf_counter() - t0) * 1e3
+        with self._stats_lock:
+            self.short_chunks += 1
+            self.last_short_chunk = {"chunk": chunk, "frames": len(frames), "pad_ms": round(pad_ms, 2)}
+        if mode is ShortChunkMode.FILL:
+            log.info("chunk %d: short chunk, %d of %d frames, mode fill: played unpadded", chunk, len(frames), target)
+        else:
+            log.info("chunk %d: short chunk, %d of %d frames, mode %s: padded to %d frames in %.1f ms", chunk,
+                     len(frames), target, mode.value, len(padded), pad_ms)
+        return padded
 
     # --- streaming -------------------------------------------------------------------------
 
@@ -906,6 +999,9 @@ class Engine:
                     "last_chunk": self.last_anchor_chunk,
                     "config": reanchor_changes(self.reanchor_config),
                 },
+                "short_chunks": {"mode": self.short_chunk_mode.value, "count": self.short_chunks,
+                                 "last_chunk": None if self.last_short_chunk is None else self.last_short_chunk["chunk"],
+                                 "last": self.last_short_chunk},
                 "video": self.video,
                 "recovery": {"count": self.recoveries, "last": self.last_recovery,
                              "crashes_in_window": len(self._crash_times)},
