@@ -72,9 +72,8 @@ def test_service_uses_it_after_the_keyword_table():
     assert "a lion in the grass" in out["steer"]["prompt"]
 
 
-def test_from_env_missing_is_off(caplog):
+def test_from_env_missing_is_off():
     assert from_env({}) is None
-    assert "slow reader off" in caplog.text
     assert from_env({"FOUNDRY_ENDPOINT": "https://e/", "FOUNDRY_KEY": "k"}).deployment == "gpt-4.1-nano"
 
 

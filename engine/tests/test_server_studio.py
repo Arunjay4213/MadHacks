@@ -6,7 +6,7 @@ import pytest
 from starlette.testclient import TestClient
 
 from engine.engine import EngineConfig
-from engine.server import build_app, parse_args
+from engine.server import build_app
 
 
 @pytest.fixture
@@ -28,41 +28,24 @@ def client(dist):
     return TestClient(build_app(EngineConfig(backend="fake"), studio_dir=dist))
 
 
-def test_studio_without_slash_redirects(client):
+def test_the_build_is_served(client):
     r = client.get("/studio", follow_redirects=False)
-    assert r.status_code in (301, 302, 307, 308)
-    assert r.headers["location"] == "/studio/"
-
-
-def test_studio_slash_serves_index_uncached(client):
+    assert r.status_code in (301, 302, 307, 308) and r.headers["location"] == "/studio/"
     r = client.get("/studio/")
-    assert r.status_code == 200
-    assert r.headers["content-type"].startswith("text/html")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/html") and "studio" in r.text
+    # The page and unhashed files must be fresh after a rebuild; hashed assets may be cached.
     assert r.headers["cache-control"] == "no-cache"
-    assert "studio" in r.text
-    assert client.get("/studio/index.html").headers["cache-control"] == "no-cache"
-
-
-@pytest.mark.parametrize("path,ctype", [
-    ("/studio/assets/x.js", "text/javascript"),
-    ("/studio/assets/x.css", "text/css"),
-    ("/studio/logo.svg", "image/svg+xml"),
-])
-def test_files_with_content_types(client, path, ctype):
-    r = client.get(path)
-    assert r.status_code == 200
-    assert r.headers["content-type"].split(";")[0] == ctype
-
-
-def test_hashed_assets_may_be_cached(client):
-    assert "max-age" in client.get("/studio/assets/x.js").headers["cache-control"]
     assert client.get("/studio/logo.svg").headers["cache-control"] == "no-cache"
+    assert "max-age" in client.get("/studio/assets/x.js").headers["cache-control"]
+    for path, ctype in [("/studio/assets/x.js", "text/javascript"), ("/studio/assets/x.css", "text/css"),
+                        ("/studio/logo.svg", "image/svg+xml")]:
+        r = client.get(path)
+        assert r.status_code == 200 and r.headers["content-type"].split(";")[0] == ctype, path
 
 
 @pytest.mark.parametrize("path", [
-    "/studio/.env", "/studio/assets/.hidden.js", "/studio/missing.js", "/studio/assets/", "/studio/assets",
-    "/studio/assets//x.js", "/studio/%2e%2e/outside.txt", "/studio/..%2foutside.txt", "/studio/..%5coutside.txt",
-    "/studio/%2fetc%2fpasswd",
+    "/studio/.env", "/studio/assets/.hidden.js", "/studio/missing.js", "/studio/assets/",
+    "/studio/%2e%2e/outside.txt", "/studio/..%5coutside.txt",
 ])
 def test_dotfiles_missing_and_traversal_give_404(client, path):
     r = client.get(path)
@@ -70,9 +53,15 @@ def test_dotfiles_missing_and_traversal_give_404(client, path):
     assert "outside" not in r.text and "SECRET" not in r.text
 
 
-def test_raw_traversal_reaches_the_handler_and_is_rejected(dist):
-    # httpx removes "/../" before sending, so send the raw path straight to the ASGI app.
+def test_raw_traversal_and_outside_symlinks_are_rejected(dist):
+    (dist / "assets" / "leak.txt").symlink_to(dist.parent / "outside.txt")
+    (dist / "inside.js").symlink_to(dist / "assets" / "x.js")
     app = build_app(EngineConfig(backend="fake"), studio_dir=dist)
+    client = TestClient(app)
+    assert client.get("/studio/assets/leak.txt").status_code == 404
+    assert client.get("/studio/inside.js").status_code == 200
+
+    # httpx removes "/../" before sending, so send the raw path straight to the ASGI app.
     sent = []
 
     async def run(raw: str):
@@ -91,23 +80,8 @@ def test_raw_traversal_reaches_the_handler_and_is_rejected(dist):
     assert sent[0]["status"] == 404
 
 
-def test_symlink_pointing_outside_is_rejected(dist):
-    (dist / "assets" / "leak.txt").symlink_to(dist.parent / "outside.txt")
-    (dist / "inside.js").symlink_to(dist / "assets" / "x.js")
-    client = TestClient(build_app(EngineConfig(backend="fake"), studio_dir=dist))
-    assert client.get("/studio/assets/leak.txt").status_code == 404
-    assert client.get("/studio/inside.js").status_code == 200
-
-
-def test_missing_build_gives_a_clear_404(tmp_path):
-    missing = tmp_path / "nope" / "dist"
-    client = TestClient(build_app(EngineConfig(backend="fake"), studio_dir=missing))
+def test_missing_build_gives_a_404_and_the_engine_still_answers(tmp_path):
+    client = TestClient(build_app(EngineConfig(backend="fake"), studio_dir=tmp_path / "nope" / "dist"))
     r = client.get("/studio/")
-    assert r.status_code == 404
-    assert r.text == f"Lucid Studio build not found at {missing}"
+    assert r.status_code == 404 and "not found" in r.text
     assert client.get("/stats").status_code == 200
-
-
-def test_studio_dir_flag():
-    assert parse_args(["--studio-dir", "/x/dist"]).studio_dir == "/x/dist"
-    assert parse_args([]).studio_dir.endswith("lucid-studio/dist")

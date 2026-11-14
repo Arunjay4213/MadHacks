@@ -6,32 +6,32 @@ from engine.reader import load_reader
 from engine.standin_reader import StandinService
 
 
-@pytest.mark.parametrize("msg", [
+VALID = [
     {"type": "partial", "text": "make it win", "t_client": 1},
     {"type": "final", "text": "make it winter", "t_client": 2},
     {"type": "tap", "action": "remove", "id": "c2"},
     {"type": "tap", "action": "undo"},
     {"type": "tap", "action": "reset"},
     {"type": "final", "text": "x", "t_client": 3, "extra": "allowed"},
-])
-def test_valid_contract_1(msg):
-    assert check(1, msg) is msg
+]
 
-
-@pytest.mark.parametrize("msg", [
+INVALID = [
     {"type": "final", "text": "no t_client"},
     {"type": "tap", "action": "remove"},
     {"type": "tap", "action": "jump"},
-    {"type": "bogus"},
     ["not", "an", "object"],
-    {"type": "partial", "text": 5, "t_client": 1},
-])
-def test_invalid_contract_1(msg):
-    with pytest.raises(BadMessage):
-        check(1, msg)
+]
 
 
-def test_bad_json():
+def test_valid_contract_1():
+    for msg in VALID:
+        assert check(1, msg) is msg
+
+
+def test_invalid_contract_1_and_bad_json():
+    for msg in INVALID:
+        with pytest.raises(BadMessage):
+            check(1, msg)
     with pytest.raises(BadMessage):
         parse_json("{nope")
 

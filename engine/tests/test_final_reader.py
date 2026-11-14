@@ -15,7 +15,7 @@ import pytest
 
 from commands.service import CommandService
 from commands.state import SceneState
-from engine.final_reader import (FORWARD_MOTION, STYLE, CacheFile, FinalReader, FinalReaderState, PromptSpec, expand_operations,
+from engine.final_reader import (FORWARD_MOTION, STYLE, CacheFile, FinalReader, FinalReaderState, expand_operations,
                                  fingerprint, load, prompt_spec, scene_after)
 from engine.foundry import FoundryMessages
 from engine.reader import FinalReadingService, apply_final, load_reader, service_snapshot
