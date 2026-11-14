@@ -71,7 +71,10 @@ The backend rebuilds the same table with the same formula and 65536 positions (`
 With `sink_frames=0` attention only sees distances inside the window, so the large absolute positions do not change what the model sees.
 Memory is fixed after the first 21 calls because the cache buffer never grows.
 
-ENDLESS_RESULT
+Test (384x672, TAEHV, threaded, one prompt): the run was planned for 1200 calls (5 minutes of video, past the old 1024-position RoPE limit) but was stopped at about call 460 (about 115 s of video) to free the GPU for the live server.
+Up to that point generation time stayed flat at 222 to 225 ms per call from call 50 to call 450 (one logged sample at 244 ms), decode stayed at 32 ms, and peak GPU memory stayed at 17.39 GiB.
+Because the run was cut short, no mp4 from late in the run was saved and late-run picture quality was not checked by eye; the 90-call switch test below (22 s of video) still looked sane at its end.
+The path past 1024 latent frames (the rebuilt RoPE table) has not been exercised yet.
 
 ## Conditioning and the second cache
 
@@ -83,7 +86,13 @@ If that cache is not reset, a new `cond` is ignored.
 Recomputing the text K/V is 30 small linear layers on 512 tokens, which is too small to see in the per-call timing.
 The frame cache is never touched by a conditioning change.
 
-SWITCH_RESULT
+Test (384x672, TAEHV, threaded): prompt A "a red fox walking through a snowy pine forest at sunrise" for calls 0 to 29, then prompt B "the same at night under a full moon, dark blue moonlight" from call 30 on, as a hard switch.
+The video kept the same fox, trees and snow and did not restart.
+The light changed gradually: frames right after the switch look like before, the scene is clearly dimmer about 4 s later, and dark blue moonlight about 14 s later.
+The slow response is expected, because the frame cache still holds 21 frames (about 5 s) made under prompt A.
+The median call time of that run (230 ms) was close to the run without a switch (226 ms); the single call that recomputed the text K/V was not timed on its own.
+
+Seeding: `reset(seed=N)` reseeds all noise of the new video; two runs with the same seed and the same `cond` gave bit-identical latents (checked on 4 calls).
 
 ## Using the backend from a plain Python script
 
@@ -91,10 +100,10 @@ Run from `~/madhacks` with `~/engine-venv` active:
 
 ```python
 from engine.backends import causal_forcing
-b = causal_forcing.load(576, 320)                  # steps=None: the distilled schedule
+b = causal_forcing.load(672, 384, vae="taehv")     # recommended real-time config; steps=None: distilled schedule
 cond = b.encode_prompt("a meadow at noon")          # [1, 512, 4096] bf16 on cuda:0
 emb, ids = b.encode_prompt_with_ids("a meadow")     # same embedding plus the real umT5 token ids
-b.reset()                                           # start a new video
+b.reset(seed=0)                                     # start a new video; same seed + same conds = same latents
 lat = b.generate_chunk(cond)                        # one latent frame
 frames = b.decode_chunk(lat)                        # uint8 [T, H, W, 3]
 ```
@@ -110,4 +119,8 @@ bash engine/setup_gpu.sh                      # once, inside tmux
 cd ~/madhacks && source ~/engine-venv/bin/activate
 python -m engine.bench_stock --width 832 --height 480 --chunks 70 --warmup 25            # gen and decode separately
 python -m engine.bench_stock --width 832 --height 480 --chunks 70 --warmup 25 --threaded # engine-style threads
+python -m engine.bench_stock --width 672 --height 384 --vae taehv --threaded --chunks 90 --switch-at 30 \
+  --prompt-b "A red fox walking through a snowy pine forest at night under a full moon" --save-mp4 switch.mp4
 ```
+
+With the server, use `--backend causal_forcing --width 672 --height 384 --steps 0 --backend-opt vae=taehv`.
