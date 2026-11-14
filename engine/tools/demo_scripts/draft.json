@@ -1,0 +1,12 @@
+{
+  "name": "draft",
+  "end": 46,
+  "steps": [
+    {"at": 0, "reset": true},
+    {"at": 4, "say": "make it winter"},
+    {"at": 12, "say": "add a red car"},
+    {"at": 20, "say": "make it night"},
+    {"at": 28, "say": "add a lion"},
+    {"at": 36, "say": "sunny"}
+  ]
+}
