@@ -128,6 +128,7 @@ class ChunkLatents:
     chunk_index: int  # 0 for the first chunk of a video
     ready: torch.cuda.Event  # recorded on the generation stream after `latents` was written
     start: ChunkStart = ChunkStart.CONTINUE  # FIRST_FRAME: the decoder restarts its stream state for it
+    fade: bool = False  # a re-anchor cut to dissolve into from the last shown frame (cut_fade_frames > 0)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -193,8 +194,10 @@ class _Decoder:
     """Streaming VAE decode. Owns all of its state; only ChunkLatents cross the boundary."""
 
     def __init__(self, repo_dir: str, vae_type: VaeType, device: torch.device, latent_hw: tuple[int, int], dtype=torch.float16,
-                 first_frame_pad: FirstFramePad = FirstFramePad.HOLD, frames_per_chunk: int = VIDEO_FRAMES_PER_LATENT):
+                 first_frame_pad: FirstFramePad = FirstFramePad.HOLD, frames_per_chunk: int = VIDEO_FRAMES_PER_LATENT,
+                 cut_fade_frames: int = 0):
         self.vae_type = vae_type
+        self.cut_fade_frames = int(cut_fade_frames)  # dissolve length after a cut chunk with `fade`; 0 = off
         self.first_frame_pad = FirstFramePad(first_frame_pad)
         self.frames_per_chunk = frames_per_chunk
         self.restarts = 0  # mid-video stream restarts (hard cuts), for tests and logs
@@ -236,6 +239,9 @@ class _Decoder:
         self.video_id = video_id
         self.next_chunk_index = 0
         self._restart_stream()
+        self._last_frame: Optional[np.ndarray] = None  # the last frame emitted in this video, uint8 [H, W, 3]
+        self._fade_from: Optional[np.ndarray] = None  # the frame a running dissolve starts from
+        self._fade_done = 0  # output frames of the running dissolve already emitted
 
     def _restart_stream(self):
         """Forget the decoded past (as for a new video), keeping video_id and the chunk count."""
@@ -256,6 +262,8 @@ class _Decoder:
         if cut:
             self._restart_stream()
             self.restarts += 1
+            if chunk.fade and self.cut_fade_frames > 0 and self._last_frame is not None:
+                self._fade_from, self._fade_done = self._last_frame, 0
 
         with torch.cuda.device(self.device), torch.cuda.stream(self.stream):
             self.stream.wait_event(chunk.ready)
@@ -286,8 +294,25 @@ class _Decoder:
 
         if cut and self.first_frame_pad is FirstFramePad.HOLD and 0 < len(out) < self.frames_per_chunk:
             out = np.concatenate([out, np.repeat(out[-1:], self.frames_per_chunk - len(out), axis=0)])
+        if self._fade_from is not None and len(out):
+            out = self._fade(out)
+        if len(out):
+            self._last_frame = out[-1]
         self.state = DecoderState.STREAMING
         self.next_chunk_index += 1
+        return out
+
+
+    def _fade(self, out: np.ndarray) -> np.ndarray:
+        """Dissolve from _fade_from: output frame k after the cut is (1 - a) * old + a * new, with
+        a = (k + 1) / (N + 1), counted over emitted frames, so it runs on across chunk boundaries."""
+        n = self.cut_fade_frames
+        k = np.arange(len(out), dtype=np.float32) + self._fade_done
+        a = np.minimum((k + 1) / (n + 1), 1.0).reshape(-1, 1, 1, 1)
+        out = np.rint(self._fade_from.astype(np.float32) * (1 - a) + out.astype(np.float32) * a).astype(np.uint8)
+        self._fade_done += len(out)
+        if self._fade_done >= n:
+            self._fade_from = None
         return out
 
 
@@ -399,6 +424,7 @@ class Backend:
             self.generator.model.compile(mode="max-autotune-no-cudagraphs")
 
         self._init_runtime(seed, **auto_rebase)
+        self.decoder.cut_fade_frames = self.cut_fade_frames
 
     def _init_runtime(
         self,
@@ -414,6 +440,8 @@ class Backend:
         refresh_keep: int = 6,
         refresh_memory_noise: int = 0,
         clean_anchor_after: int = 3,
+        cut_fade_frames: int = 0,
+        cut_fade_refresh: bool = True,
     ) -> None:
         """Generation state: lock, stream, RNG, caches, counters, automatic rebase settings.
         Split out of __init__ so tests can build a Backend around a stub generator."""
@@ -432,6 +460,12 @@ class Backend:
         # The clean anchor: the latent of the chunk `clean_anchor_after` chunks after the start of
         # the video or after the last rebase that did not start from the clean anchor (a steer).
         # A refresh (reanchor(..., source="clean")) starts from it instead of the drifted last latent.
+        if int(cut_fade_frames) < 0:
+            raise ValueError(f"cut_fade_frames must be >= 0, got {cut_fade_frames}")
+        # Dissolve from the last shown frame over this many frames after a re-anchor cut (0 = off);
+        # cut_fade_refresh: refreshes (reanchor source "clean") fade too, else only steers.
+        self.cut_fade_frames = int(cut_fade_frames)
+        self.cut_fade_refresh = bool(cut_fade_refresh)
         if clean_anchor_after < 0:
             raise ValueError(f"clean_anchor_after must be >= 0, got {clean_anchor_after}")
         self._clean_anchor_after = int(clean_anchor_after)
@@ -682,6 +716,7 @@ class Backend:
             noisy = torch.randn([1, f, LATENT_CHANNELS, lh, lw], device=self.device, dtype=self.dtype, generator=self._rng)
             schedule = self.first_chunk_steps if self.state is GenState.EMPTY else self.denoising_steps
             start = ChunkStart.FIRST_FRAME if self.state is GenState.EMPTY else ChunkStart.CONTINUE
+            fade = False
             if plan is not None:
                 x_last = self._history[-1] if self._history else None
                 from_clean = plan.from_clean and self._clean_anchor is not None
@@ -701,6 +736,7 @@ class Backend:
                 if keep == 0:
                     schedule = self.first_chunk_steps  # a hard cut: this is a first frame again
                     start = ChunkStart.FIRST_FRAME  # and the decoder restarts for it
+                    fade = self.cut_fade_frames > 0 and (self.cut_fade_refresh or not plan.from_clean)
                 n = plan.anchor_step
                 if n is not None:
                     if reason is not None:
@@ -760,7 +796,8 @@ class Backend:
 
             ready = torch.cuda.Event()
             ready.record(self._gen_stream)
-            out = ChunkLatents(latents=denoised, video_id=self.video_id, chunk_index=self.chunk_index, ready=ready, start=start)
+            out = ChunkLatents(latents=denoised, video_id=self.video_id, chunk_index=self.chunk_index, ready=ready, start=start,
+                               fade=fade)
             self.frame_index += f
             self.chunk_index += 1
             self.state = GenState.STREAMING
@@ -789,13 +826,17 @@ def load(width: int, height: int, steps: Optional[int] = None, device: str = "cu
     saved; reanchor(strength, source="clean") starts from it.
     first_frame_pad ("hold" or "none"): a hard cut (keep-0 rebase, every re-anchor) is decoded as a
     new video's first chunk, 1 frame; "hold" repeats it to the usual chunk length, "none" emits 1.
+    cut_fade_frames (0 = off): after a re-anchor cut, dissolve from the last shown frame into the new
+    picture over this many output frames, across chunk boundaries; never on a new video.
+    cut_fade_refresh (1): refreshes (reanchor source "clean") fade too; 0 fades only steers.
     """
     # Options may arrive as strings from the server's --backend-opt KEY=VALUE.
     flag = lambda v: v if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes", "on")  # noqa: E731
     types = {"attn_window_frames": int, "sink_frames": int, "max_latent_frames": int, "seed": int, "compile": flag,
              "steer_rebase": flag, "steer_keep": int, "steer_memory_noise": int, "steer_anchor_step": int,
              "steer_min_gap": int, "steer_fire_on_change": flag, "refresh_every": int, "refresh_keep": int,
-             "refresh_memory_noise": int, "clean_anchor_after": int}
+             "refresh_memory_noise": int, "clean_anchor_after": int, "cut_fade_frames": int,
+             "cut_fade_refresh": flag}
     options = {k: types[k](v) if k in types else v for k, v in options.items()}
     steps = int(steps) if steps is not None and int(steps) > 0 else None  # 0 or None: distilled schedule
     t0 = time.time()
