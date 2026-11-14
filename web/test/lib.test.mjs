@@ -182,6 +182,14 @@ test('latency: the per-chunk echo of the same t_client is measured once, never a
   assert.deepEqual(l.onFrameDrawn(150, 40300), { ms: 300, stamps: undefined });
 });
 
+test('latency: an unmatched command is never measured, even with a chunk number attached', () => {
+  const l = makeLatencyTracker();
+  l.sent(5000);
+  // An engine that echoes the unmatched command's t_client with the previous command's chunk.
+  l.onServer({ t_client: 5000, applies_from_chunk: 3, unmatched: true });
+  assert.equal(l.onFrameDrawn(9, 5100), null);
+});
+
 test('fake server test pattern: real JPEG frames bigger than one pixel', () => {
   const frames = loadTestPattern();
   assert.ok(frames.length >= 16);
