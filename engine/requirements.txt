@@ -1,0 +1,13 @@
+# Engine server dependencies, without the GPU model packages (see the backend's own requirements for those).
+# torch is needed by steering/; on a CPU-only machine install the CPU build:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch
+numpy
+pillow
+starlette>=0.40
+uvicorn[standard]>=0.30
+jsonschema>=4.20
+# tests and tools
+pytest
+httpx
+websockets>=13
