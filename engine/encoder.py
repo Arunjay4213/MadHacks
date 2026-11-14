@@ -96,6 +96,12 @@ class EncoderService:
         return self.request(prompt).result()[0]
 
     @property
+    def pending(self) -> int:
+        """Prompts queued or being encoded, prefetch included; 0 means the encoder is idle."""
+        with self._lock:
+            return len(self._inflight)
+
+    @property
     def cache_size(self) -> int:
         with self._lock:
             return len(self._cache)

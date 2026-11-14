@@ -218,7 +218,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--port", type=int, default=8000)
     p.add_argument("--width", type=int, default=832)
     p.add_argument("--height", type=int, default=480)
-    p.add_argument("--steps", type=int, default=4)
+    p.add_argument("--steps", type=int, default=0,
+                   help="denoising steps per chunk; 0 uses the schedule the backend's checkpoint was distilled for")
     p.add_argument("--device", default="cuda:0", help="generation device (the fake backend ignores it)")
     p.add_argument("--decode-device", default="cuda:0", help="decode device (the fake backend ignores it)")
     p.add_argument("--base-prompt", default=EngineConfig.base_prompt,

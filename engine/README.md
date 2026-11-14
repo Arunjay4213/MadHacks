@@ -21,6 +21,10 @@ End-to-end check against the running server (exits non-zero on failure):
 .venv-engine/bin/python -m engine.tools.e2e_check --url http://127.0.0.1:8000
 ```
 
+The check reads the server's command reader from `/stats` (or take `--reader standin|commands`) and sends commands that reader understands.
+With `standin` it sends a raw new prompt, then the starting prompt again as a cache hit.
+With `commands` it sends "new scene of a lighthouse on a cliff <time>", waits until the reader's likely prompts are encoded, then sends "make it winter" and "go back", and checks that both are cache hits and that `changes` shows the winter chip and then none.
+
 Unit tests:
 
 ```
@@ -31,10 +35,11 @@ Unit tests:
 
 ```
 python -m engine.server --backend fake|causal_forcing --reader standin|commands --host 127.0.0.1 --port 8000 --width 832 --height 480 \
-    --steps 4 --base-prompt "..." --jpeg-quality 80 --precompute-file prompts.txt \
+    --steps 0 --base-prompt "..." --jpeg-quality 80 --precompute-file prompts.txt \
     --device cuda:0 --decode-device cuda:0 --backend-opt key=value --lead-margin 1.3 --log-level info
 ```
 
+- `--steps 0` (the default) runs the denoising schedule the backend's checkpoint was distilled for; the real model is distilled for 2 steps, so any other number changes the schedule.
 - `--reader` picks the command reader: `standin` (default, `engine/standin_reader.py`) or `commands` (`commands.service.CommandService`, imported only when chosen).
 - The starting prompt is the reader's `committed_prompt` when it has one, else `--base-prompt`.
 - `--precompute-file` is a text file with one prompt per line; each is encoded at startup, so a known prompt needs no encoding time.
@@ -54,7 +59,7 @@ All on one origin; the message shapes are in `contracts/README.md`.
 | websocket `/control` | Contract 1 in (JSON text); contract 4 out, one message per chunk; `{"error": "..."}` replies to a bad message. |
 | `POST /target` | Body is a contract 2 message; it skips the command reader and goes unchanged to the encoder and `steering.Controller.handle`. |
 | `POST /reset` | Same as a `{"type":"tap","action":"reset"}` on `/control`: goes through the reader, then starts a new video; returns when done. |
-| `GET /stats` | JSON: lifecycle state, last generated and shown chunk, last and average generation, decode and JPEG ms, measured fps, queue depths, encoder cache, clients. |
+| `GET /stats` | JSON: lifecycle state, backend, reader, last generated and shown chunk, last and average generation, decode and JPEG ms, measured fps, queue depths, encoder cache and pending encodes, clients. |
 | `GET /healthz` | 200 with the state, or 503 when FAILED or STOPPED. |
 
 ## Backend interface
@@ -87,7 +92,8 @@ contract 1 on `/control` -> reader worker thread: `reader.handle` -> `steer` (co
 - The stand-in reader takes a `final` text as the whole new prompt with a 4-chunk ramp, gives no steer for `partial` and `tap`, and keeps an empty changes list.
 - The `steer` dict is passed unchanged to `steering.Controller.handle`, including optional fields such as `strength` and `without_prompt`.
   The engine first encodes `prompt` and `without_prompt` in its encoder service, so `handle` never waits for encoding.
-- A reset tap also resets the engine: RESETTING, `backend.reset()` to clear the frame cache, then a new steerer and controller seeded directly with the embedding of the reset's `steer` prompt (no ramp), or the starting prompt if `steer` is None.
+- A reset tap also resets the engine: RESETTING, `backend.reset()` to clear the frame cache, then `steering.Controller.reset(prompt, strength, without_prompt)` with the reset's `steer` (or the starting prompt if `steer` is None).
+  That jumps the steerer to the new target with no ramp, honours a strength pair, and keeps the controller's prompt cache.
 - The encoder service runs on its own thread with a priority queue, caches embeddings and token ids by exact prompt text (LRU, 512 entries), shares one encoding between identical requests, and logs cache hits, misses and encode ms.
 - The reader's `likely_prompts()` are encoded at startup, and after every command they are queued again at background priority, behind any command's encoding.
 
@@ -98,7 +104,7 @@ contract 1 on `/control` -> reader worker thread: `reader.handle` -> `steer` (co
 | LOADING | `backend.load()` is running | WARMING, STOPPED, FAILED |
 | WARMING | encoding the base prompt and the precompute file | GENERATING, STOPPED, FAILED |
 | GENERATING | producing chunks | RESETTING, STOPPED, FAILED |
-| RESETTING | between chunks: wait for decode to finish, `backend.reset()`, new steerer and controller on the new video's prompt | GENERATING, STOPPED, FAILED |
+| RESETTING | between chunks: wait for decode to finish, `backend.reset()`, `Controller.reset` on the new video's prompt | GENERATING, STOPPED, FAILED |
 | FAILED | a thread raised; `/stats` shows the error | STOPPED |
 | STOPPED | shut down | none |
 

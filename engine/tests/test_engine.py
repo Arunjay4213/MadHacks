@@ -112,6 +112,7 @@ def test_reader_api_reset_seed_and_errors():
         assert rec.target["prompt"] == "fresh scene"
         assert wait(lambda: rec.stage is CommandStage.SHOWN)
         assert e.steerer.progress == 1.0  # started directly on the new prompt, no ramp
+        assert e.controller.committed_prompt == "fresh scene"  # through Controller.reset
         assert wait(lambda: any(s["t_client"] == 9 and "shown" in s["stamps"] for s in states))
         last = states[-1]
         assert last["keyword"] == "winter" and last["changes"][0]["strength"] == 0.5 and not errors(4, last)

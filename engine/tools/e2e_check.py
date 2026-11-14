@@ -5,6 +5,11 @@
 Connects to /frames and /control, measures the frame rate, checks chunk numbers and JPEGs, sends `final`
 commands, validates every contract 4 message against contracts/schemas, checks that all five stamps appear in
 order, checks a bad message gets an error reply, and checks a reset tap. Prints the numbers; exits 1 on failure.
+
+The commands depend on the server's command reader (`--reader auto` reads it from /stats):
+    standin   a raw new prompt, then the starting prompt again (a cache hit)
+    commands  "new scene of ..." with a unique scene (needs encoding), then "make it winter" and "go back" (cache
+              hits, because the reader's likely prompts are pre-encoded), checking the changes list each time
 """
 
 import argparse
@@ -77,8 +82,12 @@ async def wait_for(predicate, timeout: float):
     return None
 
 
-async def command(client: Client, check: Check, text: str, label: str) -> dict | None:
-    """Send a final command and wait for a contract 4 message carrying all five stamps for it."""
+async def command(client: Client, check: Check, text: str, label: str, labels: list[str] | None = None,
+                  cached: bool = False) -> dict | None:
+    """Send a final command and wait for a contract 4 message carrying all five stamps for it.
+
+    `labels`: the change labels contract 4 must show. `cached`: the embedding must come from the cache.
+    """
     t_client = int(time.time() * 1000)
     await client.send({"type": "final", "text": text, "t_client": t_client})
 
@@ -96,6 +105,12 @@ async def command(client: Client, check: Check, text: str, label: str) -> dict |
     check.that([s[k] for k in STAMPS] == sorted(s[k] for k in STAMPS), f"{label}: stamps are in order")
     check.that(s["heard"] == 0 and s["shown"] < 5000, f"{label}: heard is 0 and shown is under 5 s")
     check.that(msg["heard"] == text, f"{label}: heard text echoed")
+    if labels is not None:
+        got = [c["label"] for c in msg["changes"]]
+        check.that(got == labels, f"{label}: changes are {labels} (got {got})")
+    if cached:
+        check.that(s["embedded"] - s["decided"] <= 30,
+                   f"{label}: embedding came from the cache ({s['embedded'] - s['decided']} ms after decided)")
     afc = msg["applies_from_chunk"]
     check.that(isinstance(afc, int), f"{label}: applies_from_chunk is set ({afc})")
     shown_frames = [f for f in client.frames if f[1] >= afc]
@@ -141,12 +156,26 @@ async def main_async(args) -> int:
     if gaps:
         print(f"     frame gap ms: max {max(gaps) * 1e3:.0f}, mean {sum(gaps) / len(gaps) * 1e3:.1f}")
 
-    print("\n2. first command (new prompt, needs encoding)")
-    first = await command(client, check, f"a snowy winter forest at dusk {time.time():.0f}", "new prompt")
-
-    await asyncio.sleep(1.0)
-    print("\n3. second command (the base prompt again, a cache hit)")
-    await command(client, check, stats_prompt(base_http), "cached prompt")
+    reader = args.reader if args.reader != "auto" else stats.get("reader", "standin")
+    print(f"\n     command reader: {reader}")
+    if reader == "commands":
+        print("\n2. first command (a new scene, needs encoding)")
+        await command(client, check, f"new scene of a lighthouse on a cliff {time.time():.0f}", "new scene",
+                      labels=[])
+        t0 = time.monotonic()
+        idle = await wait_for(lambda: (s := _try_stats(base_http)) and s["encoder"]["pending"] == 0, 30.0)
+        print(f"     likely prompts prefetched in {time.monotonic() - t0:.1f} s")
+        check.that(bool(idle), "the encoder finished prefetching the likely prompts")
+        print("\n3. keyword commands (cache hits)")
+        await command(client, check, "make it winter", "make it winter", labels=["winter"], cached=True)
+        await asyncio.sleep(1.0)
+        await command(client, check, "go back", "go back", labels=[], cached=True)
+    else:
+        print("\n2. first command (new prompt, needs encoding)")
+        await command(client, check, f"a snowy winter forest at dusk {time.time():.0f}", "new prompt")
+        await asyncio.sleep(1.0)
+        print("\n3. second command (the starting prompt again, a cache hit)")
+        await command(client, check, stats_prompt(base_http), "cached prompt", cached=True)
 
     print("\n4. contract 4 messages")
     bad = [e for _, m in client.states for e in errors(4, m)]
@@ -198,6 +227,8 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--url", default="http://127.0.0.1:8000")
     p.add_argument("--seconds", type=float, default=5.0, help="how long to measure the frame rate")
+    p.add_argument("--reader", choices=["auto", "standin", "commands"], default="auto",
+                   help="the server's command reader; auto reads it from /stats")
     sys.exit(asyncio.run(main_async(p.parse_args())))
 
 
