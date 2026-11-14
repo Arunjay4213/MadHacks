@@ -19,7 +19,7 @@ from engine.final_reader import (FORWARD_MOTION, STYLE, VEHICLE_STYLE, CacheFile
                                  expand_operations,
                                  fingerprint, load, prompt_spec, scene_after)
 from engine.foundry import FoundryMessages
-from engine.reader import FinalReadingService, apply_final, load_reader, service_snapshot
+from engine.reader import FinalReadingService, load_reader
 
 WINTER = {"op": "add", "label": "winter", "kind": "season", "phrase": "snow on the ground", "strength": 1.0}
 LION = {"op": "add", "label": "lion", "kind": "extra", "phrase": "a lion in the grass", "strength": 0.5}
@@ -192,7 +192,9 @@ def test_prompt_spec_prefers_commands_rewriter(monkeypatch):
     assert spec.name == "commands.rewriter" and spec.details_instructions == "his prompt"
     chat = FakeChat({"make it winter": reply([WINTER], "snow")})
     r = reader(chat, spec=spec)
-    assert r("make it winter", snap())["prompt"] == "a red car driving along a road; snow on the ground; snow"
+    # the vehicle subject still gets the forward-driving words with commands.rewriter
+    assert r("make it winter", snap())["prompt"] == \
+        "a red car driving along a road, " + FORWARD_MOTION + "; snow on the ground; snow"
     assert "his prompt" in chat.calls[0][0]
     assert seen == [{"details": "snow"}]  # only the details key: his validator rejects any other
 
@@ -243,14 +245,14 @@ def service():
     return CommandService(semantic_reader=lambda *a: None)
 
 
-def test_shim_against_the_real_command_service():
+def test_public_service_methods_used_by_the_wrapper():
     svc = service()
-    assert service_snapshot(svc)["base"] == "a wide shot of a meadow with a single oak tree"
-    out = apply_final(svc, "winter and a lion", [WINTER, LION])
+    assert svc.snapshot()["base"] == "a wide shot of a meadow with a single oak tree"
+    out = svc.apply_final("winter and a lion", [WINTER, LION], None)
     assert [c["label"] for c in out["state"]["changes"]] == ["winter", "lion"]
     assert out["state"]["heard"] == "winter and a lion" and not out["state"]["unmatched"]
     assert out["steer"]["prompt"] == svc.committed_prompt and not out["steer"]["provisional"]
-    out = apply_final(svc, "blocked words", [])
+    out = svc.apply_final("blocked words", [], None)
     assert out["steer"] is None and out["state"]["unmatched"]
     out = svc.handle(final("undo"))
     assert out["state"]["changes"] == []  # the two operations were one edit
