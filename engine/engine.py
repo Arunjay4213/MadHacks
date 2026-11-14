@@ -44,7 +44,7 @@ class EngineConfig:
     reader: str = "standin"         # standin, or commands (commands.service.CommandService)
     width: int = 832
     height: int = 480
-    steps: int = 4
+    steps: int = 0                  # 0: the backend's distilled schedule
     device: str = "cuda:0"
     decode_device: str = "cuda:0"
     backend_options: dict = field(default_factory=dict)
@@ -146,7 +146,7 @@ class Engine:
         self._gate = LeadGate()
         self._reset_lock = threading.Lock()
         self._reset_waiters: list[threading.Event] = []
-        self._reset_seed: tuple[str, object, CommandRecord | None] | None = None  # (prompt, embedding, command)
+        self._reset_seed: tuple[dict, CommandRecord] | None = None  # (the reset's steer, its command)
         self._threads: list[threading.Thread] = []
         # reader.handle (may block about 0.4 s) and Controller.handle run here, off the generation thread and the
         # asyncio loop. One reader thread keeps commands in arrival order.
@@ -314,11 +314,12 @@ class Engine:
 
     # --- reset -----------------------------------------------------------------------------
 
-    def request_reset(self, seed: tuple[str, object, CommandRecord | None] | None = None) -> threading.Event:
+    def request_reset(self, seed: tuple[dict, CommandRecord] | None = None) -> threading.Event:
         """Ask for a reset at the next chunk boundary. The returned event is set when it is done.
 
-        `seed` is (prompt, embedding, command): the new video starts directly on that embedding, with no ramp.
-        Without it the new video starts on the starting prompt.
+        `seed` is (steer, command): the new video starts directly on the steer's target (its prompt, and its
+        strength pair if it has one), with no ramp. Without it the new video starts on the starting prompt.
+        The steer's prompts must already be in the encoder cache, so the reset does not wait for encoding.
         """
         state = self.lifecycle.state
         if state not in (Lifecycle.GENERATING, Lifecycle.RESETTING):
@@ -333,12 +334,21 @@ class Engine:
         with self._reset_lock:
             waiters, self._reset_waiters = self._reset_waiters, []
             seed, self._reset_seed = self._reset_seed, None
-        prompt, embedding, rec = seed if seed else (self.base_prompt, self.base_embedding, None)
-        self.lifecycle.transition(Lifecycle.RESETTING, f"reset requested, new video on {prompt!r}")
+        steer, rec = seed if seed else ({"prompt": self.base_prompt}, None)
+        self.lifecycle.transition(Lifecycle.RESETTING, f"reset requested, new video on {steer['prompt']!r}")
         t0 = time.perf_counter()
         self._decode_queue.join()  # the decoder finishes the chunks of the old video first
         self.backend.reset()
-        self.book.reset(lambda: self._new_steerer(embedding), rec)
+
+        def restart() -> None:
+            """Controller.reset keeps its prompt cache and jumps the steerer to the new target with no ramp."""
+            try:
+                self.controller.reset(steer["prompt"], steer.get("strength"), steer.get("without_prompt"))
+            except Exception:
+                log.exception("controller.reset failed for %r; starting on the starting prompt", steer["prompt"])
+                self.controller.reset(self.base_prompt)
+
+        self.book.reset(restart, rec)
         self.lifecycle.transition(Lifecycle.GENERATING, f"reset done in {(time.perf_counter() - t0) * 1e3:.0f} ms")
         for w in waiters:
             w.set()
@@ -475,7 +485,10 @@ class Engine:
             seed = None
             if steer is not None:
                 self.book.decided(rec, steer)
-                seed = (steer["prompt"], self.encoder.encode(steer["prompt"]), rec)
+                for prompt in (steer["prompt"], steer.get("without_prompt")):
+                    if prompt:
+                        self.encoder.encode(prompt)  # into the cache now, so the reset itself does not wait
+                seed = (steer, rec)
             else:
                 self.book.drop(rec, "reset to the starting prompt")
             try:
@@ -550,6 +563,7 @@ class Engine:
                 "state": self.lifecycle.state.value,
                 "failure": self.failure,
                 "backend": self.config.backend,
+                "reader": self.config.reader,
                 "chunk_generated": self.chunk_generated,
                 "chunk_shown": self.chunk_shown,
                 "gen_ms": {"last": _round(self.gen_ms.last), "avg": _round(self.gen_ms.avg)},
@@ -567,7 +581,7 @@ class Engine:
             out.update(fps_target=self.backend.fps, frames_per_chunk=self.backend.frames_per_chunk,
                        width=self.backend.width, height=self.backend.height)
         if self.encoder is not None:
-            out["encoder"] = {"cache_size": self.encoder.cache_size, "hits": self.encoder.hits,
+            out["encoder"] = {"cache_size": self.encoder.cache_size, "pending": self.encoder.pending, "hits": self.encoder.hits,
                               "misses": self.encoder.misses, "last_encode_ms": _round(self.encoder.last_encode_ms)}
         out["clients"] = self.client_counts()
         return out
