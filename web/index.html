@@ -7,35 +7,46 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="bar">
-    <span id="connection" class="status" data-state="connecting">Connecting…</span>
-    <span id="mode-banner" class="banner" hidden>MOCK server: test pattern, not the real engine</span>
-    <div class="delay" title="Delay from your command to the first frame generated with it">
-      <span id="latency" class="latency">—</span>
-      <span id="timing" class="timing"></span>
+  <header class="topbar">
+    <div class="topbar-left">
+      <span id="connection" class="status" data-state="connecting" role="status">Connecting…</span>
+      <span id="mode-banner" class="banner" hidden>MOCK server · test pattern, not the real engine</span>
+    </div>
+    <div class="delay">
+      <span id="latency" class="latency" role="status" aria-describedby="timing">—</span>
+      <span id="timing" class="timing" role="tooltip"></span>
     </div>
   </header>
 
   <main class="stage">
-    <canvas id="video" width="832" height="480" aria-label="Live generated video"></canvas>
-    <p id="video-notice" class="notice" role="status">Connecting to the video server…</p>
+    <div id="frame" class="frame">
+      <canvas id="video" width="672" height="384" aria-label="Live generated video"></canvas>
+      <p id="video-notice" class="notice" role="status">Connecting to the video server…</p>
+    </div>
   </main>
 
-  <section class="below">
+  <section class="caption">
     <p id="words" class="words" aria-live="polite" data-kind="" data-unmatched="false"></p>
     <ul id="changes" class="chips" aria-label="Active changes"></ul>
-
-    <form id="command-form" class="controls" autocomplete="off">
-      <input id="command" type="text" aria-label="Command"
-             placeholder="Type or speak a command">
-      <button id="mic" type="button" aria-pressed="false" title="Live mic on or off. Wispr Flow: hold Ctrl and speak; the sentence lands in the box">Mic</button>
-      <button id="ptt" type="button" aria-pressed="false" title="Hold to talk (or hold the ` key)">Hold to talk</button>
-      <button id="undo" type="button" title="Undo the last change">Undo</button>
-      <button id="reset" type="button" title="Back to the starting scene (Option+R / Alt+R)">Reset</button>
-    </form>
-
-    <p id="error" class="error" role="alert" hidden></p>
   </section>
+
+  <form id="command-form" class="dock" autocomplete="off">
+    <input id="command" type="text" aria-label="Command" placeholder="Type or speak a command">
+    <div class="dock-buttons">
+      <button id="mic" type="button" class="btn" aria-pressed="false"
+              title="Live mic on or off. Wispr Flow: hold Ctrl and speak; the sentence lands in the box">
+        Mic <kbd>Ctrl = Wispr</kbd></button>
+      <button id="ptt" type="button" class="btn" aria-pressed="false" title="Hold to talk (or hold the ` key)">
+        Hold to talk <kbd>`</kbd></button>
+      <button id="undo" type="button" class="btn" title="Undo the last change">Undo</button>
+      <button id="reset" type="button" class="btn" title="Back to the starting scene (Option+R / Alt+R)">
+        Reset <kbd>⌥R</kbd></button>
+      <button id="fullscreen" type="button" class="btn btn-ghost" title="Full screen for the demo (Esc leaves)">
+        Full screen</button>
+    </div>
+  </form>
+
+  <p id="error" class="error" role="alert" hidden></p>
 
   <script type="module" src="app.js"></script>
 </body>

@@ -7,6 +7,8 @@ Owner: `@anirudhaugile` (Ani), since the lead's swap on 2026-11-14. Started by `
 | id | element | app.js does |
 |---|---|---|
 | `video` | `<canvas>` | draws decoded JPEG frames, newest only |
+| `frame` | any | the box the video fits into; app.js sets the canvas's CSS size to the fitted frame so its rounded corners sit on the picture |
+| `fullscreen` | `<button>` | toggles full screen; refocuses the text box; if the browser refuses, the error says to use View → Enter Full Screen |
 | `connection` | any | `textContent` = status; `data-state` = `connecting` / `open` / `closed` |
 | `mode-banner` | any | shown only while server messages say `fake: true` (the fake server); hidden otherwise, including before the first message, so a real engine that is still loading is never labelled MOCK. |
 | `words` | any, `aria-live="polite"` | children replaced: a `.words-label` ("hearing…" while local, "heard" from the server), the full sentence in `.words-text` with one `<mark>` around the keyword, and `.words-understood` ("→ understood: <keyword>" or "→ not understood"); `data-unmatched="true"` when no operation; `data-kind` = `partial` / `final` / `server` |
