@@ -201,6 +201,7 @@ export function makeLatencyTracker(maxSent = 50) {
     },
     onServer(m) {
       if (!isNum(m.t_client) || !isChunk(m.applies_from_chunk) || !sent.includes(m.t_client)) return;
+      if (m.unmatched === true) return; // nothing changed, so there is no delay to measure
       if (pending?.t === m.t_client) {
         pending.stamps = m.stamps; // same command: keep its target chunk, take the newest stamps
         return;
