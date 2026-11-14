@@ -185,3 +185,26 @@ then `RESULT PASS|FAIL`; exit code 1 on any failure.
 `first_step/normal` <= 1 means the first frame after an interrupt is no
 bigger than a normal first step. The same checks run briefly in
 `steering/tests/test_properties.py`.
+
+## follow_probe.py: does the picture follow a prompt switch (GPU)
+
+Drives the real backend's frame-cache rebase (`engine/MODEL_NOTES.md`, "Rebase") on a hard prompt switch:
+
+```
+python -m steering.eval.follow_probe --out eval_out/follow                     # 672x384, taehv, all variants, both pairs
+python -m steering.eval.follow_probe --out eval_out/follow --variants hardcut,keep3,keep0 --pair meadow_winter
+python -m steering.eval.follow_probe --out eval_out/long --long 90             # decay: refresh vs none
+```
+
+Defaults: `--backend causal_forcing --width 672 --height 384 --vae taehv --seed 0 --switch-chunk 20 --chunks 80`.
+The backend is loaded once; every variant starts from `reset(seed)`. Pairs: `meadow_winter`, `meadow_city`
+(long prompts with the same camera wording). Variants: `hardcut` (text switch only), `keep6/3/1`
+(rebase keeping that many frames), `keep3_n500`, `keep6_n500`, `keep1_n700` (noisy memory), `keep0`
+(new first frame), `keep0_a1..a3` (first frame anchored on the old picture; skipped past the schedule).
+`--long SECONDS` runs one prompt with `none`, `refresh40_keep6`, `refresh60_keep6`, `refresh40_keep3`,
+`refresh40_keep6_n300` and reports mean saturation and RMS contrast per 5 s (decay shows as both climbing).
+
+Output: `DIR/<pair>/<variant>/frames/*.jpg`, `chunk_ms.txt`, `sheet.png` (one frame per chunk, switch in red),
+`clip.txt` (CLIP similarity per chunk to both prompts, when `transformers` loads; `--no-clip` to skip) and
+`DIR/summary.md`: switch-chunk ms, max ms after it, CLIP(target) - CLIP(base) over the last 5 s, and chunks
+until CLIP(target) first beats CLIP(base). On a backend without `rebase` (the fake) those variants read "unsupported".

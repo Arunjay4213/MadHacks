@@ -28,7 +28,11 @@ bf16 (padding tokens zeroed), passed as conditional_dict["prompt_embeds"]. The W
 caches the cross-attention K/V of the text in a second cache (crossattn_cache, flag
 "is_init"). generate_chunk() resets that cache whenever `cond` is a different object from
 the one used for the previous call, so a new prompt takes effect on the very next chunk.
-The frame KV cache is never touched by a conditioning change.
+The frame KV cache is not touched by a conditioning change, unless a rebase is asked for:
+generate_chunk(cond, rebase=Rebase(...)) or the automatic options (steer_rebase, refresh_every)
+clear the frame cache and re-encode the last few clean frames under the current cond at
+positions starting from 0 (LongLive's KV recache, arXiv 2509.22622). All of that is off by
+default, and then the calls, the RNG draws and their order are exactly what they were before.
 
 Threads and devices: generation, prompt encoding and decoding each run on their own CUDA
 stream. The decoder object owns all decode state and receives only the ChunkLatents passed
@@ -37,9 +41,11 @@ in, so it can move to `decode_device` or to another process later.
 
 from __future__ import annotations
 
+import collections
 import contextlib
 import dataclasses
 import enum
+import inspect
 import os
 import sys
 import threading
@@ -105,6 +111,34 @@ class ChunkLatents:
     video_id: int  # increases on every reset(); the decoder starts fresh when it changes
     chunk_index: int  # 0 for the first chunk of a video
     ready: torch.cuda.Event  # recorded on the generation stream after `latents` was written
+
+
+@dataclasses.dataclass(frozen=True)
+class Rebase:
+    """Restart the frame cache before a chunk, keeping the last `keep` clean frames (LongLive's
+    KV recache, arXiv 2509.22622, with positions restarted at 0). Plain ints, so callers can build
+    one, or a plain dict with the same keys, without importing torch.
+
+    keep: most recent clean latent frames re-encoded under the current cond at positions
+        0..keep-1 (clamped to what exists and to attn_window_frames - 1). 0 = hard cut: the
+        next frame is made as the first frame of a video.
+    memory_noise: 0, or a timestep on the 0-1000 scale; the kept frames are re-encoded noised
+        to that level (weaker memory) instead of clean.
+    anchor_step: None, or n: the new frame starts from the last clean latent noised to step n of
+        its schedule and is denoised with schedule[n:] (n = 0 is pure noise).
+    """
+
+    keep: int = 3
+    memory_noise: int = 0
+    anchor_step: Optional[int] = None
+
+    @classmethod
+    def of(cls, value) -> Optional["Rebase"]:
+        if value is None or isinstance(value, Rebase):
+            return value
+        if isinstance(value, dict):
+            return cls(**value)
+        raise TypeError(f"rebase must be a Rebase, a dict or None, got {type(value).__name__}")
 
 
 @contextlib.contextmanager
@@ -240,6 +274,7 @@ class Backend:
         text_encoder_device: Optional[str] = None,
         compile: bool = False,
         seed: int = 0,
+        **auto_rebase,
     ):
         if width % 16 or height % 16:
             raise ValueError("width and height must be multiples of 16 (VAE x8, then patch x2)")
@@ -258,6 +293,9 @@ class Backend:
         self.max_latent_frames = max_latent_frames
         if sink_frames >= attn_window_frames:
             raise ValueError("sink_frames must be smaller than attn_window_frames")
+        unknown = set(auto_rebase) - set(inspect.signature(self._init_runtime).parameters)
+        if unknown:
+            raise TypeError(f"unknown backend options {sorted(unknown)}")
 
         repo_dir = _import_repo(repo_dir)
         from omegaconf import OmegaConf
@@ -307,6 +345,7 @@ class Backend:
             self.denoising_steps = _timestep_list(self.scheduler, chosen, warp)
             first = getattr(cfg, "denoising_step_list_first_chunk", None)
             self.first_chunk_steps = _timestep_list(self.scheduler, [int(t) for t in first], warp) if first is not None else self.denoising_steps
+            self._warp = warp
 
             # Text encoder (umT5-xxl), its own lock and stream so it can run beside generation.
             te = WanTextEncoder()
@@ -319,6 +358,43 @@ class Backend:
         if compile:
             self.generator.model.compile(mode="max-autotune-no-cudagraphs")
 
+        self._init_runtime(seed, **auto_rebase)
+
+    def _init_runtime(
+        self,
+        seed: int,
+        *,
+        steer_rebase: bool = False,
+        steer_keep: int = 3,
+        steer_memory_noise: int = 0,
+        steer_anchor_step: int = -1,
+        steer_min_gap: int = 8,
+        steer_fire_on_change: bool = True,
+        refresh_every: int = 0,
+        refresh_keep: int = 6,
+        refresh_memory_noise: int = 0,
+    ) -> None:
+        """Generation state: lock, stream, RNG, caches, counters, automatic rebase settings.
+        Split out of __init__ so tests can build a Backend around a stub generator."""
+        if (steer_rebase or refresh_every > 0) and self.num_frame_per_block != 1:
+            raise ValueError("steer_rebase / refresh_every need a framewise variant (1 latent frame per chunk)")
+        self._auto_steer = (
+            Rebase(steer_keep, steer_memory_noise, None if steer_anchor_step < 0 else steer_anchor_step) if steer_rebase else None
+        )
+        self._auto_refresh = Rebase(refresh_keep, refresh_memory_noise) if refresh_every > 0 else None
+        self._steer_min_gap = int(steer_min_gap)
+        self._steer_fire_on_change = bool(steer_fire_on_change)
+        self._refresh_every = int(refresh_every)
+        self._steer_pending = False  # the cond changed and has not stopped changing yet
+        self._last_rebase_chunk = 0  # chunk_index of the last rebase; 0 after reset()
+        self._pending_reanchor: Optional[Rebase] = None  # set by reanchor(), used by the next chunk
+        # Last clean latents of this video, oldest first (references to the returned latents, no
+        # copies). Only kept for framewise variants, which are the only ones that can rebase.
+        self._history: collections.deque = collections.deque(maxlen=self.attn_window_frames)
+        self.rebases = 0  # rebases done (explicit + automatic), for tests and logs
+        self.recached_frames = 0  # latent frames re-encoded by rebases
+        self.auto_rebases = {"change": 0, "arrival": 0, "refresh": 0}
+        self.last_rebase: Optional[Rebase] = None  # the last rebase as executed (keep after clamping)
         self._gen_lock = threading.Lock()
         self._gen_stream = torch.cuda.Stream(device=self.device)
         self._rng = torch.Generator(device=self.device).manual_seed(seed)
@@ -389,24 +465,145 @@ class Backend:
             if seed is not None:
                 self._rng.manual_seed(int(seed))
             with torch.cuda.device(self.device), torch.cuda.stream(self._gen_stream):
-                for c in self.kv_cache:
-                    c["global_end_index"].zero_()
-                    c["local_end_index"].zero_()
+                self._clear_frame_cache()
             self._reset_crossattn_cache()
             self._last_cond = None
             self.frame_index = 0
             self.chunk_index = 0
             self.video_id += 1
             self.state = GenState.EMPTY
+            self._history.clear()
+            self._steer_pending = False
+            self._pending_reanchor = None
+            self._last_rebase_chunk = 0
+
+    def _clear_frame_cache(self) -> None:
+        # Same as the official pipeline between videos (pipeline/causal_inference.py, "reset kv
+        # cache"): only the end indices; stale K/V beyond local_end_index is never attended.
+        for c in self.kv_cache:
+            c["global_end_index"].zero_()
+            c["local_end_index"].zero_()
+
+    # ---- rebase ---------------------------------------------------------------------------------
+
+    @property
+    def first_frame_steps(self) -> int:
+        """Length of the first-frame denoising schedule (the valid anchor steps are 0..this-1)."""
+        return len(self.first_chunk_steps)
+
+    def anchor_step_for_strength(self, strength: float) -> Optional[int]:
+        """Map a 0..1 cut strength to an anchor step: 1.0 -> 0 (pure noise, full cut), lower ->
+        a later step (more of the old picture kept), <= 0 -> None (no anchor)."""
+        if strength <= 0:
+            return None
+        n = self.first_frame_steps
+        return min(n - 1, int((1.0 - min(float(strength), 1.0)) * n))
+
+    def reanchor(self, strength: float) -> None:
+        """Ask for a re-anchor on the next generate_chunk: a hard cut of the frame cache (keep 0)
+        whose first frame starts from the last picture noised to anchor_step_for_strength(strength).
+        Strength 1.0 repaints from pure noise; lower keeps more of the old picture; <= 0 cancels."""
+        step = self.anchor_step_for_strength(strength)
+        self._pending_reanchor = None if step is None else Rebase(keep=0, anchor_step=step)
+
+    def _plan_rebase(self, changed: bool, explicit: Optional[Rebase]) -> tuple[Optional[Rebase], Optional[str]]:
+        """Which rebase (if any) to do before this chunk; updates the automatic-mode state."""
+        if self.state is GenState.EMPTY:
+            # First chunk of a video: the frame cache is already empty.
+            self._steer_pending = False
+            return None, None
+        gap = self.chunk_index - self._last_rebase_chunk
+        auto, reason = None, None
+        if self._auto_steer is not None:
+            if changed:
+                first_change = not self._steer_pending
+                self._steer_pending = True
+                if first_change and self._steer_fire_on_change and gap >= self._steer_min_gap:
+                    auto, reason = self._auto_steer, "change"
+            elif self._steer_pending:
+                # The cond stopped changing (a ramp ended, or a hard switch one chunk ago).
+                self._steer_pending = False
+                if gap >= self._steer_min_gap:
+                    auto, reason = self._auto_steer, "arrival"
+        if auto is None and self._auto_refresh is not None and gap >= self._refresh_every:
+            auto, reason = self._auto_refresh, "refresh"
+        if explicit is not None:
+            return explicit, None
+        return auto, reason
+
+    def _timestep(self, t_1000: int) -> torch.Tensor:
+        """A 0-1000 timestep in the backend's convention (warped like the denoising steps)."""
+        if not 0 <= t_1000 <= 1000:
+            raise ValueError(f"timestep must be in 0..1000, got {t_1000}")
+        return _timestep_list(self.scheduler, [int(t_1000)], self._warp)[0]
+
+    def _rebase(self, plan: Rebase, cond_dict: dict) -> int:
+        """Clear the frame cache and re-encode the last `keep` clean frames at positions 0..keep-1
+        under the current cond. Returns keep after clamping. The text cache was already reset."""
+        hist = self._history
+        keep = max(0, min(int(plan.keep), len(hist), self.attn_window_frames - 1))
+        self._clear_frame_cache()
+        self.frame_index = 0
+        fs = self.frame_seq_length
+        if plan.memory_noise > 0:
+            # Warped, like the denoising steps: the model was distilled on the shifted timestep
+            # grid, so memory_noise=500 is the same noise level as the "500" step of its 2-step
+            # schedule, an input level the model was trained to see. Unwarped would mean a much
+            # lower sigma than the same number in the config (500 -> sigma 0.5 instead of ~0.83).
+            t_mem = self._timestep(plan.memory_noise)
+        kept = list(hist)[len(hist) - keep:]  # oldest first
+        for i, lat in enumerate(kept):
+            if plan.memory_noise > 0:
+                flat = lat.flatten(0, 1)
+                x = self.scheduler.add_noise(
+                    flat,
+                    torch.randn(flat.shape, device=self.device, dtype=lat.dtype, generator=self._rng),
+                    t_mem * torch.ones([flat.shape[0]], device=self.device, dtype=torch.long),
+                ).unflatten(0, lat.shape[:2])
+                timestep = torch.ones([1, 1], device=self.device, dtype=torch.int64) * t_mem
+            else:
+                x = lat
+                timestep = torch.ones([1, 1], device=self.device, dtype=torch.int64) * self.context_noise
+            # One frame per pass at position i, the same call as the context pass after a frame.
+            self.generator(
+                noisy_image_or_video=x,
+                conditional_dict=cond_dict,
+                timestep=timestep,
+                kv_cache=self.kv_cache,
+                crossattn_cache=self.crossattn_cache,
+                current_start=i * fs,
+            )
+        self.frame_index = keep
+        self.rebases += 1
+        self.recached_frames += keep
+        self._last_rebase_chunk = self.chunk_index
+        return keep
+
+    # ---- generation -----------------------------------------------------------------------------
 
     @torch.no_grad()
-    def generate_chunk(self, cond: torch.Tensor) -> ChunkLatents:
+    def generate_chunk(self, cond: torch.Tensor, rebase=None) -> ChunkLatents:
+        """One chunk. `rebase` (a Rebase, a dict of its fields, or None) restarts the frame cache
+        before this chunk; with steer_rebase / refresh_every set, the backend may also do so by
+        itself. An explicit `rebase` always wins for that chunk. Ignored on the first chunk of a
+        video. Rebase needs a framewise variant."""
         with self._gen_lock, torch.cuda.device(self.device), torch.cuda.stream(self._gen_stream):
             if self.frame_index + self.num_frame_per_block > self.max_latent_frames:
                 raise RuntimeError("reached max_latent_frames; call reset() or load with a larger max_latent_frames")
             # `cond` may have been written on another thread's stream (the steerer's blend).
             self._gen_stream.wait_stream(torch.cuda.default_stream(self.device))
-            if cond is not self._last_cond:
+            pending = self._pending_reanchor
+            if pending is not None:
+                self._pending_reanchor = None
+                if rebase is None:
+                    rebase = pending
+            changed = cond is not self._last_cond
+            plan = reason = None
+            if rebase is not None or self._auto_steer is not None or self._auto_refresh is not None:
+                plan, reason = self._plan_rebase(changed, Rebase.of(rebase))
+                if plan is not None and self.num_frame_per_block != 1:
+                    raise ValueError("rebase needs a framewise variant (1 latent frame per chunk)")
+            if changed or plan is not None:
                 self._reset_crossattn_cache()
                 self._last_cond = cond
             cond_dict = {"prompt_embeds": cond}
@@ -415,6 +612,30 @@ class Backend:
             lh, lw = self.latent_hw
             noisy = torch.randn([1, f, LATENT_CHANNELS, lh, lw], device=self.device, dtype=self.dtype, generator=self._rng)
             schedule = self.first_chunk_steps if self.state is GenState.EMPTY else self.denoising_steps
+            if plan is not None:
+                x_last = self._history[-1] if self._history else None
+                keep = self._rebase(plan, cond_dict)
+                if keep == 0:
+                    schedule = self.first_chunk_steps  # a hard cut: this is a first frame again
+                n = plan.anchor_step
+                if n is not None:
+                    if reason is not None:
+                        n = min(max(0, n), len(schedule) - 1)  # automatic mode: clamp, never fail mid-stream
+                    elif not 0 <= n < len(schedule):
+                        raise ValueError(f"anchor_step {n} outside the schedule of {len(schedule)} steps")
+                if n is not None and n > 0 and x_last is not None:
+                    # Start from the last clean frame noised to step n (reuses the noise drawn above).
+                    noisy = self.scheduler.add_noise(
+                        x_last.flatten(0, 1),
+                        noisy.flatten(0, 1),
+                        schedule[n] * torch.ones([f], device=self.device, dtype=torch.long),
+                    ).unflatten(0, noisy.shape[:2])
+                    schedule = schedule[n:]
+                else:
+                    n = None if n is None else 0
+                self.last_rebase = Rebase(keep, int(plan.memory_noise), n)
+                if reason is not None:
+                    self.auto_rebases[reason] += 1
             current_start = self.frame_index * self.frame_seq_length
 
             for i, t in enumerate(schedule):
@@ -444,6 +665,8 @@ class Backend:
                 crossattn_cache=self.crossattn_cache,
                 current_start=current_start,
             )
+            if f == 1:
+                self._history.append(denoised)  # a reference, for a later rebase
 
             ready = torch.cuda.Event()
             ready.record(self._gen_stream)
@@ -469,10 +692,16 @@ def load(width: int, height: int, steps: Optional[int] = None, device: str = "cu
     Options: variant ("framewise_2step" default, "framewise_1step", "chunkwise_4step"),
     repo_dir, vae ("wan" or "taehv"), attn_window_frames (21), sink_frames (0),
     max_latent_frames (65536), text_encoder_device, compile (False), seed (0).
+    Automatic rebase (all off by default, see generate_chunk and MODEL_NOTES.md): steer_rebase (0),
+    steer_keep (3), steer_memory_noise (0), steer_anchor_step (-1 = none), steer_min_gap (8),
+    steer_fire_on_change (1), refresh_every (0 = off), refresh_keep (6), refresh_memory_noise (0).
     """
     # Options may arrive as strings from the server's --backend-opt KEY=VALUE.
-    types = {"attn_window_frames": int, "sink_frames": int, "max_latent_frames": int, "seed": int,
-             "compile": lambda v: v if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes", "on")}
+    flag = lambda v: v if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes", "on")  # noqa: E731
+    types = {"attn_window_frames": int, "sink_frames": int, "max_latent_frames": int, "seed": int, "compile": flag,
+             "steer_rebase": flag, "steer_keep": int, "steer_memory_noise": int, "steer_anchor_step": int,
+             "steer_min_gap": int, "steer_fire_on_change": flag, "refresh_every": int, "refresh_keep": int,
+             "refresh_memory_noise": int}
     options = {k: types[k](v) if k in types else v for k, v in options.items()}
     steps = int(steps) if steps is not None and int(steps) > 0 else None  # 0 or None: distilled schedule
     t0 = time.time()
