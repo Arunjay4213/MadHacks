@@ -97,6 +97,19 @@ def _pace(t: str):
     return "slow" if _SLOW_RX.search(t) else "sudden" if _SUDDEN_RX.search(t) else None
 
 
+def strength_for(text, current=0.0):
+    """Shared intensity rules for dictionary, vector and style paths."""
+    if _LOW_RX.search(text):
+        return _STRENGTH_LOW
+    if _HIGH_RX.search(text):
+        return _STRENGTH_HIGH
+    if current and _MORE_RX.search(text):
+        return min(_STRENGTH_HIGH, round(current + _STEP, 2))
+    if current and _LESS_RX.search(text):
+        return max(_STRENGTH_LOW / 3, round(current - _STEP, 2))
+    return 1.0
+
+
 def _pick(t: str):
     """The keyword match to act on: the first object noun if there is one, else the first match.
 
@@ -130,7 +143,14 @@ def resolve(query: str, snapshot: dict):
             return c["id"]
     q = _norm(query)
     # Present labels as whole phrases, longest first: "dark knight" before the "dark" alias of night.
-    named = [c for c in changes if re.search(r"\b" + re.escape(_norm(c["label"])) + r"\b", q)]
+    aliases = list(KEYWORD_RX.finditer(q))
+    named = []
+    for change in changes:
+        for match in re.finditer(r"\b" + re.escape(_norm(change["label"])) + r"\b", q):
+            if not any(a.start() <= match.start() and match.end() <= a.end()
+                       and KEYWORDS[a.group()]["label"] != change["label"] for a in aliases):
+                named.append(change)
+                break
     if named:
         longest = max(len(_norm(c["label"])) for c in named)
         return [c for c in named if len(_norm(c["label"])) == longest][-1]["id"]
@@ -257,16 +277,7 @@ def read(text: str, snapshot: dict) -> dict:
     description_match = add_verb or (_ADD_RX.search("add " + t) if bare else None)
     if entry["kind"] == "extra" and description_match:
         rest = t[:add_verb.start()] if add_verb else ""  # noun descriptions carry attributes, not strength
-    if _LOW_RX.search(rest):
-        strength = _STRENGTH_LOW
-    elif _HIGH_RX.search(rest):
-        strength = _STRENGTH_HIGH
-    elif _MORE_RX.search(rest) and existing:
-        strength = min(_STRENGTH_HIGH, round(current + _STEP, 2))
-    elif _LESS_RX.search(rest) and existing:
-        strength = max(_STRENGTH_LOW / 3, round(current - _STEP, 2))
-    else:
-        strength = 1.0
+    strength = strength_for(rest, current)
     if entry["kind"] == "extra":
         if description_match:
             article, description = description_match.groups()
@@ -288,7 +299,7 @@ def read(text: str, snapshot: dict) -> dict:
 # A clause starts with an explicit action (optionally after "also/then/please/now" and a pace word).
 _LEAD = r"^(?:(?:also|then|please|now|and)\s+)*(?:(?:slowly|gradually|gently|suddenly|instantly|quickly|immediately)\s+)?"
 _ACTION_RX = re.compile(_LEAD + r"(?:add|put|place|bring|include|build|draw|give me|i want|i'd like|let's|lets|let it|remove|delete"
-                        r"|get rid of|take away|drop|lose|no more|make|turn|change|set|switch|show me|take me to|go to|go back"
+                        r"|get rid of|take away|drop|lose|no more|stop the|without|make|turn|change|set|switch|show me|take me to|go to|go back"
                         r"|undo|revert|reset|start over|start again|clear|new scene|never mind|nevermind|take that back"
                         r"|don't|dont|do not|never|a lot more|much more|more|less|a little more|a little less)\b")
 # Verbs that may be repeated over a list of recognized nouns: "add a dog and a cat".
@@ -374,13 +385,17 @@ def style_fallback(text: str):
     if not m:
         return None
     like, what = m.group(1), _FILLER_TAIL_RX.sub("", m.group(2)).strip()
+    if len(what.split()) > _MAX_STYLE_WORDS:
+        return None
+    strength = strength_for(what)
+    what = " ".join(_HIGH_RX.sub(" ", _LOW_RX.sub(" ", what)).split())
     if not what or what in _NOT_AN_OBJECT or len(what.split()) > _MAX_STYLE_WORDS:
         return None
     if set(what.split()) <= _VAGUE | _STOP - {"black", "white", "red", "orange", "yellow", "green", "blue", "purple", "pink",
                                               "grey", "gray", "brown", "golden", "gold", "silver", "dark", "bright"}:
         return None
     return {"op": "add", "label": what, "kind": "extra", "phrase": "the whole scene looks " + ("like " if like else "") + what,
-            "strength": 1.0}
+            "strength": strength}
 
 
 def is_blocked(text: str) -> bool:

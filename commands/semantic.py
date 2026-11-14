@@ -10,7 +10,7 @@ import threading
 from pathlib import Path
 
 from .dictionary import KEYWORD_RX, KEYWORDS, normalize
-from .reader import remove_target
+from .reader import remove_target, strength_for
 
 SINGLE_CANDIDATE_MINIMUM = 0.70  # with one active change the margin test is meaningless
 
@@ -104,8 +104,8 @@ class SemanticReader:
         entry = self._entries[label]
         existing = next((c for c in snapshot.get("changes", []) if c["label"] == label), None)
         if existing:
-            return {"op": "set_strength", "id": existing["id"], "strength": existing["strength"]}
-        return {"op": "add", **entry, "strength": 1.0}
+            return {"op": "set_strength", "id": existing["id"], "strength": strength_for(t, existing["strength"])}
+        return {"op": "add", **entry, "strength": strength_for(t)}
 
 
 def local_reader(download=False):
