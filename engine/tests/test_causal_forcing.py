@@ -382,3 +382,210 @@ def test_reanchor_strength_maps_to_step_and_applies_once():
     assert b._pending_reanchor == cf.Rebase(keep=0, anchor_step=3)
     cf.Backend.reanchor(b, 0.0)
     assert b._pending_reanchor is None
+    with pytest.raises(ValueError, match="source"):
+        cf.Backend.reanchor(b, 0.5, source="golden")
+    cf.Backend.reanchor(b, 0.5, source="clean")
+    assert b._pending_reanchor == cf.Rebase(keep=0, anchor_step=2, from_clean=True)
+
+
+# ---------------------------------------------------------------- clean anchor
+
+
+def reanchored_chunk(b, cond, strength, source):
+    """One chunk with reanchor(strength, source); returns (out, its generator calls, RNG state before it)."""
+    b.reanchor(strength, source=source)
+    n0 = len(b.generator.calls)
+    rng = b._rng.get_state()
+    out = b.generate_chunk(cond)
+    return out, b.generator.calls[n0:], rng
+
+
+def start_latent(b, x, step, rng):
+    """What the first denoising pass of a hard cut gets: x noised to first_chunk_steps[step]."""
+    g = torch.Generator().set_state(rng)
+    noise = torch.randn(x.shape, generator=g)
+    t = b.first_chunk_steps[step] * torch.ones([1], dtype=torch.long)
+    return b.scheduler.add_noise(x.flatten(0, 1), noise.flatten(0, 1), t).unflatten(0, x.shape[:2])
+
+
+def test_clean_anchor_saved_three_chunks_after_reset(no_cuda):
+    b = make_backend()
+    a = torch.full((1, 3, 8), 1.0)
+    b.reset(seed=0)
+    outs = [b.generate_chunk(a) for _ in range(3)]
+    assert b._clean_anchor is None and b.clean_anchor_chunk is None
+    outs += [b.generate_chunk(a) for _ in range(5)]
+    assert b._clean_anchor is outs[3].latents and b.clean_anchor_chunk == 3
+    b.reset(seed=0)
+    assert b._clean_anchor is None and b.clean_anchor_chunk is None
+
+
+def test_refresh_starts_from_the_clean_anchor_and_keeps_it(no_cuda):
+    b = make_backend()
+    a = torch.full((1, 3, 8), 1.0)
+    b.reset(seed=0)
+    outs = [b.generate_chunk(a) for _ in range(10)]
+    clean = outs[3].latents
+    out, calls, rng = reanchored_chunk(b, a, 0.5, "clean")
+    assert torch.allclose(calls[0]["x"], start_latent(b, clean, 2, rng))
+    assert not torch.allclose(calls[0]["x"], start_latent(b, outs[-1].latents, 2, rng))
+    assert [c["t"] for c in calls] == [[int(t)] for t in b.first_chunk_steps[2:]] + [[0]]
+    assert calls[0]["frame"] == 0 and b.frame_index == 1
+    assert b.last_rebase == cf.Rebase(0, 0, 2, True)
+    # The refresh does not replace the clean anchor, so every refresh starts from the same picture.
+    outs += [out] + [b.generate_chunk(a) for _ in range(6)]
+    assert b._clean_anchor is clean and b.clean_anchor_chunk == 3
+    _, calls, rng = reanchored_chunk(b, a, 0.5, "clean")
+    assert torch.allclose(calls[0]["x"], start_latent(b, clean, 2, rng))
+
+
+def test_steer_reanchor_drops_and_recaptures_the_clean_anchor(no_cuda):
+    b = make_backend()
+    a, c = torch.full((1, 3, 8), 1.0), torch.full((1, 3, 8), 2.0)
+    b.reset(seed=0)
+    outs = [b.generate_chunk(a) for _ in range(10)]
+    out, calls, rng = reanchored_chunk(b, c, 0.5, "last")  # a steer at chunk 10, from the last latent
+    assert torch.allclose(calls[0]["x"], start_latent(b, outs[-1].latents, 2, rng))
+    assert b.last_rebase == cf.Rebase(0, 0, 2, False)
+    assert b._clean_anchor is None
+    # A refresh before the new clean anchor exists falls back to the last latent and changes nothing.
+    outs += [out, b.generate_chunk(c)]
+    out, calls, rng = reanchored_chunk(b, c, 0.5, "clean")  # chunk 12
+    assert torch.allclose(calls[0]["x"], start_latent(b, outs[-1].latents, 2, rng))
+    assert b.last_rebase == cf.Rebase(0, 0, 2, False)
+    outs += [out, b.generate_chunk(c)]  # chunk 13 = 10 + 3: the new clean anchor, under the new cond
+    assert b._clean_anchor is outs[13].latents and b.clean_anchor_chunk == 13
+    _, calls, rng = reanchored_chunk(b, c, 0.5, "clean")
+    assert torch.allclose(calls[0]["x"], start_latent(b, outs[13].latents, 2, rng))
+
+
+def test_clean_refresh_at_full_strength_is_pure_noise(no_cuda):
+    b = make_backend()
+    a = torch.full((1, 3, 8), 1.0)
+    b.reset(seed=0)
+    outs = [b.generate_chunk(a) for _ in range(6)]
+    _, calls, rng = reanchored_chunk(b, a, 1.0, "clean")
+    assert torch.equal(calls[0]["x"], torch.randn(outs[0].latents.shape, generator=torch.Generator().set_state(rng)))
+    assert b.last_rebase == cf.Rebase(0, 0, 0, False)
+    assert b.clean_anchor_chunk == 3  # kept
+
+
+def test_clean_anchor_after_option(no_cuda):
+    b = make_backend(clean_anchor_after=0)
+    a = torch.full((1, 3, 8), 1.0)
+    b.reset(seed=0)
+    out = b.generate_chunk(a)
+    assert b._clean_anchor is out.latents and b.clean_anchor_chunk == 0
+    with pytest.raises(ValueError):
+        make_backend(clean_anchor_after=-1)
+
+
+# ---------------------------------------------------------------- chunk start and decoder restart
+
+
+def test_chunk_start_marks_first_frames(no_cuda):
+    b = make_backend()
+    a = torch.full((1, 3, 8), 1.0)
+    b.reset(seed=0)
+    starts = [b.generate_chunk(a).start for _ in range(10)]
+    starts.append(b.generate_chunk(a, rebase=cf.Rebase(keep=0, anchor_step=2)).start)
+    starts.append(b.generate_chunk(a).start)
+    starts.append(b.generate_chunk(a, rebase=cf.Rebase(keep=2)).start)
+    b.reanchor(0.5, source="clean")
+    starts.append(b.generate_chunk(a).start)
+    F, C = cf.ChunkStart.FIRST_FRAME, cf.ChunkStart.CONTINUE
+    assert starts == [F] + [C] * 9 + [F, C, C, F]
+    b.reset(seed=0)
+    assert b.generate_chunk(a).start is F
+
+
+class StubTaehv:
+    """decode_video stand-in: 4 frames per latent, each frame's value is its latent's mean."""
+
+    def __init__(self):
+        self.inputs = []
+
+    def decode_video(self, x, parallel=False):
+        self.inputs.append([round(float(v), 3) for v in x[0].float().mean(dim=(1, 2, 3))])
+        vals = x[0].float().mean(dim=(1, 2, 3)).repeat_interleave(4)
+        return vals.reshape(1, -1, 1, 1, 1).expand(1, len(vals), 3, 2, 2).clone()
+
+
+def make_decoder(monkeypatch, pad="hold"):
+    monkeypatch.setattr(torch.Tensor, "record_stream", lambda self, s: None, raising=False)
+    d = cf._Decoder.__new__(cf._Decoder)
+    d.vae_type = cf.VaeType.TAEHV
+    d.device = torch.device("cpu")
+    d.dtype = torch.float32
+    d.first_frame_pad = cf.FirstFramePad(pad)
+    d.frames_per_chunk = 4
+    d.restarts = 0
+    d.stream = _Null()
+    d.stream.wait_event = lambda e: None
+    d.model = StubTaehv()
+    d.video_id = None
+    d._start_video(0)
+    return d
+
+
+def chunk(i, value, start=cf.ChunkStart.CONTINUE, video=1):
+    return cf.ChunkLatents(latents=torch.full((1, 1, 2, 2, 2), value), video_id=video, chunk_index=i,
+                           ready=None, start=start)
+
+
+@pytest.mark.parametrize("pad, cut_frames", [("hold", 4), ("none", 1)])
+def test_decoder_restarts_on_a_first_frame_mid_video(no_cuda, monkeypatch, pad, cut_frames):
+    d = make_decoder(monkeypatch, pad)
+    F = cf.ChunkStart.FIRST_FRAME
+    # Values in (0, 1) map to pixels (2v - 1 + 1) * 127.5 = 255 v.
+    outs = [d.decode(chunk(0, 0.1, F))] + [d.decode(chunk(i, 0.1 * (i + 1))) for i in range(1, 5)]
+    assert [len(o) for o in outs] == [1, 4, 4, 4, 4]  # the first chunk of a video: 1 frame, as before
+    cut = d.decode(chunk(5, 0.8, F))
+    nxt = d.decode(chunk(6, 0.9))
+    # The cut is decoded alone (no old context), like a first chunk; the next one with only the cut as context.
+    assert d.model.inputs[-2] == [0.8] and d.model.inputs[-1] == [0.8, 0.9]
+    assert len(cut) == cut_frames and (cut == round(0.8 * 255)).all()
+    assert len(nxt) == 4 and (nxt == round(0.9 * 255)).all()
+    assert d.restarts == 1 and d.video_id == 1 and d.next_chunk_index == 7
+    assert d.decode(chunk(7, 0.5)).shape[0] == 4 and d.model.inputs[-1] == [0.8, 0.9, 0.5]
+
+
+def test_decoder_first_frame_of_a_new_video_is_not_a_restart(no_cuda, monkeypatch):
+    d = make_decoder(monkeypatch)
+    assert len(d.decode(chunk(0, 0.1, cf.ChunkStart.FIRST_FRAME, video=3))) == 1
+    assert d.restarts == 0
+
+
+def test_first_frame_pad_option_is_checked():
+    with pytest.raises(ValueError):
+        cf.FirstFramePad("repeat")
+    with pytest.raises(ValueError):
+        cf.Backend(64, 64, None, "cpu", "cpu", first_frame_pad="repeat")
+
+
+def test_clean_refresh_after_a_scene_change_without_steer_recaptures(no_cuda):
+    """A cond change with no steer re-anchor (e.g. a provisional): the refresh must not bring the old scene back."""
+    b = make_backend()
+    a, c = torch.full((1, 3, 8), 1.0), torch.full((1, 3, 8), 2.0)
+    b.reset(seed=0)
+    outs = [b.generate_chunk(a) for _ in range(6)]
+    assert b.clean_anchor_chunk == 3
+    outs += [b.generate_chunk(c) for _ in range(4)]  # the scene changed, no re-anchor
+    out, calls, rng = reanchored_chunk(b, c, 0.5, "clean")  # chunk 10
+    assert torch.allclose(calls[0]["x"], start_latent(b, outs[-1].latents, 2, rng))  # from the last latent
+    assert b.last_rebase == cf.Rebase(0, 0, 2, False)
+    assert b._clean_anchor is None
+    outs += [out] + [b.generate_chunk(c) for _ in range(3)]  # chunk 13 = 10 + 3: saved again, under c
+    assert b.clean_anchor_chunk == 13 and b._clean_anchor is outs[13].latents
+    _, calls, rng = reanchored_chunk(b, c, 0.5, "clean")
+    assert torch.allclose(calls[0]["x"], start_latent(b, outs[13].latents, 2, rng))
+    assert b.last_rebase.from_clean
+
+
+def test_clean_refresh_accepts_an_equal_cond_object(no_cuda):
+    b = make_backend()
+    b.reset(seed=0)
+    outs = [b.generate_chunk(torch.full((1, 3, 8), 1.0)) for _ in range(6)]
+    _, calls, rng = reanchored_chunk(b, torch.full((1, 3, 8), 1.0), 0.5, "clean")  # equal values, new object
+    assert torch.allclose(calls[0]["x"], start_latent(b, outs[3].latents, 2, rng))
+    assert b.last_rebase.from_clean

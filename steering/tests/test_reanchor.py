@@ -12,6 +12,9 @@ from steering.reanchor import Anchor, ReanchorConfig, ReanchorPolicy
 
 SHAPE = (1, 4, 8)
 GAP = ReanchorConfig().min_gap_chunks
+EVERY = ReanchorConfig().refresh_every_chunks
+REFRESH = Anchor(0.5, "refresh", "clean")  # the default refresh
+NO_REFRESH = ReanchorConfig(refresh_every_chunks=None)  # for steer tests that run past EVERY
 
 
 def _emb(prompt: str) -> torch.Tensor:
@@ -107,6 +110,7 @@ def _warm_policy(config: ReanchorConfig = ReanchorConfig()) -> ReanchorPolicy:
         {"slow_anchors": True},
         {"refresh_every_chunks": 0},
         {"refresh_every_chunks": 60.0},
+        {"refresh_source": "golden"},
         {"min_gap_chunks": 0},
         {"min_gap_chunks": "8"},
     ],
@@ -134,7 +138,7 @@ def test_initial_state() -> None:
 
 @pytest.mark.parametrize("reason", ["stale", "unchanged"])
 def test_unapplied_result_is_ignored(reason: str) -> None:
-    p = _warm_policy()
+    p = _warm_policy(NO_REFRESH)
     p.on_target(_msg("winter", 1), {"applied": False, "kind": None, "reason": reason,
                                     "cache_hit": True})
     assert not p.pending
@@ -186,7 +190,7 @@ def test_message_strength_scales(ramp: int, msg_strength: float, expected: float
 
 
 def test_scaled_below_min_strength_schedules_nothing() -> None:
-    e = Engine()
+    e = Engine(NO_REFRESH)
     e.send(_msg("winter", 4, strength=0.05))  # 0.85 * 0.05 < 0.05
     assert not e.policy.pending
     assert e.run(20) == []
@@ -204,7 +208,7 @@ def test_confirm_schedules_a_steer() -> None:
 # --- rule 3: provisional ----------------------------------------------------
 
 def test_provisional_never_anchors_by_default() -> None:
-    e = Engine()
+    e = Engine(NO_REFRESH)
     e.send(_msg("winter", 1, provisional=True, cap=0.4))
     assert e.run(30) == []
 
@@ -300,7 +304,7 @@ def test_latest_target_wins() -> None:
 
 
 def test_applied_target_that_schedules_nothing_cancels_pending() -> None:
-    e = Engine()
+    e = Engine(NO_REFRESH)
     e.send(_msg("winter", 4))
     e.step()
     e.send(_msg("snow", 4, provisional=True, cap=0.4))  # applied, schedules nothing
@@ -368,24 +372,46 @@ def test_steer_after_refresh_waits_gap() -> None:
     cfg = ReanchorConfig(refresh_every_chunks=20)
     e = Engine(cfg)
     anchors = e.run(20 - GAP)
-    assert anchors == [(20 - GAP, Anchor(0.25, "refresh"))]
+    assert anchors == [(20 - GAP, REFRESH)]
     e.send(_msg("winter", 1))
     assert e.run(20) == [(GAP, Anchor(1.0, "steer"))]
 
 
 # --- rule 7: refresh --------------------------------------------------------
 
+def test_refresh_defaults_are_the_measured_ones() -> None:
+    cfg = ReanchorConfig()
+    # Every 24 chunks, strength 0.5 (anchor step 2 of 4), from the clean anchor: the setting that
+    # stayed clean for 360 chunks on the real model (MODEL_NOTES.md).
+    assert (cfg.refresh_every_chunks, cfg.refresh_strength, cfg.refresh_source) == (24, 0.5, "clean")
+
+
 def test_long_idle_refresh_cadence_is_exact() -> None:
     p = ReanchorPolicy()
-    chunks = [k for k in range(1, 6001) if p.next_chunk(1.0, False) is not None]
-    assert chunks == list(range(60, 6001, 60))
+    got = [(k, a) for k in range(1, 6001) if (a := p.next_chunk(1.0, False)) is not None]
+    assert [k for k, _ in got] == list(range(EVERY, 6001, EVERY))
+    assert all(a == REFRESH for _, a in got)
+
+
+def test_refresh_source_last_and_bad_source() -> None:
+    p = ReanchorPolicy(ReanchorConfig(refresh_every_chunks=8, refresh_source="last"))
+    got = [p.next_chunk(1.0, False) for _ in range(8)]
+    assert got[-1] == Anchor(0.5, "refresh", "last")
+    with pytest.raises(ValueError, match="refresh_source"):
+        ReanchorConfig(refresh_source="golden")
+
+
+def test_steer_anchor_source_is_last() -> None:
+    e = Engine()
+    e.send(_msg("winter", 1))
+    assert e.run(1) == [(1, Anchor(1.0, "steer", "last"))]
 
 
 def test_refresh_anchor_value_and_disable() -> None:
     p = ReanchorPolicy(ReanchorConfig(refresh_every_chunks=5, refresh_strength=0.3,
                                       min_gap_chunks=1))
     got = [p.next_chunk(1.0, False) for _ in range(5)]
-    assert got == [None] * 4 + [Anchor(0.3, "refresh")]
+    assert got == [None] * 4 + [Anchor(0.3, "refresh", "clean")]
     off = ReanchorPolicy(ReanchorConfig(refresh_every_chunks=None))
     assert all(off.next_chunk(1.0, False) is None for _ in range(1000))
 
@@ -399,7 +425,7 @@ def test_refresh_never_shorter_than_gap() -> None:
 def test_no_refresh_while_moving() -> None:
     p = ReanchorPolicy()
     assert all(p.next_chunk(0.5, True) is None for _ in range(200))
-    assert p.next_chunk(1.0, False) == Anchor(0.25, "refresh")
+    assert p.next_chunk(1.0, False) == REFRESH
 
 
 def test_no_refresh_while_steer_pending() -> None:
@@ -416,7 +442,7 @@ def test_steer_restarts_refresh_count() -> None:
     e.send(_msg("winter", 4))
     anchors = e.run(200)
     assert [(k, a.reason) for k, a in anchors] == [
-        (4, "steer"), (64, "refresh"), (124, "refresh"), (184, "refresh")]
+        (4, "steer")] + [(k, "refresh") for k in range(4 + EVERY, 201, EVERY)]
 
 
 # --- rule 8: reset ----------------------------------------------------------
@@ -430,7 +456,7 @@ def test_reset_clears_pending_and_restarts_counts() -> None:
     e.policy.on_reset()
     assert not e.policy.pending
     assert e.policy.chunks_since_anchor == 0
-    assert [k for k, _ in e.run(130)] == [60, 120]  # refresh restarts from the reset
+    assert [k for k, _ in e.run(130)] == list(range(EVERY, 131, EVERY))  # refresh restarts from the reset
 
 
 def test_steer_right_after_reset_waits_gap() -> None:
@@ -539,7 +565,7 @@ def test_strength_always_in_unit_interval_and_gap_holds() -> None:
 # --- interrupt storms -------------------------------------------------------
 
 def test_storm_of_finals_never_fires_mid_ramp_then_fires_once() -> None:
-    e = Engine()
+    e = Engine(NO_REFRESH)
     for k in range(100):
         e.send(_msg("ab"[k % 2] + "x", 4))
         assert e.step() is None  # each ramp is replaced before reaching 1.0

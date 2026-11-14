@@ -19,7 +19,7 @@ class ReadTest(unittest.TestCase):
 
     def test_undo_reset_beat_keywords(self):
         self.assertEqual(read("go back", snap())["op"], {"op": "undo"})
-        self.assertEqual(read("undo the river", snap(("c1", "river")))["op"], {"op": "undo"})
+        self.assertEqual(read("undo the river", snap(("c1", "river")))["op"], {"op": "remove", "id": "c1"})
         self.assertEqual(read("start over", snap())["op"], {"op": "reset"})
 
     def test_undo_synonyms_are_not_eaten_by_negation(self):

@@ -129,3 +129,27 @@ python -m commands.check_engine --url http://127.0.0.1:8000
 The check resets the session, sends partial/final text and taps over the real
 websockets, checks stacking/removal/undo/rollback, and validates the streamed state.
 It does not measure real-model semantic quality or microphone latency.
+
+
+## Motion and continuity
+
+Explicit object descriptions and motion now remain in scene state across weather/light edits.
+For example, adding a red car driving forward preserves its color and direction when winter is added.
+A motion edit updates the existing subject; bare repeated additions and partial guesses keep its details.
+Normal/confirmed ramps are one chunk, gradual edits remain 12, and guesses remain four.
+The optional cached enrichment boundary lives in commands.rewriter; the engine owns its network call.
+See [integration and frame-evaluation notes](../docs/prompt-continuity.md).
+Language embeddings do not store visual history; clean anchors remain the backend's responsibility.
+
+World/place commands now replace a singleton world layer rather than append a style.
+The embedded world dictionary includes the tested desert, mountain-road, city, coast and Mars descriptions, plus forest/meadow.
+The default scene and Ishaan’s subject/world/style template support replacement; unsupported mixed custom bases are rejected safely.
+Enrichment accepts the full final sentence through build_messages(prompt, command=None), and preserves the canonical scene verbatim.
+
+
+For the engine-owned asynchronous Sonnet final reader, snapshot() returns an independent
+full scene snapshot. apply_final(text, operations, prompt=None) validates and applies one
+final decision atomically, returning the same steer/state shape as handle(). The engine
+owns the bounded model wait, content rejection, persistent cache and fallback to handle().
+Empty operations reject a final without changing state and roll back any provisional guess.
+Enriched prompts become the committed target so later guess rollback uses the displayed scene.

@@ -2,7 +2,8 @@
 
 No model code: the engine calls `on_target` after each `Controller.handle`,
 `next_chunk` once per chunk after `steerer.get_cond()`, and `on_reset` when a
-new video starts, then passes any returned `Anchor.strength` to the backend.
+new video starts, then passes any returned anchor to the backend as
+`backend.reanchor(anchor.strength, source=anchor.source)`.
 """
 
 import math
@@ -12,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any
 
 _EPS = 1e-9  # progress comparisons tolerate float rounding
+SOURCES = ("last", "clean")  # where the backend's re-anchor starts from; see Anchor.source
 
 
 @dataclass(frozen=True)
@@ -20,6 +22,10 @@ class Anchor:
 
     strength: float  # in (0, 1]
     reason: str  # "steer" or "refresh"
+    # "last": start from the last latent (a steer: repaint toward the new target).
+    # "clean": start from the clean anchor, the latent the backend saved a few chunks after the
+    # last reset or steer (a refresh: undo drift without baking it in).
+    source: str = "last"
 
 
 def _check_int(name: str, value: object, low: int) -> None:
@@ -48,7 +54,11 @@ class ReanchorConfig:
     with the conditioning current on its chunk and the scene stays locked to it,
     so the (last) anchor must fire once the ramp has reached the full target
     (progress 1.0). Firing mid-ramp repaints toward a half-blended prompt.
-    The strengths, gap and refresh period are still untuned.
+    The refresh is measured too (MODEL_NOTES.md, 360 chunks, no commands): from
+    the last (already drifted) latent it bakes the damage in and degrades from
+    ~chunk 180; from the clean anchor at strength 0.5 (anchor step 2 of 4) every
+    24 chunks the picture stays clean and the same scene. The steer strengths
+    and the gap are still untuned.
     """
 
     steer_strength: float = 0.85  # for a normal final/confirm
@@ -59,8 +69,9 @@ class ReanchorConfig:
     slow_anchors: int = 3  # anchors spread over a slow ramp
     fire_at_progress: float = 1.0  # single anchor fires on the first chunk with progress >= this (1.0: the full target)
     provisional_strength: float = 0.0  # 0 means provisional targets never re-anchor
-    refresh_every_chunks: int | None = 60  # None disables the refresh
-    refresh_strength: float = 0.25
+    refresh_every_chunks: int | None = 24  # None disables the refresh
+    refresh_strength: float = 0.5  # anchor step 2 of the 4-step first-frame schedule
+    refresh_source: str = "clean"  # "clean" (the clean anchor) or "last" (the drifted last latent)
     min_gap_chunks: int = 8
     min_strength: float = 0.05  # anything that scales below this is skipped
 
@@ -74,6 +85,8 @@ class ReanchorConfig:
         _check_int("slow_min_ramp", self.slow_min_ramp, 1)
         _check_int("slow_anchors", self.slow_anchors, 1)
         _check_int("min_gap_chunks", self.min_gap_chunks, 1)
+        if self.refresh_source not in SOURCES:
+            raise ValueError(f"refresh_source must be one of {SOURCES}, got {self.refresh_source!r}")
         if self.refresh_every_chunks is not None:
             _check_int("refresh_every_chunks", self.refresh_every_chunks, 1)
         if self.slow_min_ramp <= self.sudden_max_ramp:
@@ -168,7 +181,7 @@ class ReanchorPolicy:
             every = cfg.refresh_every_chunks
             if every is not None and not is_moving and gap_ok and self._since >= every:
                 self._since = 0
-                return Anchor(cfg.refresh_strength, "refresh")
+                return Anchor(cfg.refresh_strength, "refresh", cfg.refresh_source)
             return None
 
     # --- internals ------------------------------------------------------------

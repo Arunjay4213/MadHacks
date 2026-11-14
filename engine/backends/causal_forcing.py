@@ -34,6 +34,12 @@ clear the frame cache and re-encode the last few clean frames under the current 
 positions starting from 0 (LongLive's KV recache, arXiv 2509.22622). All of that is off by
 default, and then the calls, the RNG draws and their order are exactly what they were before.
 
+Clean anchor: reanchor(strength) (a steer) starts the new first frame from the last latent;
+reanchor(strength, source="clean") (the periodic refresh) starts it from the clean anchor, the
+latent saved `clean_anchor_after` (3) chunks after the last reset or steer re-anchor. The last
+latent has already drifted (over-contrast, blocky grass) and a refresh from it bakes that in; a
+refresh from the clean anchor does not (measured, MODEL_NOTES.md).
+
 Threads and devices: generation, prompt encoding and decoding each run on their own CUDA
 stream. The decoder object owns all decode state and receives only the ChunkLatents passed
 in, so it can move to `decode_device` or to another process later.
@@ -98,6 +104,16 @@ class GenState(enum.Enum):
     STREAMING = "streaming"  # frame cache holds past frames; next call continues the video
 
 
+class ChunkStart(enum.Enum):
+    CONTINUE = "continue"  # the latent continues the previous one (decoded with the stream's context)
+    FIRST_FRAME = "first_frame"  # a first-frame latent: the first chunk of a video, or a hard cut (keep-0 rebase)
+
+
+class FirstFramePad(str, enum.Enum):
+    HOLD = "hold"  # a hard cut mid-video emits its 1 clean frame repeated to the usual chunk length
+    NONE = "none"  # a hard cut mid-video emits its 1 frame, as the first chunk of a video does
+
+
 class DecoderState(enum.Enum):
     EMPTY = "empty"  # no chunk of the current video decoded yet
     STREAMING = "streaming"  # streaming decode state holds the previous chunks of this video
@@ -111,6 +127,7 @@ class ChunkLatents:
     video_id: int  # increases on every reset(); the decoder starts fresh when it changes
     chunk_index: int  # 0 for the first chunk of a video
     ready: torch.cuda.Event  # recorded on the generation stream after `latents` was written
+    start: ChunkStart = ChunkStart.CONTINUE  # FIRST_FRAME: the decoder restarts its stream state for it
 
 
 @dataclasses.dataclass(frozen=True)
@@ -126,11 +143,14 @@ class Rebase:
         to that level (weaker memory) instead of clean.
     anchor_step: None, or n: the new frame starts from the last clean latent noised to step n of
         its schedule and is denoised with schedule[n:] (n = 0 is pure noise).
+    from_clean: with anchor_step > 0, start from the clean anchor (see Backend.reanchor) instead
+        of the last latent; falls back to the last latent when there is no clean anchor yet.
     """
 
     keep: int = 3
     memory_noise: int = 0
     anchor_step: Optional[int] = None
+    from_clean: bool = False
 
     @classmethod
     def of(cls, value) -> Optional["Rebase"]:
@@ -172,8 +192,12 @@ def _timestep_list(scheduler, steps_1000: list[int], warp: bool) -> torch.Tensor
 class _Decoder:
     """Streaming VAE decode. Owns all of its state; only ChunkLatents cross the boundary."""
 
-    def __init__(self, repo_dir: str, vae_type: VaeType, device: torch.device, latent_hw: tuple[int, int], dtype=torch.float16):
+    def __init__(self, repo_dir: str, vae_type: VaeType, device: torch.device, latent_hw: tuple[int, int], dtype=torch.float16,
+                 first_frame_pad: FirstFramePad = FirstFramePad.HOLD, frames_per_chunk: int = VIDEO_FRAMES_PER_LATENT):
         self.vae_type = vae_type
+        self.first_frame_pad = FirstFramePad(first_frame_pad)
+        self.frames_per_chunk = frames_per_chunk
+        self.restarts = 0  # mid-video stream restarts (hard cuts), for tests and logs
         self.device = device
         self.dtype = dtype
         self.latent_hw = latent_hw
@@ -211,6 +235,10 @@ class _Decoder:
     def _start_video(self, video_id: int):
         self.video_id = video_id
         self.next_chunk_index = 0
+        self._restart_stream()
+
+    def _restart_stream(self):
+        """Forget the decoded past (as for a new video), keeping video_id and the chunk count."""
         self.state = DecoderState.EMPTY
         self._wan_cache = None
         self._taehv_context = None
@@ -221,6 +249,13 @@ class _Decoder:
             self._start_video(chunk.video_id)
         if chunk.chunk_index != self.next_chunk_index:
             raise ValueError(f"decode_chunk got chunk {chunk.chunk_index}, expected {self.next_chunk_index} (chunks must be decoded in order)")
+        # A hard cut makes a first-frame latent. Decoding it as a continuation, with the old scene's
+        # context, gives a washed-out, ghosted chunk and a soft next one; decode it as a new video's
+        # first chunk instead (1 frame), padded to the usual length unless first_frame_pad is "none".
+        cut = chunk.start is ChunkStart.FIRST_FRAME and self.state is DecoderState.STREAMING
+        if cut:
+            self._restart_stream()
+            self.restarts += 1
 
         with torch.cuda.device(self.device), torch.cuda.stream(self.stream):
             self.stream.wait_event(chunk.ready)
@@ -249,6 +284,8 @@ class _Decoder:
             frames = ((pixels[0].float().clamp_(-1, 1) + 1.0) * 127.5).round_().to(torch.uint8).permute(0, 2, 3, 1).contiguous()
             out = frames.cpu().numpy()  # waits for this stream only
 
+        if cut and self.first_frame_pad is FirstFramePad.HOLD and 0 < len(out) < self.frames_per_chunk:
+            out = np.concatenate([out, np.repeat(out[-1:], self.frames_per_chunk - len(out), axis=0)])
         self.state = DecoderState.STREAMING
         self.next_chunk_index += 1
         return out
@@ -274,12 +311,14 @@ class Backend:
         text_encoder_device: Optional[str] = None,
         compile: bool = False,
         seed: int = 0,
+        first_frame_pad: str = "hold",
         **auto_rebase,
     ):
         if width % 16 or height % 16:
             raise ValueError("width and height must be multiples of 16 (VAE x8, then patch x2)")
         if variant not in VARIANTS:
             raise ValueError(f"unknown variant {variant}; choose from {sorted(VARIANTS)}")
+        first_frame_pad = FirstFramePad(first_frame_pad)  # fails before any weights load
         self.width, self.height = width, height
         self.variant = variant
         self.device = torch.device(device)
@@ -353,7 +392,8 @@ class Backend:
             self._text_lock = threading.Lock()
             self._text_stream = torch.cuda.Stream(device=self.text_device)
 
-            self.decoder = _Decoder(repo_dir, VaeType(vae), self.decode_device, self.latent_hw)
+            self.decoder = _Decoder(repo_dir, VaeType(vae), self.decode_device, self.latent_hw,
+                                    first_frame_pad=FirstFramePad(first_frame_pad), frames_per_chunk=self.frames_per_chunk)
 
         if compile:
             self.generator.model.compile(mode="max-autotune-no-cudagraphs")
@@ -373,6 +413,7 @@ class Backend:
         refresh_every: int = 0,
         refresh_keep: int = 6,
         refresh_memory_noise: int = 0,
+        clean_anchor_after: int = 3,
     ) -> None:
         """Generation state: lock, stream, RNG, caches, counters, automatic rebase settings.
         Split out of __init__ so tests can build a Backend around a stub generator."""
@@ -388,6 +429,16 @@ class Backend:
         self._steer_pending = False  # the cond changed and has not stopped changing yet
         self._last_rebase_chunk = 0  # chunk_index of the last rebase; 0 after reset()
         self._pending_reanchor: Optional[Rebase] = None  # set by reanchor(), used by the next chunk
+        # The clean anchor: the latent of the chunk `clean_anchor_after` chunks after the start of
+        # the video or after the last rebase that did not start from the clean anchor (a steer).
+        # A refresh (reanchor(..., source="clean")) starts from it instead of the drifted last latent.
+        if clean_anchor_after < 0:
+            raise ValueError(f"clean_anchor_after must be >= 0, got {clean_anchor_after}")
+        self._clean_anchor_after = int(clean_anchor_after)
+        self._clean_anchor: Optional[torch.Tensor] = None
+        self._clean_anchor_cond: Optional[torch.Tensor] = None  # the cond the clean anchor was made under
+        self._clean_capture_chunk: Optional[int] = self._clean_anchor_after  # chunk_index to save, or None
+        self.clean_anchor_chunk: Optional[int] = None  # chunk_index the clean anchor was saved from
         # Last clean latents of this video, oldest first (references to the returned latents, no
         # copies). Only kept for framewise variants, which are the only ones that can rebase.
         self._history: collections.deque = collections.deque(maxlen=self.attn_window_frames)
@@ -476,6 +527,10 @@ class Backend:
             self._steer_pending = False
             self._pending_reanchor = None
             self._last_rebase_chunk = 0
+            self._clean_anchor = None
+            self._clean_anchor_cond = None
+            self._clean_capture_chunk = self._clean_anchor_after
+            self.clean_anchor_chunk = None
 
     def _clear_frame_cache(self) -> None:
         # Same as the official pipeline between videos (pipeline/causal_inference.py, "reset kv
@@ -499,12 +554,19 @@ class Backend:
         n = self.first_frame_steps
         return min(n - 1, int((1.0 - min(float(strength), 1.0)) * n))
 
-    def reanchor(self, strength: float) -> None:
+    def reanchor(self, strength: float, source: str = "last") -> None:
         """Ask for a re-anchor on the next generate_chunk: a hard cut of the frame cache (keep 0)
-        whose first frame starts from the last picture noised to anchor_step_for_strength(strength).
-        Strength 1.0 repaints from pure noise; lower keeps more of the old picture; <= 0 cancels."""
+        whose first frame starts from a picture noised to anchor_step_for_strength(strength).
+        Strength 1.0 repaints from pure noise; lower keeps more of the old picture; <= 0 cancels.
+
+        source "last" (a steer): start from the last latent; the clean anchor is dropped and saved
+        again `clean_anchor_after` chunks later, so it shows the new scene. source "clean" (a
+        refresh): start from the clean anchor, which is kept; with no clean anchor yet, as "last"
+        but without dropping or re-saving anything."""
+        if source not in ("last", "clean"):
+            raise ValueError(f"reanchor source must be 'last' or 'clean', got {source!r}")
         step = self.anchor_step_for_strength(strength)
-        self._pending_reanchor = None if step is None else Rebase(keep=0, anchor_step=step)
+        self._pending_reanchor = None if step is None else Rebase(keep=0, anchor_step=step, from_clean=source == "clean")
 
     def _plan_rebase(self, changed: bool, explicit: Optional[Rebase]) -> tuple[Optional[Rebase], Optional[str]]:
         """Which rebase (if any) to do before this chunk; updates the automatic-mode state."""
@@ -530,6 +592,13 @@ class Backend:
         if explicit is not None:
             return explicit, None
         return auto, reason
+
+    @staticmethod
+    def _same_cond(a: torch.Tensor, b: Optional[torch.Tensor]) -> bool:
+        """Is `a` the conditioning `b`? The steerer returns the same object once a move has ended."""
+        if b is None:
+            return False
+        return a is b or (a.shape == b.shape and a.dtype == b.dtype and bool(torch.equal(a, b)))
 
     def _timestep(self, t_1000: int) -> torch.Tensor:
         """A 0-1000 timestep in the backend's convention (warped like the denoising steps)."""
@@ -612,11 +681,26 @@ class Backend:
             lh, lw = self.latent_hw
             noisy = torch.randn([1, f, LATENT_CHANNELS, lh, lw], device=self.device, dtype=self.dtype, generator=self._rng)
             schedule = self.first_chunk_steps if self.state is GenState.EMPTY else self.denoising_steps
+            start = ChunkStart.FIRST_FRAME if self.state is GenState.EMPTY else ChunkStart.CONTINUE
             if plan is not None:
                 x_last = self._history[-1] if self._history else None
+                from_clean = plan.from_clean and self._clean_anchor is not None
+                if from_clean and not self._same_cond(cond, self._clean_anchor_cond):
+                    # The scene changed without a steer re-anchor (a provisional or a steer too weak
+                    # to repaint): the clean anchor shows the old scene, so this refresh is a steer.
+                    from_clean = False
+                if from_clean:
+                    x_last = self._clean_anchor  # a refresh: the clean anchor stays as it is
+                elif not plan.from_clean or self._clean_anchor is not None:
+                    # A steer (or any other rebase): the old clean anchor shows the old scene.
+                    self._clean_anchor = None
+                    self._clean_anchor_cond = None
+                    self.clean_anchor_chunk = None
+                    self._clean_capture_chunk = self.chunk_index + self._clean_anchor_after
                 keep = self._rebase(plan, cond_dict)
                 if keep == 0:
                     schedule = self.first_chunk_steps  # a hard cut: this is a first frame again
+                    start = ChunkStart.FIRST_FRAME  # and the decoder restarts for it
                 n = plan.anchor_step
                 if n is not None:
                     if reason is not None:
@@ -633,7 +717,8 @@ class Backend:
                     schedule = schedule[n:]
                 else:
                     n = None if n is None else 0
-                self.last_rebase = Rebase(keep, int(plan.memory_noise), n)
+                    from_clean = False
+                self.last_rebase = Rebase(keep, int(plan.memory_noise), n, from_clean)
                 if reason is not None:
                     self.auto_rebases[reason] += 1
             current_start = self.frame_index * self.frame_seq_length
@@ -667,10 +752,15 @@ class Backend:
             )
             if f == 1:
                 self._history.append(denoised)  # a reference, for a later rebase
+            if self.chunk_index == self._clean_capture_chunk:
+                self._clean_anchor = denoised  # a reference; returned latents are never modified
+                self._clean_anchor_cond = cond
+                self.clean_anchor_chunk = self.chunk_index
+                self._clean_capture_chunk = None
 
             ready = torch.cuda.Event()
             ready.record(self._gen_stream)
-            out = ChunkLatents(latents=denoised, video_id=self.video_id, chunk_index=self.chunk_index, ready=ready)
+            out = ChunkLatents(latents=denoised, video_id=self.video_id, chunk_index=self.chunk_index, ready=ready, start=start)
             self.frame_index += f
             self.chunk_index += 1
             self.state = GenState.STREAMING
@@ -695,13 +785,17 @@ def load(width: int, height: int, steps: Optional[int] = None, device: str = "cu
     Automatic rebase (all off by default, see generate_chunk and MODEL_NOTES.md): steer_rebase (0),
     steer_keep (3), steer_memory_noise (0), steer_anchor_step (-1 = none), steer_min_gap (8),
     steer_fire_on_change (1), refresh_every (0 = off), refresh_keep (6), refresh_memory_noise (0).
+    clean_anchor_after (3): chunks after a reset or a steer re-anchor at which the clean anchor is
+    saved; reanchor(strength, source="clean") starts from it.
+    first_frame_pad ("hold" or "none"): a hard cut (keep-0 rebase, every re-anchor) is decoded as a
+    new video's first chunk, 1 frame; "hold" repeats it to the usual chunk length, "none" emits 1.
     """
     # Options may arrive as strings from the server's --backend-opt KEY=VALUE.
     flag = lambda v: v if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes", "on")  # noqa: E731
     types = {"attn_window_frames": int, "sink_frames": int, "max_latent_frames": int, "seed": int, "compile": flag,
              "steer_rebase": flag, "steer_keep": int, "steer_memory_noise": int, "steer_anchor_step": int,
              "steer_min_gap": int, "steer_fire_on_change": flag, "refresh_every": int, "refresh_keep": int,
-             "refresh_memory_noise": int}
+             "refresh_memory_noise": int, "clean_anchor_after": int}
     options = {k: types[k](v) if k in types else v for k, v in options.items()}
     steps = int(steps) if steps is not None and int(steps) > 0 else None  # 0 or None: distilled schedule
     t0 = time.time()

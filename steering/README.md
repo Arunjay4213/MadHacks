@@ -156,7 +156,8 @@ keeps almost everything. It breaks motion a little, so it must be rare.
 | newer applied target before it fires | replaces it (latest wins) |
 | ramp ended before a threshold | fires on the next allowed chunk |
 | any two anchors | at least `min_gap_chunks` (8) apart; a blocked steer waits, thresholds due together fire once |
-| idle (not moving, nothing pending) for `refresh_every_chunks` (60) | `refresh_strength` (0.25), reason "refresh" |
+| idle (not moving, nothing pending) for `refresh_every_chunks` (24) | `refresh_strength` (0.5), reason "refresh", source `refresh_source` ("clean") |
+| any steer anchor | source "last" |
 | `on_reset()` (new video) | drops pending; gap and refresh count from the reset |
 
 Fire timing is **measured**, not guessed: on the real model the anchor
@@ -164,8 +165,24 @@ repaints with whatever conditioning is current on its chunk, and the scene then
 stays locked to it. Firing half-way through the ramp (the old 0.5) repainted
 with a half-blended prompt, so "make it winter" gave a new green meadow; firing
 once the ramp has reached the full target works. So a single anchor waits for
-progress 1.0, and a slow steer's last anchor is at 1.0. The strengths, gap and
-refresh period are still untuned.
+progress 1.0, and a slow steer's last anchor is at 1.0. The steer strengths and
+the gap are still untuned.
+
+The refresh is measured too. The engine passes each anchor as
+`backend.reanchor(strength, source=anchor.source)`. Source "last" starts from
+the last generated latent; source "clean" starts from the backend's clean
+anchor, the latent it saved 3 chunks after the last reset or steer re-anchor.
+A refresh from the last latent starts from a picture that has already drifted,
+so it bakes the damage in (over-contrast, blocky neon grass). Over 360 chunks
+with no commands: from the last latent at anchor step 1 every 40 chunks, the
+picture degrades from about chunk 180; a full restart from noise every 60
+chunks makes the scene and colours jump (unusable); from the clean anchor at
+anchor step 1 or 2 every 24 or 40 chunks, it stays clean and the same scene for
+all 360 chunks, and step 2 every 24 is the steadiest. Hence the defaults: every
+24 chunks, strength 0.5 (step 2 of 4), source "clean". `refresh_source="last"`
+gives the old behaviour; `refresh_every_chunks=None` turns the refresh off.
+Because a steer re-anchor drops the clean anchor and the backend saves a new
+one 3 chunks later, a refresh after a steer keeps the new scene.
 
 With the default gap of 8, a slow ramp shorter than 14 chunks gets 2 anchors,
 not 3, and below 24 chunks the gap pushes later anchors back (the last one can
@@ -179,7 +196,7 @@ policy = ReanchorPolicy()                      # ReanchorConfig(...) to tune
 result = controller.handle(msg); policy.on_target(msg, result)
 # generation thread, once per chunk
 cond = steerer.get_cond(); a = policy.next_chunk(steerer.progress, steerer.is_moving)
-if a: backend.reanchor(a.strength)             # takes effect on this chunk
+if a: backend.reanchor(a.strength, source=a.source)  # takes effect on this chunk
 latents = backend.generate_chunk(cond)
 # new video
 controller.reset(prompt); policy.on_reset()
