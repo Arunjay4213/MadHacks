@@ -144,3 +144,22 @@ Verdict: PASS = scattered (B) and reversed (C) rows match A within max(3 x A-vs-
 while another prompt (D) clearly differs, so `--align` is safe. FAIL = B or C differs by at
 least half as much as D: do not align. INCONCLUSIVE = seeding is not deterministic (A2 > 1
 level), D barely differs, or B/C sit in between; read the numbers before deciding.
+
+## sheet.py / clip_score.py: after a GPU run comes back
+
+Run on the returned `eval_out/scenarios/` (best with `--save-frames`; `.mp4` needs `imageio` + `imageio-ffmpeg`):
+
+```
+python -m steering.eval.sheet --dir eval_out/scenarios --cuts         # <name>.sheet.png
+python -m steering.eval.clip_score --dir eval_out/scenarios --ramp 4  # <name>.clip.txt
+python -m steering.eval.sheet eval_out/scenarios/single.mp4 --mark 16 --every 2
+python -m steering.eval.clip_score eval_out/scenarios/single.frames.pt \
+    --before "<old prompt>" --after "<new prompt>" --steer-frame 16 --fps 16
+```
+
+Sheets: red border = frame where a message was applied (from `<name>.report.txt`), blue = cut.
+`clip_score` (CLIP `openai/clip-vit-base-patch32`, ~600 MB, `--model`/`--device` to change)
+prints per-frame sim(before), sim(after), score = after - before, then the ms from the steer
+frame to 10% and 90% of the rise and how often the smoothed score goes down after it.
+`--dir` scores each applied message against the prompt in force before it; strength-only
+changes (same prompt) are listed but not scored. Pass the run's `--ramp` and `--fps`.
