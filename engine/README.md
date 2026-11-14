@@ -73,7 +73,7 @@ Both are being worked on in the backend (re-anchoring the frame history at a com
 ```
 python -m engine.server --backend fake|causal_forcing --reader standin|commands --host 127.0.0.1 --port 8000 --width 832 --height 480 \
     --steps 0 --base-prompt "..." --jpeg-quality 80 --precompute-file prompts.txt \
-    --device cuda:0 --decode-device cuda:0 --backend-opt key=value --lead-margin 1.3 --log-level info
+    --device cuda:0 --decode-device cuda:0 --backend-opt key=value --lead-margin 1.3 --reanchor off --log-level info
 ```
 
 - `--steps 0` (the default) runs the denoising schedule the backend's checkpoint was distilled for; the real model is distilled for 2 steps, so any other number changes the schedule.
@@ -83,6 +83,7 @@ python -m engine.server --backend fake|causal_forcing --reader standin|commands 
 - `--backend-opt key=value` is passed to the backend's `load()` and may be repeated; numbers and true/false are converted.
 - The fake backend's options are `gen_ms` (170), `decode_ms` (60), `encode_ms` (80), `frames_per_chunk` (4), `first_chunk_frames` (1) and `fps` (16).
 - `--lead-margin` sets how much video generation keeps ready ahead of what is on screen (see "Pipeline").
+- `--reanchor off|on` (default `off`) turns on the steering re-anchor policy (see "Re-anchor").
 - SIGINT or SIGTERM shuts down cleanly and moves the engine to STOPPED.
 
 ## Endpoints
@@ -96,7 +97,7 @@ All on one origin; the message shapes are in `contracts/README.md`.
 | websocket `/control` | Contract 1 in (JSON text); contract 4 out, one message per chunk; `{"error": "..."}` replies to a bad message. |
 | `POST /target` | Body is a contract 2 message; it skips the command reader and goes unchanged to the encoder and `steering.Controller.handle`. |
 | `POST /reset` | Same as a `{"type":"tap","action":"reset"}` on `/control`: goes through the reader, then starts a new video; returns when done. |
-| `GET /stats` | JSON: lifecycle state, backend, reader, last generated and shown chunk, last and average generation, decode and JPEG ms, measured fps, queue depths, encoder cache and pending encodes, clients. |
+| `GET /stats` | JSON: lifecycle state, backend, reader, last generated and shown chunk, last and average generation, decode and JPEG ms, measured fps, queue depths, re-anchor state and last anchor, encoder cache and pending encodes, clients. |
 | `GET /healthz` | 200 with the state, or 503 when FAILED or STOPPED. |
 | `GET /app/` | The demo page from `web/` (see "The demo page at /app/"). |
 
@@ -138,6 +139,21 @@ One `generate_chunk` call is one chunk in every contract, and it may produce any
 - Lead gate: before each chunk, generation waits until the frames already made but not yet sent are no more than (generation + decode + JPEG time) x fps x `--lead-margin`.
   This keeps the stream fed while keeping as little video queued as possible, because every queued frame adds to the delay of a command.
 - Timing log: one line per chunk with generation, decode and JPEG ms and the decode queue depth, and a summary line every 20 chunks.
+
+## Re-anchor
+
+`--reanchor on` puts `steering.reanchor.ReanchorPolicy` (see `steering/README.md`, "Re-anchor policy") into the generation loop.
+With `--reanchor off`, the default, no policy exists and every chunk is exactly `backend.generate_chunk(cond)`.
+
+- The policy is built next to the Controller in `Engine._new_steerer`.
+- `on_target(msg, result)` runs right after every `Controller.handle`, in `Engine._apply_target`, under the CommandBook lock.
+- `next_chunk(progress, is_moving)` runs once per chunk in `Engine._take_cond`, under the same lock and right after `get_cond`.
+- `on_reset()` runs on every reset, right after `Controller.reset`.
+- `Engine._generate(cond, anchor)` is the one backend call: with an anchor it calls `backend.reanchor(strength)` and then `backend.generate_chunk(cond)`.
+- The state is an enum, `ReanchorState`: `off`, `on`, or `unsupported` when `--reanchor on` is given but the backend has no `reanchor(strength)` (logged once at load, then the engine runs as with `off`).
+- The real backend (`causal_forcing`) cannot re-anchor yet, so it reports `unsupported`; the diffusion side is issue #45.
+- The fake backend records each `reanchor` call and draws a white border and "re-anchor 1.00" on the next chunk's frames.
+- `/stats` has `reanchor`: `state`, `count`, `last_strength`, `last_reason` (`steer` or `refresh`), `last_chunk`, and the policy's `chunks_since_anchor`.
 
 ## Commands
 
