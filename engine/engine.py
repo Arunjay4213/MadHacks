@@ -683,7 +683,7 @@ class Engine:
                         self.encoder.encode(prompt)  # into the cache now, so the reset itself does not wait
                 seed = (steer, rec)
             else:
-                self.book.drop(rec, "reset to the starting prompt")
+                self.book.no_operation(rec, "reset to the starting prompt")
             try:
                 return self.request_reset(seed)
             except BadMessage as exc:
@@ -691,7 +691,10 @@ class Engine:
                 reply({"error": str(exc)})
                 return None
         if steer is None:
-            self.book.drop(rec, f"no steer for {msg['type']}")
+            if msg["type"] == "partial":  # not a command until it gives a steer
+                self.book.drop(rec, "no steer for partial")
+            else:
+                self.book.no_operation(rec, f"no operation for {msg['type']}")
             return None
         self.book.decided(rec, steer)
         self._embed(rec, steer)
