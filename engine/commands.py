@@ -50,6 +50,7 @@ class CommandStage(enum.Enum):
 
 
 TERMINAL = frozenset({CommandStage.SHOWN, CommandStage.DROPPED, CommandStage.SUPERSEDED, CommandStage.UNCHANGED})
+IN_FLIGHT = frozenset(CommandStage) - TERMINAL
 
 NEXT: dict[CommandStage, frozenset[CommandStage]] = {
     CommandStage.HEARD: frozenset({CommandStage.DECIDED, CommandStage.DROPPED}),
@@ -210,6 +211,11 @@ class CommandBook:
                 self._move(rec, CommandStage.EMBEDDED, time.monotonic_ns(), "new video starts on it")
 
     # --- reading -----------------------------------------------------------------------------
+
+    def in_flight(self) -> bool:
+        """True while any command is between HEARD and SHOWN: it still needs the reader, the encoder or the GPU."""
+        with self._lock:
+            return any(r.stage in IN_FLIGHT for r in self._records)
 
     def latest_fields(self) -> dict:
         """The contract 4 fields the engine fills from the most recent command: the newest one the reader read
