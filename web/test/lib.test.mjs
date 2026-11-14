@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseFrame, parseServerMessage, splitKeyword, backoffMs, isWholeInsert,
   makeFrameGate, makeLatencyTracker, makeTranscriber, changesKey, commandKey, makeInputClassifier,
-  PUSH_TO_TALK_CODE, isPushToTalk, micErrorText, looksUnfinished, finalizeDelay,
+  PUSH_TO_TALK_CODE, isPushToTalk, micErrorText, looksUnfinished, finalizeDelay, wordsLabels, makeHeardTracker, PENDING_MS,
 } from '../lib.js';
 import { loadTestPattern } from '../fake-server.mjs';
 import { wsBaseUrl, fitSize, videoNotice, formatStamps, STALL_MS, isResetShortcut } from '../lib.js';
@@ -226,6 +226,35 @@ test('transcriber hold mode (push-to-talk): Chrome splitting at a pause still se
   t.flush(); // key released
   assert.deepEqual(out.filter(([type]) => type === 'final'), [['final', 'make it night and add a car racing on a road']]);
   assert.deepEqual(out.at(-2), ['partial', 'make it night and add a car racing on a road']); // words line showed it all
+});
+
+test('wordsLabels: hearing while local, heard + what was understood once the server has it', () => {
+  assert.deepEqual(wordsLabels({ local: true }), { label: 'hearing…', understood: '' });
+  assert.deepEqual(wordsLabels({ keyword: 'car', unmatched: false }), { label: 'heard', understood: '→ understood: car' });
+  assert.deepEqual(wordsLabels({ keyword: null, unmatched: true }), { label: 'heard', understood: '→ not understood' });
+  // No keyword: claim "understood" only for a confirmed final (the AI reader accepted it), not for
+  // partial text the server also reports with unmatched false.
+  assert.deepEqual(wordsLabels({ keyword: null, unmatched: false, confirmed: true }), { label: 'heard', understood: '→ understood' });
+  assert.deepEqual(wordsLabels({ keyword: null, unmatched: false }), { label: 'heard', understood: '' });
+});
+
+test('heard tracker: own partials are pending, own finals confirmed, anything else other', () => {
+  const h = makeHeardTracker();
+  h.sentPartial('make it');
+  h.sentPartial('make it night');
+  assert.equal(h.classify('make it', 7), 'pending'); // server echoed a partial: not a command yet
+  h.sentFinal('make it night', 8);
+  assert.equal(h.classify('make it night', 8), 'confirmed');
+  assert.equal(h.classify('make it', 7), 'other'); // after the final, old partials are not pending
+  assert.equal(h.classify('add a lion', 99), 'other'); // another viewer's command
+  // An abandoned draft: deleted, or simply old. Another viewer's identical final then shows normally.
+  const g = makeHeardTracker();
+  g.sentPartial('add a lion', 1000);
+  assert.equal(g.classify('add a lion', 5, 2000), 'pending');
+  assert.equal(g.classify('add a lion', 5, 1000 + PENDING_MS + 1), 'other');
+  g.sentPartial('add a lion', 9000);
+  g.clearPartials();
+  assert.equal(g.classify('add a lion', 5, 9100), 'other');
 });
 
 const R = (transcript, isFinal = false) => ({ transcript, isFinal });

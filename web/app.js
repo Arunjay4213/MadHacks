@@ -2,7 +2,7 @@
 import {
   PROTOCOL, finalizeDelay, partialMsg, finalMsg, tapMsg, parseFrame, parseServerMessage,
   splitKeyword, backoffMs, makeFrameGate, makeLatencyTracker, makeTranscriber,
-  changesKey, commandKey, makeInputClassifier, PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
+  changesKey, commandKey, makeInputClassifier, wordsLabels, makeHeardTracker, PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
   wsBaseUrl, fitSize, videoNotice, formatStamps, isResetShortcut,
 } from './lib.js';
 
@@ -21,6 +21,7 @@ const wsBase = wsBaseUrl(params.get('server'), location);
 // `?debug=1` logs every text-box input to the console, to see how Wispr Flow inserts on this laptop.
 const DEBUG = params.get('debug') === '1';
 const latency = makeLatencyTracker();
+const heardTracker = makeHeardTracker();
 const PROXY_NOTE = 'command sent → first frame tagged with its chunk drawn to the canvas (page clock; chunk-tag proxy, not proof the picture changed or was painted)';
 el.latency.title = PROXY_NOTE;
 
@@ -49,6 +50,8 @@ function send(msg) {
   }
   control.send(JSON.stringify(msg));
   if (msg.type === 'final') latency.sent(msg.t_client);
+  if (msg.type === 'final') heardTracker.sentFinal(msg.text, msg.t_client);
+  if (msg.type === 'partial') heardTracker.sentPartial(msg.text);
   // Show the words at once; the server's version (keyword, red if unmatched) replaces them when it lands.
   if (msg.type === 'partial' || msg.type === 'final') renderLocalWords(msg.text, msg.type);
   return true;
@@ -106,26 +109,45 @@ function onServer(raw) {
   }
   if (m.heard !== undefined && commandKey(m) !== shownCommand) {
     shownCommand = commandKey(m);
-    renderWords(m);
+    const status = heardTracker.classify(m.heard, m.t_client);
+    if (status === 'pending') renderLocalWords(m.heard, 'partial'); // still being said or typed
+    else renderWords({ ...m, confirmed: status === 'confirmed' });
   }
   latency.onServer(m);
 }
 
+// The words line: a small label, the full sentence, and what the server understood.
+function wordsParts(sentenceNodes, labels) {
+  const label = document.createElement('span');
+  label.className = 'words-label';
+  label.textContent = labels.label;
+  const text = document.createElement('span');
+  text.className = 'words-text';
+  text.append(...sentenceNodes);
+  const parts = [label, text];
+  if (labels.understood) {
+    const understood = document.createElement('span');
+    understood.className = 'words-understood';
+    understood.textContent = labels.understood;
+    parts.push(understood);
+  }
+  return parts;
+}
+
 function renderLocalWords(text, kind) {
-  el.words.replaceChildren(document.createTextNode(text));
+  el.words.replaceChildren(...wordsParts([document.createTextNode(text)], wordsLabels({ local: true })));
   el.words.dataset.unmatched = 'false';
   el.words.dataset.kind = kind;
 }
 
-function renderWords({ heard, keyword, unmatched, kind }) {
-  el.words.replaceChildren(
-    ...splitKeyword(heard, keyword).map((p) => {
-      if (!p.mark) return document.createTextNode(p.text);
-      const mark = document.createElement('mark');
-      mark.textContent = p.text;
-      return mark;
-    }),
-  );
+function renderWords({ heard, keyword, unmatched, kind, confirmed }) {
+  const sentence = splitKeyword(heard, keyword).map((p) => {
+    if (!p.mark) return document.createTextNode(p.text);
+    const mark = document.createElement('mark');
+    mark.textContent = p.text;
+    return mark;
+  });
+  el.words.replaceChildren(...wordsParts(sentence, wordsLabels({ keyword, unmatched, confirmed })));
   el.words.dataset.unmatched = String(Boolean(unmatched));
   el.words.dataset.kind = kind || 'server';
 }
@@ -227,7 +249,7 @@ el.command.addEventListener('input', (e) => {
   if (DEBUG) console.info(`[web] input ${e.inputType} chars=${e.data?.length ?? '-'} -> ${kind}`);
   if (kind === 'whole') return sendFinalFromBox();
   const text = el.command.value.trim();
-  if (!text) return;
+  if (!text) return heardTracker.clearPartials(); // draft deleted: it is no longer pending
   send(partialMsg(text));
   // Sent after a pause, unless it still looks unfinished ("a car,"): then only Enter sends it.
   const delay = finalizeDelay(kind, text);

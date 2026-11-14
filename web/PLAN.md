@@ -9,7 +9,7 @@ Owner: `@anirudhaugile` (Ani), since the lead's swap on 2026-11-14. Started by `
 | `video` | `<canvas>` | draws decoded JPEG frames, newest only |
 | `connection` | any | `textContent` = status; `data-state` = `connecting` / `open` / `closed` |
 | `mode-banner` | any | shown only while server messages say `fake: true` (the fake server); hidden otherwise, including before the first message, so a real engine that is still loading is never labelled MOCK. |
-| `words` | any, `aria-live="polite"` | children replaced: text nodes plus one `<mark>` around the keyword; `data-unmatched="true"` when no operation; `data-kind` = `partial` / `final` |
+| `words` | any, `aria-live="polite"` | children replaced: a `.words-label` ("hearing…" while local, "heard" from the server), the full sentence in `.words-text` with one `<mark>` around the keyword, and `.words-understood` ("→ understood: <keyword>" or "→ not understood"); `data-unmatched="true"` when no operation; `data-kind` = `partial` / `final` / `server` |
 | `changes` | any (list container) | children replaced from server state; `data-stale="true"` while disconnected |
 | `command-form` | `<form>` | submit is `preventDefault`ed (no reload); submit sends `final` |
 | `command` | `<input type="text">` | kept focused; input events send messages; cleared after `final` |

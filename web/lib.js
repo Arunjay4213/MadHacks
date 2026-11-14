@@ -127,6 +127,47 @@ export function splitKeyword(text, keyword) {
 
 export const backoffMs = (attempt) => Math.min(5000, 250 * 2 ** attempt);
 
+// What the words line says around the sentence: a label before it ("hearing…" while you type or speak,
+// "heard" once the server has it) and, for the server's version, what it understood.
+// `confirmed` is true only for a final this page sent: the server also reports partial text with
+// unmatched false, so a no-keyword "understood" is claimed only after a confirmed final.
+export function wordsLabels({ local, keyword, unmatched, confirmed = false }) {
+  if (local) return { label: 'hearing…', understood: '' };
+  if (unmatched) return { label: 'heard', understood: '→ not understood' };
+  if (keyword) return { label: 'heard', understood: `→ understood: ${keyword}` };
+  // No keyword when the AI reader (or another fallback) understood it: say so, but only for a confirmed final.
+  return { label: 'heard', understood: confirmed ? '→ understood' : '' };
+}
+
+// Tells whether the server's "heard" is this page's own partial (still being said or typed), this
+// page's own final (confirmed), or something else (another viewer's command, or the starting state).
+// A partial counts as still being said or typed only for PENDING_MS after it was sent, so an abandoned
+// draft never hides another viewer's identical command.
+export const PENDING_MS = 5000;
+export function makeHeardTracker(max = 50) {
+  let partials = new Map(); // text -> time sent
+  const finals = [];
+  return {
+    sentPartial(text, now = Date.now()) {
+      partials.set(text, now);
+    },
+    sentFinal(text, t) {
+      partials = new Map(); // the sentence is done; its partials no longer count as pending
+      finals.push({ text, t });
+      if (finals.length > max) finals.shift();
+    },
+    clearPartials() {
+      partials = new Map(); // the draft was deleted or abandoned
+    },
+    classify(heard, tClient, now = Date.now()) {
+      if (finals.some((f) => f.t === tClient && f.text === heard)) return 'confirmed';
+      const sentAt = partials.get(heard);
+      if (sentAt !== undefined && now - sentAt < PENDING_MS) return 'pending';
+      return 'other';
+    },
+  };
+}
+
 // How long without a frame, while connected, before the page says the video has paused.
 export const STALL_MS = 2000;
 
