@@ -238,7 +238,7 @@ contract 1 on `/control` -> reader worker thread: `reader.handle` -> `steer` (co
 
 - The reader API, agreed with the `commands/` owner, is in `engine/reader.py`:
   `handle(msg) -> {"steer": contract 2 or None, "state": {...}}`, `state_fields()`, `likely_prompts()` and `committed_prompt`.
-- Every contract 1 message (`partial`, `final`, `tap`) goes to `reader.handle`, one at a time in arrival order on its own worker thread, because it may block for about 0.4 s.
+- Every contract 1 message (`partial`, `final`, `tap`) goes to `reader.handle`, one at a time in arrival order on its own worker thread, because it may block for up to 1.5 s (the slow reader, next section).
   If it raises ValueError, the client gets `{"error": ...}` on `/control`.
 - The stand-in reader takes a `final` text as the whole new prompt with a 4-chunk ramp, gives no steer for `partial` and `tap`, and keeps an empty changes list.
 - The `steer` dict is passed unchanged to `steering.Controller.handle`, including optional fields such as `strength` and `without_prompt`.
@@ -247,6 +247,24 @@ contract 1 on `/control` -> reader worker thread: `reader.handle` -> `steer` (co
   That jumps the steerer to the new target with no ramp, honours a strength pair, and keeps the controller's prompt cache.
 - The encoder service runs on its own thread with a priority queue, caches embeddings and token ids by exact prompt text (LRU, 512 entries), shares one encoding between identical requests, and logs cache hits, misses and encode ms.
 - The reader's `likely_prompts()` are encoded at startup, and after every command they are queued again at background priority, behind any command's encoding.
+
+## Slow reader (LLM fallback)
+
+With `--reader commands`, a `final` that the commands/ matching does not understand ("add a lion", "make it day", "turn the tree into a lighthouse") goes to one LLM call, `engine/slow_reader.py`.
+It is the last fallback: the keyword table and any other matching in commands/ run first, and only what they miss reaches the LLM.
+
+- The model is an Azure AI Foundry deployment, by default `gpt-4.1-nano`, called as Azure OpenAI chat completions with JSON mode, temperature 0 and at most 120 tokens.
+- It gets the current scene (base and changes with their ids) and the sentence, and returns one operation for `commands/state.py`: add (any object goes in as kind `extra`), remove, set_strength, undo, reset, new_scene, or none.
+- The reply is checked before use: a bad JSON reply, an unknown kind, an id that is not in the scene or a strength out of range gives None, and the words show as unmatched.
+- `CommandService` waits up to 1.5 s for it; the HTTP call itself gives up after 2 s.
+- Measured from the engine machine on 2026-11-14: 390 to 550 ms per call with `gpt-4.1-nano` (`gpt-4.1-mini` took 1.0 to 1.3 s).
+- Each call logs one line: `slow reader: 'add a lion' -> {...} (547 ms, ok)`.
+- `CommandService.handle` holds its lock during the call, and the streamer thread asks for `state_fields()` on every chunk.
+  So the engine wraps the service in `StateCachingReader`, which answers `state_fields()` from the state the last `handle` returned, and the stream never waits for the LLM.
+- Credentials come from the environment: `FOUNDRY_ENDPOINT`, `FOUNDRY_KEY` and `FOUNDRY_DEPLOYMENT`.
+  On the engine machine they are in `~/.madhacks-foundry.env` (mode 600, never in git), which the systemd unit loads with `EnvironmentFile=`.
+  For a manual run, load it first: `set -a; . ~/.madhacks-foundry.env; set +a`.
+- Without the variables the engine runs as before and logs one line: `slow reader off: FOUNDRY_ENDPOINT or FOUNDRY_KEY is not set ...`.
 
 ## Lifecycle states
 
