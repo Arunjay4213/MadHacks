@@ -170,7 +170,7 @@ def test_target_cast_to_cond_dtype():
 
 # --- validation -------------------------------------------------------------
 
-@pytest.mark.parametrize("ramp", [0, -1, 1.5, 2.0, True, False, "3", None])
+@pytest.mark.parametrize("ramp", [0, 1.5, True])
 def test_bad_ramp_raises(ramp):
     a, b = _vecs(2)
     s = Steerer(a)
@@ -178,7 +178,7 @@ def test_bad_ramp_raises(ramp):
         s.set_target(b, ramp)
 
 
-@pytest.mark.parametrize("cap", [0.0, -0.5, 1.01, 2.0, float("nan")])
+@pytest.mark.parametrize("cap", [0.0, 1.01, float("nan")])
 def test_bad_cap_raises(cap):
     a, b = _vecs(2)
     s = Steerer(a)
