@@ -99,6 +99,13 @@ def blocked_word(text: str) -> str | None:
 
 STYLE = "Cinematic, highly detailed, realistic, sharp focus, motion blur on the road."
 
+# Measured by the steering owner with optical flow (board, 2026-11-14): a vehicle subject drives backwards in 1 of
+# 3 seeds with a short prompt, and forward in 3 of 3 with this wording. Added to SUBJECT when the subject is a
+# vehicle and does not already say how it moves.
+VEHICLE_WORDS = ("car", "truck", "van", "bus", "motorcycle", "motorbike", "jeep", "taxi", "vehicle")
+FORWARD_MOTION = ("speeding forward, driving away from the camera, the camera follows directly behind, "
+                  "lane markings rush toward the viewer")
+
 STANDIN_DETAILS = """The "details" field is the WORLD of the new scene, for the Wan2.1 text-to-video model.
 The engine builds the video prompt as SUBJECT + WORLD + STYLE. SUBJECT is the scene's base sentence and STYLE is
 a fixed style sentence; both are added by the engine, so never repeat, rephrase or contradict the subject, and say
@@ -133,10 +140,18 @@ def standin_validate(prompt: str, reply) -> str | None:
         return prompt
     if "\n" in details or len(details.split()) > 80:
         return None
-    subject = prompt.split(";")[0].strip()
+    subject = with_forward_motion(prompt.split(";")[0].strip())
     subject = subject[:1].upper() + subject[1:]
     world = details if details.endswith(".") else details + "."
     return f"{subject}, {world} {STYLE}"
+
+
+def with_forward_motion(subject: str) -> str:
+    """`subject` plus FORWARD_MOTION when it names a vehicle and says nothing about its direction yet."""
+    words = set(re.findall(r"[a-z]+", subject.lower()))
+    if words & set(VEHICLE_WORDS) and not words & {"forward", "away", "behind", "reversing", "backwards"}:
+        return f"{subject}, {FORWARD_MOTION}"
+    return subject
 
 
 @dataclasses.dataclass(frozen=True)
