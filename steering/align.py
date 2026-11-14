@@ -40,7 +40,11 @@ class Aligner:
     call (identity) ignore it.
 
     `place` = `prepare` + `commit`. Use `prepare`/`commit` to commit only
-    after the placed tensor was actually used. All methods are thread safe.
+    after the placed tensor was actually used. `prepare(..., against=layout)`
+    matches against `layout` instead of the committed one (e.g. to place a
+    second prompt next to one just prepared); `against=()` places with no
+    previous tokens, which is the identity when nothing is occupied. All
+    methods are thread safe.
     """
 
     def __init__(self, length: int = 512) -> None:
@@ -73,11 +77,19 @@ class Aligner:
             return out
 
     def prepare(
-        self, emb: Tensor, ids: Sequence[int], occupied: Mask | None = None
+        self,
+        emb: Tensor,
+        ids: Sequence[int],
+        occupied: Mask | None = None,
+        against: Layout | None = None,
     ) -> tuple[Tensor, Layout]:
-        """Like `place` but does not commit; returns (placed, layout)."""
+        """Like `place` but does not commit; returns (placed, layout).
+
+        With `against`, tokens are matched against that layout instead of the
+        committed one (which is neither read nor changed).
+        """
         with self._lock:
-            return self._prepare(emb, ids, occupied)
+            return self._prepare(emb, ids, occupied, against)
 
     def commit(self, layout: Layout) -> None:
         """Make `layout` (from `prepare`) the previous layout for the next call."""
@@ -90,7 +102,11 @@ class Aligner:
             self._layout = None
 
     def _prepare(
-        self, emb: Tensor, ids: Sequence[int], occupied: Mask | None
+        self,
+        emb: Tensor,
+        ids: Sequence[int],
+        occupied: Mask | None,
+        against: Layout | None = None,
     ) -> tuple[Tensor, Layout]:
         ids = [int(i) for i in ids]
         n = len(ids)
@@ -113,17 +129,19 @@ class Aligner:
             if len(occ) != self.length:
                 raise ValueError(f"occupied must have length {self.length}, got {len(occ)}")
 
-        positions = self._assign(ids, occ)
+        prev = self._layout if against is None else tuple(against)
+        positions = self._assign(ids, occ, prev)
         out_rows = torch.zeros_like(rows)
         out_rows[torch.tensor(positions, device=rows.device)] = rows[:n]
         out = out_rows.unsqueeze(0) if emb.dim() == 3 else out_rows
         return out, tuple(zip(positions, ids))
 
-    def _assign(self, ids: list[int], occ: list[bool]) -> list[int]:
-        if self._layout is None:
+    @staticmethod
+    def _assign(ids: list[int], occ: list[bool], prev: Layout | None) -> list[int]:
+        if prev is None:
             return list(range(len(ids)))
-        prev_pos = [p for p, _ in self._layout]
-        prev_ids = [i for _, i in self._layout]
+        prev_pos = [p for p, _ in prev]
+        prev_ids = [i for _, i in prev]
         out: list[int | None] = [None] * len(ids)
         matcher = difflib.SequenceMatcher(None, prev_ids, ids, autojunk=False)
         for a, b, size in matcher.get_matching_blocks():
@@ -131,7 +149,7 @@ class Aligner:
                 out[b + k] = prev_pos[a + k]
         taken = {p for p in out if p is not None}
         was_used = set(prev_pos)
-        free = [p for p in range(self.length) if p not in taken]
+        free = [p for p in range(len(occ)) if p not in taken]
         free.sort(key=lambda p: (occ[p], p in was_used))  # stable: lowest first
         it = iter(free)
         return [p if p is not None else next(it) for p in out]

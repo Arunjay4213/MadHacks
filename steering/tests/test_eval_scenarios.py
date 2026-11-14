@@ -155,7 +155,8 @@ def test_invalid_scenario_raises(steps, events):
 def test_default_scenarios_valid_for_any_ramp(ramp):
     names = [s.name for s in default_scenarios(ramp)]
     assert names == ["single", "hard_swap", "interrupt", "pace_1", "pace_2", "pace_3",
-                     "pace_4", "pace_12", "stack_remove_middle", "early_right", "early_wrong"]
+                     "pace_4", "pace_12", "stack_remove_middle", "early_right", "early_wrong",
+                     "strength_low", "strength_full", "strength_steps"]
     for sc in default_scenarios(ramp):
         assert sc.events[0].step >= 2  # room for pre-steer frames
 
@@ -202,3 +203,31 @@ def test_every_default_scenario_runs_with_aligner(sc):
 def test_cli_fake_align(capsys):
     assert main(["--fake", "--align", "--ramp", "2"]) == 0
     assert "stack_remove_middle" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("align", [False, True])
+def test_strength_scenarios_pass_messages_through(align):
+    from steering import blend
+
+    sc = _by_name()
+    assert [e.msg["strength"] for e in sc["strength_steps"].events] == [0.3, 0.6, 1.0, 1.3]
+    for name, s in (("strength_low", 0.3), ("strength_full", 1.0)):
+        (e,) = sc[name].events
+        assert e.msg["prompt"] == BASE + WINTER and e.msg["without_prompt"] == BASE
+        assert e.msg["strength"] == s
+    kw = {"aligner": Aligner(FAKE_ALIGN_LEN)} if align else {}
+    enc = fake_encode_ids if align else fake_encode
+    for name in ("strength_low", "strength_full", "strength_steps"):
+        spy = _SpyModel()
+        res = run(sc[name], spy, enc, FPS, **kw)
+        assert all(r["applied"] and r["kind"] == "final" for _, r in res.handled)
+        assert all(e.msg is sc[name].events[i].msg for i, (e, _) in enumerate(res.handled))
+        if not align:
+            last = res.handled[-1][0].msg["strength"]
+            want = blend(fake_encode(BASE), fake_encode(BASE + WINTER), last)
+            assert torch.equal(spy.conds[-1], want)
+    full = _SpyModel()
+    run(sc["strength_full"], full, enc, FPS, **kw)
+    plain = _SpyModel()
+    run(sc["single"], plain, enc, FPS, **({"aligner": Aligner(FAKE_ALIGN_LEN)} if align else {}))
+    assert torch.equal(full.conds[-1], plain.conds[-1])

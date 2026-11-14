@@ -51,6 +51,19 @@ class Steerer:
             self._k = 0
             self._cap = float(cap)
 
+    def reset(self, cond: Tensor) -> None:
+        """Jump to `cond` with no move (a new stream): idle, progress 1.0.
+
+        The shape may differ from before. Takes effect on the next `get_cond`.
+        """
+        with self._lock:
+            self._now = cond
+            self._start = cond
+            self._target = cond
+            self._ramp = 0
+            self._k = 0
+            self._cap = 1.0
+
     def get_cond(self) -> Tensor:
         """Advance the current move by one chunk and return the conditioning.
 
