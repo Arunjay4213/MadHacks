@@ -11,7 +11,7 @@ const el = {
   video: $('video'), connection: $('connection'), banner: $('mode-banner'), words: $('words'),
   changes: $('changes'), form: $('command-form'), command: $('command'), mic: $('mic'),
   ptt: $('ptt'), undo: $('undo'), latency: $('latency'), timing: $('timing'), error: $('error'),
-  notice: $('video-notice'), reset: $('reset'),
+  notice: $('video-notice'), reset: $('reset'), frame: $('frame'), fullscreen: $('fullscreen'),
 };
 const ctx = el.video.getContext('2d');
 // Same origin by default; `?server=host:port` points the page at another server (e.g. the engine on :8000).
@@ -59,7 +59,7 @@ function send(msg) {
 
 function setConnected(open) {
   el.connection.dataset.state = open ? 'open' : control ? 'closed' : 'connecting';
-  el.connection.textContent = open ? 'Connected' : 'Connection lost — reconnecting…';
+  el.connection.textContent = open ? 'Connected' : 'Reconnecting…'; // the notice over the video says the connection was lost
   el.changes.dataset.stale = String(!open);
   el.undo.disabled = !open;
   el.reset.disabled = !open;
@@ -152,27 +152,42 @@ function renderWords({ heard, keyword, unmatched, kind, confirmed }) {
   el.words.dataset.kind = kind || 'server';
 }
 
+// Chips are keyed by id: a chip that stays keeps its element (so a click on its × is never lost),
+// a new one animates in, and a removed one animates out. They still show only the server's state.
 function renderChanges(changes) {
   const open = control?.readyState === WebSocket.OPEN;
-  el.changes.replaceChildren(
-    ...changes.map((c) => {
-      const li = document.createElement('li');
-      li.className = 'chip';
-      li.dataset.id = c.id;
-      const label = document.createElement('span');
-      label.className = 'chip-label';
-      label.textContent = c.label;
-      const x = document.createElement('button');
-      x.type = 'button';
-      x.className = 'chip-remove';
-      x.textContent = '×';
-      x.setAttribute('aria-label', `Remove ${c.label}`);
-      x.disabled = !open;
-      x.addEventListener('click', () => send(tapMsg('remove', c.id))); // chips change only when the server says so
-      li.append(label, x);
-      return li;
-    }),
-  );
+  const existing = new Map([...el.changes.querySelectorAll('.chip:not(.leaving)')].map((li) => [li.dataset.id, li]));
+  const keep = new Set();
+  for (const c of changes) {
+    let li = existing.get(c.id);
+    if (!li) li = makeChip(c);
+    li.querySelector('.chip-label').textContent = c.label;
+    li.querySelector('.chip-remove').disabled = !open;
+    keep.add(c.id);
+    el.changes.append(li); // in the server's order
+  }
+  for (const [id, li] of existing) {
+    if (keep.has(id)) continue;
+    li.classList.add('leaving');
+    li.querySelector('.chip-remove').disabled = true;
+    setTimeout(() => li.remove(), 220);
+  }
+}
+
+function makeChip(c) {
+  const li = document.createElement('li');
+  li.className = 'chip';
+  li.dataset.id = c.id;
+  const label = document.createElement('span');
+  label.className = 'chip-label';
+  const x = document.createElement('button');
+  x.type = 'button';
+  x.className = 'chip-remove';
+  x.textContent = '×';
+  x.setAttribute('aria-label', `Remove ${c.label}`);
+  x.addEventListener('click', () => send(tapMsg('remove', c.id))); // chips change only when the server says so
+  li.append(label, x);
+  return li;
 }
 
 // ---------- frames socket ----------
@@ -198,12 +213,16 @@ function connectFrames() {
       return; // undecodable frame: skip it, keep the last good one
     }
     if (!gate.tryDraw(seq)) return bmp.close(); // a newer frame was already drawn
-    // Size the canvas to the screen space it has (in device pixels) at the frame's own aspect ratio,
-    // read from the decoded frame, then upscale with high-quality smoothing.
-    const size = fitSize(bmp.width, bmp.height, el.video.clientWidth, el.video.clientHeight, window.devicePixelRatio || 1);
+    // Fit the frame (its size read from the decoded image) into the space the stage has, keeping its
+    // aspect ratio. The canvas's CSS size is the picture itself, so the rounded corners and shadow sit on
+    // it; its backing size is in device pixels and the frame is upscaled with high-quality smoothing.
+    const dpr = window.devicePixelRatio || 1;
+    const size = fitSize(bmp.width, bmp.height, el.frame.clientWidth, el.frame.clientHeight, dpr);
     if (el.video.width !== size.width || el.video.height !== size.height) {
       el.video.width = size.width; // resizing a canvas resets its drawing settings
       el.video.height = size.height;
+      el.video.style.width = `${size.width / dpr}px`;
+      el.video.style.height = `${size.height / dpr}px`;
     }
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
@@ -270,6 +289,16 @@ window.addEventListener('focus', refocus); // returning from another app
 document.addEventListener('pointerup', refocus);
 
 el.undo.addEventListener('click', () => send(tapMsg('undo')));
+// Full screen for the demo. The text box gets focus back either way, so Wispr Flow keeps working;
+// if the browser refuses, the tooltip points at Chrome's own full screen.
+el.fullscreen.addEventListener('click', () => {
+  const p = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+  p?.catch(() => showError('Full screen was blocked: use View → Enter Full Screen in Chrome'));
+});
+document.addEventListener('fullscreenchange', () => {
+  el.fullscreen.textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
+  refocus();
+});
 // Back to the starting scene (the scene reset is undoable; the picture restarts cleanly).
 el.reset.addEventListener('click', () => send(tapMsg('reset')));
 // Keyboard: Option+R (Alt+R). The key never types into the text box.

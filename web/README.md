@@ -49,7 +49,7 @@ The page is four static files with no build step: `index.html`, `style.css`, `ap
    - with nothing to run: `https://<engine tunnel address>/app/` once the engine serves `web/` there.
 
    Both give the mic (localhost and https are allowed). Allow the microphone the first time Chrome asks.
-2. **Full screen:** Chrome menu **View → Enter Full Screen**.
+2. **Full screen:** the **Full screen** button (or Chrome's **View → Enter Full Screen** if the browser blocks it).
 3. **Speak commands:**
    - **Wispr Flow:** hold **Ctrl**, speak, release. The sentence lands in the text box and is sent at once.
    - **Live mic:** hold the **backtick** key (`` ` ``, under Esc) or the **Hold to talk** button, speak, release.
