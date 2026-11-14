@@ -171,6 +171,7 @@ Press Reset (or send the reset tap) to start a clean video.
 Steering works with `--reanchor on`: Gate 2 passed live after PR #57, with full winter about 2 s after "make it winter" (`engine/samples/gate2_live_make_it_winter_pass.jpg`).
 The policy's periodic refresh (every 60 chunks at strength 0.25) visibly breaks the picture on the refresh chunk (`engine/samples/refresh_breaks_picture.jpg`).
 The live engine therefore runs with the refresh off: `--reanchor-opt refresh_every_chunks=none`.
+Now the refresh starts from the clean anchor (every 24 chunks, strength 0.5): no long-run drift over 360 chunks, but a one-chunk glitch on every refresh chunk remains (`engine/samples/refresh_clean_anchor.jpg`, MODEL_NOTES.md).
 
 ## Command line
 

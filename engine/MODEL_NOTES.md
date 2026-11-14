@@ -137,6 +137,13 @@ Measured over 360 chunks with no commands (672x384, 2 steps, taehv, `quick_gold.
 | from the clean anchor (saved at chunk 3), step 1 or 2, every 24 or 40 chunks | clean and the same scene for all 360 chunks |
 | from the clean anchor, step 2 every 24 chunks | the steadiest; now the default (`refresh_every_chunks=24`, `refresh_strength=0.5`, `refresh_source="clean"`) |
 
+Checked with this code (real backend + real `ReanchorPolicy` at the defaults, 360 chunks, 672x384, 2 steps, taehv, about 290 ms per chunk on the shared L40S):
+`engine/samples/refresh_clean_anchor.jpg` (meadow and car, no commands) stays the same clean scene for all 360 chunks; mean saturation and RMS contrast per 60 chunks stay flat (meadow 0.30-0.33 / 0.28-0.30, car 0.20-0.23 / 0.26-0.27).
+`engine/samples/refresh_clean_anchor_steer.jpg` (meadow, "deep winter" steer sent at chunk 60, anchor at chunk 63): the clean anchor is saved again at chunk 66 and every later refresh stays winter; nothing pulls back to summer.
+Still open: **the refresh chunk itself is visibly bad**, a washed-out, ghosted frame with horizontal streaks, for one chunk (0.25 s), slightly soft on the next, clean on the one after, every 24 chunks (6 s).
+The mean absolute change from the last frame of the previous chunk is 23-28 (0-255) on refresh chunks against 7-9 on other chunks.
+`quick_gold.py` never sampled a refresh chunk, so it did not show this. A steer re-anchor (step 0) has the same one-chunk glitch.
+
 ## Using the backend from a plain Python script
 
 Run from `~/madhacks` with `~/engine-venv` active:
