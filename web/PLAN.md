@@ -70,8 +70,9 @@ It sits in `PROTOCOL` in `lib.js` and in `fake-server.mjs`.
    socket), waiting for the first frame, or "Video paused" after 2 s without frames (`STALL_MS`). The delay line is
    short ("voice → video" plus server stamps); its full definition is in the tooltip.
 6. Reset button (sends the `reset` tap, Option+R / Alt+R shortcut, never Ctrl) and no "Connection lost" while the
-   sockets are still opening: done. Big-screen layout: on hold (the lead chose lucid-studio/ as the demo page for
-   now; web/ is the tested fallback).
+   sockets are still opening: done. Big-screen layout: dropped (the lead chose lucid-studio/ as the demo page for
+   now; web/ is the tested fallback). Unmerged work is on branch `6-web-bigscreen`. For full screen use Chrome's
+   View → Enter Full Screen.
 
 ## Open
 
