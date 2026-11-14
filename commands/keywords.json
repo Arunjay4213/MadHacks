@@ -24,7 +24,7 @@
   {"label":"deer","kind":"extra","phrase":"a deer grazing nearby","aliases":["stag","doe","fawn"]},
   {"label":"fireflies","kind":"extra","phrase":"glowing fireflies","aliases":["firefly","fire fly","fire flies","lightning bugs","lightning bug"]},
   {"label":"lake","kind":"extra","phrase":"a calm lake reflecting the sky","aliases":["lakes","pond","ponds","lagoon","lagoons"]},
-  {"label":"car","kind":"extra","phrase":"a car parked beside the scene","aliases":["cars","automobile","automobiles","vehicle","vehicles","sedan","sedans","motorcar","motor car","sports car"]},
+  {"label":"car","kind":"extra","phrase":"a car driving forward along a road","aliases":["cars","automobile","automobiles","vehicle","vehicles","sedan","sedans","motorcar","motor car","sports car"]},
   {"label":"dog","kind":"extra","phrase":"a dog standing nearby","aliases":["dogs","puppy","puppies","hound","hounds","canine","canines"]},
   {"label":"cat","kind":"extra","phrase":"a cat sitting nearby","aliases":["cats","kitten","kittens","feline","felines"]},
   {"label":"snowman","kind":"extra","phrase":"a snowman with a carrot nose and a scarf","aliases":["snowmen","snow man","snow men"]},
