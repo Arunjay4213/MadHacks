@@ -66,7 +66,7 @@ def test_validate_shapes():
 def test_service_uses_it_after_the_keyword_table():
     svc = CommandService(slow_reader=reader_replying(
         json.dumps({"op": "add", "label": "lion", "kind": "extra", "phrase": "a lion in the grass"})), slow_timeout_s=2)
-    out = svc.handle(final("add a lion"))
+    out = svc.handle(final("turn the tree into a lion"))
     assert out["state"]["unmatched"] is False
     assert [c["label"] for c in out["state"]["changes"]] == ["lion"]
     assert "a lion in the grass" in out["steer"]["prompt"]
@@ -87,7 +87,7 @@ def test_state_fields_does_not_wait_for_a_slow_handle():
         return {"op": "add", "label": "lion", "kind": "extra", "phrase": "a lion"}
 
     reader = StateCachingReader(CommandService(slow_reader=slow, slow_timeout_s=2))
-    t = threading.Thread(target=reader.handle, args=(final("add a lion"),))
+    t = threading.Thread(target=reader.handle, args=(final("turn the tree into a lion"),))
     t.start()
     started.wait(1)
     t0 = time.monotonic()
