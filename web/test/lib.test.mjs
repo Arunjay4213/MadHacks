@@ -6,7 +6,16 @@ import {
   PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
 } from '../lib.js';
 import { loadTestPattern } from '../fake-server.mjs';
-import { wsBaseUrl, fitSize, videoNotice, formatStamps, STALL_MS } from '../lib.js';
+import { wsBaseUrl, fitSize, videoNotice, formatStamps, STALL_MS, isResetShortcut } from '../lib.js';
+
+test('reset shortcut: Option/Alt+R only; never with Ctrl (Wispr Flow) or Cmd; plain R just types', () => {
+  const key = (code, mods = {}) => ({ code, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...mods });
+  assert.equal(isResetShortcut(key('KeyR', { altKey: true })), true);
+  assert.equal(isResetShortcut(key('KeyR')), false);
+  assert.equal(isResetShortcut(key('KeyR', { altKey: true, ctrlKey: true })), false);
+  assert.equal(isResetShortcut(key('KeyR', { altKey: true, metaKey: true })), false);
+  assert.equal(isResetShortcut(key('KeyT', { altKey: true })), false);
+});
 
 test('videoNotice: connecting, lost, waiting, paused, or live', () => {
   const live = { controlOpen: true, framesOpen: true, lastFrameAt: 1000, now: 1100, everConnected: true };
