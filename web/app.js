@@ -192,6 +192,15 @@ function makeChip(c) {
 
 // ---------- frames socket ----------
 const gate = makeFrameGate();
+let lastFrameSize = null;
+// When the space changes with no new frame (window resized, full screen, video paused), re-fit the
+// picture's CSS size at once; the next frame redraws it at the new resolution.
+new ResizeObserver(() => {
+  if (!lastFrameSize) return;
+  const size = fitSize(lastFrameSize.w, lastFrameSize.h, el.frame.clientWidth, el.frame.clientHeight, 1);
+  el.video.style.width = `${size.width}px`;
+  el.video.style.height = `${size.height}px`;
+}).observe(el.frame);
 let frameAttempt = 0;
 
 function connectFrames() {
@@ -217,6 +226,7 @@ function connectFrames() {
     // aspect ratio. The canvas's CSS size is the picture itself, so the rounded corners and shadow sit on
     // it; its backing size is in device pixels and the frame is upscaled with high-quality smoothing.
     const dpr = window.devicePixelRatio || 1;
+    lastFrameSize = { w: bmp.width, h: bmp.height };
     const size = fitSize(bmp.width, bmp.height, el.frame.clientWidth, el.frame.clientHeight, dpr);
     if (el.video.width !== size.width || el.video.height !== size.height) {
       el.video.width = size.width; // resizing a canvas resets its drawing settings
