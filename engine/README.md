@@ -178,7 +178,8 @@ The live engine therefore runs with the refresh off: `--reanchor-opt refresh_eve
 python -m engine.server --backend fake|causal_forcing --reader standin|commands --host 127.0.0.1 --port 8000 --width 832 --height 480 \
     --steps 0 --base-prompt "..." --jpeg-quality 80 --precompute-file prompts.txt \
     --device cuda:0 --decode-device cuda:0 --backend-opt key=value --lead-margin 1.3 --reanchor off --reanchor-opt key=value --log-level info \
-    --record-dir ~/recordings --record-max-gb 20 --final-reader off --final-timeout-s 3.0 --final-cache ~/.cache/madhacks/final_reader.json
+    --record-dir ~/recordings --record-max-gb 20 --final-reader off --final-timeout-s 3.0 --final-cache ~/.cache/madhacks/final_reader.json \
+    --short-chunk crossfade
 ```
 
 - `--steps 0` (the default) runs the denoising schedule the backend's checkpoint was distilled for; the real model is distilled for 2 steps, so any other number changes the schedule.
@@ -193,6 +194,8 @@ python -m engine.server --backend fake|causal_forcing --reader standin|commands 
 - `--reanchor off|on` (default `off`) turns on the steering re-anchor policy (see "Re-anchor").
 - `--reanchor-opt key=value` sets one field of the policy's `ReanchorConfig` and may be repeated (see "Re-anchor").
 - `--final-reader off|sonnet` (default `off`), `--final-timeout-s` and `--final-cache` control the Sonnet final reader (see "Final reader (Sonnet)").
+- `--short-chunk fill|hold|crossfade` (default `crossfade`) sets how a chunk with fewer frames than `frames_per_chunk` is padded (see "Short chunks").
+- The fake backend's `short_on_chunks=40,80` makes those chunks (numbered across resets, as `fail_on_chunk`) 1 frame long and labels them "short chunk", to test "Short chunks".
 - `--record-dir` and `--record-max-gb` control the recorder (see "Recorder"); `--record-dir none` turns it off.
 - SIGINT or SIGTERM shuts down cleanly, finalizes the open recording and moves the engine to STOPPED.
 - The process exits with code 70 when the engine reaches FAILED, so systemd restarts it.
@@ -208,7 +211,7 @@ All on one origin; the message shapes are in `contracts/README.md`.
 | websocket `/control` | Contract 1 in (JSON text); contract 4 out, one message per chunk; `{"error": "..."}` replies to a bad message. |
 | `POST /target` | Body is a contract 2 message; it skips the command reader and goes unchanged to the encoder and `steering.Controller.handle`. |
 | `POST /reset` | Same as a `{"type":"tap","action":"reset"}` on `/control`: goes through the reader, then starts a new video; returns when done. |
-| `GET /stats` | JSON: lifecycle state, backend, reader, last generated and shown chunk, last and average generation, decode and JPEG ms, measured fps, queue depths, re-anchor state and last anchor, encoder cache and pending encodes, current video number, recovery count and last recovery time, recorder, clients. |
+| `GET /stats` | JSON: lifecycle state, backend, reader, last generated and shown chunk, last and average generation, decode and JPEG ms, measured fps, queue depths, re-anchor state and last anchor, encoder cache and pending encodes, current video number, recovery count and last recovery time, short chunks, recorder, clients. |
 | `GET /healthz` | 200 with the state (RECOVERING included), or 503 when FAILED or STOPPED. |
 | `GET /app/` | The demo page from `web/` (see "The demo page at /app/"). |
 
@@ -250,6 +253,28 @@ One `generate_chunk` call is one chunk in every contract, and it may produce any
 - Lead gate: before each chunk, generation waits until the frames already made but not yet sent are no more than (generation + decode + JPEG time) x fps x `--lead-margin`.
   This keeps the stream fed while keeping as little video queued as possible, because every queued frame adds to the delay of a command.
 - Timing log: one line per chunk with generation, decode and JPEG ms and the decode queue depth, and a summary line every 20 chunks.
+
+## Short chunks
+
+After a rebase the model restarts its frame memory, and the decoder restarts on that chunk, so it decodes to 1 frame instead of `frames_per_chunk` (4).
+Played as it is, the playout runs 3 frames (0.19 s) short and the stream stalls for about 47 ms at the next chunk.
+The decode thread finds such a chunk by its frame count: fewer frames than `frames_per_chunk`, and not the first chunk of a video.
+It pads the chunk to `frames_per_chunk` frames before JPEG encoding, by `--short-chunk` (the enum `ShortChunkMode`):
+
+- `crossfade` (default): the missing slots blend linearly from the last frame decoded before the chunk to the chunk's first frame, ending on that frame.
+  With 1 of 4 frames the slots are 25 %, 50 %, 75 % and then the new frame itself.
+  The blend is integer math in uint16 and takes about 0.7 ms at 672x384 alone, and about 1.9 ms at 832x480 inside a running fake server.
+- `hold`: the missing slots repeat the chunk's first frame.
+- `fill`: no padding, the old behaviour, kept for comparison.
+
+The first chunk of a video (at start, after a reset or after a recovery) is never padded.
+It is a cut to a new picture, so a cross-fade from the old video would blend two unrelated scenes, and padding it would add 0.19 s to every reset.
+The decode thread knows it by the video number in `ChunkMeta`: the last decoded frame belongs to another video, or there is none.
+The decision is the enum `ChunkShape`: `full`, `video_start` or `short`.
+The padding frames count as frames of the chunk, so the lead gate's estimate of `frames_per_chunk` frames stays right.
+Each short chunk logs one line (`chunk 40: short chunk, 1 of 4 frames, mode crossfade: padded to 4 frames in 1.9 ms`).
+`/stats` has `short_chunks`: `mode`, `count`, `last_chunk`, and `last` (`chunk`, decoded `frames`, `pad_ms`).
+When the backend marks a first-frame chunk explicitly (a planned `ChunkStart.FIRST_FRAME` field), the frame count stays a correct test, so nothing here needs to change.
 
 ## Re-anchor
 
