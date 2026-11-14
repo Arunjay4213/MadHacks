@@ -97,9 +97,14 @@ The main track theme is: go deep into something and do deep research.
 We enter the main track, and we may also enter one sponsor track: Databricks or Qualcomm.
 Entering no sponsor track is also allowed.
 
-Status on 2026-11-14: the sponsor track and the project idea are both open.
-An earlier note said Databricks was decided. The lead reopened that choice after the theme and the Qualcomm kit were known.
-The candidate ideas are on the board.
+Decided by the lead on 2026-11-14: the project is real-time video editing with diffusion models.
+A live video is changed by an instruction while it plays, for example summer to winter.
+Ishaan (`@Tactacion`) writes the blueprint.
+Work is divided after the blueprint is posted, and the lead then fills in the table in section 4.
+No project code and no new folders before that.
+
+The sponsor track is still open.
+Earlier directions are dropped: pooling laptops to run models, and a diffusion model writing the reasoning for a language model.
 
 Whichever sponsor we pick, its product must do work the demo depends on, not sit beside it as an add-on.
 Good test: if the sponsor's product were removed, the main demo should stop working.
