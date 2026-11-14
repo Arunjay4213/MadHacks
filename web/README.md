@@ -4,7 +4,7 @@ Owner `@anirudhaugile` (Ani), issue #6. See `PLAN.md` here for the DOM ids, beha
 
 ```sh
 cd web
-npm install
+npm ci          # install the exact dependency versions first (needed before npm test or npm start)
 npm test        # unit tests (lib.js) + fake-server integration tests
 npm start       # MOCK fake server on http://127.0.0.1:8787 (PORT to change)
 ```

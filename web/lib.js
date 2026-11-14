@@ -141,21 +141,28 @@ export function wordsLabels({ local, keyword, unmatched, confirmed = false }) {
 
 // Tells whether the server's "heard" is this page's own partial (still being said or typed), this
 // page's own final (confirmed), or something else (another viewer's command, or the starting state).
+// A partial counts as still being said or typed only for PENDING_MS after it was sent, so an abandoned
+// draft never hides another viewer's identical command.
+export const PENDING_MS = 5000;
 export function makeHeardTracker(max = 50) {
-  let partials = new Set();
+  let partials = new Map(); // text -> time sent
   const finals = [];
   return {
-    sentPartial(text) {
-      partials.add(text);
+    sentPartial(text, now = Date.now()) {
+      partials.set(text, now);
     },
     sentFinal(text, t) {
-      partials = new Set(); // the sentence is done; its partials no longer count as pending
+      partials = new Map(); // the sentence is done; its partials no longer count as pending
       finals.push({ text, t });
       if (finals.length > max) finals.shift();
     },
-    classify(heard, tClient) {
+    clearPartials() {
+      partials = new Map(); // the draft was deleted or abandoned
+    },
+    classify(heard, tClient, now = Date.now()) {
       if (finals.some((f) => f.t === tClient && f.text === heard)) return 'confirmed';
-      if (partials.has(heard)) return 'pending';
+      const sentAt = partials.get(heard);
+      if (sentAt !== undefined && now - sentAt < PENDING_MS) return 'pending';
       return 'other';
     },
   };

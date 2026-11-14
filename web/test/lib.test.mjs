@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseFrame, parseServerMessage, splitKeyword, backoffMs, isWholeInsert,
   makeFrameGate, makeLatencyTracker, makeTranscriber, changesKey, commandKey, makeInputClassifier,
-  PUSH_TO_TALK_CODE, isPushToTalk, micErrorText, looksUnfinished, finalizeDelay, wordsLabels, makeHeardTracker,
+  PUSH_TO_TALK_CODE, isPushToTalk, micErrorText, looksUnfinished, finalizeDelay, wordsLabels, makeHeardTracker, PENDING_MS,
 } from '../lib.js';
 import { loadTestPattern } from '../fake-server.mjs';
 import { wsBaseUrl, fitSize, videoNotice, formatStamps, STALL_MS, isResetShortcut } from '../lib.js';
@@ -247,6 +247,14 @@ test('heard tracker: own partials are pending, own finals confirmed, anything el
   assert.equal(h.classify('make it night', 8), 'confirmed');
   assert.equal(h.classify('make it', 7), 'other'); // after the final, old partials are not pending
   assert.equal(h.classify('add a lion', 99), 'other'); // another viewer's command
+  // An abandoned draft: deleted, or simply old. Another viewer's identical final then shows normally.
+  const g = makeHeardTracker();
+  g.sentPartial('add a lion', 1000);
+  assert.equal(g.classify('add a lion', 5, 2000), 'pending');
+  assert.equal(g.classify('add a lion', 5, 1000 + PENDING_MS + 1), 'other');
+  g.sentPartial('add a lion', 9000);
+  g.clearPartials();
+  assert.equal(g.classify('add a lion', 5, 9100), 'other');
 });
 
 const R = (transcript, isFinal = false) => ({ transcript, isFinal });

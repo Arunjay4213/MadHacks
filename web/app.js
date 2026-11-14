@@ -249,7 +249,7 @@ el.command.addEventListener('input', (e) => {
   if (DEBUG) console.info(`[web] input ${e.inputType} chars=${e.data?.length ?? '-'} -> ${kind}`);
   if (kind === 'whole') return sendFinalFromBox();
   const text = el.command.value.trim();
-  if (!text) return;
+  if (!text) return heardTracker.clearPartials(); // draft deleted: it is no longer pending
   send(partialMsg(text));
   // Sent after a pause, unless it still looks unfinished ("a car,"): then only Enter sends it.
   const delay = finalizeDelay(kind, text);
