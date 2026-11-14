@@ -160,6 +160,31 @@ Measured on the meadow, 360 chunks, refresh every 24 at step 2, mean over the re
 
 The refresh chunk is now as sharp as its neighbours and not washed out. What remains is one cut: the change on the refresh chunk (about 33) is the jump to the clean anchor's composition, and on the car the trees and road jump back to the saved layout every refresh.
 
+The same on the car and on steers (sharpness of the anchor chunk / the next chunk, against about 510-540 for the car and 2050-2250 for the meadow before it):
+
+| Run, event | before | after |
+|---|---|---|
+| car, refresh | 133 / 296 | 524 / 505 |
+| meadow, steer to winter | 110 / 494 | 901 / 1071 |
+| car, steer to a snowy road | 71 / 189 | 361 / 397 |
+
+With the restart a steer is one clean cut to the new scene, instead of three ghosted chunks.
+Sheets (V0 = before, V1 = after, every chunk from -2 to +4 around each event): `engine/samples/reanchor_decoder_restart.jpg` (3 refreshes each on meadow and car), `engine/samples/reanchor_decoder_restart_steer.jpg` (the steer and the first refresh after it). `refresh_clean_anchor.jpg` and `refresh_clean_anchor_steer.jpg` are now with the restart.
+
+Refresh interval, 360 chunks at step 2, with the restart (mean saturation per 60 chunks; "snap" = mean absolute change, 0-255, from the chunk before a refresh to 3 chunks after it, against the same 4-chunk change elsewhere):
+
+| Run | saturation per 60 chunks | snap | by eye |
+|---|---|---|---|
+| car, every 24 (default) | 0.23 0.22 0.20 0.21 0.21 0.21 | 34 (normal 20) | clean all run |
+| car, every 48 | 0.25 0.24 0.21 0.23 0.20 0.21 | 41 (normal 18) | mostly clean, trees slightly blocky near the end |
+| car, every 72 | 0.25 0.21 0.20 0.21 0.30 0.20 | 44 (normal 17) | the sky over-saturates and the trees go blocky before refreshes |
+| car, refresh off | 0.25 0.28 0.27 0.13 0.05 0.03 | - | the colour is gone by the end |
+| meadow, every 72 | 0.40 0.32 0.31 0.29 0.36 0.37 | 42 (normal 8) | brown, blocky or dark noisy grass between refreshes |
+| meadow, step 1 (strength 0.75) every 24 | 0.36 0.36 0.39 0.35 0.36 0.36 | 30 (normal 8) | clean, but the scene wanders more (hills, a sun appear) |
+
+So 24 stays the default. 48 is the longest interval that stays nearly clean on the car (`--reanchor-opt refresh_every_chunks=48` halves the jumps); 72 drifts on both scenes.
+Still open: each refresh snaps the composition back to the clean anchor (on the car the same trees and road layout every 6 s).
+
 ## Using the backend from a plain Python script
 
 Run from `~/madhacks` with `~/engine-venv` active:

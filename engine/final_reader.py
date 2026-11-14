@@ -12,6 +12,11 @@ The prompt is built from the composed (canonical) prompt of the new scene and th
 PromptSpec: the engine's stand-in below, or commands.rewriter (SYSTEM_PROMPT, validate_rewrite) once it exists.
 
 The model's reply, JSON: {"blocked": bool, "operations": [op, ...], "details": str}.
+The validator gets {"details": str} only. Details it rejects keep the operations and use the composed prompt.
+
+Places: "take me to the desert" is one change of kind world (commands/world.py) that replaces the old world and
+keeps the other changes. Only an explicit "new scene of ..." resets. Season, weather and time adds get the
+keyword table's label and kind ("sunny" is day, of kind time).
 
 Content block: a small word list (BLOCKED_WORDS) is checked first, with no call at all; the model also flags
 sexual, violent or hateful requests with "blocked": true in the same reply.
@@ -52,6 +57,7 @@ HTTP_TIMEOUT_S = 10.0        # a call may finish after the wait; its answer is t
 WORKERS = 4
 MAX_OPERATIONS = 6
 DEFAULT_CACHE_FILE = "~/.cache/madhacks/final_reader.json"
+DEFAULT_DEMO_PROMPTS = str(Path(__file__).resolve().parent / "demo_prompts.json")
 LOG_CHARS = 100
 FENCE = re.compile(r"^\s*```[A-Za-z]*\s*|\s*```\s*$")
 
@@ -75,6 +81,7 @@ class Outcome(enum.Enum):
     SONNET = "sonnet"      # operations and a prompt from the model: saved
     BLOCKED = "blocked"    # refused (word list or the model): saved when the model said so
     FALLBACK = "fallback"  # timeout, error or invalid reply: the dictionary path; final in memory only
+    PINNED = "pinned"      # from the demo prompts file: never called, never saved, never evicted
 
 
 @dataclasses.dataclass(frozen=True)
@@ -84,7 +91,7 @@ class Entry:
     prompt: str | None = None
 
     def result(self) -> dict | None:
-        if self.outcome is Outcome.SONNET:
+        if self.outcome in (Outcome.SONNET, Outcome.PINNED):
             return {"operations": [dict(op) for op in self.operations], "prompt": self.prompt}
         if self.outcome is Outcome.BLOCKED:
             return {"blocked": True}
@@ -97,7 +104,9 @@ def blocked_word(text: str) -> str | None:
 
 # --- the prompt part ------------------------------------------------------------------------------------
 
-STYLE = "Cinematic, highly detailed, realistic, sharp focus, motion blur on the road."
+STYLE = "Cinematic, highly detailed, realistic, sharp focus."
+# "motion blur on the road" only fits a vehicle on a road; on a meadow with a lion it is wrong.
+VEHICLE_STYLE = "Cinematic, highly detailed, realistic, sharp focus, motion blur on the road."
 
 # Measured by the steering owner with optical flow (board, 2026-11-14): a vehicle subject drives backwards in 1 of
 # 3 seeds with a short prompt, and forward in 3 of 3 with this wording. Added to SUBJECT when the subject is a
@@ -107,18 +116,23 @@ FORWARD_MOTION = ("speeding forward, driving away from the camera, the camera fo
                   "lane markings rush toward the viewer")
 
 STANDIN_DETAILS = """The "details" field is the WORLD of the new scene, for the Wan2.1 text-to-video model.
-The engine builds the video prompt as SUBJECT + WORLD + STYLE. SUBJECT is the scene's base sentence and STYLE is
-a fixed style sentence; both are added by the engine, so never repeat, rephrase or contradict the subject, and say
+The engine builds the video prompt as SUBJECT + OBJECTS + WORLD + STYLE. SUBJECT is the scene's base sentence,
+OBJECTS are the phrases of the scene's extra changes (objects, animals, people), word for word, and STYLE is a
+fixed style sentence; all three are added by the engine, so never repeat, rephrase or contradict them, and say
 nothing about the camera, shots, lenses or editing.
 Write WORLD in about 50 words (never more than 60), plain present tense, no lists, no line breaks:
 - First the ground or road of that place, then two or three concrete things on both sides, then the light or sky.
-- Every change the new scene names (objects, animals, weather, season, time of day) must appear in WORLD.
+- The season, weather and time of day of the new scene must appear in WORLD. Objects, animals and people are
+  already in OBJECTS: do not describe them again.
 - A place REPLACES the world. It is never added to the old one: "make it a desert" turns the meadow into a
-  desert, and nothing of the old landscape (grass, meadow, fields) is described.
+  desert, and nothing of the old landscape (grass, meadow, fields) is described. The objects and animals of the
+  scene stay, now in the new place.
 - Do not add any object, creature, person or vehicle the scene does not name, and no motion or events beyond
   what it says.
-- If a change adds a kind the scene already has (the scene has a red car and the user adds "a car"), describe a
-  second, different one with a colour or type and a clear position, for example "a second blue car driving
+- If a change adds a kind the scene already has, describe a second one with a clear position. A colour, type or
+  size the user names ALWAYS wins: "add a red car racing on a road" when the scene has a red car gives "a second
+  red car racing alongside it in the next lane", differing only by position. Only when the user names no
+  attribute ("add a car"), give the second one another colour or type, for example "a second blue car driving
   alongside it in the next lane".
 - If changes conflict (sunlight and rain), blend them plausibly, such as sun breaking through rain clouds.
 Examples of WORLD:
@@ -129,9 +143,11 @@ Examples of WORLD:
 """
 
 
-def standin_validate(prompt: str, reply) -> str | None:
-    """SUBJECT + WORLD + STYLE from the canonical prompt of the new scene and the reply's details; the canonical
-    prompt for empty details; None for details that are not one plain paragraph of at most 80 words."""
+def standin_validate(prompt: str, reply, objects=()) -> str | None:
+    """SUBJECT + OBJECTS + WORLD + STYLE from the canonical prompt of the new scene (SUBJECT is its part before the
+    first ";"), the phrases of its extra changes (`objects`, kept word for word right after SUBJECT so a lion
+    stays the same lion in every later prompt) and the reply's details. The canonical prompt for empty details;
+    None for details that are not one plain paragraph of at most 80 words."""
     details = reply.get("details") if isinstance(reply, dict) else None
     if not isinstance(details, str):
         return None
@@ -140,63 +156,110 @@ def standin_validate(prompt: str, reply) -> str | None:
         return prompt
     if "\n" in details or len(details.split()) > 80:
         return None
-    subject = with_forward_motion(prompt.split(";")[0].strip())
+    base = prompt.split(";")[0].strip()
+    subject = ", ".join([with_forward_motion(base), *objects])
     subject = subject[:1].upper() + subject[1:]
     world = details if details.endswith(".") else details + "."
-    return f"{subject}, {world} {STYLE}"
+    return f"{subject}, {world} {VEHICLE_STYLE if is_vehicle(base) else STYLE}"
+
+
+def is_vehicle(subject: str) -> bool:
+    """True when `subject` names a vehicle (VEHICLE_WORDS), as a whole word."""
+    return bool(set(re.findall(r"[a-z]+", subject.lower())) & set(VEHICLE_WORDS))
 
 
 def with_forward_motion(subject: str) -> str:
     """`subject` plus FORWARD_MOTION when it names a vehicle and says nothing about its direction yet."""
     words = set(re.findall(r"[a-z]+", subject.lower()))
-    if words & set(VEHICLE_WORDS) and not words & {"forward", "away", "behind", "reversing", "backwards"}:
+    if is_vehicle(subject) and not words & {"forward", "away", "behind", "reversing", "backwards"}:
         return f"{subject}, {FORWARD_MOTION}"
     return subject
 
 
 @dataclasses.dataclass(frozen=True)
 class PromptSpec:
-    """How the prompt part is asked for and checked. `validate(prompt, reply)` gets the canonical prompt of the
-    new scene and the parsed reply, and gives the text the model sees, or None to reject the reply."""
+    """How the prompt part is asked for and checked. `validate(scene, reply)` gets the snapshot of the new scene
+    and {"details": str}, and gives the text the model sees, or None to reject the details."""
     name: str
     details_instructions: str
-    validate: Callable[[str, dict], str | None]
+    validate: Callable[[dict, dict], str | None]
 
 
-STANDIN = PromptSpec("engine stand-in", STANDIN_DETAILS, standin_validate)
+def _scene_objects(scene: dict) -> list[str]:
+    """The phrases of the scene's extra changes that are on (strength above 0), in the order they were added."""
+    return [c["phrase"] for c in scene["changes"] if c["kind"] == "extra" and c["strength"] > 0]
+
+
+def _standin_spec_validate(scene: dict, reply: dict) -> str | None:
+    from commands.composer import compose
+    return standin_validate(compose(scene), reply, _scene_objects(scene))
+
+
+STANDIN = PromptSpec("engine stand-in", STANDIN_DETAILS, _standin_spec_validate)
+
+
+def rewriter_validate(validate_rewrite: Callable[[str, dict], str | None]) -> Callable[[dict, dict], str | None]:
+    """commands.rewriter.validate_rewrite on the composed prompt of the scene, with FORWARD_MOTION in its subject
+    (the part before the first ";") when that subject is a vehicle that does not say how it moves yet, as the
+    stand-in does. The order of the composed prompt is the commands/ composer's."""
+    def validate(scene: dict, reply: dict) -> str | None:
+        from commands.composer import compose
+        subject, sep, rest = compose(scene).partition(";")
+        return validate_rewrite(with_forward_motion(subject.strip()) + sep + rest, reply)
+    return validate
 
 
 def prompt_spec(import_rules: Callable[[], object] = lambda: importlib.import_module("commands.rewriter")) -> PromptSpec:
-    """commands.rewriter (SYSTEM_PROMPT, validate_rewrite) when it imports, else the engine stand-in."""
+    """commands.rewriter (SYSTEM_PROMPT, validate_rewrite) when it imports, else the engine stand-in.
+
+    commands.rewriter.build_messages is not used. It is made for a separate call that only writes details:
+    its user message is the finished scene text, where "the command is context only and never permission to
+    add, remove or change anything", and its few-shot replies are {"details"} alone. The engine's one call has
+    to apply the command (the operations) and describe the scene after it, in about 1.8 s; with
+    build_messages that would be two calls in a row, past the 3 s wait. Its SYSTEM_PROMPT is used as the rules
+    for the details field, and validate_rewrite checks them against the composed prompt of the new scene.
+    """
     try:
         rules = import_rules()
-        return PromptSpec("commands.rewriter", rules.SYSTEM_PROMPT, rules.validate_rewrite)
+        return PromptSpec("commands.rewriter", rules.SYSTEM_PROMPT, rewriter_validate(rules.validate_rewrite))
     except Exception as exc:  # not there yet, or not the agreed shape
         log.info("final reader: commands.rewriter not usable (%r); using the engine's stand-in prompt", exc)
         return STANDIN
 
 
-OPERATIONS = """You read one spoken sentence that edits a video scene, and reply with one JSON object only:
-{"blocked": <true or false>, "operations": [<operation>, ...], "details": "<text>"}
+_PLACE_RULE = """- A PLACE or setting ("take me to the desert", "make it a desert", "go to Mars", "switch to a
+  neon city") is ONE add of kind world: label = the place in 1 to 3 words, phrase = a short description of that
+  place. It replaces the old world and KEEPS every other change: a red car added before stays in the desert.
+  Known places, use exactly these labels when one fits: {places}."""
+
+_OPERATIONS = """You read one spoken sentence that edits a video scene, and reply with one JSON object only:
+{{"blocked": <true or false>, "operations": [<operation>, ...], "details": "<text>"}}
 
 The scene is a base sentence plus a list of changes. Each change has an id, a label (a short name shown on a
 chip), a kind, a phrase (the words added to the video prompt) and a strength (0 to 1.3, normal 1.0).
-Kinds: season (winter, autumn, ...), weather (rain, fog, sunny, ...), time (night, day, sunset, ...), and extra
-(any object, animal, person or effect). Adding a season, weather or time replaces the old one of that kind.
+Kinds: {kinds_help}. Adding a {singletons} replaces the old one of that kind.
 
 Operations, applied in order (a sentence with several edits gives several operations, at most 6):
-{"op": "add", "label": "<1 or 2 words, lowercase>", "kind": "<season|weather|time|extra>", "phrase": "<short visual description>", "strength": 1.0}
-{"op": "remove", "id": "<id of an existing change>"}
-{"op": "set_strength", "id": "<id of an existing change>", "strength": <0 to 1.3>}
-{"op": "edit_base", "base": "<the base sentence rewritten, changing only what the user asked>"}
-{"op": "new_scene", "base": "<one sentence describing the whole new scene>"}
+{{"op": "add", "label": "<1 or 2 words, lowercase>", "kind": "<{kinds}>", "phrase": "<short visual description>", "strength": 1.0}}
+{{"op": "remove", "id": "<id of an existing change>"}}
+{{"op": "set_strength", "id": "<id of an existing change>", "strength": <0 to 1.3>}}
+{{"op": "edit_base", "base": "<the base sentence rewritten, changing only what the user asked>"}}
+{{"op": "new_scene", "base": "<one sentence describing the whole new scene>"}}
 
 Rules for operations:
-- Write phrases as concrete visual descriptions, under 12 words, for example "a lion standing in the grass".
-- A BASE EDIT changes something the base sentence names and KEEPS every change ("turn the tree into a
-  lighthouse", "make the meadow a beach"): use edit_base. The engine keeps the changes; never copy them yourself.
-- A NEW SCENE ("take me to the desert", "new scene of a beach") starts over: use new_scene, which clears every
-  change.
+- Write phrases as concrete visual descriptions, under 20 words.
+- A new object, animal or person (kind extra) gets explicit size and position words in its phrase that a video
+  model obeys, for example "a large male lion standing in the foreground at the left of the frame, facing the
+  camera". The engine keeps that phrase word for word in every later prompt.
+{place_rule}
+- Seasons, weather and times of day use the keyword table's labels and kinds, so a sentence gives the same
+  change however it is read: label (kind): words that mean it.
+{vocabulary}
+  "sunny" is the time change day: it replaces night. Use one of these labels whenever the words fit.
+- A BASE EDIT turns something the base sentence names into something else and KEEPS every change ("turn the
+  tree into a lighthouse"): use edit_base. The engine keeps the changes; never copy them yourself.
+- A NEW SCENE only when the user asks for one in so many words ("new scene of a beach", "start over with a
+  beach"): use new_scene, which clears every change.
 - edit_base and new_scene come before any other operation of the sentence.
 - To remove or weaken something, use the id of the matching change. "a little" means strength 0.3, "a lot" or
   "very" means 1.3.
@@ -205,9 +268,48 @@ Rules for operations:
 Set "blocked" to true, with no operations, if the sentence asks for sexual, violent (gore, killing, injury) or
 hateful content. Otherwise "blocked" is false.
 
-The user message is JSON: {"scene": <the scene before the sentence>, "prompt": <its current video prompt>,
-"sentence": <what the user said>}.
+The user message is JSON: {{"scene": <the scene before the sentence>, "prompt": <its current video prompt>,
+"sentence": <what the user said>}}.
+
+For the "details" field, follow the rules below. Where they speak of the scene or the description, that is the
+NEW scene, after your operations. Any reply format they name is only the shape of that one field: you always
+reply with the one JSON object above, {{"blocked", "operations", "details"}}.
 """
+
+_KIND_HELP = {"world": "world (the place: desert, neon city, Mars, ...)", "season": "season (winter, autumn, ...)",
+              "weather": "weather (rain, fog, sunny, ...)", "time": "time (night, day, sunset, ...)",
+              "extra": "extra (any object, animal, person or effect)"}
+
+
+def _known_worlds() -> dict:
+    """commands.world.WORLDS: normalized alias -> {"label", "kind", "phrase"}."""
+    from commands.world import WORLDS
+    return WORLDS
+
+
+def _vocabulary() -> dict[str, dict]:
+    """commands.dictionary.KEYWORDS restricted to season, weather and time: normalized alias -> entry."""
+    from commands.dictionary import KEYWORDS
+    return {alias: e for alias, e in KEYWORDS.items() if e["kind"] in ("season", "weather", "time")}
+
+
+def _vocabulary_lines() -> str:
+    words: dict[tuple[str, str], list[str]] = {}
+    for alias, e in _vocabulary().items():
+        words.setdefault((e["label"], e["kind"]), [])
+        if alias != e["label"]:
+            words[(e["label"], e["kind"])].append(alias)
+    return "\n".join(f"  {label} ({kind}): {', '.join(aliases) or label}" for (label, kind), aliases in words.items())
+
+
+def operations_instructions() -> str:
+    """The operations part of the system prompt, for the kinds this commands/ has."""
+    from commands.state import KINDS
+    places = ", ".join(sorted({w["label"] for w in _known_worlds().values()})) or "none"
+    singletons = [k for k in KINDS if k != "extra"]
+    return _OPERATIONS.format(kinds_help=", ".join(_KIND_HELP.get(k, k) for k in KINDS), kinds="|".join(KINDS),
+                              singletons=", ".join(singletons[:-1]) + " or " + singletons[-1],
+                              place_rule=_PLACE_RULE.format(places=places), vocabulary=_vocabulary_lines())
 
 
 # --- the cache file -------------------------------------------------------------------------------------
@@ -236,7 +338,7 @@ class CacheFile:
         for e in data.get("entries") or []:
             try:
                 outcome = Outcome(e["outcome"])
-                if outcome is Outcome.FALLBACK:
+                if outcome not in (Outcome.SONNET, Outcome.BLOCKED):
                     continue
                 out[(e["prompt_before"], e["sentence"])] = Entry(
                     outcome, tuple(e.get("operations") or ()), e.get("prompt"))
@@ -247,7 +349,7 @@ class CacheFile:
     def save(self, cache: dict[tuple[str, str], Entry]) -> None:
         entries = [{"prompt_before": k[0], "sentence": k[1], "outcome": v.outcome.value,
                     "operations": list(v.operations), "prompt": v.prompt}
-                   for k, v in cache.items() if v.outcome is not Outcome.FALLBACK]
+                   for k, v in cache.items() if v.outcome in (Outcome.SONNET, Outcome.BLOCKED)]
         with self._lock:
             try:
                 self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -261,24 +363,90 @@ class CacheFile:
                 log.exception("final reader: cannot save %s; the cache stays in memory", self.path)
 
 
+# --- the pinned demo prompts ----------------------------------------------------------------------------
+
+def load_pinned(path: str | Path | None) -> dict[tuple[str, str], Entry]:
+    """The demo prompts file as PINNED entries keyed by (prompt_before, sentence). Never raises.
+
+    File: [entry, ...] or {"base": str, "entries": [entry, ...]}, where an entry is
+    {"sentence", "prompt_before", "operations": [op, ...], "prompt"} (other keys, such as "canonical", "model" or
+    "fingerprint", are notes and ignored). The entries are replayed in order on a commands.state.SceneState that
+    starts at `base` (commands.state.DEFAULT_BASE for the list form). An entry whose
+    prompt_before is the composed prompt of the base starts again from the base (a reset came before it).
+    An entry is skipped, with a log line, when its prompt_before is not the composed prompt of the replayed
+    scene, its operations do not apply (expand_operations, then one batch), or its prompt is not text.
+    """
+    if path is None:
+        return {}
+    path = Path(path).expanduser()
+    try:
+        data = json.loads(path.read_text())
+    except FileNotFoundError:
+        log.info("final reader: no demo prompts file at %s", path)
+        return {}
+    except (OSError, ValueError) as exc:
+        log.warning("final reader: cannot read the demo prompts %s (%r); none pinned", path, exc)
+        return {}
+    try:
+        from commands.composer import compose
+        from commands.state import DEFAULT_BASE, SceneState
+        if isinstance(data, list):
+            data = {"base": DEFAULT_BASE, "entries": data}
+        base = data.get("base", DEFAULT_BASE)
+        start = compose(SceneState(base).snapshot())
+        entries = data["entries"]
+        if not isinstance(entries, list):
+            raise TypeError("entries is not a list")
+    except Exception as exc:  # noqa: BLE001 - a bad file must never stop the engine
+        log.warning("final reader: the demo prompts %s are not usable (%r); none pinned", path, exc)
+        return {}
+    pinned: dict[tuple[str, str], Entry] = {}
+    scene = SceneState(base)
+    for n, e in enumerate(entries):
+        try:
+            sentence, before, prompt = e["sentence"], e["prompt_before"], e["prompt"]
+            if not all(isinstance(v, str) and v.strip() for v in (sentence, before, prompt)):
+                raise ValueError("sentence, prompt_before and prompt must be nonempty text")
+            if before == start:
+                scene = SceneState(base)
+            if compose(scene.snapshot()) != before:
+                raise ValueError("prompt_before is not the scene the entries before it lead to")
+            ops = expand_operations(e["operations"], scene.snapshot()) if isinstance(e["operations"], list) else None
+            if not ops:
+                raise ValueError("the operations are not valid for that scene")
+            trial = copy.deepcopy(scene)
+            trial.apply(ops[0] if len(ops) == 1 else {"op": "batch", "operations": ops})
+            compose(trial.snapshot())
+        except Exception as exc:  # noqa: BLE001 - skip the entry, keep the others
+            log.warning("final reader: demo prompt %d (%r) skipped: %r", n, _short(e.get("sentence") if isinstance(e, dict) else e), exc)
+            continue
+        scene = trial
+        pinned[(before, sentence)] = Entry(Outcome.PINNED, tuple(ops), prompt)
+    log.info("final reader: %d of %d demo prompts pinned from %s", len(pinned), len(entries), path)
+    return pinned
+
+
 # --- the reader -----------------------------------------------------------------------------------------
 
 class FinalReader:
     """Callable `reader(text, snapshot)`; see the module docstring. Never raises."""
 
     def __init__(self, state: FinalReaderState, reason: str = "", chat=None, spec: PromptSpec = STANDIN,
-                 timeout_s: float = DEFAULT_TIMEOUT_S, cache_file: CacheFile | None = None) -> None:
+                 timeout_s: float = DEFAULT_TIMEOUT_S, cache_file: CacheFile | None = None,
+                 pinned: dict[tuple[str, str], Entry] | None = None) -> None:
         if state is FinalReaderState.ON and chat is None:
             raise ValueError("an ON final reader needs a chat client")
         self.state = state
         self.reason = reason
         self.spec = spec
         self.timeout_s = timeout_s
-        self.system_prompt = f"{OPERATIONS}\n{spec.details_instructions}"
+        self.system_prompt = f"{operations_instructions()}\n{spec.details_instructions}"
         self._chat = chat
         self._file = cache_file
         self._lock = threading.Lock()
         self._cache: dict[tuple[str, str], Entry] = cache_file.load() if cache_file is not None else {}
+        self._pinned: dict[tuple[str, str], Entry] = dict(pinned or {})  # checked before the cache
+        self.pinned_hits = 0
         self._pool = concurrent.futures.ThreadPoolExecutor(max_workers=WORKERS, thread_name_prefix="final-reader")
         self.calls = 0
         self.cache_hits = 0
@@ -286,6 +454,7 @@ class FinalReader:
         self.timeouts = 0
         self.late_dropped = 0
         self.rejects = 0
+        self.details_rejected = 0
         self.errors = 0
         self.last_ms: float | None = None
         self._recent_ms: deque[float] = deque(maxlen=50)
@@ -321,9 +490,13 @@ class FinalReader:
         from commands.composer import compose  # the commands/ owner's composer; imported only when ON
         key = (compose(snapshot), text)
         with self._lock:
-            entry = self._cache.get(key)
+            entry = self._pinned.get(key)
             if entry is not None:
-                self.cache_hits += 1
+                self.pinned_hits += 1
+            else:
+                entry = self._cache.get(key)
+                if entry is not None:
+                    self.cache_hits += 1
         if entry is not None:
             return self._from_cache(key, entry, snapshot)
         with self._lock:
@@ -353,9 +526,10 @@ class FinalReader:
     def stats(self) -> dict:
         with self._lock:
             return {"state": self.state.value, "reason": self.reason or None, "prompt_spec": self.spec.name,
-                    "calls": self.calls, "cache_hits": self.cache_hits, "blocked": self.blocked,
+                    "calls": self.calls, "cache_hits": self.cache_hits,
+                    "pinned": len(self._pinned), "pinned_hits": self.pinned_hits, "blocked": self.blocked,
                     "timeouts": self.timeouts, "late_dropped": self.late_dropped, "rejects": self.rejects,
-                    "errors": self.errors,
+                    "details_rejected": self.details_rejected, "errors": self.errors,
                     "p50_ms": round(statistics.median(self._recent_ms), 1) if self._recent_ms else None,
                     "last_ms": None if self.last_ms is None else round(self.last_ms, 1),
                     "cache_size": len(self._cache), "timeout_s": self.timeout_s,
@@ -369,8 +543,8 @@ class FinalReader:
         log.info("final reader: a late answer was dropped")
 
     def _from_cache(self, key, entry: Entry, snapshot: dict) -> dict | None:
-        """A cached SONNET result's operations name change ids; check they still fit this snapshot."""
-        if entry.outcome is not Outcome.SONNET:
+        """A cached SONNET or PINNED result's operations name change ids; check they still fit this snapshot."""
+        if entry.outcome not in (Outcome.SONNET, Outcome.PINNED):
             return entry.result()
         if all(validate_operation(dict(op), snapshot) == dict(op) for op in entry.operations):
             return entry.result()
@@ -410,6 +584,14 @@ class FinalReader:
                      _short(entry.prompt), ms)
         return entry
 
+    def _plain(self, after: dict, canonical: str) -> str:
+        """The spec's prompt with no details (the composed prompt, plus forward motion with commands.rewriter)."""
+        try:
+            prompt = self.spec.validate(after, {"details": ""})
+        except Exception:  # noqa: BLE001 - the composed prompt is always usable
+            prompt = None
+        return prompt if isinstance(prompt, str) and prompt.strip() else canonical
+
     def _check(self, reply, snapshot: dict) -> tuple[Entry, str]:
         if not isinstance(reply, dict):
             return Entry(Outcome.FALLBACK), "not an object"
@@ -427,11 +609,21 @@ class FinalReader:
             return Entry(Outcome.FALLBACK), "an invalid operation (undo and reset stay with the dictionary)"
         from commands.composer import compose
         try:
-            prompt = self.spec.validate(compose(after), reply)
+            canonical = compose(after)  # with PR #88 a world the base cannot take raises ValueError
+        except (ValueError, TypeError, KeyError) as exc:
+            return Entry(Outcome.FALLBACK), f"the new scene does not compose: {exc!r}"
+        details = reply.get("details")
+        try:  # only {"details"}: commands.rewriter.validate_rewrite rejects any other key
+            prompt = self.spec.validate(after, {"details": details if isinstance(details, str) else ""})
         except Exception as exc:
-            return Entry(Outcome.FALLBACK), f"validate raised {exc!r}"
+            prompt = None
+            log.info("final reader: validate raised %r", exc)
         if not isinstance(prompt, str) or not prompt.strip():
-            return Entry(Outcome.FALLBACK), "details rejected"
+            # The operations are still the model's reading of the sentence; only its wording is dropped.
+            with self._lock:
+                self.details_rejected += 1
+            log.info("final reader: details rejected, using the composed prompt: %s", _short(details))
+            prompt = self._plain(after, canonical)
         return Entry(Outcome.SONNET, tuple(clean), prompt), "ok"
 
 
@@ -443,8 +635,10 @@ def expand_operations(ops: list, snapshot: dict) -> list[dict] | None:
 
     {"op": "edit_base", "base": B} becomes new_scene B followed by one add per change the scene has at that
     point (label, kind, phrase and strength copied), so a base edit keeps the changes and, applied as one
-    batch, is undone in one step. An operation naming a change id after a base edit or a new scene is invalid
-    (those ids are gone), and undo and reset stay with the dictionary.
+    batch, is undone in one step. commands/state.py has no operation that rewrites only the base (a world
+    change replaces the place, not an object of the base such as the tree), so this expansion stays.
+    An operation naming a change id after a base edit or a new scene is invalid (those ids are gone), and undo
+    and reset stay with the dictionary.
     """
     out: list[dict] = []
     rebuilt = False  # an edit_base or new_scene came first: the old ids no longer exist
@@ -463,8 +657,29 @@ def expand_operations(ops: list, snapshot: dict) -> list[dict] | None:
         if clean is None or clean["op"] in ("undo", "reset") or (rebuilt and "id" in clean):
             return None
         rebuilt = rebuilt or clean["op"] == "new_scene"
-        out.append(clean)
+        out.append(canonical_change(canonical_world(clean)))
     return out if len(out) <= BATCH_LIMIT else None
+
+
+def canonical_change(op: dict) -> dict:
+    """An add whose label is a season, weather or time word of the keyword table ("sunny", "snow") gets that
+    table's label and kind (day of kind time, winter of kind season), so it replaces the right earlier change,
+    as the keyword table's edit would. The model's phrase is kept. Other operations are returned as they are."""
+    if op.get("op") != "add" or op.get("kind") == "world":
+        return op
+    from commands.dictionary import normalize
+    entry = _vocabulary().get(normalize(op["label"]))
+    return {**op, "label": entry["label"], "kind": entry["kind"]} if entry else op
+
+
+def canonical_world(op: dict) -> dict:
+    """A world add for a place commands.world knows ("desert", "the city") gets its label and tested phrase,
+    the same change the keyword table makes for that place. Any other operation is returned as it is."""
+    if op.get("op") != "add" or op.get("kind") != "world":
+        return op
+    from commands.dictionary import normalize
+    known = _known_worlds().get(normalize(op["label"]))
+    return {**op, "label": known["label"], "phrase": known["phrase"]} if known else op
 
 
 def scene_after(snapshot: dict, operations: list[dict]) -> dict:
@@ -497,10 +712,11 @@ def fingerprint(system_prompt: str, model: str) -> str:
 
 
 def load(mode: str, timeout_s: float = DEFAULT_TIMEOUT_S, cache_path: str | None = DEFAULT_CACHE_FILE,
-         environ=os.environ, chat=None, spec: PromptSpec | None = None) -> FinalReader:
+         environ=os.environ, chat=None, spec: PromptSpec | None = None,
+         demo_prompts: str | None = DEFAULT_DEMO_PROMPTS) -> FinalReader:
     """The final reader for --final-reader `mode` ("off" or "sonnet"). With "sonnet" but no FOUNDRY_* settings
     it logs once and gives an UNAVAILABLE reader. `chat` replaces the Foundry client (tests); `cache_path` None
-    keeps the cache in memory only."""
+    keeps the cache in memory only. `demo_prompts` is the pinned demo prompts file (load_pinned), None for none."""
     if mode == "off":
         return FinalReader.off()
     if mode != "sonnet":
@@ -514,7 +730,8 @@ def load(mode: str, timeout_s: float = DEFAULT_TIMEOUT_S, cache_path: str | None
         chat = FoundryMessages.from_settings(settings, HTTP_TIMEOUT_S)
     spec = spec or prompt_spec()
     model = getattr(chat, "model", "")
-    reader = FinalReader(FinalReaderState.ON, chat=chat, spec=spec, timeout_s=timeout_s)
+    reader = FinalReader(FinalReaderState.ON, chat=chat, spec=spec, timeout_s=timeout_s,
+                         pinned=load_pinned(demo_prompts))
     if cache_path:
         reader._file = CacheFile(cache_path, fingerprint(reader.system_prompt, model))
         reader._cache = reader._file.load()

@@ -9,6 +9,8 @@
 Commands: contract 1 -> reader worker thread: reader.handle -> steer (contract 2) -> encoder service (its own thread)
 -> steer worker thread: steering.Controller.handle (which calls steerer.set_target) -> takes effect on the next get_cond.
 The frame cache is never rebuilt on a command; only the steerer's target changes.
+A command heard after a reset tap waits on the steer worker until that reset is done (ResetTicket), so it applies
+to the new video; commands heard before the reset are dropped by it.
 
 Re-anchor (--reanchor on, off by default): steering.reanchor.ReanchorPolicy sits next to the Controller. It hears
 every applied target (on_target after Controller.handle), is asked once per chunk where cond and progress are taken
@@ -46,6 +48,7 @@ from .backends import load_backend
 from .commands import CommandBook, CommandRecord
 from .encoder import EncoderService
 from .final_reader import DEFAULT_CACHE_FILE as FINAL_CACHE_FILE
+from .final_reader import DEFAULT_DEMO_PROMPTS
 from .final_reader import DEFAULT_TIMEOUT_S as FINAL_TIMEOUT_S
 from .final_reader import FinalReader
 from .final_reader import load as load_final_reader
@@ -80,6 +83,7 @@ class EngineConfig:
     final_reader: str = "off"       # "off" or "sonnet": one Sonnet call per final sentence (final_reader.py)
     final_timeout_s: float = FINAL_TIMEOUT_S  # how long a final waits for Sonnet before the dictionary result
     final_cache: str | None = FINAL_CACHE_FILE  # Sonnet results kept across restarts; None: in memory only
+    demo_prompts: str | None = DEFAULT_DEMO_PROMPTS  # pinned final reader results; None: none
     record_dir: str | None = None   # where every video is saved as mp4; None turns the recorder off
     record_max_bytes: int = DEFAULT_MAX_BYTES  # the oldest recordings are deleted above this total
     recovery_limit: int = 3         # this many crashes within recovery_window_s -> FAILED
@@ -262,41 +266,78 @@ class PrefetchPacer:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self.state = PrefetchState.HELD
+        self._state = PrefetchState.HELD
         self._saved_ms = 0.0
+
+    @property
+    def state(self) -> PrefetchState:
+        with self._lock:
+            return self._state
 
     def hold(self) -> None:
         """A command arrived: hold background encodes until it is shown."""
         with self._lock:
-            self.state = PrefetchState.HELD
+            self._state = PrefetchState.HELD
             self._saved_ms = 0.0
 
-    def chunk_done(self, idle_ms: float, in_flight: bool, cost_ms: float | None) -> bool:
-        """Generation thread, after each chunk. Returns True when the state became READY."""
+    def chunk_done(self, idle_ms: float, in_flight: Callable[[], bool], cost_ms: float | None) -> bool:
+        """Generation thread, after each chunk. Returns True when the state became READY.
+
+        `in_flight` (CommandBook.in_flight) is called under this pacer's lock, not read by the caller beforehand.
+        A command thread calls hold() before it records its command, so a hold either lands before this call
+        (and in_flight() then sees the command) or waits for the lock and lands after it (and wins). Reading
+        in_flight outside the lock let a hold land between the read and this call, and the stale False then
+        moved HELD back to SAVING or READY, so a background encode could start while the command was in flight.
+        """
         with self._lock:
-            if in_flight:
-                self.state = PrefetchState.HELD
+            if in_flight():
+                self._state = PrefetchState.HELD
                 self._saved_ms = 0.0
                 return False
-            if self.state is PrefetchState.HELD:
-                self.state = PrefetchState.SAVING
-            if self.state is PrefetchState.READY:
+            if self._state is PrefetchState.HELD:
+                self._state = PrefetchState.SAVING
+            if self._state is PrefetchState.READY:
                 return False  # one turn at a time; it waits for the encoder
             self._saved_ms += idle_ms
             cost = self.DEFAULT_COST_MS if cost_ms is None else cost_ms
             if self._saved_ms < cost:
                 return False
             self._saved_ms -= cost
-            self.state = PrefetchState.READY
+            self._state = PrefetchState.READY
             return True
 
     def take(self) -> bool:
         """Encoder thread, before a background encode: True (and back to SAVING) when it may start now."""
         with self._lock:
-            if self.state is not PrefetchState.READY:
+            if self._state is not PrefetchState.READY:
                 return False
-            self.state = PrefetchState.SAVING
+            self._state = PrefetchState.SAVING
             return True
+
+
+class ResetStage(enum.Enum):
+    """Where one requested reset is. See ResetTicket."""
+    REQUESTED = "requested"  # waiting for the generation thread's next chunk boundary, or running there now
+    DONE = "done"            # the new video's steerer is in place (or the reset failed and the engine recovers)
+
+
+@dataclass
+class ResetTicket:
+    """One reset request, in the order commands were heard.
+
+    Commands heard after the reset's own command (seq above `heard_up_to`) wait on the steer worker until the
+    ticket is DONE, then apply to the new video's steerer. Without that wait a final sent a few ms after a reset
+    tap was applied to the old video, and the reset then dropped it and restarted the steerer without it.
+    """
+    heard_up_to: int                         # seq of the reset's command: the newest command the reset replaces
+    command: CommandRecord | None            # the reset's command when it carries a steer (the seed), else None
+    steer: dict | None                       # the new video starts on this target; None: the starting prompt
+    done: threading.Event = field(default_factory=threading.Event)
+    stage: ResetStage = ResetStage.REQUESTED
+
+    def finish(self) -> None:
+        self.stage = ResetStage.DONE
+        self.done.set()
 
 
 class Rolling:
@@ -328,7 +369,7 @@ class Engine:
         self.publish_frame = publish_frame
         self.publish_control = publish_control
         self.final_reader = final_reader if final_reader is not None else load_final_reader(
-            config.final_reader, config.final_timeout_s, config.final_cache)
+            config.final_reader, config.final_timeout_s, config.final_cache, demo_prompts=config.demo_prompts)
         # An injected reader (tests) does not use the final reader; load_reader marks it UNAVAILABLE if it cannot.
         self.reader = reader if reader is not None else load_reader(config.reader, self.final_reader)
         self.base_prompt: str | None = None
@@ -359,8 +400,8 @@ class Engine:
         self._gate = LeadGate()
         self.prefetch = PrefetchPacer()
         self._reset_lock = threading.Lock()
-        self._reset_waiters: list[threading.Event] = []
-        self._reset_seed: tuple[dict, CommandRecord] | None = None  # (the reset's steer, its command)
+        self._pending_resets: list[ResetTicket] = []  # REQUESTED tickets the generation thread has not taken yet
+        self._latest_reset: ResetTicket | None = None  # the newest ticket, taken or not; None before the first reset
         self._threads: list[threading.Thread] = []
         # A crash in the generation or decode thread: set once, handled by the generation thread in _recover.
         self._crash_lock = threading.Lock()
@@ -617,7 +658,7 @@ class Engine:
         while not self._stop.is_set():
             if self._crashed.is_set():
                 return
-            if self._reset_waiters:
+            if self._pending_resets:
                 self._do_reset()
                 last_cond = None
             t_wait = time.perf_counter()
@@ -633,7 +674,7 @@ class Engine:
             latents = self._generate(cond, anchor)
             gen_ms = (time.perf_counter() - t0) * 1e3
             self.book.chunk_generated(chunk)
-            if self.prefetch.chunk_done(idle_ms, self.book.in_flight(), self.encoder.work_ms):
+            if self.prefetch.chunk_done(idle_ms, self.book.in_flight, self.encoder.work_ms):
                 self.encoder.wake()
             with self._stats_lock:
                 self.gen_ms.add(gen_ms)
@@ -675,35 +716,51 @@ class Engine:
 
     # --- reset -----------------------------------------------------------------------------
 
-    def request_reset(self, seed: tuple[dict, CommandRecord] | None = None) -> threading.Event:
+    def request_reset(self, command: CommandRecord | None = None, steer: dict | None = None) -> threading.Event:
         """Ask for a reset at the next chunk boundary. The returned event is set when it is done.
 
-        `seed` is (steer, command): the new video starts directly on the steer's target (its prompt, and its
-        strength pair if it has one), with no ramp. Without it the new video starts on the starting prompt.
-        The steer's prompts must already be in the encoder cache, so the reset does not wait for encoding.
+        `command` is the reset's own command record; commands heard after it wait for this reset and then apply
+        to the new video (see ResetTicket). Without it, every command heard so far counts as before the reset.
+        `steer` is the reset's target: the new video starts directly on it (its prompt, and its strength pair if
+        it has one), with no ramp, and `command` counts its first chunk. Without it the new video starts on the
+        starting prompt. The steer's prompts must already be in the encoder cache, so the reset does not wait.
         """
         state = self.lifecycle.state
         if state not in (Lifecycle.GENERATING, Lifecycle.RESETTING):
             raise BadMessage(f"cannot reset while {state.value}")
-        done = threading.Event()
+        heard_up_to = command.seq if command is not None else self.book.newest_seq()
+        ticket = ResetTicket(heard_up_to, command if steer is not None else None, steer)
         with self._reset_lock:
-            self._reset_waiters.append(done)
-            self._reset_seed = seed
-        return done
+            self._pending_resets.append(ticket)
+            self._latest_reset = ticket
+        return ticket.done
 
     def _do_reset(self) -> None:
+        """Generation thread, at a chunk boundary: run every requested reset as one. The newest one decides the
+        new video's target and which commands it replaces."""
         with self._reset_lock:
-            waiters, self._reset_waiters = self._reset_waiters, []
-            seed, self._reset_seed = self._reset_seed, None
-        steer, rec = seed if seed else ({"prompt": self.base_prompt}, None)
+            tickets, self._pending_resets = self._pending_resets, []
+        newest = tickets[-1]
+        steer = newest.steer if newest.steer is not None else {"prompt": self.base_prompt}
         self.lifecycle.transition(Lifecycle.RESETTING, f"reset requested, new video on {steer['prompt']!r}")
         try:
-            self._reset_now(steer, rec)
-        finally:  # also after an error (the engine then recovers), so POST /reset does not hang
-            for w in waiters:
-                w.set()
+            self._reset_now(steer, newest.command, newest.heard_up_to)
+        finally:  # also after an error (the engine then recovers), so POST /reset and held commands do not hang
+            for t in tickets:
+                t.finish()
 
-    def _reset_now(self, steer: dict, rec: CommandRecord | None) -> None:
+    def _wait_for_reset(self, rec: CommandRecord) -> None:
+        """Steer worker thread: a command heard after a reset that is still REQUESTED waits until it is DONE, so
+        it is applied to the new video's steerer rather than to the old one (which the reset would throw away)."""
+        with self._reset_lock:
+            ticket = self._latest_reset
+        if ticket is None or ticket.stage is ResetStage.DONE or rec.seq <= ticket.heard_up_to:
+            return
+        log.info("command %d: waits for the reset of command %d before it applies", rec.seq, ticket.heard_up_to)
+        while ticket.stage is ResetStage.REQUESTED and not self._stop.is_set():
+            ticket.done.wait(0.1)
+
+    def _reset_now(self, steer: dict, rec: CommandRecord | None, heard_up_to: int) -> None:
         t0 = time.perf_counter()
         self._decode_queue.join()  # the decoder finishes the chunks of the old video first
         self.backend.reset()
@@ -719,7 +776,7 @@ class Engine:
             if self.policy is not None:
                 self.policy.on_reset()
 
-        self.book.reset(restart, rec)
+        self.book.reset(restart, rec, heard_up_to)
         self.lifecycle.transition(Lifecycle.GENERATING, f"reset done in {(time.perf_counter() - t0) * 1e3:.0f} ms")
 
     # --- decode ----------------------------------------------------------------------------
@@ -893,17 +950,15 @@ class Engine:
             return None
         self.encoder.prefetch(self._likely_prompts())
         if is_reset:
-            seed = None
             if steer is not None:
                 self.book.decided(rec, steer)
                 for prompt in (steer["prompt"], steer.get("without_prompt")):
                     if prompt:
                         self.encoder.encode(prompt)  # into the cache now, so the reset itself does not wait
-                seed = (steer, rec)
             else:
                 self.book.no_operation(rec, "reset to the starting prompt")
             try:
-                return self.request_reset(seed)
+                return self.request_reset(rec, steer)
             except BadMessage as exc:
                 self.book.drop(rec, str(exc))
                 reply({"error": str(exc)})
@@ -957,6 +1012,7 @@ class Engine:
             except Exception as exc:
                 self.book.drop(rec, f"encoding failed: {exc!r}")
                 return
+        self._wait_for_reset(rec)
         try:
             result = self.book.embedded(rec, lambda: self._apply_target(target))
         except ValueError as exc:

@@ -43,14 +43,12 @@ def test_the_build_is_served(client):
         assert r.status_code == 200 and r.headers["content-type"].split(";")[0] == ctype, path
 
 
-@pytest.mark.parametrize("path", [
-    "/studio/.env", "/studio/assets/.hidden.js", "/studio/missing.js", "/studio/assets/",
-    "/studio/%2e%2e/outside.txt", "/studio/..%5coutside.txt",
-])
-def test_dotfiles_missing_and_traversal_give_404(client, path):
-    r = client.get(path)
-    assert r.status_code == 404
-    assert "outside" not in r.text and "SECRET" not in r.text
+def test_dotfiles_missing_and_traversal_give_404(client):
+    for path in ["/studio/.env", "/studio/assets/.hidden.js", "/studio/missing.js", "/studio/assets/",
+                 "/studio/%2e%2e/outside.txt", "/studio/..%5coutside.txt"]:
+        r = client.get(path)
+        assert r.status_code == 404, path
+        assert "outside" not in r.text and "SECRET" not in r.text, path
 
 
 def test_raw_traversal_and_outside_symlinks_are_rejected(dist):

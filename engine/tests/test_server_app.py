@@ -56,14 +56,12 @@ def test_the_page_files_are_served_fresh_with_their_types(client):
         assert r.content == (WEB / name).read_bytes(), path
 
 
-@pytest.mark.parametrize("path", [
-    "/app/package.json", "/app/README.md", "/app/node_modules/", "/app/INDEX.HTML",
-    "/app/%2e%2e/engine/server.py", "/app/..%5cengine%5cserver.py",
-])
-def test_other_files_and_traversal_are_not_served(client, path):
-    r = client.get(path)
-    assert r.status_code == 404
-    assert b"import" not in r.content
+def test_other_files_and_traversal_are_not_served(client):
+    for path in ["/app/package.json", "/app/README.md", "/app/node_modules/", "/app/INDEX.HTML",
+                 "/app/%2e%2e/engine/server.py", "/app/..%5cengine%5cserver.py"]:
+        r = client.get(path)
+        assert r.status_code == 404, path
+        assert b"import" not in r.content, path
 
 
 def test_raw_traversal_is_rejected():

@@ -62,15 +62,18 @@ class FinalReadingService:
     def handle(self, msg: dict) -> dict:
         if isinstance(msg, dict) and msg.get("type") == "final" and isinstance(msg.get("text"), str) \
                 and isinstance(msg.get("t_client"), int) and not isinstance(msg.get("t_client"), bool):
-            snapshot = service_snapshot(self._svc)
+            snapshot = self._svc.snapshot()
             if _is_undo_or_reset(msg["text"], snapshot):  # the dictionary knows these; no call
                 return self._mapped(self._svc.handle(msg))
             result = self._final_reader(msg["text"], snapshot)
             if result is not None and result.get("blocked"):
                 log.info("final reader: %r blocked, no steer", msg["text"][:100])
-                return self._mapped(apply_final(self._svc, msg["text"], []))
+                return self._mapped(self._svc.apply_final(msg["text"], [], None))
             if result is not None:
-                out = apply_final(self._svc, msg["text"], result["operations"])
+                # prompt None: the service steers to the composed prompt and _mapped gives the rich one. Passing
+                # the rich prompt would make an undo back to this state steer to the composed prompt (another
+                # embedding for the same scene), and another sentence reaching it could pick other wording.
+                out = self._svc.apply_final(msg["text"], result["operations"], None)
                 if out["steer"] is not None:
                     self._model_prompts.setdefault(out["steer"]["prompt"], result["prompt"])
                 return self._mapped(out)
@@ -98,35 +101,3 @@ def _is_undo_or_reset(text: str, snapshot: dict) -> bool:
     from commands.reader import read
     op = read(text, snapshot)["op"]
     return op is not None and op["op"] in ("undo", "reset")
-
-
-# --- the CommandService shim ------------------------------------------------------------------------------
-# CommandService has no public way yet to read the full scene or to apply operations decided elsewhere.
-# The two methods below were asked of the commands/ owner (board, 2026-11-14): `snapshot()` and
-# `apply_final(text, operations, prompt)`. When they exist they are used; until then these functions do the
-# same through the service's private fields. engine/tests/test_final_reader.py runs them against the real
-# CommandService, so a change to those fields fails a test, not the live demo.
-
-def service_snapshot(svc) -> dict:
-    """The service's scene, commands.state.SceneState.snapshot()."""
-    if hasattr(svc, "snapshot"):
-        return svc.snapshot()
-    with svc._lock:
-        return svc._state.snapshot()
-
-
-def apply_final(svc, text: str, operations: list[dict]) -> dict:
-    """A FINAL read by the final reader: `operations` as one edit (a batch if several; none for a block), heard
-    set to `text`, and {"steer", "state"} as CommandService.handle returns them."""
-    if hasattr(svc, "apply_final"):
-        return svc.apply_final(text, operations, None)
-    from commands.reader import RAMP
-    with svc._lock:
-        svc._heard, svc._keyword = text, None
-        changed = None
-        if operations:
-            op = operations[0] if len(operations) == 1 else {"op": "batch", "operations": operations}
-            changed = svc._apply(op)
-        svc._unmatched = changed is None
-        steer = svc._commit(changed, RAMP["default"])
-        return {"steer": steer, "state": svc._fields()}

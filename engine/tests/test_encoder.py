@@ -109,8 +109,11 @@ def test_background_waits_for_its_turn_and_urgent_never_does():
     assert time.perf_counter() - t0 < 0.1
     turns.set()
     svc.wake()
-    assert svc.request("bg").result(2) == ("emb:bg", [2])
+    t0 = time.monotonic()
+    while svc.pending and time.monotonic() - t0 < 2:  # not svc.request("bg"): that would make it urgent
+        time.sleep(0.01)
     assert calls == ["urgent", "bg"]
+    assert svc.request("bg").result(0) == ("emb:bg", [2])  # cached by the background encode
     svc.stop()
 
 
