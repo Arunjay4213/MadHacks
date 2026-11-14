@@ -66,7 +66,10 @@ It sits in `PROTOCOL` in `lib.js` and in `fake-server.mjs`.
 4. Chips and undo on real state: done. Checked against the engine (fake backend, `--reader commands`, 672x384):
    stack, remove by name and chip x, undo, unmatched words in red, delay steady at ~575 ms. Real-model check pending
    the live engine address.
-5. and 6.: delay and highlight polish, connection-lost state, big-screen layout.
+5. Delay, highlight, connection state: done. A notice over the video says connecting, connection lost (either
+   socket), waiting for the first frame, or "Video paused" after 2 s without frames (`STALL_MS`). The delay line is
+   short ("voice → video" plus server stamps); its full definition is in the tooltip.
+6. Big-screen layout: next.
 
 ## Open
 

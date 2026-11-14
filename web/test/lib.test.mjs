@@ -6,7 +6,23 @@ import {
   PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
 } from '../lib.js';
 import { loadTestPattern } from '../fake-server.mjs';
-import { wsBaseUrl, fitSize } from '../lib.js';
+import { wsBaseUrl, fitSize, videoNotice, formatStamps, STALL_MS } from '../lib.js';
+
+test('videoNotice: connecting, lost, waiting, paused, or live', () => {
+  const live = { controlOpen: true, framesOpen: true, lastFrameAt: 1000, now: 1100, everConnected: true };
+  assert.equal(videoNotice(live), null);
+  assert.match(videoNotice({ ...live, controlOpen: false, everConnected: false }), /Connecting/);
+  assert.match(videoNotice({ ...live, framesOpen: false }), /Connection lost/); // either socket down
+  assert.match(videoNotice({ ...live, lastFrameAt: null }), /first frame/);
+  assert.match(videoNotice({ ...live, now: 1000 + STALL_MS + 1 }), /paused/);
+  assert.equal(videoNotice({ ...live, now: 1000 + STALL_MS }), null);
+});
+
+test('formatStamps: pipeline order, known stamps only', () => {
+  assert.equal(formatStamps({ heard: 0, shown: 1010, decided: 4, generated: 790, embedded: 61 }), 'decided 4 · embedded 61 · generated 790 · shown 1010');
+  assert.equal(formatStamps({ heard: 0, decided: 3 }), 'decided 3');
+  assert.equal(formatStamps(undefined), '');
+});
 
 test('wsBaseUrl: same origin by default; ?server= as host:port or a full URL (tunnels)', () => {
   const local = { protocol: 'http:', host: 'localhost:8787' };
