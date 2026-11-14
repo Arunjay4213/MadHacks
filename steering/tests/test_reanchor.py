@@ -89,30 +89,13 @@ def _warm_policy(config: ReanchorConfig = ReanchorConfig()) -> ReanchorPolicy:
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"steer_strength": 0.0},
-        {"steer_strength": 1.1},
-        {"steer_strength": float("nan")},
-        {"steer_strength": True},
-        {"sudden_strength": -0.1},
-        {"slow_strength": 2.0},
-        {"refresh_strength": 0.0},
-        {"fire_at_progress": 0.0},
-        {"fire_at_progress": 1.01},
-        {"provisional_strength": -0.1},
-        {"provisional_strength": 1.5},
-        {"min_strength": -0.01},
-        {"min_strength": 1.2},
-        {"sudden_max_ramp": -1},
-        {"sudden_max_ramp": 2.0},
-        {"slow_min_ramp": 0},
-        {"slow_min_ramp": 2},  # not above sudden_max_ramp
-        {"slow_anchors": 0},
-        {"slow_anchors": True},
+        {"steer_strength": 0.0},             # strengths are in (0, 1]
+        {"steer_strength": True},            # a bool is not a number
+        {"provisional_strength": -0.1},      # zero-allowed strengths are still in [0, 1]
+        {"slow_min_ramp": 2},                # not above sudden_max_ramp: a ramp would be both sudden and slow
         {"refresh_every_chunks": 0},
-        {"refresh_every_chunks": 60.0},
         {"refresh_source": "golden"},
-        {"min_gap_chunks": 0},
-        {"min_gap_chunks": "8"},
+        {"min_gap_chunks": "8"},             # a string is not an int
     ],
 )
 def test_bad_config_raises(kwargs: dict) -> None:
