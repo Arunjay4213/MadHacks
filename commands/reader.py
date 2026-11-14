@@ -223,11 +223,13 @@ def read(text: str, snapshot: dict) -> dict:
     t = _norm(text)
     pace = _pace(t)
     out = lambda op, keyword=None: {"op": op, "keyword": keyword, "pace": pace}  # noqa: E731
-    if _NEGATION_RX.search(t) or _TRANSFORM_RX.search(t) or _POSITION_RX.search(t):
+    if _NEGATION_RX.search(t) or _TRANSFORM_RX.search(t):
         return out(None)
     setting = world_op(t)
     if setting:
         return out(setting, setting["label"])
+    if _POSITION_RX.search(t):
+        return out(None)
     m = _UNDO_RX.search(t)
     if m:
         tail = t[m.end():].strip()
@@ -304,7 +306,7 @@ def read(text: str, snapshot: dict) -> dict:
             article, description = description_match.groups()
             description = _FILLER_TAIL_RX.sub("", description).strip()
             # Bare aliases keep their stable dictionary phrase; explicit visual details survive.
-            detail = KEYWORD_RX.sub(" ", description)
+            detail = KEYWORD_RX.sub(lambda m: " " if KEYWORDS[m.group()]["label"] == entry["label"] else m.group(), description)
             for rx in (_LOW_RX, _HIGH_RX, _MORE_RX, _LESS_RX):
                 detail = rx.sub(" ", detail)
             if detail.strip() and detail.strip() not in _NOT_AN_OBJECT:

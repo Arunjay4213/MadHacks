@@ -18,6 +18,20 @@ class ReviewRegressions(unittest.TestCase):
             self.assertNotIn('meadow', service.committed_prompt)
             self.assertIn('red car', service.committed_prompt)
 
+    def test_setting_move_is_not_an_object_position_edit(self):
+        service = CommandService()
+        send(service, 'add a red car')
+        result = send(service, 'move us to the desert')
+        self.assertFalse(result['state']['unmatched'])
+        self.assertIn('red car', service.committed_prompt)
+        self.assertNotIn('meadow', service.committed_prompt)
+
+    def test_adjective_aliases_are_preserved_in_object_descriptions(self):
+        for text, fragment in [('add a dark car', 'dark car'), ('add dark clouds', 'dark clouds')]:
+            service = CommandService()
+            send(service, text)
+            self.assertIn(fragment, service.committed_prompt)
+
     def test_place_partial_does_not_guess_an_object_addition(self):
         self.assertIsNone(spot('make it a forest'))
         self.assertIsNone(spot('take me to the beach'))
