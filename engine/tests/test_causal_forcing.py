@@ -144,13 +144,6 @@ def test_off_is_bit_for_bit_unchanged(no_cuda):
     assert [o.chunk_index for o in outs] == [0, 1, 2, 3, 4, 5, 0, 1]
 
 
-def test_off_with_auto_options_at_defaults_is_unchanged(no_cuda):
-    b = make_backend(steer_rebase=False, refresh_every=0)
-    (calls, sums), _ = _legacy_run(b)
-    assert _same_trace((calls, sums), GOLDEN)
-    assert b.rebases == 0 and b.recached_frames == 0
-
-
 # ---------------------------------------------------------------- explicit rebase
 
 
@@ -168,65 +161,33 @@ def run_then_rebase(b, n_before, rebase, a=None, c=None):
     return outs, b.generator.calls[n0:], rng, resets, c
 
 
-@pytest.mark.parametrize("keep", [0, 1, 3])
-def test_rebase_call_sequence(no_cuda, keep):
+def test_hard_cut_rebase_call_sequence(no_cuda):
+    # keep 0 is the only rebase the live engine uses: a re-anchor is a hard cut of the frame cache.
     b = make_backend()
-    outs, calls, _, resets, c = run_then_rebase(b, 5, cf.Rebase(keep=keep))
+    outs, calls, _, resets, c = run_then_rebase(b, 5, cf.Rebase(keep=0))
     ctx = int(b.context_noise)
-    # Re-encode: one pass per kept frame, oldest first, positions 0..keep-1, new cond, context timestep.
-    for i in range(keep):
-        call = calls[i]
-        assert call["frame"] == i and call["t"] == [ctx] and call["cond"] is c
-        assert torch.equal(call["x"], outs[5 - keep + i].latents)
     assert calls[0]["kv_end"] == 0  # frame cache cleared before the first pass
     assert calls[0]["text_init"] is False  # text cache reset, rebuilt from the new cond
     assert all(call["text_init"] for call in calls[1:])
     assert b.crossattn_resets == resets + 1  # once, although the cond also changed
-    # Then the new frame at position keep: first-frame schedule for a hard cut, else the normal one.
-    sched = b.first_chunk_steps if keep == 0 else b.denoising_steps
-    gen = calls[keep:]
-    assert [call["t"] for call in gen] == [[int(t)] for t in sched] + [[ctx]]
-    assert all(call["frame"] == keep and call["cond"] is c for call in gen)
-    assert b.frame_index == keep + 1 and b.chunk_index == 6
-    assert b.rebases == 1 and b.recached_frames == keep
-    assert b.last_rebase == cf.Rebase(keep, 0, None)
+    # The new frame at position 0 runs the first-frame schedule, then the context pass.
+    assert [call["t"] for call in calls] == [[int(t)] for t in b.first_chunk_steps] + [[ctx]]
+    assert all(call["frame"] == 0 and call["cond"] is c for call in calls)
+    assert b.frame_index == 1 and b.chunk_index == 6
+    assert b.rebases == 1 and b.recached_frames == 0
+    assert b.last_rebase == cf.Rebase(0, 0, None)
     assert outs[-1].chunk_index == 5 and outs[-1].video_id == outs[0].video_id  # no decoder restart
-    # The next chunk continues normally from position keep + 1.
+    # The next chunk continues normally from position 1.
     n0 = len(b.generator.calls)
     b.generate_chunk(c)
     nxt = b.generator.calls[n0:]
-    assert [call["frame"] for call in nxt] == [keep + 1] * 3
+    assert [call["frame"] for call in nxt] == [1] * 3
     assert [call["t"] for call in nxt] == [[int(t)] for t in b.denoising_steps] + [[ctx]]
 
 
-def test_rebase_same_cond_still_resets_text_cache(no_cuda):
-    b = make_backend()
-    a = torch.full((1, 3, 8), 1.0)
-    outs, calls, _, resets, _ = run_then_rebase(b, 4, {"keep": 2}, a=a, c=a)
-    assert calls[0]["text_init"] is False and b.crossattn_resets == resets + 1
-    assert b.last_rebase.keep == 2
-
-
-def test_memory_noise_uses_noisy_input_and_timestep(no_cuda):
-    b = make_backend()
-    outs, calls, rng, _, _ = run_then_rebase(b, 5, cf.Rebase(keep=2, memory_noise=500))
-    t_mem = b._timestep(500)
-    assert int(t_mem) > 500  # warped onto the shifted grid
-    g = torch.Generator().set_state(rng)
-    shape = outs[0].latents.shape
-    torch.randn(shape, generator=g)  # the start noise of the new frame is drawn first
-    for i in range(2):
-        lat = outs[3 + i].latents
-        noise = torch.randn(lat.flatten(0, 1).shape, generator=g)
-        want = b.scheduler.add_noise(lat.flatten(0, 1), noise, t_mem * torch.ones([1], dtype=torch.long)).unflatten(0, shape[:2])
-        assert calls[i]["t"] == [int(t_mem)] and calls[i]["frame"] == i
-        assert torch.allclose(calls[i]["x"], want)
-        assert not torch.equal(calls[i]["x"], lat)
-    assert b.recached_frames == 2
-
-
-@pytest.mark.parametrize("keep,n", [(0, 2), (0, 3), (1, 1)])
-def test_anchor_step_start_latent_and_schedule(no_cuda, keep, n):
+@pytest.mark.parametrize("n", [2, 3])
+def test_anchor_step_start_latent_and_schedule(no_cuda, n):
+    keep = 0
     b = make_backend()
     outs, calls, rng, _, _ = run_then_rebase(b, 4, cf.Rebase(keep=keep, anchor_step=n))
     sched = b.first_chunk_steps if keep == 0 else b.denoising_steps
@@ -251,17 +212,7 @@ def test_anchor_step_zero_is_pure_noise(no_cuda):
 def test_anchor_step_out_of_range_raises(no_cuda):
     b = make_backend()
     with pytest.raises(ValueError):
-        run_then_rebase(b, 4, cf.Rebase(keep=1, anchor_step=2))  # the normal schedule has 2 steps
-
-
-def test_keep_clamped_to_buffer_and_window(no_cuda):
-    b = make_backend()
-    run_then_rebase(b, 2, cf.Rebase(keep=6))
-    assert b.last_rebase.keep == 2 and b.frame_index == 3
-    b = make_backend(window=4)
-    outs, calls, _, _, _ = run_then_rebase(b, 10, cf.Rebase(keep=6))
-    assert b.last_rebase.keep == 3 and [c["frame"] for c in calls[:3]] == [0, 1, 2]
-    assert torch.equal(calls[0]["x"], outs[7].latents)
+        run_then_rebase(b, 4, cf.Rebase(keep=0, anchor_step=4))  # the first-frame schedule has 4 steps
 
 
 def test_rebase_on_first_chunk_is_ignored(no_cuda):
@@ -281,111 +232,28 @@ def test_rebase_of_and_strength_mapping(no_cuda):
     assert [b.anchor_step_for_strength(s) for s in (1.0, 1.5, 0.8, 0.5, 0.3, 0.01, 0.0, -1)] == [0, 0, 0, 2, 2, 3, None, None]
 
 
-# ---------------------------------------------------------------- automatic mode
-
-
-def drive(b, conds_seq):
-    """Generate one chunk per cond; return the chunk indices at which a rebase happened."""
+def test_reanchor_applies_on_the_next_chunk_only(no_cuda):
+    b = make_backend()
+    a = torch.full((1, 3, 8), 1.0)
     b.reset(seed=0)
-    fired = []
-    for i, cond in enumerate(conds_seq):
-        before = b.rebases
-        b.generate_chunk(cond)
-        if b.rebases != before:
-            fired.append(i)
-    return fired
-
-
-def ramp_case():
-    a = torch.zeros(1, 3, 8)
-    ramp = [torch.full((1, 3, 8), 0.25 * (k + 1)) for k in range(4)]
-    return [a] * 10 + ramp + [ramp[-1]] * 10
-
-
-def test_auto_fire_on_change_then_arrival_skipped_by_gap(no_cuda):
-    b = make_backend(steer_rebase=True, steer_keep=2)
-    assert drive(b, ramp_case()) == [10]  # first changed chunk; arrival at 14 is within min_gap
-    assert b.auto_rebases == {"change": 1, "arrival": 0, "refresh": 0}
-    assert b.last_rebase.keep == 2
-
-
-def test_auto_arrival_only(no_cuda):
-    b = make_backend(steer_rebase=True, steer_fire_on_change=False)
-    assert drive(b, ramp_case()) == [14]  # the first chunk whose cond stopped changing
-    assert b.auto_rebases["arrival"] == 1
-
-
-def test_auto_arrival_after_long_ramp(no_cuda):
-    a = torch.zeros(1, 3, 8)
-    ramp = [torch.full((1, 3, 8), 0.1 * (k + 1)) for k in range(9)]
-    b = make_backend(steer_rebase=True)
-    assert drive(b, [a] * 10 + ramp + [ramp[-1]] * 3) == [10, 19]
-
-
-def test_auto_min_gap_from_reset_and_first_chunk(no_cuda):
-    a, c = torch.zeros(1, 3, 8), torch.ones(1, 3, 8)
-    b = make_backend(steer_rebase=True)
-    assert drive(b, [a] * 3 + [c] * 10) == []  # change at 3 and arrival at 4 are within 8 of reset
-    b = make_backend(steer_rebase=True, steer_min_gap=0)
-    assert drive(b, [a] * 2 + [c] * 2)[0] == 2  # never on chunk 0 even with no gap
-
-
-def test_auto_hard_switch_then_another(no_cuda):
-    a, c, d = torch.zeros(1, 3, 8), torch.ones(1, 3, 8), torch.full((1, 3, 8), 2.0)
-    b = make_backend(steer_rebase=True, steer_min_gap=4)
-    # change at 8 fires; arrival at 9 is too close; change at 11 too close; arrival at 12 fires.
-    assert drive(b, [a] * 8 + [c] * 3 + [d] * 4) == [8, 12]
-
-
-def test_auto_refresh(no_cuda):
-    a = torch.zeros(1, 3, 8)
-    b = make_backend(refresh_every=5, refresh_keep=2)
-    assert drive(b, [a] * 12) == [5, 10]
-    assert b.auto_rebases["refresh"] == 2
-    assert b.frame_index == 2 + 2  # rebased at chunk 10: 2 kept + chunks 10 and 11
-    frames = [c["frame"] for c in b.generator.calls]
-    assert max(frames) == 6  # positions stay small: at most keep + refresh_every - 1
-
-
-def test_explicit_wins_over_auto(no_cuda):
-    seq = ramp_case()
-    b = make_backend(steer_rebase=True, steer_keep=3)
-    b.reset(seed=0)
-    for i, cond in enumerate(seq[:11]):
-        b.generate_chunk(cond, rebase=cf.Rebase(keep=1) if i == 10 else None)
-    assert b.rebases == 1 and b.last_rebase.keep == 1
-    assert b.auto_rebases == {"change": 0, "arrival": 0, "refresh": 0}
-
-
-def test_auto_needs_framewise(no_cuda):
-    b = cf.Backend.__new__(cf.Backend)
-    b.num_frame_per_block = 3
+    for _ in range(6):
+        b.generate_chunk(a)
     with pytest.raises(ValueError):
-        b._init_runtime(0, steer_rebase=True)
-
-
-def test_reanchor_strength_maps_to_step_and_applies_once():
-    import inspect
-
-    from engine.backends import causal_forcing as cf
-
-    src = inspect.getsource(cf.Backend.generate_chunk)
-    assert "_pending_reanchor" in src
-    b = cf.Backend.__new__(cf.Backend)
-    b.first_chunk_steps = [1000, 937, 833, 625]
-    b._pending_reanchor = None
-    cf.Backend.reanchor(b, 1.0)
-    assert b._pending_reanchor == cf.Rebase(keep=0, anchor_step=0)
-    cf.Backend.reanchor(b, 0.5)
-    assert b._pending_reanchor == cf.Rebase(keep=0, anchor_step=2)
-    cf.Backend.reanchor(b, 0.25)
-    assert b._pending_reanchor == cf.Rebase(keep=0, anchor_step=3)
-    cf.Backend.reanchor(b, 0.0)
-    assert b._pending_reanchor is None
-    with pytest.raises(ValueError, match="source"):
-        cf.Backend.reanchor(b, 0.5, source="golden")
-    cf.Backend.reanchor(b, 0.5, source="clean")
-    assert b._pending_reanchor == cf.Rebase(keep=0, anchor_step=2, from_clean=True)
+        b.reanchor(0.5, source="golden")
+    for strength, step in [(1.0, 0), (0.5, 2), (0.25, 3)]:
+        b.reanchor(strength)
+        n0 = len(b.generator.calls)
+        b.generate_chunk(a)
+        # A hard cut: the first-frame schedule from the mapped step, at position 0.
+        assert [c["t"] for c in b.generator.calls[n0:]] == [[int(t)] for t in b.first_chunk_steps[step:]] + [[0]]
+        assert b.last_rebase == cf.Rebase(0, 0, step, False) and b.frame_index == 1
+        n0 = len(b.generator.calls)
+        b.generate_chunk(a)  # applied once: the next chunk is a normal one
+        assert [c["t"] for c in b.generator.calls[n0:]] == [[int(t)] for t in b.denoising_steps] + [[0]]
+    rebases = b.rebases
+    b.reanchor(0.0)  # zero strength cancels: no cut
+    b.generate_chunk(a)
+    assert b.rebases == rebases
 
 
 # ---------------------------------------------------------------- clean anchor
