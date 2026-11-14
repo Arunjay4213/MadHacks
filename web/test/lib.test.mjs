@@ -6,6 +6,28 @@ import {
   PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
 } from '../lib.js';
 import { loadTestPattern } from '../fake-server.mjs';
+import { wsBaseUrl, fitSize } from '../lib.js';
+
+test('wsBaseUrl: same origin by default; ?server= as host:port or a full URL (tunnels)', () => {
+  const local = { protocol: 'http:', host: 'localhost:8787' };
+  assert.equal(wsBaseUrl(null, local), 'ws://localhost:8787');
+  assert.equal(wsBaseUrl('127.0.0.1:8000', local), 'ws://127.0.0.1:8000');
+  assert.equal(wsBaseUrl('wss://engine.example.trycloudflare.com/', local), 'wss://engine.example.trycloudflare.com');
+  assert.equal(wsBaseUrl('https://engine.example.trycloudflare.com', local), 'wss://engine.example.trycloudflare.com');
+  assert.equal(wsBaseUrl('10.0.0.5:8000', { protocol: 'https:', host: 'x' }), 'wss://10.0.0.5:8000');
+});
+
+test('fitSize: real 672x384 frames fill the screen at their own aspect ratio, in device pixels', () => {
+  // A 1880x900 CSS-pixel video area on a 2x Retina screen: height-limited.
+  assert.deepEqual(fitSize(672, 384, 1880, 900, 2), { width: 3150, height: 1800 });
+  // A wide area: aspect ratio kept (672/384 = 1.75).
+  const s = fitSize(672, 384, 3000, 600, 1);
+  assert.equal(s.height, 600);
+  assert.equal(s.width, 1050);
+  // The 416x240 test pattern and odd inputs.
+  assert.deepEqual(fitSize(416, 240, 832, 480, 1), { width: 832, height: 480 });
+  assert.deepEqual(fitSize(672, 384, 0, 0, 1), { width: 672, height: 384 }); // not laid out yet
+});
 
 test('push-to-talk: the set key alone; never with Ctrl (Wispr Flow), Cmd or Alt; never Ctrl itself', () => {
   const key = (code, mods = {}) => ({ code, ctrlKey: false, metaKey: false, altKey: false, ...mods });

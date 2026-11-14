@@ -105,6 +105,24 @@ export function splitKeyword(text, keyword) {
 
 export const backoffMs = (attempt) => Math.min(5000, 250 * 2 ** attempt);
 
+// Websocket base URL from the page location and an optional `?server=` value: either `host:port`
+// (ws, or wss on an https page) or a full `ws://` / `wss://` / `http(s)://` URL, e.g. an HTTPS tunnel.
+export function wsBaseUrl(server, location) {
+  if (!server) return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
+  if (/^wss?:\/\//.test(server)) return server.replace(/\/+$/, '');
+  if (/^https?:\/\//.test(server)) return server.replace(/^http/, 'ws').replace(/\/+$/, '');
+  return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${server}`;
+}
+
+// Canvas size in device pixels that fits a frame of fw x fh inside a box of boxW x boxH CSS pixels,
+// keeping the frame's aspect ratio. The page draws each frame scaled to this size with high-quality
+// smoothing, so a small frame (672x384) is upscaled smoothly for a big screen.
+export function fitSize(fw, fh, boxW, boxH, dpr = 1) {
+  if (!(fw > 0 && fh > 0 && boxW > 0 && boxH > 0)) return { width: fw || 1, height: fh || 1 };
+  const scale = Math.min(boxW / fw, boxH / fh) * dpr;
+  return { width: Math.max(1, Math.round(fw * scale)), height: Math.max(1, Math.round(fh * scale)) };
+}
+
 // Text box: a paste or Wispr Flow insert is a whole sentence, so it is final at once.
 export function isWholeInsert(inputType, data) {
   if (['insertFromPaste', 'insertFromDrop', 'insertReplacementText', 'insertFromYank'].includes(inputType)) return true;
