@@ -107,3 +107,13 @@ Every final and tap clears the guess.
 ```
 `before` lists labels added first (via KEYWORDS). `expect` is a subset match; for `remove`/`set_strength`, `label` names the change whose id is expected.
 `expect: null` means no operation. `pace` is optional (absent means not checked).
+
+## Issue #59 update
+
+The embedded dictionary now owns canonical phrases and aliases in `keywords.json`.
+Final sentences split into at most 16 ordered operations, validated on a temporary
+state and committed atomically with one undo snapshot and one target prompt.
+Dictionary misses retain the existing bounded slow reader; explicit unknown objects
+and short visual styles pass through without substituting an unrelated known noun.
+The engine now configures its Azure slow reader; provider selection above is historical.
+Optional vector retrieval ships separately so this parser remains dependency-free.

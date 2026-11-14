@@ -51,6 +51,11 @@ async def check(url):
         await send(dict(type="tap", action="reset"), [])
         await send(dict(type="tap", action="undo"), ["winter", "river", "night"])
         await send(dict(type="final", text="don’t add a rainbow"), ["winter", "river", "night"], unmatched=True)
+        await send(dict(type="tap", action="reset"), [])
+        await send(dict(type="final", text="add a lighthouse"), ["lighthouse"])
+        await send(dict(type="final", text="add a dog and remove the lighthouse"), ["dog"])
+        await send(dict(type="tap", action="undo"), ["lighthouse"])
+        await send(dict(type="final", text="make it winter； add a river"), ["lighthouse", "winter", "river"])
         assert all(not errors(4, state) for _, state in client.states)
         assert len(client.frames) > 1, "frames stopped"
         print(f"PASSED: {len(client.frames)} streamed frames; all {len(client.states)} state messages validate")
