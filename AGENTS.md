@@ -83,12 +83,13 @@ Two agents should never edit the same folder.
 |---|---|---|
 | Steering: everything inside the diffusion model. How the prompt embedding is blended, paced, scaled and interrupted. | `@Tactacion` (Ishaan) | `steering/` |
 | Real-time engine: the GPU machines, the generation loop, the text encoder service, streaming frames, delay measurement. | `@Arunjay4213` (Arunjay) | `engine/` |
-| The page and the inputs: the demo page, the words line, chips, undo button, the text box for Wispr Flow, and the live mic (voice). | `@prateekraouw` (Prateek) | `web/` |
-| Understanding commands: scene state, operations, undo history, the prompt composer, the keyword table. Also the write-up and the pitch. | `@anirudhaugile` (Ani) | `commands/`, `docs/` |
+| The page and the inputs: the demo page, the words line, chips, undo button, the text box for Wispr Flow, and the live mic (voice). | `@anirudhaugile` (Ani) | `web/` |
+| Understanding commands: scene state, operations, undo history, the prompt composer, the keyword table. Also the write-up and the pitch. | `@prateekraouw` (Prateek) | `commands/`, `docs/` |
 | The four message shapes between the parts. | `@Arunjay4213` (lead) | `contracts/` |
 
 Assigned by the lead on 2026-11-14, following Ishaan's blueprint (board post #6883918631).
-In the blueprint's words: Ishaan is steering, Arunjay is teammate 1, Prateek is teammate 2, Ani is teammate 3.
+In the blueprint's words: Ishaan is steering, Arunjay is teammate 1, Ani is teammate 2, Prateek is teammate 3.
+The lead swapped teammates 2 and 3 on 2026-11-14 at about 21:00 UTC: before that, Prateek had `web/` and Ani had `commands/` and `docs/`.
 The blueprint is the plan of record for what each part contains, its first deliverable, and the gates.
 A change to a file in `contracts/` needs agreement on the board from every owner whose part uses that message.
 This table replaces the earlier three-way split of the core feature.
