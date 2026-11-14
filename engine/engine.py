@@ -5,8 +5,8 @@
     streamer thread     playout_queue -> paced at backend.fps -> publish(frame); on a chunk's first frame,
                         stamp `shown` and publish one contract 4 message
 
-Commands: contract 1 -> command reader -> contract 2 -> encoder service (its own thread) -> steer worker thread ->
-steering.Controller.handle (which calls steerer.set_target) -> takes effect on the next get_cond.
+Commands: contract 1 -> reader worker thread: reader.handle -> steer (contract 2) -> encoder service (its own thread)
+-> steer worker thread: steering.Controller.handle (which calls steerer.set_target) -> takes effect on the next get_cond.
 The frame cache is never rebuilt on a command; only the steerer's target changes.
 """
 
@@ -17,7 +17,7 @@ import queue
 import threading
 import time
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from io import BytesIO
 from pathlib import Path
@@ -27,13 +27,13 @@ from PIL import Image
 
 from steering import Controller, Steerer
 
-from . import standin_reader
 from .backends import load_backend
 from .commands import CommandBook, CommandRecord
 from .encoder import EncoderService
 from .framing import pack_frame
 from .lifecycle import Lifecycle, LifecycleMachine
 from .messages import BadMessage, check
+from .reader import load_reader
 
 log = logging.getLogger("engine")
 
@@ -41,13 +41,14 @@ log = logging.getLogger("engine")
 @dataclass
 class EngineConfig:
     backend: str = "fake"
+    reader: str = "standin"         # standin, or commands (commands.service.CommandService)
     width: int = 832
     height: int = 480
     steps: int = 4
     device: str = "cuda:0"
     decode_device: str = "cuda:0"
     backend_options: dict = field(default_factory=dict)
-    base_prompt: str = "a wide shot of a meadow with a single oak tree"
+    base_prompt: str = "a wide shot of a meadow with a single oak tree"  # used when the reader has no committed prompt
     jpeg_quality: int = 80
     precompute_file: str | None = None
     decode_queue_size: int = 2      # chunks waiting for decode; generation blocks (and logs) when full
@@ -124,13 +125,12 @@ def _round(v: float | None) -> float | None:
 
 class Engine:
     def __init__(self, config: EngineConfig, publish_frame: Callable[[bytes], None],
-                 publish_control: Callable[[dict], None], reader=standin_reader.read_command,
-                 scene=None) -> None:
+                 publish_control: Callable[[dict], None], reader=None) -> None:
         self.config = config
         self.publish_frame = publish_frame
         self.publish_control = publish_control
-        self.read_command = reader
-        self.scene = scene if scene is not None else standin_reader.StandinScene()
+        self.reader = reader if reader is not None else load_reader(config.reader)
+        self.base_prompt: str | None = None
         self.lifecycle = LifecycleMachine()
         self.book = CommandBook()
         self.encoder: EncoderService | None = None
@@ -146,8 +146,11 @@ class Engine:
         self._gate = LeadGate()
         self._reset_lock = threading.Lock()
         self._reset_waiters: list[threading.Event] = []
+        self._reset_seed: tuple[str, object, CommandRecord | None] | None = None  # (prompt, embedding, command)
         self._threads: list[threading.Thread] = []
-        # Runs Controller.handle off the generation thread and the asyncio loop.
+        # reader.handle (may block about 0.4 s) and Controller.handle run here, off the generation thread and the
+        # asyncio loop. One reader thread keeps commands in arrival order.
+        self._reader_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="reader")
         self._steer_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="steer")
 
         self._stats_lock = threading.Lock()
@@ -176,6 +179,7 @@ class Engine:
             t.join(timeout)
             if t.is_alive():
                 log.warning("thread %s did not stop within %.0f s", t.name, timeout)
+        self._reader_pool.shutdown(wait=False, cancel_futures=True)
         self._steer_pool.shutdown(wait=False, cancel_futures=True)
         if self.encoder:
             self.encoder.stop()
@@ -203,9 +207,12 @@ class Engine:
             self.lifecycle.transition(Lifecycle.WARMING, "backend loaded")
             self.encoder = EncoderService(self.backend.encode_prompt_with_ids)
             self.encoder.start()
-            self.base_embedding = self.encoder.encode(cfg.base_prompt)
+            committed = self.reader.committed_prompt
+            self.base_prompt = committed if committed else cfg.base_prompt
+            log.info("starting prompt %r (from %s)", self.base_prompt, "the reader" if committed else "--base-prompt")
+            self.base_embedding = self.encoder.encode(self.base_prompt)
             self._precompute()
-            self._new_steerer()
+            self._new_steerer(self.base_embedding)
             for target, name in ((self._decode_loop, "decode"), (self._stream_loop, "streamer")):
                 t = threading.Thread(target=target, name=name, daemon=True)
                 self._threads.append(t)
@@ -218,20 +225,30 @@ class Engine:
             self._fail("generation thread", exc)
 
     def _precompute(self) -> None:
-        path = self.config.precompute_file
-        if not path:
-            return
-        prompts = [line.strip() for line in Path(path).read_text().splitlines() if line.strip()]
+        """Encode the --precompute-file prompts and the reader's likely prompts before generation starts."""
+        prompts = []
+        if self.config.precompute_file:
+            path = Path(self.config.precompute_file)
+            prompts += [line.strip() for line in path.read_text().splitlines() if line.strip()]
+        prompts += self._likely_prompts()
         t0 = time.perf_counter()
-        for p in prompts:
+        for p in dict.fromkeys(prompts):
             if self._stop.is_set():
                 return
             self.encoder.encode(p)
-        log.info("precomputed %d prompts from %s in %.1f s", len(prompts), path, time.perf_counter() - t0)
+        if prompts:
+            log.info("precomputed %d prompts in %.1f s", len(set(prompts)), time.perf_counter() - t0)
 
-    def _new_steerer(self) -> None:
-        """A steerer at the base prompt, and the steering owner's Controller that applies contract 2 to it."""
-        self.steerer = Steerer(self.base_embedding)
+    def _likely_prompts(self) -> list[str]:
+        try:
+            return [p for p in self.reader.likely_prompts() if isinstance(p, str) and p]
+        except Exception:
+            log.exception("reader.likely_prompts failed")
+            return []
+
+    def _new_steerer(self, embedding) -> None:
+        """A steerer at `embedding`, and the steering owner's Controller that applies contract 2 to it."""
+        self.steerer = Steerer(embedding)
         self.controller = Controller(self.steerer, self.encoder.encode, cache_size=CONTROLLER_CACHE)
 
     # --- generation ------------------------------------------------------------------------
@@ -297,24 +314,31 @@ class Engine:
 
     # --- reset -----------------------------------------------------------------------------
 
-    def request_reset(self) -> threading.Event:
-        """Ask for a reset at the next chunk boundary. The returned event is set when it is done."""
+    def request_reset(self, seed: tuple[str, object, CommandRecord | None] | None = None) -> threading.Event:
+        """Ask for a reset at the next chunk boundary. The returned event is set when it is done.
+
+        `seed` is (prompt, embedding, command): the new video starts directly on that embedding, with no ramp.
+        Without it the new video starts on the starting prompt.
+        """
         state = self.lifecycle.state
         if state not in (Lifecycle.GENERATING, Lifecycle.RESETTING):
             raise BadMessage(f"cannot reset while {state.value}")
         done = threading.Event()
         with self._reset_lock:
             self._reset_waiters.append(done)
+            self._reset_seed = seed
         return done
 
     def _do_reset(self) -> None:
         with self._reset_lock:
             waiters, self._reset_waiters = self._reset_waiters, []
-        self.lifecycle.transition(Lifecycle.RESETTING, "reset requested")
+            seed, self._reset_seed = self._reset_seed, None
+        prompt, embedding, rec = seed if seed else (self.base_prompt, self.base_embedding, None)
+        self.lifecycle.transition(Lifecycle.RESETTING, f"reset requested, new video on {prompt!r}")
         t0 = time.perf_counter()
         self._decode_queue.join()  # the decoder finishes the chunks of the old video first
         self.backend.reset()
-        self.book.reset(self._new_steerer)
+        self.book.reset(lambda: self._new_steerer(embedding), rec)
         self.lifecycle.transition(Lifecycle.GENERATING, f"reset done in {(time.perf_counter() - t0) * 1e3:.0f} ms")
         for w in waiters:
             w.set()
@@ -400,9 +424,14 @@ class Engine:
                      self._lead_limit(), s["stalls"], s["decode_blocked"], s["clients"])
 
     def state_message(self, chunk: int, progress: float) -> dict:
-        """One contract 4 message."""
-        return {"chunk": chunk, "changes": [dict(c) for c in self.scene.changes],
-                "progress": round(min(1.0, max(0.0, progress)), 3), **self.book.latest_fields()}
+        """One contract 4 message: the reader's state fields plus what the engine measures."""
+        try:
+            state = dict(self.reader.state_fields())
+        except Exception:
+            log.exception("reader.state_fields failed")
+            state = {"changes": [], "heard": None, "keyword": None, "unmatched": False}
+        return {**state, "chunk": chunk, "progress": round(min(1.0, max(0.0, progress)), 3),
+                **self.book.latest_fields()}
 
     # --- commands --------------------------------------------------------------------------
 
@@ -411,27 +440,63 @@ class Engine:
         if state not in (Lifecycle.GENERATING, Lifecycle.RESETTING):
             raise BadMessage(f"engine is {state.value}, not accepting commands")
 
-    def handle_control(self, message: object, heard_ns: int) -> None:
-        """A contract 1 message from /control. Raises BadMessage if it is invalid."""
+    def handle_control(self, message: object, heard_ns: int,
+                       reply: Callable[[dict], None] = lambda _m: None) -> Future:
+        """A contract 1 message from /control.
+
+        Checks it against the schema here (raises BadMessage), then hands it to the reader worker thread.
+        `reply` is called from that thread with {"error": ...} if the reader rejects it.
+        The returned Future gives the reset's done event for a reset tap, else None.
+        """
         msg = check(1, message)
         self._require_running()
-        if msg["type"] == "tap" and msg["action"] == "reset":
-            self.request_reset()
         rec = self.book.heard("control", msg.get("text"), msg.get("t_client"), heard_ns)
+        return self._reader_pool.submit(self._read, msg, rec, reply)
+
+    def _read(self, msg: dict, rec: CommandRecord, reply: Callable[[dict], None]) -> threading.Event | None:
+        """Reader worker thread: reader.handle, then steer, or reset for a reset tap."""
+        is_reset = msg["type"] == "tap" and msg.get("action") == "reset"
         try:
-            target = self.read_command(msg, self.scene)
-            if target is None:
-                self.book.no_operation(rec, f"no operation for {msg['type']}", report=msg["type"] == "final")
-                return
-            check_target(target)
+            result = self.reader.handle(msg)
+            steer = result.get("steer")
+            if steer is not None:
+                check_target(steer)
+        except (ValueError, BadMessage) as exc:  # BadMessage is a ValueError too
+            self.book.drop(rec, f"reader rejected it: {exc}")
+            reply({"error": f"command reader: {exc}"})
+            return None
         except Exception as exc:
-            self.book.drop(rec, f"reader error: {exc}")
-            raise BadMessage(f"command reader failed: {exc}") from None
-        self.book.decided(rec, target, keyword=getattr(self.scene, "keyword", None))
-        self._embed(rec, target)
+            log.exception("reader.handle failed")
+            self.book.drop(rec, f"reader error: {exc!r}")
+            reply({"error": f"command reader failed: {exc!r}"})
+            return None
+        self.encoder.prefetch(self._likely_prompts())
+        if is_reset:
+            seed = None
+            if steer is not None:
+                self.book.decided(rec, steer)
+                seed = (steer["prompt"], self.encoder.encode(steer["prompt"]), rec)
+            else:
+                self.book.drop(rec, "reset to the starting prompt")
+            try:
+                return self.request_reset(seed)
+            except BadMessage as exc:
+                self.book.drop(rec, str(exc))
+                reply({"error": str(exc)})
+                return None
+        if steer is None:
+            self.book.drop(rec, f"no steer for {msg['type']}")
+            return None
+        self.book.decided(rec, steer)
+        self._embed(rec, steer)
+        return None
+
+    def reset(self, heard_ns: int) -> Future:
+        """POST /reset: the same path as a reset tap, so the reader resets its scene too."""
+        return self.handle_control({"type": "tap", "action": "reset"}, heard_ns)
 
     def handle_target(self, message: object, heard_ns: int) -> CommandRecord:
-        """A contract 2 message from POST /target, bypassing the reader."""
+        """A contract 2 message from POST /target, bypassing the reader. Passed to the Controller unchanged."""
         target = check_target(message)
         self._require_running()
         rec = self.book.heard("target", None, None, heard_ns)
@@ -440,14 +505,30 @@ class Engine:
         return rec
 
     def _embed(self, rec: CommandRecord, target: dict) -> None:
-        fut = self.encoder.request(target["prompt"])
-        fut.add_done_callback(lambda f: self._steer_pool.submit(self._on_embedding, rec, target, f))
+        """Encode every prompt the target names, then apply it on the steer worker thread."""
+        futures = [self.encoder.request(p) for p in (target["prompt"], target.get("without_prompt")) if p]
+        remaining = [len(futures)]
+        lock = threading.Lock()
 
-    def _on_embedding(self, rec: CommandRecord, target: dict, fut) -> None:
-        """Steer worker thread. The embedding is now in the encoder cache, so handle does not wait for encoding."""
-        if fut.exception() is not None:
-            self.book.drop(rec, f"encoding failed: {fut.exception()!r}")
-            return
+        def one_done(_fut) -> None:  # runs on the encoder thread, or right here if already cached
+            with lock:
+                remaining[0] -= 1
+                last = remaining[0] == 0
+            if last:
+                self._steer_pool.submit(self._on_embedding, rec, target, futures)
+
+        for fut in futures:
+            fut.add_done_callback(one_done)
+
+    def _on_embedding(self, rec: CommandRecord, target: dict, futures: list) -> None:
+        """Steer worker thread. Once the embeddings are in the encoder cache, Controller.handle does not wait for
+        encoding while the engine's lock is held."""
+        for fut in futures:
+            try:
+                fut.result()
+            except Exception as exc:
+                self.book.drop(rec, f"encoding failed: {exc!r}")
+                return
         try:
             result = self.book.embedded(rec, lambda: self.controller.handle(target))
         except ValueError as exc:

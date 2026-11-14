@@ -115,16 +115,25 @@ def build_app(config: EngineConfig) -> Starlette:
         hub.control[ws] = q
         log.info("control client connected: %s (%d total)", ws.client, len(hub.control))
 
+        def put(message: dict) -> None:  # event loop only
+            with contextlib.suppress(asyncio.QueueFull):
+                q.put_nowait(json.dumps(message))
+
+        loop = asyncio.get_running_loop()
+
+        def reply(message: dict) -> None:  # any thread; the reader worker uses it for errors
+            log.info("control: error reply to %s: %s", ws.client, message.get("error"))
+            loop.call_soon_threadsafe(put, message)
+
         async def on_receive(msg):
             heard_ns = time.monotonic_ns()
             try:
                 if msg.get("text") is None:
                     raise BadMessage("send JSON text messages, not binary")
-                engine.handle_control(parse_json(msg["text"]), heard_ns)
+                engine.handle_control(parse_json(msg["text"]), heard_ns, reply)
             except BadMessage as exc:
                 log.info("control: rejected message from %s: %s", ws.client, exc)
-                with contextlib.suppress(asyncio.QueueFull):
-                    q.put_nowait(json.dumps({"error": str(exc)}))
+                put({"error": str(exc)})
 
         try:
             await _serve(ws, q, ws.send_text, on_receive)
@@ -144,10 +153,13 @@ def build_app(config: EngineConfig) -> Starlette:
         return JSONResponse({"ok": ok, "state": state.value}, status_code=200 if ok else 503)
 
     async def reset(_request: Request):
+        heard_ns = time.monotonic_ns()
         try:
-            done = engine.request_reset()
+            done = await asyncio.wrap_future(engine.reset(heard_ns))
         except BadMessage as exc:
             return JSONResponse({"error": str(exc)}, status_code=409)
+        if done is None:
+            return JSONResponse({"error": "reset refused; see the server log"}, status_code=409)
         finished = await asyncio.to_thread(done.wait, 15.0)
         return JSONResponse({"ok": finished, "state": engine.lifecycle.state.value},
                             status_code=200 if finished else 504)
@@ -200,6 +212,8 @@ def _option_value(text: str):
 def parse_args(argv=None) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="python -m engine.server", description=__doc__.splitlines()[0])
     p.add_argument("--backend", default="fake", help="fake or causal_forcing")
+    p.add_argument("--reader", default="standin", choices=["standin", "commands"],
+                   help="command reader: the engine's stand-in, or commands.service.CommandService")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8000)
     p.add_argument("--width", type=int, default=832)
@@ -207,7 +221,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--steps", type=int, default=4)
     p.add_argument("--device", default="cuda:0", help="generation device (the fake backend ignores it)")
     p.add_argument("--decode-device", default="cuda:0", help="decode device (the fake backend ignores it)")
-    p.add_argument("--base-prompt", default=EngineConfig.base_prompt)
+    p.add_argument("--base-prompt", default=EngineConfig.base_prompt,
+                   help="starting prompt, used when the reader has no committed prompt")
     p.add_argument("--jpeg-quality", type=int, default=80)
     p.add_argument("--precompute-file", help="text file of prompts, one per line, encoded at startup")
     p.add_argument("--backend-opt", action="append", default=[], metavar="KEY=VALUE",
@@ -229,7 +244,7 @@ def main(argv=None) -> None:
         if not sep or not key:
             raise SystemExit(f"--backend-opt expects KEY=VALUE, got {item!r}")
         options[key] = _option_value(value)
-    config = EngineConfig(backend=args.backend, width=args.width, height=args.height, steps=args.steps,
+    config = EngineConfig(backend=args.backend, reader=args.reader, width=args.width, height=args.height, steps=args.steps,
                           device=args.device, decode_device=args.decode_device, backend_options=options,
                           base_prompt=args.base_prompt, jpeg_quality=args.jpeg_quality,
                           precompute_file=args.precompute_file, lead_margin=args.lead_margin)

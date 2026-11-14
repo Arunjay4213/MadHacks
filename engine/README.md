@@ -30,11 +30,13 @@ Unit tests:
 ## Command line
 
 ```
-python -m engine.server --backend fake|causal_forcing --host 127.0.0.1 --port 8000 --width 832 --height 480 \
+python -m engine.server --backend fake|causal_forcing --reader standin|commands --host 127.0.0.1 --port 8000 --width 832 --height 480 \
     --steps 4 --base-prompt "..." --jpeg-quality 80 --precompute-file prompts.txt \
     --device cuda:0 --decode-device cuda:0 --backend-opt key=value --lead-margin 1.3 --log-level info
 ```
 
+- `--reader` picks the command reader: `standin` (default, `engine/standin_reader.py`) or `commands` (`commands.service.CommandService`, imported only when chosen).
+- The starting prompt is the reader's `committed_prompt` when it has one, else `--base-prompt`.
 - `--precompute-file` is a text file with one prompt per line; each is encoded at startup, so a known prompt needs no encoding time.
 - `--backend-opt key=value` is passed to the backend's `load()` and may be repeated; numbers and true/false are converted.
 - The fake backend's options are `gen_ms` (170), `decode_ms` (60), `encode_ms` (80), `frames_per_chunk` (4), `first_chunk_frames` (1) and `fps` (16).
@@ -50,8 +52,8 @@ All on one origin; the message shapes are in `contracts/README.md`.
 | `GET /` | The engine's own test viewer (`engine/static/index.html`); the demo page is `web/`. |
 | websocket `/frames` | Binary frames out: 4-byte big-endian chunk number, 2-byte big-endian frame index in that chunk, JPEG bytes. |
 | websocket `/control` | Contract 1 in (JSON text); contract 4 out, one message per chunk; `{"error": "..."}` replies to a bad message. |
-| `POST /target` | Body is a contract 2 message; it skips the command reader and goes straight to the encoder and steering. |
-| `POST /reset` | Starts a new video at the base prompt; returns when done. A `{"type":"tap","action":"reset"}` on `/control` does the same. |
+| `POST /target` | Body is a contract 2 message; it skips the command reader and goes unchanged to the encoder and `steering.Controller.handle`. |
+| `POST /reset` | Same as a `{"type":"tap","action":"reset"}` on `/control`: goes through the reader, then starts a new video; returns when done. |
 | `GET /stats` | JSON: lifecycle state, last generated and shown chunk, last and average generation, decode and JPEG ms, measured fps, queue depths, encoder cache, clients. |
 | `GET /healthz` | 200 with the state, or 503 when FAILED or STOPPED. |
 
@@ -76,13 +78,18 @@ One `generate_chunk` call is one chunk in every contract, and it may produce any
 
 ## Commands
 
-contract 1 on `/control` -> command reader -> contract 2 -> encoder service -> `steering.Controller.handle` -> `steerer.set_target` -> the next `get_cond`.
+contract 1 on `/control` -> reader worker thread: `reader.handle` -> `steer` (contract 2) -> encoder service -> steer worker thread: `steering.Controller.handle` -> `steerer.set_target` -> the next `get_cond`.
 
-- The command reader is `engine/standin_reader.py` until the `commands/` owner's reader is merged; the boundary is `read_command(message, scene) -> contract 2 dict or None`.
-  The stand-in takes a `final` text as the whole new prompt with a 4-chunk ramp, gives no operation for `partial` and `tap`, and keeps an empty changes list.
-- A `reset` tap also resets the engine; `undo` and `remove` taps go to the reader only.
-- The encoder service runs on its own thread with a request queue, caches by exact prompt text (LRU, 512 entries), shares one encoding between identical requests, and logs cache hits, misses and encode ms.
-- `steering.Controller.handle` runs on its own worker thread once the embedding is in the encoder cache, so it never waits for encoding and never runs on the generation thread or the event loop.
+- The reader API, agreed with the `commands/` owner, is in `engine/reader.py`:
+  `handle(msg) -> {"steer": contract 2 or None, "state": {...}}`, `state_fields()`, `likely_prompts()` and `committed_prompt`.
+- Every contract 1 message (`partial`, `final`, `tap`) goes to `reader.handle`, one at a time in arrival order on its own worker thread, because it may block for about 0.4 s.
+  If it raises ValueError, the client gets `{"error": ...}` on `/control`.
+- The stand-in reader takes a `final` text as the whole new prompt with a 4-chunk ramp, gives no steer for `partial` and `tap`, and keeps an empty changes list.
+- The `steer` dict is passed unchanged to `steering.Controller.handle`, including optional fields such as `strength` and `without_prompt`.
+  The engine first encodes `prompt` and `without_prompt` in its encoder service, so `handle` never waits for encoding.
+- A reset tap also resets the engine: RESETTING, `backend.reset()` to clear the frame cache, then a new steerer and controller seeded directly with the embedding of the reset's `steer` prompt (no ramp), or the starting prompt if `steer` is None.
+- The encoder service runs on its own thread with a priority queue, caches embeddings and token ids by exact prompt text (LRU, 512 entries), shares one encoding between identical requests, and logs cache hits, misses and encode ms.
+- The reader's `likely_prompts()` are encoded at startup, and after every command they are queued again at background priority, behind any command's encoding.
 
 ## Lifecycle states
 
@@ -91,7 +98,7 @@ contract 1 on `/control` -> command reader -> contract 2 -> encoder service -> `
 | LOADING | `backend.load()` is running | WARMING, STOPPED, FAILED |
 | WARMING | encoding the base prompt and the precompute file | GENERATING, STOPPED, FAILED |
 | GENERATING | producing chunks | RESETTING, STOPPED, FAILED |
-| RESETTING | between chunks: wait for decode to finish, `backend.reset()`, new steerer and controller at the base prompt | GENERATING, STOPPED, FAILED |
+| RESETTING | between chunks: wait for decode to finish, `backend.reset()`, new steerer and controller on the new video's prompt | GENERATING, STOPPED, FAILED |
 | FAILED | a thread raised; `/stats` shows the error | STOPPED |
 | STOPPED | shut down | none |
 
@@ -108,7 +115,7 @@ Stamps use the monotonic clock and are reported as integer ms after `heard`:
 |---|---|
 | heard | the server received the contract 1 message (or the `POST /target` request) |
 | decided | the command reader returned an operation (contract 2) |
-| embedded | the embedding was ready and `steering.Controller.handle` applied it, which calls `steerer.set_target` |
+| embedded | the embedding was ready and `steering.Controller.handle` applied it, which calls `steerer.set_target` (for a reset with a prompt: the new steerer was seeded with it) |
 | generated | generation finished for the first chunk whose `get_cond` came after that `set_target` |
 | shown | the first frame of that chunk was handed to the `/frames` clients |
 
@@ -119,10 +126,9 @@ That chunk's number is sent as `applies_from_chunk`.
 
 The engine sends one message per chunk when the chunk's first frame is sent.
 
+- `changes`, `heard`, `keyword`, `unmatched`: from `reader.state_fields()`, called for every message.
 - `chunk`: that chunk's number.
-- `changes`: the scene's changes from the command reader; the stand-in keeps `[]`.
 - `progress`: `steerer.progress` right after the `get_cond` for that chunk.
-- `stamps`, `t_client`, `applies_from_chunk`, `heard`, `keyword`, `unmatched`: from the most recent command.
-  The most recent command is the newest one the reader turned into an operation, or a `final` it could not match (then `unmatched` is true).
-  A `partial` or `tap` with no operation does not replace it.
+- `stamps`, `t_client`, `applies_from_chunk`: from the most recent command, which is the newest one the reader gave a `steer` (or a `POST /target`).
+  A message with no steer does not replace it.
 - Stamps appear as they become known, so the page sees `heard` and `decided` first and `shown` last; `{}` before any command.

@@ -47,7 +47,7 @@ def test_streams_and_applies_a_command(engine):
     assert engine.frames[0] == (0, 0)  # first chunk has 1 frame
     with pytest.raises(BadMessage):
         engine.handle_control({"type": "final", "text": "x"}, time.monotonic_ns())
-    engine.handle_control({"type": "final", "text": "make it winter", "t_client": 5}, time.monotonic_ns())
+    engine.handle_control({"type": "final", "text": "make it winter", "t_client": 5}, time.monotonic_ns()).result(5)
     rec = engine.book.latest()
     assert wait(lambda: rec.stage is CommandStage.SHOWN)
     assert wait(lambda: any(s["t_client"] == 5 and "shown" in s["stamps"] for s in engine.states))
@@ -60,8 +60,61 @@ def test_streams_and_applies_a_command(engine):
 
 def test_reset(engine):
     assert wait(lambda: len(engine.frames) > 5)
-    done = engine.request_reset()
+    done = engine.reset(time.monotonic_ns()).result(5)
     assert done.wait(5)
     assert engine.lifecycle.state is Lifecycle.GENERATING
     n = len(engine.frames)
     assert wait(lambda: len(engine.frames) > n + 5)
+
+
+class SeedingReader:
+    """A reader whose reset tap returns a steer, like the commands/ reader will."""
+
+    committed_prompt = "committed scene"
+
+    def __init__(self):
+        self.seen = []
+
+    def handle(self, msg):
+        self.seen.append(msg)
+        if msg["type"] == "tap" and msg["action"] == "reset":
+            return {"steer": {"prompt": "fresh scene", "ramp_chunks": 4, "provisional": False, "cap": 1.0},
+                    "state": self.state_fields()}
+        if msg["type"] == "final" and msg["text"] == "reject me":
+            raise ValueError("no thanks")
+        return {"steer": None, "state": self.state_fields()}
+
+    def state_fields(self):
+        return {"changes": [{"id": "c1", "label": "winter", "strength": 0.5}], "heard": "h", "keyword": "winter",
+                "unmatched": False}
+
+    def likely_prompts(self):
+        return ["likely one", "likely two"]
+
+
+def test_reader_api_reset_seed_and_errors():
+    states, reader = [], SeedingReader()
+    cfg = EngineConfig(backend="fake", width=64, height=48, backend_options=dict(
+        gen_ms=20, decode_ms=5, encode_ms=10, frames_per_chunk=3, fps=50))
+    e = Engine(cfg, lambda b: None, states.append, reader=reader)
+    e.start()
+    try:
+        assert wait(lambda: e.lifecycle.state is Lifecycle.GENERATING)
+        assert e.base_prompt == "committed scene"
+        assert e.encoder.cache_size >= 3  # starting prompt and both likely prompts
+        replies = []
+        assert e.handle_control({"type": "final", "text": "reject me", "t_client": 1}, time.monotonic_ns(),
+                                replies.append).result(5) is None
+        assert replies and "no thanks" in replies[0]["error"]
+        done = e.handle_control({"type": "tap", "action": "reset", "t_client": 9}, time.monotonic_ns()).result(5)
+        assert done.wait(5)
+        rec = e.book.latest()
+        assert rec.target["prompt"] == "fresh scene"
+        assert wait(lambda: rec.stage is CommandStage.SHOWN)
+        assert e.steerer.progress == 1.0  # started directly on the new prompt, no ramp
+        assert wait(lambda: any(s["t_client"] == 9 and "shown" in s["stamps"] for s in states))
+        last = states[-1]
+        assert last["keyword"] == "winter" and last["changes"][0]["strength"] == 0.5 and not errors(4, last)
+    finally:
+        e.stop()
+

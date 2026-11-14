@@ -1,6 +1,7 @@
 """Text encoder service: its own thread and request queue, off the generation path, with a cache by prompt text."""
 
 import collections
+import itertools
 import logging
 import queue
 import threading
@@ -10,7 +11,7 @@ from concurrent.futures import Future
 
 log = logging.getLogger("engine.encoder")
 
-_STOP = object()
+URGENT, BACKGROUND = 0, 1  # request priorities; lower runs first
 
 
 class EncoderService:
@@ -21,6 +22,7 @@ class EncoderService:
 
     A cached prompt returns an already finished Future, so it costs no encoding time.
     Identical prompts requested while one is being encoded share one Future.
+    `prefetch(prompts)` queues prompts at background priority, behind every command's request.
     The cache is a bounded LRU keyed by the exact prompt text.
     """
 
@@ -30,7 +32,9 @@ class EncoderService:
         self._cache: collections.OrderedDict[str, object] = collections.OrderedDict()
         self._inflight: dict[str, Future] = {}
         self._lock = threading.Lock()
-        self._requests: queue.Queue = queue.Queue()
+        self._requests: queue.PriorityQueue = queue.PriorityQueue()
+        self._order = itertools.count()
+        self._background: set[str] = set()  # in-flight prompts that were queued at background priority
         self._thread = threading.Thread(target=self._run, name="encoder", daemon=True)
         self.hits = 0
         self.misses = 0
@@ -40,7 +44,23 @@ class EncoderService:
         self._thread.start()
 
     def stop(self) -> None:
-        self._requests.put(_STOP)
+        self._requests.put((-1, next(self._order), None, None))
+
+    def prefetch(self, prompts) -> int:
+        """Queue every prompt not cached or in flight at background priority. Returns how many were queued."""
+        queued = 0
+        with self._lock:
+            for prompt in prompts:
+                if prompt in self._cache or prompt in self._inflight:
+                    continue
+                fut = Future()
+                self._inflight[prompt] = fut
+                self._background.add(prompt)
+                self._requests.put((BACKGROUND, next(self._order), prompt, fut))
+                queued += 1
+        if queued:
+            log.info("encoder: %d prompts queued for prefetch", queued)
+        return queued
 
     def request(self, prompt: str) -> Future:
         with self._lock:
@@ -52,13 +72,19 @@ class EncoderService:
                 log.info("encoder: cache hit %r", _short(prompt))
                 return fut
             if prompt in self._inflight:
-                log.info("encoder: already encoding %r", _short(prompt))
-                return self._inflight[prompt]
+                fut = self._inflight[prompt]
+                if prompt in self._background:  # move it ahead of the other background work
+                    self._background.discard(prompt)
+                    self._requests.put((URGENT, next(self._order), prompt, fut))
+                    log.info("encoder: %r was queued for prefetch, now urgent", _short(prompt))
+                else:
+                    log.info("encoder: already encoding %r", _short(prompt))
+                return fut
             self.misses += 1
             fut = Future()
             self._inflight[prompt] = fut
         log.info("encoder: cache miss %r, queued (queue depth %d)", _short(prompt), self._requests.qsize())
-        self._requests.put((prompt, fut))
+        self._requests.put((URGENT, next(self._order), prompt, fut))
         return fut
 
     def encode_with_ids(self, prompt: str) -> tuple[object, list[int]]:
@@ -76,10 +102,11 @@ class EncoderService:
 
     def _run(self) -> None:
         while True:
-            item = self._requests.get()
-            if item is _STOP:
+            priority, _, prompt, fut = self._requests.get()
+            if prompt is None:
                 return
-            prompt, fut = item
+            if fut.done():  # the same request was queued twice (prefetch, then urgent)
+                continue
             t0 = time.perf_counter()
             try:
                 emb, ids = self._encode(prompt)
@@ -88,6 +115,7 @@ class EncoderService:
                 log.exception("encoder: failed on %r", _short(prompt))
                 with self._lock:
                     self._inflight.pop(prompt, None)
+                    self._background.discard(prompt)
                 fut.set_exception(exc)
                 continue
             ms = (time.perf_counter() - t0) * 1e3
@@ -97,7 +125,9 @@ class EncoderService:
                 while len(self._cache) > self._cache_size:
                     self._cache.popitem(last=False)
                 self._inflight.pop(prompt, None)
-            log.info("encoder: encoded %r in %.0f ms", _short(prompt), ms)
+                self._background.discard(prompt)
+            log.info("encoder: encoded %r in %.0f ms%s", _short(prompt), ms,
+                     " (prefetch)" if priority == BACKGROUND else "")
             fut.set_result(result)
 
 

@@ -35,8 +35,7 @@ def test_full_path_stamps_in_order():
     assert stamps["heard"] == 0 and stamps["embedded"] >= 2
     assert list(stamps.values()) == sorted(stamps.values())
     fields = book.latest_fields()
-    assert fields["t_client"] == 123 and fields["applies_from_chunk"] == 7 and fields["heard"] == "make it p"
-    assert fields["unmatched"] is False
+    assert fields == {"stamps": stamps, "t_client": 123, "applies_from_chunk": 7}
 
 
 def test_get_cond_before_set_target_does_not_count():
@@ -85,14 +84,25 @@ def test_unchanged_target():
     assert rec.stage is CommandStage.UNCHANGED
 
 
-def test_unmatched_final_is_reported_and_partial_is_not():
+def test_dropped_command_does_not_become_latest():
     book, *_ = setup()
     p = book.heard("control", "make it", 1, time.monotonic_ns())
-    book.no_operation(p, "partial", report=False)
+    book.drop(p, "no steer for partial")
     assert book.latest() is None and p.stage is CommandStage.DROPPED
-    f = book.heard("control", "gibberish", 2, time.monotonic_ns())
-    book.no_operation(f, "no match", report=True)
-    assert book.latest_fields()["unmatched"] is True and book.latest_fields()["heard"] == "gibberish"
+
+
+def test_reset_with_seed_command_counts_its_first_chunk():
+    book, steerer, ctl = setup()
+    other = book.heard("control", "x", 1, time.monotonic_ns())
+    book.decided(other, TARGET)
+    rec = book.heard("control", None, None, time.monotonic_ns())
+    book.decided(rec, TARGET)
+    book.reset(lambda: None, rec)
+    assert other.stage is CommandStage.DROPPED and rec.stage is CommandStage.EMBEDDED
+    book.take_cond(steerer.get_cond, chunk=40)
+    book.chunk_generated(40)
+    book.chunk_shown(40)
+    assert rec.stage is CommandStage.SHOWN and rec.applies_from_chunk == 40
 
 
 def test_reset_drops_in_flight():
@@ -107,5 +117,4 @@ def test_reset_drops_in_flight():
 
 def test_no_command_fields():
     book, *_ = setup()
-    assert book.latest_fields() == {"stamps": {}, "t_client": None, "applies_from_chunk": None,
-                                    "heard": None, "keyword": None, "unmatched": False}
+    assert book.latest_fields() == {"stamps": {}, "t_client": None, "applies_from_chunk": None}
