@@ -5,6 +5,8 @@ did not work in rehearsal; replace bracketed measurements with real results.
 
 ## Pitch
 
+We build on Training-Free Interactive World Models to let you shape a scene as it unfolds.
+
 A video that never stops generating and changes within a fraction of a second
 when you speak.
 
@@ -23,7 +25,7 @@ moving while you shape the scene.
    + night. Use captured demo images only once those changes work visibly.
 2. **Words to state to pixels.** Text/mic → keyword or slow reader → reversible
    scene state → deterministic prompt → steerer → engine → browser. Mark the
-   video model and highlight the command, state and steering modules.
+   Training-Free Interactive World Models method and highlight the command, state and steering modules.
 3. **What we measured and what remains.** Report [actual GPU], [resolution/FPS],
    [command-to-frame proxy], [visible switch behavior], and [failure cases]. List
    typed and voice results separately. CPU unit tests are not GPU benchmarks.
@@ -32,7 +34,8 @@ moving while you shape the scene.
 
 - **Inspiration:** interactive visual storytelling controlled by speech.
 - **What it does:** include only features demonstrated on the final integrated system.
-- **How we built it:** Python command/state layer, the team's steering and engine,
+- **How we built it:** built on Training-Free Interactive World Models, with a Python
+  command/state layer, the team's steering and engine,
   and Ani's browser interface. Name the exact pretrained model and version used.
 - **Challenges:** provisional speech revisions, stable phrases across prompt
   changes, coherent removals, and running generation within the compute budget.
@@ -44,7 +47,7 @@ moving while you shape the scene.
 
 - The team's architecture, gates and role split are in the root `PLAN.md` and
   `AGENTS.md`; accepted messages are in `contracts/`.
-- Prior-project comparisons in the root plan are research references, not pitch copy.
+- Competition and award comparisons stay out of the pitch.
 - The engine team selects and verifies the upstream model, code and weight
   licenses. Copy their final exact model identifiers and source links here before
   submitting. Do not copy unlicensed SPED project files into this repository.
