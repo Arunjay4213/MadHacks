@@ -21,7 +21,7 @@ from starlette.responses import FileResponse, JSONResponse, PlainTextResponse, R
 from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
-from .engine import Engine, EngineConfig, reanchor_config
+from .engine import Engine, EngineConfig, ShortChunkMode, reanchor_config
 from .lifecycle import Lifecycle
 from .messages import BadMessage, parse_json
 
@@ -313,6 +313,8 @@ def parse_args(argv=None) -> argparse.Namespace:
                    help="how long a final waits for Sonnet before it keeps the keyword table's result")
     p.add_argument("--final-cache", default=EngineConfig.final_cache, metavar="PATH",
                    help="JSON file of the Sonnet results, kept across restarts; none keeps them in memory only")
+    p.add_argument("--short-chunk", default=EngineConfig.short_chunk, choices=[m.value for m in ShortChunkMode],
+                   help="how a chunk with fewer than frames_per_chunk frames (after a rebase) is padded before playout")
     p.add_argument("--studio-dir", default=str(STUDIO), help="Lucid Studio build folder served at /studio/")
     p.add_argument("--record-dir", default="~/recordings",
                    help="folder for the mp4 of every video (one file per reset); none turns the recorder off")
@@ -350,6 +352,7 @@ def main(argv=None) -> None:
                           reanchor=args.reanchor, reanchor_options=reanchor_options,
                           final_reader=args.final_reader, final_timeout_s=args.final_timeout_s,
                           final_cache=None if args.final_cache.lower() == "none" else args.final_cache,
+                          short_chunk=args.short_chunk,
                           record_dir=None if args.record_dir.lower() == "none" else args.record_dir,
                           record_max_bytes=int(args.record_max_gb * 1e9))
     app = build_app(config, studio_dir=Path(args.studio_dir))
