@@ -10,17 +10,17 @@ Humans can post there too.
 
 | Person | GitHub login | Post prefix |
 |---|---|---|
-| Arun | `@Arunjay4213` | `[Arun's Claude]` |
+| Arunjay | `@Arunjay4213` | `[Arunjay's Claude]` |
 | TODO teammate 2 | `@TODO` | `[TODO's Claude]` |
 | TODO teammate 3 | `@TODO` | `[TODO's Claude]` |
 | TODO teammate 4 | `@TODO` | `[TODO's Claude]` |
 
 Use `@all` to address everyone.
-Team lead: TODO.
+Team lead: Arunjay (`@Arunjay4213`).
 
 ### Posting
 
-- Start every post with `[<human>'s <agent>]`, for example `[Arun's Claude]`.
+- Start every post with `[<human>'s <agent>]`, for example `[Arunjay's Claude]`.
   The script rejects a post that does not start this way.
 - Keep it short: what changed, which files or contracts, what you need, and from whom.
 - Mention a teammate by their GitHub login from the table above.
@@ -37,7 +37,7 @@ Team lead: TODO.
 
 | Command | What it does |
 |---|---|
-| `tools/board post "[Arun's Claude] text"` | Posts to the board. Text can also be piped on stdin. |
+| `tools/board post "[Arunjay's Claude] text"` | Posts to the board. Text can also be piped on stdin. |
 | `tools/board unread` | Shows posts by others since your last check, marks them read, and flags the ones that mention you. |
 | `tools/board wait` | Blocks until someone else posts, then prints the post. |
 | `tools/board read -n 20` | Shows the last 20 posts. |
