@@ -34,6 +34,12 @@ clear the frame cache and re-encode the last few clean frames under the current 
 positions starting from 0 (LongLive's KV recache, arXiv 2509.22622). All of that is off by
 default, and then the calls, the RNG draws and their order are exactly what they were before.
 
+Clean anchor: reanchor(strength) (a steer) starts the new first frame from the last latent;
+reanchor(strength, source="clean") (the periodic refresh) starts it from the clean anchor, the
+latent saved `clean_anchor_after` (3) chunks after the last reset or steer re-anchor. The last
+latent has already drifted (over-contrast, blocky grass) and a refresh from it bakes that in; a
+refresh from the clean anchor does not (measured, MODEL_NOTES.md).
+
 Threads and devices: generation, prompt encoding and decoding each run on their own CUDA
 stream. The decoder object owns all decode state and receives only the ChunkLatents passed
 in, so it can move to `decode_device` or to another process later.
@@ -126,11 +132,14 @@ class Rebase:
         to that level (weaker memory) instead of clean.
     anchor_step: None, or n: the new frame starts from the last clean latent noised to step n of
         its schedule and is denoised with schedule[n:] (n = 0 is pure noise).
+    from_clean: with anchor_step > 0, start from the clean anchor (see Backend.reanchor) instead
+        of the last latent; falls back to the last latent when there is no clean anchor yet.
     """
 
     keep: int = 3
     memory_noise: int = 0
     anchor_step: Optional[int] = None
+    from_clean: bool = False
 
     @classmethod
     def of(cls, value) -> Optional["Rebase"]:
@@ -373,6 +382,7 @@ class Backend:
         refresh_every: int = 0,
         refresh_keep: int = 6,
         refresh_memory_noise: int = 0,
+        clean_anchor_after: int = 3,
     ) -> None:
         """Generation state: lock, stream, RNG, caches, counters, automatic rebase settings.
         Split out of __init__ so tests can build a Backend around a stub generator."""
@@ -388,6 +398,15 @@ class Backend:
         self._steer_pending = False  # the cond changed and has not stopped changing yet
         self._last_rebase_chunk = 0  # chunk_index of the last rebase; 0 after reset()
         self._pending_reanchor: Optional[Rebase] = None  # set by reanchor(), used by the next chunk
+        # The clean anchor: the latent of the chunk `clean_anchor_after` chunks after the start of
+        # the video or after the last rebase that did not start from the clean anchor (a steer).
+        # A refresh (reanchor(..., source="clean")) starts from it instead of the drifted last latent.
+        if clean_anchor_after < 0:
+            raise ValueError(f"clean_anchor_after must be >= 0, got {clean_anchor_after}")
+        self._clean_anchor_after = int(clean_anchor_after)
+        self._clean_anchor: Optional[torch.Tensor] = None
+        self._clean_capture_chunk: Optional[int] = self._clean_anchor_after  # chunk_index to save, or None
+        self.clean_anchor_chunk: Optional[int] = None  # chunk_index the clean anchor was saved from
         # Last clean latents of this video, oldest first (references to the returned latents, no
         # copies). Only kept for framewise variants, which are the only ones that can rebase.
         self._history: collections.deque = collections.deque(maxlen=self.attn_window_frames)
@@ -476,6 +495,9 @@ class Backend:
             self._steer_pending = False
             self._pending_reanchor = None
             self._last_rebase_chunk = 0
+            self._clean_anchor = None
+            self._clean_capture_chunk = self._clean_anchor_after
+            self.clean_anchor_chunk = None
 
     def _clear_frame_cache(self) -> None:
         # Same as the official pipeline between videos (pipeline/causal_inference.py, "reset kv
@@ -499,12 +521,19 @@ class Backend:
         n = self.first_frame_steps
         return min(n - 1, int((1.0 - min(float(strength), 1.0)) * n))
 
-    def reanchor(self, strength: float) -> None:
+    def reanchor(self, strength: float, source: str = "last") -> None:
         """Ask for a re-anchor on the next generate_chunk: a hard cut of the frame cache (keep 0)
-        whose first frame starts from the last picture noised to anchor_step_for_strength(strength).
-        Strength 1.0 repaints from pure noise; lower keeps more of the old picture; <= 0 cancels."""
+        whose first frame starts from a picture noised to anchor_step_for_strength(strength).
+        Strength 1.0 repaints from pure noise; lower keeps more of the old picture; <= 0 cancels.
+
+        source "last" (a steer): start from the last latent; the clean anchor is dropped and saved
+        again `clean_anchor_after` chunks later, so it shows the new scene. source "clean" (a
+        refresh): start from the clean anchor, which is kept; with no clean anchor yet, as "last"
+        but without dropping or re-saving anything."""
+        if source not in ("last", "clean"):
+            raise ValueError(f"reanchor source must be 'last' or 'clean', got {source!r}")
         step = self.anchor_step_for_strength(strength)
-        self._pending_reanchor = None if step is None else Rebase(keep=0, anchor_step=step)
+        self._pending_reanchor = None if step is None else Rebase(keep=0, anchor_step=step, from_clean=source == "clean")
 
     def _plan_rebase(self, changed: bool, explicit: Optional[Rebase]) -> tuple[Optional[Rebase], Optional[str]]:
         """Which rebase (if any) to do before this chunk; updates the automatic-mode state."""
@@ -614,6 +643,14 @@ class Backend:
             schedule = self.first_chunk_steps if self.state is GenState.EMPTY else self.denoising_steps
             if plan is not None:
                 x_last = self._history[-1] if self._history else None
+                from_clean = plan.from_clean and self._clean_anchor is not None
+                if from_clean:
+                    x_last = self._clean_anchor  # a refresh: the clean anchor stays as it is
+                elif not plan.from_clean:
+                    # A steer (or any other rebase): the old clean anchor shows the old scene.
+                    self._clean_anchor = None
+                    self.clean_anchor_chunk = None
+                    self._clean_capture_chunk = self.chunk_index + self._clean_anchor_after
                 keep = self._rebase(plan, cond_dict)
                 if keep == 0:
                     schedule = self.first_chunk_steps  # a hard cut: this is a first frame again
@@ -633,7 +670,8 @@ class Backend:
                     schedule = schedule[n:]
                 else:
                     n = None if n is None else 0
-                self.last_rebase = Rebase(keep, int(plan.memory_noise), n)
+                    from_clean = False
+                self.last_rebase = Rebase(keep, int(plan.memory_noise), n, from_clean)
                 if reason is not None:
                     self.auto_rebases[reason] += 1
             current_start = self.frame_index * self.frame_seq_length
@@ -667,6 +705,10 @@ class Backend:
             )
             if f == 1:
                 self._history.append(denoised)  # a reference, for a later rebase
+            if self.chunk_index == self._clean_capture_chunk:
+                self._clean_anchor = denoised  # a reference; returned latents are never modified
+                self.clean_anchor_chunk = self.chunk_index
+                self._clean_capture_chunk = None
 
             ready = torch.cuda.Event()
             ready.record(self._gen_stream)
@@ -695,13 +737,15 @@ def load(width: int, height: int, steps: Optional[int] = None, device: str = "cu
     Automatic rebase (all off by default, see generate_chunk and MODEL_NOTES.md): steer_rebase (0),
     steer_keep (3), steer_memory_noise (0), steer_anchor_step (-1 = none), steer_min_gap (8),
     steer_fire_on_change (1), refresh_every (0 = off), refresh_keep (6), refresh_memory_noise (0).
+    clean_anchor_after (3): chunks after a reset or a steer re-anchor at which the clean anchor is
+    saved; reanchor(strength, source="clean") starts from it.
     """
     # Options may arrive as strings from the server's --backend-opt KEY=VALUE.
     flag = lambda v: v if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes", "on")  # noqa: E731
     types = {"attn_window_frames": int, "sink_frames": int, "max_latent_frames": int, "seed": int, "compile": flag,
              "steer_rebase": flag, "steer_keep": int, "steer_memory_noise": int, "steer_anchor_step": int,
              "steer_min_gap": int, "steer_fire_on_change": flag, "refresh_every": int, "refresh_keep": int,
-             "refresh_memory_noise": int}
+             "refresh_memory_noise": int, "clean_anchor_after": int}
     options = {k: types[k](v) if k in types else v for k, v in options.items()}
     steps = int(steps) if steps is not None and int(steps) > 0 else None  # 0 or None: distilled schedule
     t0 = time.time()

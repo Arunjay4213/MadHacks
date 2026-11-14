@@ -116,6 +116,27 @@ Counters for logs and tests: `rebases`, `recached_frames`, `auto_rebases`, `last
 With everything off, the calls, the RNG draws and their order are exactly as before (checked by `engine/tests/test_causal_forcing.py` against a recording of the old code).
 The experiment driver is `python -m steering.eval.follow_probe` (see `steering/eval/README.md`).
 
+### Re-anchor and the clean anchor (the periodic refresh)
+
+`reanchor(strength, source="last")` queues `Rebase(keep=0, anchor_step=anchor_step_for_strength(strength))` for the next chunk: a first frame made with an empty frame cache.
+With the 4-step first-frame schedule: strength >= 0.76 gives step 0 (full repaint from noise), 0.51-0.75 step 1, 0.26-0.5 step 2, <= 0.25 step 3.
+
+The backend also keeps a **clean anchor**: the latent of the chunk `clean_anchor_after` (3) chunks after `reset()` or after any rebase that does not start from the clean anchor (a steer re-anchor).
+`reanchor(strength, source="clean")` starts the first frame from the clean anchor noised to the anchor step instead of from the last latent, and keeps the clean anchor as it is.
+If there is no clean anchor yet (the first 3 chunks of a video or of a steer), it falls back to the last latent and changes nothing.
+`clean_anchor_chunk` says which chunk the current clean anchor came from; `last_rebase.from_clean` says whether the last rebase used it.
+`ReanchorPolicy` sends steers with source "last" and refreshes with `refresh_source` ("clean").
+
+Why: a refresh started from the last latent starts from a picture that has already drifted, so each refresh bakes the damage in (over-contrast, blocky neon grass).
+Measured over 360 chunks with no commands (672x384, 2 steps, taehv, `quick_gold.py` on the GPU box):
+
+| Refresh | Result |
+|---|---|
+| from the last latent, anchor step 1 every 40 chunks | degrades from about chunk 180 |
+| full restart from noise (step 0) every 60 chunks | the scene and colours jump on every restart; unusable |
+| from the clean anchor (saved at chunk 3), step 1 or 2, every 24 or 40 chunks | clean and the same scene for all 360 chunks |
+| from the clean anchor, step 2 every 24 chunks | the steadiest; now the default (`refresh_every_chunks=24`, `refresh_strength=0.5`, `refresh_source="clean"`) |
+
 ## Using the backend from a plain Python script
 
 Run from `~/madhacks` with `~/engine-venv` active:

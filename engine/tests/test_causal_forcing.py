@@ -382,3 +382,99 @@ def test_reanchor_strength_maps_to_step_and_applies_once():
     assert b._pending_reanchor == cf.Rebase(keep=0, anchor_step=3)
     cf.Backend.reanchor(b, 0.0)
     assert b._pending_reanchor is None
+    with pytest.raises(ValueError, match="source"):
+        cf.Backend.reanchor(b, 0.5, source="golden")
+    cf.Backend.reanchor(b, 0.5, source="clean")
+    assert b._pending_reanchor == cf.Rebase(keep=0, anchor_step=2, from_clean=True)
+
+
+# ---------------------------------------------------------------- clean anchor
+
+
+def reanchored_chunk(b, cond, strength, source):
+    """One chunk with reanchor(strength, source); returns (out, its generator calls, RNG state before it)."""
+    b.reanchor(strength, source=source)
+    n0 = len(b.generator.calls)
+    rng = b._rng.get_state()
+    out = b.generate_chunk(cond)
+    return out, b.generator.calls[n0:], rng
+
+
+def start_latent(b, x, step, rng):
+    """What the first denoising pass of a hard cut gets: x noised to first_chunk_steps[step]."""
+    g = torch.Generator().set_state(rng)
+    noise = torch.randn(x.shape, generator=g)
+    t = b.first_chunk_steps[step] * torch.ones([1], dtype=torch.long)
+    return b.scheduler.add_noise(x.flatten(0, 1), noise.flatten(0, 1), t).unflatten(0, x.shape[:2])
+
+
+def test_clean_anchor_saved_three_chunks_after_reset(no_cuda):
+    b = make_backend()
+    a = torch.full((1, 3, 8), 1.0)
+    b.reset(seed=0)
+    outs = [b.generate_chunk(a) for _ in range(3)]
+    assert b._clean_anchor is None and b.clean_anchor_chunk is None
+    outs += [b.generate_chunk(a) for _ in range(5)]
+    assert b._clean_anchor is outs[3].latents and b.clean_anchor_chunk == 3
+    b.reset(seed=0)
+    assert b._clean_anchor is None and b.clean_anchor_chunk is None
+
+
+def test_refresh_starts_from_the_clean_anchor_and_keeps_it(no_cuda):
+    b = make_backend()
+    a = torch.full((1, 3, 8), 1.0)
+    b.reset(seed=0)
+    outs = [b.generate_chunk(a) for _ in range(10)]
+    clean = outs[3].latents
+    out, calls, rng = reanchored_chunk(b, a, 0.5, "clean")
+    assert torch.allclose(calls[0]["x"], start_latent(b, clean, 2, rng))
+    assert not torch.allclose(calls[0]["x"], start_latent(b, outs[-1].latents, 2, rng))
+    assert [c["t"] for c in calls] == [[int(t)] for t in b.first_chunk_steps[2:]] + [[0]]
+    assert calls[0]["frame"] == 0 and b.frame_index == 1
+    assert b.last_rebase == cf.Rebase(0, 0, 2, True)
+    # The refresh does not replace the clean anchor, so every refresh starts from the same picture.
+    outs += [out] + [b.generate_chunk(a) for _ in range(6)]
+    assert b._clean_anchor is clean and b.clean_anchor_chunk == 3
+    _, calls, rng = reanchored_chunk(b, a, 0.5, "clean")
+    assert torch.allclose(calls[0]["x"], start_latent(b, clean, 2, rng))
+
+
+def test_steer_reanchor_drops_and_recaptures_the_clean_anchor(no_cuda):
+    b = make_backend()
+    a, c = torch.full((1, 3, 8), 1.0), torch.full((1, 3, 8), 2.0)
+    b.reset(seed=0)
+    outs = [b.generate_chunk(a) for _ in range(10)]
+    out, calls, rng = reanchored_chunk(b, c, 0.5, "last")  # a steer at chunk 10, from the last latent
+    assert torch.allclose(calls[0]["x"], start_latent(b, outs[-1].latents, 2, rng))
+    assert b.last_rebase == cf.Rebase(0, 0, 2, False)
+    assert b._clean_anchor is None
+    # A refresh before the new clean anchor exists falls back to the last latent and changes nothing.
+    outs += [out, b.generate_chunk(c)]
+    out, calls, rng = reanchored_chunk(b, c, 0.5, "clean")  # chunk 12
+    assert torch.allclose(calls[0]["x"], start_latent(b, outs[-1].latents, 2, rng))
+    assert b.last_rebase == cf.Rebase(0, 0, 2, False)
+    outs += [out, b.generate_chunk(c)]  # chunk 13 = 10 + 3: the new clean anchor, under the new cond
+    assert b._clean_anchor is outs[13].latents and b.clean_anchor_chunk == 13
+    _, calls, rng = reanchored_chunk(b, c, 0.5, "clean")
+    assert torch.allclose(calls[0]["x"], start_latent(b, outs[13].latents, 2, rng))
+
+
+def test_clean_refresh_at_full_strength_is_pure_noise(no_cuda):
+    b = make_backend()
+    a = torch.full((1, 3, 8), 1.0)
+    b.reset(seed=0)
+    outs = [b.generate_chunk(a) for _ in range(6)]
+    _, calls, rng = reanchored_chunk(b, a, 1.0, "clean")
+    assert torch.equal(calls[0]["x"], torch.randn(outs[0].latents.shape, generator=torch.Generator().set_state(rng)))
+    assert b.last_rebase == cf.Rebase(0, 0, 0, False)
+    assert b.clean_anchor_chunk == 3  # kept
+
+
+def test_clean_anchor_after_option(no_cuda):
+    b = make_backend(clean_anchor_after=0)
+    a = torch.full((1, 3, 8), 1.0)
+    b.reset(seed=0)
+    out = b.generate_chunk(a)
+    assert b._clean_anchor is out.latents and b.clean_anchor_chunk == 0
+    with pytest.raises(ValueError):
+        make_backend(clean_anchor_after=-1)

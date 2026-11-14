@@ -15,6 +15,9 @@ The interface every backend implements:
         def reset(self) -> None                                   # new video: clears frame cache and decoder state
         def generate_chunk(self, cond: torch.Tensor) -> object    # generation thread only; returns latents
         def decode_chunk(self, latents: object) -> numpy.ndarray  # decode thread only, in chunk order; uint8 [T,H,W,3]
+        def reanchor(self, strength: float, source: str = "last") -> None  # optional (--reanchor on); generation
+            # thread, applies to the next generate_chunk. source "last": from the last latent (a steer);
+            # "clean": from the clean anchor saved after the last reset or steer (the periodic refresh)
 
 The module is imported only when chosen, so the fake backend needs no GPU packages.
 """

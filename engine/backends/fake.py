@@ -4,7 +4,8 @@ encode_prompt hashes the prompt into a deterministic tensor of shape [1, 16, 32]
 The background colour comes from token 0 and the moving ball's colour from token 1, so as the steerer blends
 the conditioning over a few chunks, the colours change smoothly.
 generate_chunk and decode_chunk sleep for configurable times to stand in for GPU work.
-reanchor(strength) stands in for the real model's re-anchor: it is recorded (reanchor_calls, last_reanchor_strength)
+reanchor(strength, source="last") stands in for the real model's re-anchor: it is recorded (reanchor_calls,
+last_reanchor_strength, last_reanchor_source; source "clean" is the refresh from the clean anchor)
 and the next chunk's frames get a white border and a "re-anchor" label, so a browser test can see it.
 
 Options (pass as --backend-opt key=value):
@@ -83,6 +84,7 @@ class FakeBackend:
         self._frame_phase = 0            # decoder state: frames decoded since reset
         self.reanchor_calls = 0          # reanchor() calls; not cleared by reset
         self.last_reanchor_strength: float | None = None
+        self.last_reanchor_source: str | None = None
         self._anchor_next: float | None = None  # strength the next generate_chunk re-anchors with, once
         if fail_in not in ("generate", "decode"):
             raise ValueError(f"fail_in must be generate or decode, got {fail_in!r}")
@@ -118,13 +120,16 @@ class FakeBackend:
         self._chunks_since_reset = 0
         self._frame_phase = 0
 
-    def reanchor(self, strength: float) -> None:
-        """Re-anchor the next generate_chunk with `strength` in (0, 1]."""
+    def reanchor(self, strength: float, source: str = "last") -> None:
+        """Re-anchor the next generate_chunk with `strength` in (0, 1], from the "last" latent or the "clean" anchor."""
         strength = float(strength)
         if not 0.0 < strength <= 1.0:
             raise ValueError(f"reanchor strength must be in (0, 1], got {strength!r}")
+        if source not in ("last", "clean"):
+            raise ValueError(f"reanchor source must be 'last' or 'clean', got {source!r}")
         self.reanchor_calls += 1
         self.last_reanchor_strength = strength
+        self.last_reanchor_source = source
         self._anchor_next = strength
 
     def _maybe_fail(self, where: str, chunk: int) -> None:
