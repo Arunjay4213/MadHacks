@@ -145,3 +145,11 @@ World/place commands now replace a singleton world layer rather than append a st
 The embedded world dictionary includes the tested desert, mountain-road, city, coast and Mars descriptions, plus forest/meadow.
 The default scene and Ishaan’s subject/world/style template support replacement; unsupported mixed custom bases are rejected safely.
 Enrichment accepts the full final sentence through build_messages(prompt, command=None), and preserves the canonical scene verbatim.
+
+
+For the engine-owned asynchronous Sonnet final reader, snapshot() returns an independent
+full scene snapshot. apply_final(text, operations, prompt=None) validates and applies one
+final decision atomically, returning the same steer/state shape as handle(). The engine
+owns the bounded model wait, content rejection, persistent cache and fallback to handle().
+Empty operations reject a final without changing state and roll back any provisional guess.
+Enriched prompts become the committed target so later guess rollback uses the displayed scene.
