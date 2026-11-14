@@ -69,11 +69,17 @@ class NormalizationTest(unittest.TestCase):
 
 
 class DisambiguationTest(unittest.TestCase):
-    def test_object_noun_beats_adjective_aliases(self):
-        for text, label in [("add a bright red car", "car"), ("add dark clouds", "clouds"), ("add lightning bugs", "fireflies"),
-                            ("add a snow man", "snowman"), ("add a dark forest", "trees"), ("add a snowy mountain", "mountains")]:
+    def test_object_noun_beats_adjective_aliases_and_keeps_them(self):
+        # The noun picks the change, and the user's adjectives stay in its phrase: a bright red car is not daytime,
+        # and it is not just "a car" either.
+        for text, label, kept in [("add a bright red car", "car", ("bright", "red")), ("add dark clouds", "clouds", ("dark",)),
+                                  ("add lightning bugs", "fireflies", ()), ("add a snow man", "snowman", ()),
+                                  ("add a dark forest", "trees", ("dark",)), ("add a snowy mountain", "mountains", ("snowy",))]:
             with self.subTest(text=text):
-                self.assertEqual(op(text)["label"], label)
+                o = op(text)
+                self.assertEqual(o["label"], label)
+                for word in kept:
+                    self.assertIn(word, o["phrase"])
 
     def test_adjective_alone_still_works(self):
         self.assertEqual(op("make it bright")["label"], "day")
@@ -145,18 +151,20 @@ class PassThroughTest(unittest.TestCase):
         self.assertEqual(op("add a snowy owl")["label"], "snowy owl")
         # ...but when nothing real is left after the alias and modifier words, the alias is the meaning.
         for text, label in [("add a little rain", "rain"), ("add a light breeze", "wind"), ("add a heavy storm", "storm"),
-                            ("add some frost", "winter"), ("add a stormy sky", "storm"), ("add a bright red car", "car")]:
+                            ("add some frost", "winter"), ("add a stormy sky", "storm")]:
             self.assertEqual(op(text)["label"], label, text)
-        # A known direct object still wins: the location does not matter.
-        self.assertEqual(op("put a boat on the lake")["label"], "boat")
+        # A known direct object still wins the label, and its location and motion stay in the phrase.
+        for text, label, kept in [("put a boat on the lake", "boat", ("lake",)),
+                                  ("add a car driving on the road", "car", ("driving", "road"))]:
+            o = op(text)
+            self.assertEqual(o["label"], label, text)
+            for word in kept:
+                self.assertIn(word, o["phrase"], text)
         self.assertEqual(op("add more snow")["label"], "winter")
         self.assertEqual(op("make it winter and add a dog")["label"], "dog")
 
-    def test_pass_through_never_guessed_early_and_never_for_negation(self):
+    def test_pass_through_is_never_guessed_early(self):
         self.assertIsNone(spot("add a lion"))
-        self.assertIsNone(op("don't add a lion"))
-        self.assertIsNone(op("do not  add a lion"))  # repeated spaces
-        self.assertIsNone(op("don’t add a lion"))
 
     def test_pass_through_change_is_valid_state(self):
         state = SceneState()
@@ -170,7 +178,9 @@ class PassThroughTest(unittest.TestCase):
 
 class UnsupportedStaysUnmatchedTest(unittest.TestCase):
     def test_negation_and_transforms(self):
-        for text in ["don't make it winter", "do not   add a river", "don’t make it night", "never snow",
+        # The one table for negation: straight and curly apostrophes, extra spaces, and pass-through objects.
+        for text in ["don't make it winter", "do not   add a river", "don\u2019t make it night", "don\u2018t make it winter",
+                     "never snow", "not night", "don't add a lion", "don\u2019t add a lion",
                      "turn the tree into a lighthouse", "replace the river with a road", "swap the dog for a cat"]:
             with self.subTest(text=text):
                 self.assertIsNone(op(text, snap("river", "dog")))
