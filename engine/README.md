@@ -368,11 +368,19 @@ The nano slow reader is not used in this mode; partials, taps and undo or reset 
 - The user message is JSON: `{"scene": {"base", "changes": [{"id", "label", "kind", "phrase", "strength"}]}, "prompt": <the current composed prompt>, "sentence": <what the user said>}`.
 - The reply (```json fences are stripped) is `{"blocked": bool, "operations": [op, ...], "details": str}`.
   Operations are the shapes of `commands/state.py` (add, remove, set_strength, new_scene), at most 6, each checked with `slow_reader.validate`.
+  A place ("take me to the desert", "make it a desert") is one `add` of kind `world` when `commands.state.KINDS` has it (PR #88): it replaces the earlier place and keeps the car and every other change.
+  A known place gets the label and tested phrase of `commands.world.WORLDS`, the same change the keyword table makes.
+  Without kind `world`, the system prompt tells the model to handle a place as a base edit instead (`PlaceRule`).
   `{"op": "edit_base", "base": ...}` is a base edit ("turn the tree into a lighthouse"): the engine expands it into `new_scene` plus one `add` per existing change, applied as one batch, so the changes stay and one undo reverts it.
-  `new_scene` ("take me to the desert") clears the changes.
+  `commands/state.py` has no operation that rewrites only the base, so this expansion stays.
+  `new_scene` is only for an explicit new scene ("new scene of a beach", "start over with a beach") and clears the changes.
   Undo and reset are left to the keyword table.
-- The prompt is SUBJECT + WORLD + STYLE: SUBJECT is the base sentence, WORLD is the model's `details` (about 50 words: the ground of the place, two or three things on both sides, then the light; a place replaces the world), STYLE is a fixed sentence.
+- The prompt is SUBJECT + WORLD + STYLE: SUBJECT is the base sentence, WORLD is the model's `details` (about 50 words: the ground of the place, two or three things on both sides, then the light; a place replaces the world), STYLE is a fixed sentence, which says "motion blur on the road" only when the subject is a vehicle.
+  A colour, type or size the user names always wins over making a second car look different.
   This is the engine's stand-in (`PromptSpec` "engine stand-in"); when `commands.rewriter` imports, its `SYSTEM_PROMPT` and `validate_rewrite` are used instead with no code change.
+  The validator gets `{"details": ...}` only, checked against the composed prompt of the new scene.
+  Details it rejects keep the model's operations and use the composed prompt (`details_rejected`).
+  `commands.rewriter.build_messages` is not used: it is made for a separate details-only call whose command is "context only", and the engine needs one call that applies the command too (two calls in a row would not fit the 3 s wait).
 - Content block: a short word list (`BLOCKED_WORDS`) is checked first with no call, and the model sets `blocked: true` for sexual, violent or hateful requests.
   A blocked final gives no steer: the words show as unmatched, and one log line says why.
 - A timeout (`--final-timeout-s`, 3.0 s), a failed call or a reply that does not validate keeps the keyword table's result and the short prompt.
@@ -380,10 +388,10 @@ The nano slow reader is not used in this mode; partials, taps and undo or reset 
   A Sonnet result or a block is chosen once and saved to `--final-cache` (JSON, written atomically, tied to a fingerprint of the system prompt and the model), so a restart gives the same result and nothing is regenerated.
   A fallback is final for that key for the life of the process, and an answer that arrives after the wait is dropped (`late_dropped`); fallbacks are not saved, so a passing outage does not disable a sentence for good.
 - The model sees one prompt per scene state: the first rich prompt chosen for a composed prompt replaces it in every later steer (an undo back to it, a chip removal), in `likely_prompts` and in `committed_prompt`, so a state always gives the same embedding.
-- `/stats` `final_reader`: `state` (`off`, `on`, `unavailable`), `reason`, `prompt_spec`, `calls`, `cache_hits`, `blocked`, `timeouts`, `late_dropped`, `rejects`, `errors`, `p50_ms`, `last_ms`, `cache_size`, `timeout_s`, `cache_file`.
+- `/stats` `final_reader`: `state` (`off`, `on`, `unavailable`), `reason`, `prompt_spec`, `calls`, `cache_hits`, `blocked`, `timeouts`, `late_dropped`, `rejects`, `details_rejected`, `errors`, `pinned`, `pinned_hits`, `p50_ms`, `last_ms`, `cache_size`, `timeout_s`, `cache_file`.
 - It is `unavailable` (and the engine runs as with `off`, logged once) when `FOUNDRY_ENDPOINT` or `FOUNDRY_KEY` is missing or the reader is not `commands`.
-- `CommandService` has no public way yet to read the full scene or apply operations decided elsewhere, so `engine/reader.py` does both through two shim functions that use its private fields.
-  They switch to `CommandService.snapshot()` and `CommandService.apply_final(text, operations, prompt)` by themselves once those exist (asked of the commands/ owner), and `engine/tests/test_final_reader.py` runs them against the real `CommandService`.
+- `engine/reader.py` uses `CommandService.snapshot()` and `CommandService.apply_final(text, operations, None)` (PR #88) when they exist, and two shim functions on its private fields otherwise; `engine/tests/test_final_reader.py` runs them against the real `CommandService`.
+  The prompt argument stays None: the service steers to the composed prompt and the wrapper maps it to the first rich prompt of that state, so an undo back to it gives the same words.
 
 Local end-to-end run with a fake Sonnet endpoint (no key needed):
 
@@ -398,6 +406,8 @@ On the engine machine, load `~/.madhacks-foundry.env` first and add `--final-rea
 `engine/demo_prompts.json` holds the real Sonnet prompts for the demo sentences, made by this final reader as one chain from a reset, in script order.
 Each entry is keyed like the cache, by `prompt_before` (the composed prompt of the scene before) and `sentence`, and also has `canonical` (the composed prompt it rewrote), `operations`, `prompt`, `model`, `fingerprint` and `generated_at`.
 Entries are hand-editable: fix a bad `prompt` in place, and keep `prompt_before` and `sentence` unchanged so a loader still matches it.
+`--demo-prompts PATH` (default `engine/demo_prompts.json`; `none` turns it off) loads it at start-up as pinned entries: they are never called or regenerated, never written to `--final-cache`, valid for any fingerprint, and checked before the cache.
+The file is a list of entries, or `{"base", "entries"}`; the loader replays the entries in order from the base and skips, with a log line, an entry whose `prompt_before` does not match the replayed scene or whose operations do not apply.
 
 ## Lifecycle states
 
