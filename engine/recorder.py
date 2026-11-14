@@ -181,18 +181,21 @@ class Recorder:
     def _open(self, video: int) -> bool:
         """Start ffmpeg on a new file for `video`. False (and ERROR) if it cannot start."""
         self._prune()
-        self.sessions += 1
+        session = self.sessions + 1
         start = datetime.now(timezone.utc)
-        path = self.dir / f"{start:%Y%m%dT%H%M%SZ}-s{self.sessions:03d}.mp4"
+        path = self.dir / f"{start:%Y%m%dT%H%M%SZ}-s{session:03d}.mp4"
         self._video = video
         try:
             self._proc = subprocess.Popen(self._command(path), stdin=subprocess.PIPE,
                                           stdout=subprocess.DEVNULL, start_new_session=True)
         except OSError as exc:
+            with self._lock:
+                self.sessions = session
             self._to_error(f"could not start ffmpeg: {exc!r}")
             return False
+        # One update under the lock, so stats() never shows the new session with the old file's frame count.
         with self._lock:
-            self.file, self.frames_written, self.error = path, 0, None
+            self.sessions, self.file, self.frames_written, self.error = session, path, 0, None
         self._transition(RecorderState.RECORDING, f"video {video} -> {path.name}")
         return True
 
