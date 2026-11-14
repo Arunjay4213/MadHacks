@@ -232,7 +232,8 @@ test('wordsLabels: hearing while local, heard + what was understood once the ser
   assert.deepEqual(wordsLabels({ local: true }), { label: 'hearing…', understood: '' });
   assert.deepEqual(wordsLabels({ keyword: 'car', unmatched: false }), { label: 'heard', understood: '→ understood: car' });
   assert.deepEqual(wordsLabels({ keyword: null, unmatched: true }), { label: 'heard', understood: '→ not understood' });
-  assert.deepEqual(wordsLabels({ keyword: null, unmatched: false }), { label: 'heard', understood: '' });
+  // Understood by the AI reader or another fallback: no keyword, but the scene changed.
+  assert.deepEqual(wordsLabels({ keyword: null, unmatched: false }), { label: 'heard', understood: '→ understood' });
 });
 
 const R = (transcript, isFinal = false) => ({ transcript, isFinal });

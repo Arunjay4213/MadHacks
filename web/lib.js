@@ -132,7 +132,8 @@ export const backoffMs = (attempt) => Math.min(5000, 250 * 2 ** attempt);
 export function wordsLabels({ local, keyword, unmatched }) {
   if (local) return { label: 'hearing…', understood: '' };
   if (unmatched) return { label: 'heard', understood: '→ not understood' };
-  return { label: 'heard', understood: keyword ? `→ understood: ${keyword}` : '' };
+  // No keyword when the AI reader (or another fallback) understood it: still say it was understood.
+  return { label: 'heard', understood: keyword ? `→ understood: ${keyword}` : '→ understood' };
 }
 
 // How long without a frame, while connected, before the page says the video has paused.
