@@ -188,13 +188,13 @@ def test_unmatched_final_is_the_most_recent_command():
         e.handle_control({"type": "final", "text": "make it winter", "t_client": 101}, time.monotonic_ns()).result(5)
         winter = e.book.latest()
         assert wait(lambda: winter.stage is CommandStage.SHOWN)
-        e.handle_control({"type": "final", "text": "make it day", "t_client": 202}, time.monotonic_ns()).result(5)
-        assert wait(lambda: any(s["heard"] == "make it day" for s in states))
+        e.handle_control({"type": "final", "text": "please sing a song", "t_client": 202}, time.monotonic_ns()).result(5)
+        assert wait(lambda: any(s["heard"] == "please sing a song" for s in states))
         n = len(states)
         assert wait(lambda: len(states) > n + 2)
         last = states[-1]
         assert not errors(4, last)
-        assert last["heard"] == "make it day" and last["unmatched"] is True and last["keyword"] is None
+        assert last["heard"] == "please sing a song" and last["unmatched"] is True and last["keyword"] is None
         assert last["t_client"] == 202
         assert last["stamps"] == {"heard": 0}  # no operation: no decided, embedded, generated or shown
         assert last["applies_from_chunk"] is None
