@@ -1,0 +1,20 @@
+# A Cloudflare quick tunnel to the engine. Each start gets a NEW https://<name>.trycloudflare.com address.
+# Print the current address: bash engine/deploy/tunnel-address.sh
+# Logs: journalctl -u madhacks-tunnel -f
+
+[Unit]
+Description=Cloudflare quick tunnel to the MadHacks engine (http://127.0.0.1:8000)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=ubuntu
+# systemd finds cloudflared in /usr/local/bin or /usr/bin.
+ExecStart=cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8000
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
