@@ -390,6 +390,10 @@ python -m engine.server --backend fake --reader commands --final-reader sonnet -
 
 On the engine machine, load `~/.madhacks-foundry.env` first and add `--final-reader sonnet` to the usual command line.
 
+`engine/demo_prompts.json` holds the real Sonnet prompts for the demo sentences, made by this final reader as one chain from a reset, in script order.
+Each entry is keyed like the cache, by `prompt_before` (the composed prompt of the scene before) and `sentence`, and also has `canonical` (the composed prompt it rewrote), `operations`, `prompt`, `model`, `fingerprint` and `generated_at`.
+Entries are hand-editable: fix a bad `prompt` in place, and keep `prompt_before` and `sentence` unchanged so a loader still matches it.
+
 ## Lifecycle states
 
 | State | Meaning | Next |
