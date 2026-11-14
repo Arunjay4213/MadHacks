@@ -115,6 +115,24 @@ def test_reset_drops_in_flight():
     assert book.embedded(rec, lambda: ctl.handle(TARGET)) is None
 
 
+def test_reset_keeps_commands_heard_after_it():
+    book, steerer, ctl = setup()
+    before = book.heard("control", "x", 1, time.monotonic_ns())
+    book.decided(before, TARGET)
+    reset = book.heard("control", None, 2, time.monotonic_ns())
+    after = book.heard("control", "make it p", 3, time.monotonic_ns())
+    book.decided(after, TARGET)
+    assert book.newest_seq() == after.seq
+    book.reset(lambda: None, None, heard_up_to=reset.seq)
+    assert before.stage is CommandStage.DROPPED and after.stage is CommandStage.DECIDED
+    assert book.embedded(after, lambda: ctl.handle(TARGET))["applied"]
+    book.take_cond(steerer.get_cond, chunk=12)
+    book.chunk_generated(12)
+    book.chunk_shown(12)
+    assert after.stage is CommandStage.SHOWN and after.applies_from_chunk == 12
+    assert book.latest_fields()["t_client"] == 3 and len(book.latest_fields()["stamps"]) == 5
+
+
 def test_no_command_fields():
     book, *_ = setup()
     assert book.latest_fields() == {"stamps": {}, "t_client": None, "applies_from_chunk": None}

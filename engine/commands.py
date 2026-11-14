@@ -2,7 +2,7 @@
 
 Stage order for a command that reaches the screen:
     HEARD -> DECIDED -> EMBEDDED -> SCHEDULED -> GENERATED -> SHOWN
-Terminal stages: SHOWN, DROPPED (the reader found no operation, an error, or a reset), SUPERSEDED (a newer
+Terminal stages: SHOWN, DROPPED (the reader found no operation, an error, or a reset heard after it), SUPERSEDED (a newer
 command's target was set before this one reached the model, or the steering Controller called it stale),
 UNCHANGED (the steering Controller found the target already applied).
 
@@ -194,17 +194,23 @@ class CommandBook:
                         and rec.applies_from_chunk <= chunk:
                     self._move(rec, CommandStage.SHOWN, now)
 
-    def reset(self, replace_steerer: Callable[[], None], rec: CommandRecord | None = None) -> None:
-        """Drop every command still in flight and replace the steerer and controller, atomically with respect to
-        get_cond and handle.
+    def reset(self, replace_steerer: Callable[[], None], rec: CommandRecord | None = None,
+              heard_up_to: int | None = None) -> None:
+        """Drop the commands still in flight that the reset replaces, and replace the steerer and controller,
+        atomically with respect to get_cond and handle.
 
         `rec` is the reset command itself when it carries a prompt: the new steerer starts on its embedding, so it
         moves to EMBEDDED here and the first chunk of the new video counts as its generated chunk.
+        `heard_up_to` is the seq of the newest command the reset replaces (the reset's own command): commands heard
+        after it are kept, because the engine holds them until the reset is done and then applies them to the new
+        video. None drops every command in flight (recovery).
         """
         with self._lock:
             now = time.monotonic_ns()
             for other in self._records:
-                if other is not rec and other.stage not in TERMINAL:
+                if other is rec or other.stage in TERMINAL:
+                    continue
+                if heard_up_to is None or other.seq <= heard_up_to:
                     self._move(other, CommandStage.DROPPED, now, "reset")
             replace_steerer()
             if rec is not None and rec.stage is CommandStage.DECIDED:
@@ -225,6 +231,11 @@ class CommandBook:
             if rec is None:
                 return {"stamps": {}, "t_client": None, "applies_from_chunk": None}
             return {"stamps": rec.stamps_ms(), "t_client": rec.t_client, "applies_from_chunk": rec.applies_from_chunk}
+
+    def newest_seq(self) -> int:
+        """The seq of the newest command heard so far, 0 before the first."""
+        with self._lock:
+            return self._records[-1].seq if self._records else 0
 
     def latest(self) -> CommandRecord | None:
         with self._lock:
