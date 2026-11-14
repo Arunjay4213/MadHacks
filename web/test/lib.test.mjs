@@ -2,16 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseFrame, parseServerMessage, splitKeyword, backoffMs, isWholeInsert,
-  makeFrameGate, makeLatencyTracker, makeTranscriber,
+  makeFrameGate, makeLatencyTracker, makeTranscriber, changesKey, commandKey,
 } from '../lib.js';
 
-test('parseFrame reads big-endian chunk and JPEG bytes; rejects short or non-buffer input', () => {
-  const buf = new Uint8Array([0, 0, 1, 2, 0xff, 0xd8]).buffer;
+test('parseFrame reads big-endian chunk, frame index and JPEG bytes; rejects short or non-buffer input', () => {
+  const buf = new Uint8Array([0, 0, 1, 2, 0, 3, 0xff, 0xd8]).buffer;
   const f = parseFrame(buf);
   assert.equal(f.chunk, 258);
+  assert.equal(f.frame, 3);
   assert.deepEqual([...f.jpeg], [0xff, 0xd8]);
-  assert.equal(parseFrame(new Uint8Array([0, 0, 0, 1]).buffer), null);
+  assert.equal(parseFrame(new Uint8Array([0, 0, 0, 1, 0, 0]).buffer), null); // header only, no JPEG
   assert.equal(parseFrame('nope'), null);
+});
+
+test('changesKey and commandKey only change when what is shown would change', () => {
+  const a = [{ id: 'c1', label: 'winter', strength: 1 }];
+  assert.equal(changesKey(a), changesKey([{ id: 'c1', label: 'winter', strength: 1 }]));
+  assert.notEqual(changesKey(a), changesKey([{ id: 'c1', label: 'winter', strength: 0.5 }]));
+  assert.notEqual(changesKey(a), changesKey([]));
+  const m = { t_client: 5, heard: 'make it winter', keyword: 'winter', unmatched: false, chunk: 1 };
+  assert.equal(commandKey(m), commandKey({ ...m, chunk: 2 })); // a new chunk alone is not a new command
+  assert.notEqual(commandKey(m), commandKey({ ...m, t_client: 6 }));
 });
 
 test('parseServerMessage accepts contract 4 and drops malformed optional fields', () => {

@@ -1,10 +1,10 @@
 // Pure logic for the page. No DOM, so node --test can load it.
 
-// MOCK / PROVISIONAL wire details: proposed on the board, not yet agreed by the lead.
+// Wire details from contracts/README.md ("Wire details"), agreed by the lead.
 export const PROTOCOL = {
   controlPath: '/control', // contract 1 in, contract 4 out, JSON text
-  framesPath: '/frames', // binary: 4-byte big-endian uint32 chunk + JPEG bytes
-  frameHeaderBytes: 4,
+  framesPath: '/frames', // binary: uint32 BE chunk + uint16 BE frame index + JPEG bytes
+  frameHeaderBytes: 6,
 };
 
 export const TYPING_IDLE_MS = 1500;
@@ -15,11 +15,19 @@ export const tapMsg = (action, id) => (id === undefined ? { type: 'tap', action 
 
 export function parseFrame(buf) {
   if (!(buf instanceof ArrayBuffer) || buf.byteLength <= PROTOCOL.frameHeaderBytes) return null;
+  const view = new DataView(buf);
   return {
-    chunk: new DataView(buf).getUint32(0, false),
+    chunk: view.getUint32(0, false),
+    frame: view.getUint16(4, false),
     jpeg: new Uint8Array(buf, PROTOCOL.frameHeaderBytes),
   };
 }
+
+// The server sends state once per chunk (4 times a second). Rebuilding the chips on every message
+// would swap the buttons out from under a click, so the page re-renders only when this key changes.
+export const changesKey = (changes) => JSON.stringify(changes.map((c) => [c.id, c.label, c.strength ?? null]));
+// Same idea for the words line: a new command has a new t_client or new heard text.
+export const commandKey = (m) => JSON.stringify([m.t_client ?? null, m.heard ?? null, m.keyword ?? null, m.unmatched ?? null]);
 
 const isStr = (v) => typeof v === 'string';
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);

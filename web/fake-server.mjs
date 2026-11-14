@@ -1,6 +1,7 @@
 // MOCK server for developing the page without the engine. It is NOT the real server.
-// It loops a test pattern, keeps a tiny authoritative state, and follows the PROVISIONAL
-// transport in PLAN.md (not yet agreed by the lead). Every message says fake: true.
+// It loops a test pattern, keeps a tiny authoritative state, and follows the wire format in
+// contracts/README.md: one contract-4 message per chunk on /control, 6-byte-header frames on
+// /frames. Every message also says fake: true (an extra field the schemas allow).
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
@@ -12,7 +13,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const STATIC = { '/': 'index.html', '/index.html': 'index.html', '/style.css': 'style.css', '/app.js': 'app.js', '/lib.js': 'lib.js' };
 const TYPES = { html: 'text/html; charset=utf-8', css: 'text/css', js: 'text/javascript' };
 const FPS = 16;
-const FRAMES_PER_CHUNK = 12; // 0.75 s chunks at 16 fps, as in PLAN.md
+const FRAMES_PER_CHUNK = 4; // the real model: 4 frames per chunk (0.25 s at 16 fps), contracts/README.md
 const MAX_MSG_BYTES = 4096;
 
 // shortcut: a dozen demo keywords, not Ani's command reader; replaced by the real server.
@@ -63,10 +64,6 @@ export function createState() {
       if (!changes.some((c) => c.label === label)) commit([...changes, { id: `c${nextId++}`, label, strength: 1 }]);
       return { keyword: kw, unmatched: false };
     },
-    spot(text) {
-      const t = text.toLowerCase();
-      return Object.keys(KEYWORDS).find((k) => t.includes(k));
-    },
     remove(id) {
       if (!changes.some((c) => c.id === id)) return false;
       commit(changes.filter((c) => c.id !== id));
@@ -109,8 +106,12 @@ export async function startServer({ port = 8787, host = '127.0.0.1' } = {}) {
     wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
   });
 
-  const snapshot = (extra = {}) => JSON.stringify({ fake: true, chunk: chunk(), changes: state.changes, ...extra });
+  // The most recent command, as contract 4 reports it. Partials are not commands, so they do not change it.
+  let last = { stamps: {}, t_client: null, applies_from_chunk: null, heard: null, keyword: null, unmatched: false };
+  // A full contract-4 message: every required field, every time.
+  const snapshot = () => JSON.stringify({ fake: true, chunk: chunk(), changes: state.changes, progress: 1, ...last });
   const broadcast = (s) => control.clients.forEach((c) => c.readyState === 1 && c.send(s));
+  const reply = (ws, error) => ws.send(JSON.stringify({ fake: true, error }));
 
   control.on('connection', (ws) => {
     ws.send(snapshot());
@@ -120,29 +121,34 @@ export async function startServer({ port = 8787, host = '127.0.0.1' } = {}) {
       try {
         m = isBinary ? null : JSON.parse(data.toString());
       } catch {}
-      if (!m || typeof m !== 'object') return ws.send(JSON.stringify({ fake: true, error: 'bad message: not JSON' }));
-      const echo = Number.isFinite(m.t_client) ? { t_client: m.t_client } : {};
+      if (!m || typeof m !== 'object') return reply(ws, 'bad message: not JSON');
+      const t_client = Number.isInteger(m.t_client) ? m.t_client : null;
       if ((m.type === 'partial' || m.type === 'final') && typeof m.text === 'string') {
-        if (m.type === 'partial') return broadcast(snapshot({ kind: 'partial', heard: m.text, keyword: state.spot(m.text) }));
+        if (m.type === 'partial') return; // the fake server does no early steering
         const r = state.applyText(m.text);
         const decided = Math.round(performance.now() - t0);
         // Mock stamps: only what this process actually measured.
-        return broadcast(snapshot({ kind: 'final', heard: m.text, ...r, ...echo, applies_from_chunk: chunk() + 1, stamps: { heard: 0, decided } }));
+        last = { stamps: { heard: 0, decided }, t_client, applies_from_chunk: chunk() + 1, heard: m.text, keyword: r.keyword ?? null, unmatched: r.unmatched };
+        return broadcast(snapshot());
       }
       if (m.type === 'tap') {
         if (m.action === 'remove' && typeof m.id === 'string') state.remove(m.id);
         else if (m.action === 'undo') state.undo();
         else if (m.action === 'reset') state.reset();
-        else return ws.send(JSON.stringify({ fake: true, error: `bad tap action` }));
-        return broadcast(snapshot({ applies_from_chunk: chunk() + 1 }));
+        else return reply(ws, 'bad tap action');
+        last = { ...last, stamps: { heard: 0 }, t_client, applies_from_chunk: chunk() + 1 };
+        return broadcast(snapshot());
       }
-      ws.send(JSON.stringify({ fake: true, error: 'bad message: unknown type' }));
+      reply(ws, 'bad message: unknown type');
     });
   });
 
   const timer = setInterval(() => {
-    const header = Buffer.alloc(4);
-    header.writeUInt32BE(chunk());
+    const index = frameIndex % FRAMES_PER_CHUNK;
+    if (index === 0) broadcast(snapshot()); // one contract-4 message per chunk, with its first frame
+    const header = Buffer.alloc(6);
+    header.writeUInt32BE(chunk(), 0);
+    header.writeUInt16BE(index, 4);
     const msg = Buffer.concat([header, frames[frameIndex % frames.length]]);
     video.clients.forEach((c) => c.readyState === 1 && c.send(msg));
     frameIndex++;

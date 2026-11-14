@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import WebSocket from 'ws';
 import { startServer, createState } from '../fake-server.mjs';
-import { parseServerMessage, parseFrame } from '../lib.js';
+import { parseFrame } from '../lib.js';
 
 test('state: add, stack, remove by name, undo, reset', () => {
   const s = createState();
@@ -37,52 +37,78 @@ function client(port, path) {
   };
 }
 
+// The fake server also sends a state message every chunk, so skip ahead to the one a test waits for.
+async function until(c, pred) {
+  for (;;) {
+    const m = JSON.parse(await c.next());
+    if (pred(m)) return m;
+  }
+}
+
+const CONTRACT_4_REQUIRED = ['chunk', 'changes', 'progress', 'stamps', 't_client', 'applies_from_chunk', 'heard', 'keyword', 'unmatched'];
+
 test('server: control round trip is authoritative, and bad input never crashes it', async (t) => {
   const srv = await startServer({ port: 0 });
   t.after(() => srv.close());
   const c = client(srv.port, '/control');
   await c.open();
-  const next = async () => parseServerMessage(await c.next());
+  const labels = (m) => m.changes.map((x) => x.label);
 
-  const hello = await next();
+  const hello = JSON.parse(await c.next());
   assert.equal(hello.fake, true);
   assert.deepEqual(hello.changes, []);
+  for (const k of CONTRACT_4_REQUIRED) assert.ok(k in hello, `contract 4 field ${k}`);
 
   c.ws.send(JSON.stringify({ type: 'partial', text: 'make it win', t_client: 1 }));
-  const p = await next();
-  assert.equal(p.kind, 'partial');
-  assert.deepEqual(p.changes, []); // partial never changes state
-
   c.ws.send(JSON.stringify({ type: 'final', text: 'make it winter', t_client: 123 }));
-  const f = await next();
-  assert.equal(f.t_client, 123);
+  const f = await until(c, (m) => m.t_client === 123);
+  assert.equal(f.heard, 'make it winter'); // the partial was not a command
   assert.equal(f.keyword, 'winter');
+  assert.equal(f.unmatched, false);
   assert.ok(Number.isInteger(f.applies_from_chunk));
-  assert.deepEqual(f.changes.map((x) => x.label), ['winter']);
+  assert.deepEqual(labels(f), ['winter']);
+  for (const k of CONTRACT_4_REQUIRED) assert.ok(k in f, `contract 4 field ${k}`);
 
   c.ws.send('not json');
-  assert.match((await next()).error, /bad message/);
+  assert.match((await until(c, (m) => m.error)).error, /bad message/);
   c.ws.send(JSON.stringify({ type: 'tap', action: 'explode' }));
-  assert.match((await next()).error, /bad tap/);
+  assert.match((await until(c, (m) => m.error)).error, /bad tap/);
 
-  c.ws.send(JSON.stringify({ type: 'tap', action: 'remove', id: f.changes[0].id }));
-  assert.deepEqual((await next()).changes, []);
-  c.ws.send(JSON.stringify({ type: 'tap', action: 'undo' }));
-  assert.deepEqual((await next()).changes.map((x) => x.label), ['winter']);
-  c.ws.send(JSON.stringify({ type: 'tap', action: 'reset' }));
-  assert.deepEqual((await next()).changes, []);
+  c.ws.send(JSON.stringify({ type: 'tap', action: 'remove', id: f.changes[0].id, t_client: 200 }));
+  assert.deepEqual((await until(c, (m) => m.t_client === 200)).changes, []);
+  c.ws.send(JSON.stringify({ type: 'tap', action: 'undo', t_client: 201 }));
+  assert.deepEqual(labels(await until(c, (m) => m.t_client === 201)), ['winter']);
+  c.ws.send(JSON.stringify({ type: 'tap', action: 'reset', t_client: 202 }));
+  assert.deepEqual((await until(c, (m) => m.t_client === 202)).changes, []);
   c.ws.close();
 });
 
-test('server: frames are tagged with a chunk number and carry a JPEG', async (t) => {
+test('server: sends a full contract-4 message every chunk without being asked', async (t) => {
+  const srv = await startServer({ port: 0 });
+  t.after(() => srv.close());
+  const c = client(srv.port, '/control');
+  await c.open();
+  const a = JSON.parse(await c.next());
+  const b = await until(c, (m) => m.chunk > a.chunk);
+  for (const k of CONTRACT_4_REQUIRED) assert.ok(k in b, `contract 4 field ${k}`);
+  c.ws.close();
+});
+
+test('server: frames carry a 6-byte header (chunk, frame index) and a JPEG', async (t) => {
   const srv = await startServer({ port: 0 });
   t.after(() => srv.close());
   const c = client(srv.port, '/frames');
   await c.open();
-  const d = await c.next();
-  const f = parseFrame(d.buffer.slice(d.byteOffset, d.byteOffset + d.byteLength));
-  assert.ok(Number.isInteger(f.chunk));
-  assert.deepEqual([...f.jpeg.subarray(0, 2)], [0xff, 0xd8]);
+  const seen = [];
+  for (let i = 0; i < 6; i++) {
+    const d = await c.next();
+    const f = parseFrame(d.buffer.slice(d.byteOffset, d.byteOffset + d.byteLength));
+    assert.ok(Number.isInteger(f.chunk));
+    assert.ok(f.frame >= 0 && f.frame < 4);
+    assert.deepEqual([...f.jpeg.subarray(0, 2)], [0xff, 0xd8]);
+    seen.push(f.frame);
+  }
+  assert.ok(seen.includes(0)); // a new chunk starts at frame index 0
   c.ws.close();
 });
 
