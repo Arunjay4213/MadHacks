@@ -1,7 +1,6 @@
 # web/ plan (issue #6, branch `6-web-page`)
 
-Owner: `@prateekraouw`. Claude: `lib.js`, `app.js`, `fake-server.mjs`, `package.json`, tests, this file, README.
-Codex: `index.html`, `style.css` (markup, styles, accessibility). Neither edits the other's files.
+Owner: `@anirudhaugile` (Ani), since the lead's swap on 2026-11-14. Started by `@prateekraouw` (handoff commit 157ebbd).
 
 ## DOM interface (index.html must provide these ids)
 
@@ -24,14 +23,14 @@ Codex: `index.html`, `style.css` (markup, styles, accessibility). Neither edits 
 Chips that app.js creates inside `#changes`: `<li class="chip" data-id>` containing `<span class="chip-label">` and `<button class="chip-remove" aria-label="Remove <label>">×</button>`.
 So `#changes` should be a `<ul>`.
 
-## Transport (MOCK / PROVISIONAL, not agreed by the lead; asked on the board)
+## Transport (agreed: `contracts/README.md`, "Wire details")
 
-All of it sits in `PROTOCOL` in `lib.js` and in `fake-server.mjs`.
+It sits in `PROTOCOL` in `lib.js` and in `fake-server.mjs`.
 - One origin. `WS /control`: contract 1 in, contract 4 out, both JSON text. `WS /frames`: binary.
-- Frame = 4-byte big-endian uint32 chunk number + JPEG bytes.
-- Contract 1 additions: `{"type":"tap","action":"undo"}`, `{"type":"tap","action":"reset"}`.
-- Contract 4 additions: `t_client` (echo of the command), `applies_from_chunk`, `heard`, `keyword`, `unmatched`, `fake`, `error`.
-  Every message carries the full `changes` list.
+- Frame = uint32 big-endian chunk number + uint16 big-endian frame index + JPEG bytes. 4 frames per chunk.
+- Contract 4 arrives once per chunk with every field; the page re-renders chips and words only when they change.
+- The fake server adds `fake: true` (schemas allow extra fields); the banner shows only while it is true.
+- `?server=host:port` points the page at another server, e.g. the engine on port 8000.
 
 ## Behaviour rules
 
@@ -52,8 +51,14 @@ All of it sits in `PROTOCOL` in `lib.js` and in `fake-server.mjs`.
 - `cd web && npm install && npm test` (node --test: `test/lib.test.mjs`, `test/fake-server.test.mjs`).
 - `npm start`, then open http://localhost:8787 in Chrome: paste, type, mic, PTT, chip x, undo, kill server to see reconnect.
 
-## Blockers
+## Status (PLAN.md "Teammate 2" items)
 
-- Lead decision on transport points above (and Ani on contract 4 state fields).
-- Real-server connection waits on `engine/`.
+1. Page against the fake server: done. Text box keeps focus (buttons never take it; blur and window focus refocus).
+2. Text box sends: next.
+3. Live mic: push-to-talk key becomes one setting, never Ctrl (Wispr Flow's hotkey on the demo laptop).
+4. to 6.: chips and undo on real state, delay and highlight polish, big-screen layout.
+
+## Open
+
 - Wispr Flow's real `inputType` must be checked on the demo laptop.
+- Connecting to the engine (fake backend works now) needs its Python environment.

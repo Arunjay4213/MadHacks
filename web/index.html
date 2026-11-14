@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live voice-steered video</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="bar">
+    <span id="connection" class="status" data-state="connecting">Connecting…</span>
+    <span id="mode-banner" class="banner">MOCK server: test pattern, not the real engine</span>
+    <div class="delay" title="Delay from your command to the first frame generated with it">
+      <span id="latency" class="latency">—</span>
+      <span id="timing" class="timing"></span>
+    </div>
+  </header>
+
+  <main class="stage">
+    <canvas id="video" width="832" height="480" aria-label="Live generated video"></canvas>
+  </main>
+
+  <section class="below">
+    <p id="words" class="words" aria-live="polite" data-kind="" data-unmatched="false"></p>
+    <ul id="changes" class="chips" aria-label="Active changes"></ul>
+
+    <form id="command-form" class="controls" autocomplete="off">
+      <input id="command" type="text" aria-label="Command"
+             placeholder="Say it with Wispr Flow (Ctrl), or type a command">
+      <button id="mic" type="button" aria-pressed="false" title="Live mic on or off">Mic</button>
+      <button id="ptt" type="button" aria-pressed="false" title="Hold to talk (or hold the ` key)">Hold to talk</button>
+      <button id="undo" type="button" title="Undo the last change">Undo</button>
+    </form>
+
+    <p id="error" class="error" role="alert" hidden></p>
+  </section>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

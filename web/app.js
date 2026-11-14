@@ -2,6 +2,7 @@
 import {
   PROTOCOL, TYPING_IDLE_MS, partialMsg, finalMsg, tapMsg, parseFrame, parseServerMessage,
   splitKeyword, backoffMs, isWholeInsert, makeFrameGate, makeLatencyTracker, makeTranscriber,
+  changesKey, commandKey,
 } from './lib.js';
 
 const $ = (id) => document.getElementById(id);
@@ -11,7 +12,9 @@ const el = {
   ptt: $('ptt'), undo: $('undo'), latency: $('latency'), timing: $('timing'), error: $('error'),
 };
 const ctx = el.video.getContext('2d');
-const wsBase = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
+// Same origin by default; `?server=host:port` points the page at another server (e.g. the engine on :8000).
+const serverHost = new URLSearchParams(location.search).get('server') || location.host;
+const wsBase = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${serverHost}`;
 const latency = makeLatencyTracker();
 const PROXY_NOTE = 'command sent → first frame tagged with its chunk drawn to the canvas (page clock; chunk-tag proxy, not proof the picture changed or was painted)';
 
@@ -31,6 +34,8 @@ function send(msg) {
   }
   control.send(JSON.stringify(msg));
   if (msg.type === 'final') latency.sent(msg.t_client);
+  // Show the words at once; the server's version (keyword, red if unmatched) replaces them when it lands.
+  if (msg.type === 'partial' || msg.type === 'final') renderLocalWords(msg.text, msg.type);
   return true;
 }
 
@@ -65,14 +70,30 @@ function connectControl() {
   };
 }
 
+// State arrives every chunk; only touch the DOM when what it shows has changed.
+let shownChanges = null;
+let shownCommand = null;
+
 function onServer(raw) {
   const m = typeof raw === 'string' ? parseServerMessage(raw) : null;
   if (!m) return showError('Ignored an invalid message from the server');
-  if (m.error) showError(`Server: ${m.error}`);
-  if (m.fake !== undefined) el.banner.hidden = !m.fake;
-  if (m.changes) renderChanges(m.changes);
-  if (m.heard !== undefined) renderWords(m);
+  if (m.error) return showError(`Server: ${m.error}`); // an error reply carries no state
+  el.banner.hidden = m.fake !== true; // the real engine does not send `fake`
+  if (m.changes && changesKey(m.changes) !== shownChanges) {
+    shownChanges = changesKey(m.changes);
+    renderChanges(m.changes);
+  }
+  if (m.heard !== undefined && commandKey(m) !== shownCommand) {
+    shownCommand = commandKey(m);
+    renderWords(m);
+  }
   latency.onServer(m);
+}
+
+function renderLocalWords(text, kind) {
+  el.words.replaceChildren(document.createTextNode(text));
+  el.words.dataset.unmatched = 'false';
+  el.words.dataset.kind = kind;
 }
 
 function renderWords({ heard, keyword, unmatched, kind }) {
@@ -85,7 +106,7 @@ function renderWords({ heard, keyword, unmatched, kind }) {
     }),
   );
   el.words.dataset.unmatched = String(Boolean(unmatched));
-  el.words.dataset.kind = kind || '';
+  el.words.dataset.kind = kind || 'server';
 }
 
 function renderChanges(changes) {
@@ -168,8 +189,13 @@ el.form.addEventListener('submit', (e) => {
   e.preventDefault();
   sendFinalFromBox();
 });
-// Keep the box focused so Wispr Flow always has a target, except while using another control.
-document.addEventListener('pointerup', () => setTimeout(() => el.command.focus(), 0));
+// Keep the box focused at all times so a Wispr Flow paste always lands in it.
+const refocus = () => setTimeout(() => document.activeElement !== el.command && el.command.focus(), 0);
+// Buttons never take focus: blocking mousedown keeps focus in the box, and the click still fires.
+document.addEventListener('mousedown', (e) => e.target.closest('button') && e.preventDefault());
+el.command.addEventListener('blur', refocus); // anything else that steals it gives it straight back
+window.addEventListener('focus', refocus); // returning from another app
+document.addEventListener('pointerup', refocus);
 
 el.undo.addEventListener('click', () => send(tapMsg('undo')));
 
