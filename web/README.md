@@ -30,3 +30,11 @@ Chrome only allows the mic on localhost or HTTPS. Point it at the engine with `?
 
 `?server=` takes `host:port` or a full `ws://`, `wss://` or `https://` URL. Frames are drawn at whatever size the
 engine sends (672x384 for the live model), scaled up to fill the screen at their own aspect ratio.
+
+## Serving the page from the engine (`/app/`)
+
+The page is four static files with no build step: `index.html`, `style.css`, `app.js`, `lib.js` (app.js imports
+`./lib.js`; nothing else is fetched). Asset paths are relative, so it works under a sub-path such as `/app/`
+(redirect `/app` to `/app/`). With no `?server=` it connects to the host it was loaded from, at `/control` and
+`/frames`. Do not serve the rest of `web/`: `node_modules/`, `fake-server.mjs`, `test/`, `tools/`, `test-pattern/`,
+`package*.json`.

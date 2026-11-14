@@ -8,7 +8,7 @@ Owner: `@anirudhaugile` (Ani), since the lead's swap on 2026-11-14. Started by `
 |---|---|---|
 | `video` | `<canvas>` | draws decoded JPEG frames, newest only |
 | `connection` | any | `textContent` = status; `data-state` = `connecting` / `open` / `closed` |
-| `mode-banner` | any | `hidden = false` while the server says `fake: true`; `hidden = true` when it says `fake: false`. Leave it visible in markup so it shows before the first message. |
+| `mode-banner` | any | shown only while server messages say `fake: true` (the fake server); hidden otherwise, including before the first message, so a real engine that is still loading is never labelled MOCK. |
 | `words` | any, `aria-live="polite"` | children replaced: text nodes plus one `<mark>` around the keyword; `data-unmatched="true"` when no operation; `data-kind` = `partial` / `final` |
 | `changes` | any (list container) | children replaced from server state; `data-stale="true"` while disconnected |
 | `command-form` | `<form>` | submit is `preventDefault`ed (no reload); submit sends `final` |
