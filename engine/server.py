@@ -291,6 +291,9 @@ def parse_args(argv=None) -> argparse.Namespace:
                    help="option passed to the backend's load(); repeatable")
     p.add_argument("--lead-margin", type=float, default=EngineConfig.lead_margin,
                    help="safety factor on how much video generation keeps ahead of the playhead")
+    p.add_argument("--reanchor", default="off", choices=["off", "on"],
+                   help="re-anchor the model at steers and at intervals (steering.reanchor policy); needs a backend "
+                        "with reanchor(strength)")
     p.add_argument("--studio-dir", default=str(STUDIO), help="Lucid Studio build folder served at /studio/")
     p.add_argument("--log-level", default="info")
     return p.parse_args(argv)
@@ -310,7 +313,8 @@ def main(argv=None) -> None:
     config = EngineConfig(backend=args.backend, reader=args.reader, width=args.width, height=args.height, steps=args.steps,
                           device=args.device, decode_device=args.decode_device, backend_options=options,
                           base_prompt=args.base_prompt, jpeg_quality=args.jpeg_quality,
-                          precompute_file=args.precompute_file, lead_margin=args.lead_margin)
+                          precompute_file=args.precompute_file, lead_margin=args.lead_margin,
+                          reanchor=args.reanchor)
     app = build_app(config, studio_dir=Path(args.studio_dir))
     uvicorn.run(app, host=args.host, port=args.port, log_level=args.log_level, timeout_graceful_shutdown=2)
 

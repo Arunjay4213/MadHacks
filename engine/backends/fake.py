@@ -4,6 +4,8 @@ encode_prompt hashes the prompt into a deterministic tensor of shape [1, 16, 32]
 The background colour comes from token 0 and the moving ball's colour from token 1, so as the steerer blends
 the conditioning over a few chunks, the colours change smoothly.
 generate_chunk and decode_chunk sleep for configurable times to stand in for GPU work.
+reanchor(strength) stands in for the real model's re-anchor: it is recorded (reanchor_calls, last_reanchor_strength)
+and the next chunk's frames get a white border and a "re-anchor" label, so a browser test can see it.
 
 Options (pass as --backend-opt key=value):
     gen_ms=170, decode_ms=60, encode_ms=80, frames_per_chunk=4, first_chunk_frames=1, fps=16
@@ -39,6 +41,9 @@ class FakeBackend:
         self._chunks_generated = 0       # counts every generate_chunk call; not cleared by reset
         self._chunks_since_reset = 0     # the "frame cache": restarts the motion after reset
         self._frame_phase = 0            # decoder state: frames decoded since reset
+        self.reanchor_calls = 0          # reanchor() calls; not cleared by reset
+        self.last_reanchor_strength: float | None = None
+        self._anchor_next: float | None = None  # strength the next generate_chunk re-anchors with, once
         yy, xx = np.mgrid[0:self.height, 0:self.width]
         self._yy, self._xx = yy.astype(np.float32), xx.astype(np.float32)
         self._shade = (0.75 + 0.25 * (self._yy / max(1, self.height - 1)))[..., None]
@@ -62,11 +67,21 @@ class FakeBackend:
         self._chunks_since_reset = 0
         self._frame_phase = 0
 
+    def reanchor(self, strength: float) -> None:
+        """Re-anchor the next generate_chunk with `strength` in (0, 1]."""
+        strength = float(strength)
+        if not 0.0 < strength <= 1.0:
+            raise ValueError(f"reanchor strength must be in (0, 1], got {strength!r}")
+        self.reanchor_calls += 1
+        self.last_reanchor_strength = strength
+        self._anchor_next = strength
+
     def generate_chunk(self, cond: torch.Tensor) -> dict:
         time.sleep(self.gen_s)
         n = self.first_chunk_frames if self._chunks_since_reset == 0 else self.frames_per_chunk
         latents = {"number": self._chunks_generated, "frames": n,
-                   "background": _rgb(cond[0, 0]), "ball": _rgb(cond[0, 1])}
+                   "background": _rgb(cond[0, 0]), "ball": _rgb(cond[0, 1]), "anchor": self._anchor_next}
+        self._anchor_next = None
         self._chunks_generated += 1
         self._chunks_since_reset += 1
         return latents
@@ -87,6 +102,11 @@ class FakeBackend:
             draw = ImageDraw.Draw(img)
             draw.text((12, 10), f"fake chunk {latents['number']}  frame {i}", fill=(255, 255, 255),
                       font=self._font, stroke_width=2, stroke_fill=(0, 0, 0))
+            if latents["anchor"] is not None:
+                border = max(4, self.height // 40)
+                draw.rectangle((0, 0, self.width - 1, self.height - 1), outline=(255, 255, 255), width=border)
+                draw.text((12, 10 + self.height // 12), f"re-anchor {latents['anchor']:.2f}", fill=(255, 255, 255),
+                          font=self._font, stroke_width=2, stroke_fill=(0, 0, 0))
             frames[i] = np.asarray(img)
             self._frame_phase += 1
         left = self.decode_s - (time.perf_counter() - t0)

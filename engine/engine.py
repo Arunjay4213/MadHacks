@@ -8,9 +8,14 @@
 Commands: contract 1 -> reader worker thread: reader.handle -> steer (contract 2) -> encoder service (its own thread)
 -> steer worker thread: steering.Controller.handle (which calls steerer.set_target) -> takes effect on the next get_cond.
 The frame cache is never rebuilt on a command; only the steerer's target changes.
+
+Re-anchor (--reanchor on, off by default): steering.reanchor.ReanchorPolicy sits next to the Controller. It hears
+every applied target (on_target after Controller.handle), is asked once per chunk where cond and progress are taken
+(next_chunk), and restarts on a reset (on_reset). An anchor it returns goes to the backend in Engine._generate.
 """
 
 import collections
+import enum
 import logging
 import math
 import queue
@@ -26,6 +31,7 @@ import numpy as np
 from PIL import Image
 
 from steering import Controller, Steerer
+from steering.reanchor import Anchor, ReanchorPolicy
 
 from .backends import load_backend
 from .commands import CommandBook, CommandRecord
@@ -55,6 +61,14 @@ class EngineConfig:
     playout_max_frames: int = 64    # hard bound on decoded frames waiting to be sent
     lead_margin: float = 1.3        # see LeadGate
     summary_every: int = 20         # chunks between rolling summary log lines
+    reanchor: str = "off"           # "off" or "on": see ReanchorState
+
+
+class ReanchorState(enum.Enum):
+    """The engine's re-anchor feature. Chosen once, when the backend is loaded."""
+    OFF = "off"                  # --reanchor off: no policy; the backend call is generate_chunk(cond)
+    ON = "on"                    # --reanchor on and the backend can re-anchor: the policy's anchors reach it
+    UNSUPPORTED = "unsupported"  # --reanchor on but the backend cannot re-anchor: no policy, as OFF
 
 
 @dataclass
@@ -64,6 +78,7 @@ class ChunkMeta:
     progress: float
     gen_ms: float
     est_frames: int
+    anchor: Anchor | None = None  # the re-anchor this chunk was generated with, if it was a re-anchor chunk
     decode_ms: float = 0.0
     jpeg_ms: float = 0.0
     frames: int = 0
@@ -139,6 +154,10 @@ class Engine:
         self.controller: Controller | None = None
         self.base_embedding = None
         self.failure: str | None = None
+        if config.reanchor not in ("off", "on"):
+            raise ValueError(f"reanchor must be 'off' or 'on', got {config.reanchor!r}")
+        self.reanchor_state = ReanchorState.OFF  # set from config.reanchor once the backend is loaded
+        self.policy: ReanchorPolicy | None = None  # exists exactly when reanchor_state is ON
 
         self._stop = threading.Event()
         self._decode_queue: queue.Queue = queue.Queue(maxsize=config.decode_queue_size)
@@ -163,6 +182,9 @@ class Engine:
         self.stalls = 0
         self.decode_blocked = 0
         self._sent_times: collections.deque[float] = collections.deque(maxlen=200)
+        self.reanchors = 0
+        self.last_anchor: Anchor | None = None
+        self.last_anchor_chunk: int | None = None
         self.client_counts: Callable[[], dict] = lambda: {}
 
     # --- lifecycle -------------------------------------------------------------------------
@@ -204,6 +226,7 @@ class Engine:
                      self.backend.frames_per_chunk)
             if self._stop.is_set():
                 return
+            self.reanchor_state = self._reanchor_support()
             self.lifecycle.transition(Lifecycle.WARMING, "backend loaded")
             self.encoder = EncoderService(self.backend.encode_prompt_with_ids)
             self.encoder.start()
@@ -250,6 +273,40 @@ class Engine:
         """A steerer at `embedding`, and the steering owner's Controller that applies contract 2 to it."""
         self.steerer = Steerer(embedding)
         self.controller = Controller(self.steerer, self.encoder.encode, cache_size=CONTROLLER_CACHE)
+        if self.reanchor_state is ReanchorState.ON:
+            self.policy = ReanchorPolicy()
+
+    # --- re-anchor -------------------------------------------------------------------------
+
+    def _reanchor_support(self) -> ReanchorState:
+        """The re-anchor state for config.reanchor and the loaded backend; logs once when it cannot re-anchor."""
+        if self.config.reanchor == "off":
+            return ReanchorState.OFF
+        if callable(getattr(self.backend, "reanchor", None)):
+            log.info("re-anchor on: the policy's anchors go to backend.reanchor(strength)")
+            return ReanchorState.ON
+        log.warning("re-anchor requested but backend %s cannot re-anchor (no reanchor(strength)); running without it",
+                    self.config.backend)
+        return ReanchorState.UNSUPPORTED
+
+    def _generate(self, cond, anchor: Anchor | None):
+        """The one backend call per chunk. `anchor` is None unless reanchor_state is ON."""
+        if anchor is not None:
+            self.backend.reanchor(anchor.strength)  # takes effect on this generate_chunk
+        return self.backend.generate_chunk(cond)
+
+    def _take_cond(self) -> tuple[object, float, Anchor | None]:
+        """Under the CommandBook lock: this chunk's cond and progress, and the policy's anchor for it."""
+        cond, progress = self.steerer.get_cond(), self.steerer.progress
+        anchor = self.policy.next_chunk(progress, self.steerer.is_moving) if self.policy is not None else None
+        return cond, progress, anchor
+
+    def _apply_target(self, target: dict) -> dict:
+        """Under the CommandBook lock: Controller.handle, then tell the policy what it did."""
+        result = self.controller.handle(target)
+        if self.policy is not None:
+            self.policy.on_target(target, result)
+        return result
 
     # --- generation ------------------------------------------------------------------------
 
@@ -274,20 +331,26 @@ class Engine:
             self._gate.wait(self._lead_limit, self._stop)
             if self._stop.is_set():
                 break
-            cond, progress = self.book.take_cond(lambda: (self.steerer.get_cond(), self.steerer.progress), chunk)
+            cond, progress, anchor = self.book.take_cond(self._take_cond, chunk)
             if cond is not last_cond:
                 log.debug("chunk %d: conditioning changed (progress %.2f)", chunk, progress)
             last_cond = cond
             t0 = time.perf_counter()
-            latents = backend.generate_chunk(cond)
+            latents = self._generate(cond, anchor)
             gen_ms = (time.perf_counter() - t0) * 1e3
             self.book.chunk_generated(chunk)
             with self._stats_lock:
                 self.gen_ms.add(gen_ms)
                 self.chunk_generated = chunk
+                if anchor is not None:
+                    self.reanchors += 1
+                    self.last_anchor, self.last_anchor_chunk = anchor, chunk
+            if anchor is not None:
+                log.info("chunk %d: re-anchor %s at strength %.2f (progress %.2f)", chunk, anchor.reason,
+                         anchor.strength, progress)
             est = backend.frames_per_chunk
             self._gate.add(est)
-            meta = ChunkMeta(chunk=chunk, progress=progress, gen_ms=gen_ms, est_frames=est)
+            meta = ChunkMeta(chunk=chunk, progress=progress, gen_ms=gen_ms, est_frames=est, anchor=anchor)
             if not self._put(self._decode_queue, (latents, meta), f"decode is behind, generation blocked at chunk {chunk}"):
                 break
             chunk += 1
@@ -347,6 +410,8 @@ class Engine:
             except Exception:
                 log.exception("controller.reset failed for %r; starting on the starting prompt", steer["prompt"])
                 self.controller.reset(self.base_prompt)
+            if self.policy is not None:
+                self.policy.on_reset()
 
         self.book.reset(restart, rec)
         self.lifecycle.transition(Lifecycle.GENERATING, f"reset done in {(time.perf_counter() - t0) * 1e3:.0f} ms")
@@ -543,7 +608,7 @@ class Engine:
                 self.book.drop(rec, f"encoding failed: {exc!r}")
                 return
         try:
-            result = self.book.embedded(rec, lambda: self.controller.handle(target))
+            result = self.book.embedded(rec, lambda: self._apply_target(target))
         except ValueError as exc:
             self.book.drop(rec, f"controller refused: {exc}")
             return
@@ -576,7 +641,15 @@ class Engine:
                 "decode_queue": self._decode_queue.qsize(),
                 "playout_frames": self._playout_queue.qsize(),
                 "frames_ahead": self._gate.ahead,
+                "reanchor": {
+                    "state": self.reanchor_state.value,
+                    "count": self.reanchors,
+                    "last_strength": None if self.last_anchor is None else self.last_anchor.strength,
+                    "last_reason": None if self.last_anchor is None else self.last_anchor.reason,
+                    "last_chunk": self.last_anchor_chunk,
+                },
             }
+        out["reanchor"]["chunks_since_anchor"] = None if self.policy is None else self.policy.chunks_since_anchor
         if self.backend is not None:
             out.update(fps_target=self.backend.fps, frames_per_chunk=self.backend.frames_per_chunk,
                        width=self.backend.width, height=self.backend.height)
