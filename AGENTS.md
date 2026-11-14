@@ -81,15 +81,17 @@ Two agents should never edit the same folder.
 
 | Area | Owner (GitHub login) | Folders |
 |---|---|---|
-| Core feature, part 1 | `@Arunjay4213` | TODO once the idea is set |
-| Core feature, part 2 | `@Tactacion` | TODO once the idea is set |
-| Core feature, part 3 | `@prateekraouw` | TODO once the idea is set |
-| TODO | `@anirudhaugile` | TODO |
+| Steering: everything inside the diffusion model. How the prompt embedding is blended, paced, scaled and interrupted. | `@Tactacion` (Ishaan) | `steering/` |
+| Real-time engine: the GPU machines, the generation loop, the text encoder service, streaming frames, delay measurement. | `@Arunjay4213` (Arunjay) | `engine/` |
+| The page and the inputs: the demo page, the words line, chips, undo button, the text box for Wispr Flow, and the live mic (voice). | `@prateekraouw` (Prateek) | `web/` |
+| Understanding commands: scene state, operations, undo history, the prompt composer, the keyword table. Also the write-up and the pitch. | `@anirudhaugile` (Ani) | `commands/`, `docs/` |
+| The four message shapes between the parts. | `@Arunjay4213` (lead) | `contracts/` |
 
-Updated at Prateek's instruction on 2026-11-14: the core feature, meaning the main thing the demo shows, goes to Arunjay, Ishaan and Prateek.
-It will be split into three separate folders, one owner each, as soon as the idea is set.
-Ani's area is not decided yet.
-Ani asked for frontend first and data + AI second.
+Assigned by the lead on 2026-11-14, following Ishaan's blueprint (board post #6883918631).
+In the blueprint's words: Ishaan is steering, Arunjay is teammate 1, Prateek is teammate 2, Ani is teammate 3.
+The blueprint is the plan of record for what each part contains, its first deliverable, and the gates.
+A change to a file in `contracts/` needs agreement on the board from every owner whose part uses that message.
+This table replaces the earlier three-way split of the core feature.
 
 ## 5. Tracks and theme
 
@@ -97,11 +99,10 @@ The main track theme is: go deep into something and do deep research.
 We enter the main track, and we may also enter one sponsor track: Databricks or Qualcomm.
 Entering no sponsor track is also allowed.
 
-Decided by the lead on 2026-11-14: the project is real-time video editing with diffusion models.
-A live video is changed by an instruction while it plays, for example summer to winter.
-Ishaan (`@Tactacion`) writes the blueprint.
-Work is divided after the blueprint is posted, and the lead then fills in the table in section 4.
-No project code and no new folders before that.
+Decided by the lead on 2026-11-14: the project is live voice-steered video.
+A video is generated continuously by a diffusion model and changes while it plays when someone speaks an instruction, for example "make it winter".
+Ishaan (`@Tactacion`) wrote the blueprint, board post #6883918631, and the work is divided in section 4.
+It builds on a published project (Training-Free Interactive World Models), which must be credited first in the pitch, on the Devpost page and on a slide.
 
 The sponsor track is still open.
 Earlier directions are dropped: pooling laptops to run models, and a diffusion model writing the reasoning for a language model.
