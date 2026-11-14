@@ -152,8 +152,12 @@ class _Decoder:
 
         with torch.cuda.device(device):
             if vae_type is VaeType.WAN:
+                from demo_utils import vae_block3
                 from demo_utils.vae_block3 import VAEDecoderWrapper
                 from demo_utils.constant import ZERO_VAE_CACHE
+
+                # The official wrapper prints a debug line on every call; silence it in that module only.
+                vae_block3.print = lambda *a, **k: None
 
                 model = VAEDecoderWrapper()
                 sd = torch.load("wan_models/Wan2.1-T2V-1.3B/Wan2.1_VAE.pth", map_location="cpu")
@@ -378,8 +382,12 @@ class Backend:
     def encode_prompt(self, prompt: str) -> torch.Tensor:
         return self.encode_prompt_with_ids(prompt)[0]
 
-    def reset(self) -> None:
+    def reset(self, seed: Optional[int] = None) -> None:
+        """Start a new video. With `seed`, the noise of the new video is reseeded, so the same
+        seed and the same conds give the same latents again."""
         with self._gen_lock:
+            if seed is not None:
+                self._rng.manual_seed(int(seed))
             with torch.cuda.device(self.device), torch.cuda.stream(self._gen_stream):
                 for c in self.kv_cache:
                     c["global_end_index"].zero_()
@@ -423,7 +431,7 @@ class Backend:
                     nxt = schedule[i + 1]
                     noisy = self.scheduler.add_noise(
                         denoised.flatten(0, 1),
-                        torch.randn_like(denoised.flatten(0, 1)),
+                        torch.randn(denoised.flatten(0, 1).shape, device=self.device, dtype=denoised.dtype, generator=self._rng),
                         nxt * torch.ones([f], device=self.device, dtype=torch.long),
                     ).unflatten(0, denoised.shape[:2])
 
@@ -456,13 +464,18 @@ class Backend:
 
 
 def load(width: int, height: int, steps: Optional[int] = None, device: str = "cuda:0", decode_device: str = "cuda:0", **options) -> Backend:
-    """Build the backend. `steps=None` uses the schedule the checkpoint was distilled for.
+    """Build the backend. `steps=None` or 0 uses the schedule the checkpoint was distilled for.
 
     Options: variant ("framewise_2step" default, "framewise_1step", "chunkwise_4step"),
     repo_dir, vae ("wan" or "taehv"), attn_window_frames (21), sink_frames (0),
     max_latent_frames (65536), text_encoder_device, compile (False), seed (0).
     """
+    # Options may arrive as strings from the server's --backend-opt KEY=VALUE.
+    types = {"attn_window_frames": int, "sink_frames": int, "max_latent_frames": int, "seed": int,
+             "compile": lambda v: v if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes", "on")}
+    options = {k: types[k](v) if k in types else v for k, v in options.items()}
+    steps = int(steps) if steps is not None and int(steps) > 0 else None  # 0 or None: distilled schedule
     t0 = time.time()
-    b = Backend(width, height, steps, device, decode_device, **options)
+    b = Backend(int(width), int(height), steps, device, decode_device, **options)
     b.load_seconds = time.time() - t0
     return b
