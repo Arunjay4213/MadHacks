@@ -28,6 +28,18 @@ def test_illegal_transitions_rejected(start, bad):
     assert m.state is start
 
 
+def test_recovering_path():
+    m = LifecycleMachine()
+    for s in (Lifecycle.WARMING, Lifecycle.GENERATING, Lifecycle.RECOVERING, Lifecycle.GENERATING,
+              Lifecycle.RESETTING, Lifecycle.RECOVERING, Lifecycle.FAILED, Lifecycle.STOPPED):
+        m.transition(s)
+        assert m.state is s
+    m2 = LifecycleMachine()
+    m2.transition(Lifecycle.WARMING)
+    with pytest.raises(IllegalTransition):
+        m2.transition(Lifecycle.RECOVERING)
+
+
 def test_stopped_is_final_and_every_state_listed():
     assert ALLOWED[Lifecycle.STOPPED] == frozenset()
     assert set(ALLOWED) == set(Lifecycle)

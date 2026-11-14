@@ -9,6 +9,10 @@ and the next chunk's frames get a white border and a "re-anchor" label, so a bro
 
 Options (pass as --backend-opt key=value):
     gen_ms=170, decode_ms=60, encode_ms=80, frames_per_chunk=4, first_chunk_frames=1, fps=16
+    fail_on_chunk=-1, fail_count=1, fail_in=generate
+
+fail_on_chunk=N injects a crash to test recovery: from chunk N on (chunks count across resets), generate_chunk
+(fail_in=generate) or decode_chunk (fail_in=decode) raises RuntimeError, fail_count times in total.
 """
 
 import hashlib
@@ -32,7 +36,8 @@ def _rgb(vec: torch.Tensor) -> np.ndarray:
 
 class FakeBackend:
     def __init__(self, width: int, height: int, steps: int, gen_ms: float = 170, decode_ms: float = 60,
-                 encode_ms: float = 80, frames_per_chunk: int = 4, first_chunk_frames: int = 1, fps: int = 16):
+                 encode_ms: float = 80, frames_per_chunk: int = 4, first_chunk_frames: int = 1, fps: int = 16,
+                 fail_on_chunk: int = -1, fail_count: int = 1, fail_in: str = "generate"):
         self.width, self.height, self.steps = int(width), int(height), int(steps)
         self.fps = int(fps)
         self.frames_per_chunk = int(frames_per_chunk)
@@ -44,6 +49,10 @@ class FakeBackend:
         self.reanchor_calls = 0          # reanchor() calls; not cleared by reset
         self.last_reanchor_strength: float | None = None
         self._anchor_next: float | None = None  # strength the next generate_chunk re-anchors with, once
+        if fail_in not in ("generate", "decode"):
+            raise ValueError(f"fail_in must be generate or decode, got {fail_in!r}")
+        self.fail_on_chunk, self.fail_in = int(fail_on_chunk), fail_in
+        self.failures_left = int(fail_count) if self.fail_on_chunk >= 0 else 0
         yy, xx = np.mgrid[0:self.height, 0:self.width]
         self._yy, self._xx = yy.astype(np.float32), xx.astype(np.float32)
         self._shade = (0.75 + 0.25 * (self._yy / max(1, self.height - 1)))[..., None]
@@ -76,8 +85,14 @@ class FakeBackend:
         self.last_reanchor_strength = strength
         self._anchor_next = strength
 
+    def _maybe_fail(self, where: str, chunk: int) -> None:
+        if where == self.fail_in and self.failures_left > 0 and chunk >= self.fail_on_chunk:
+            self.failures_left -= 1
+            raise RuntimeError(f"fake backend: injected {where} failure at chunk {chunk}")
+
     def generate_chunk(self, cond: torch.Tensor) -> dict:
         time.sleep(self.gen_s)
+        self._maybe_fail("generate", self._chunks_generated)
         n = self.first_chunk_frames if self._chunks_since_reset == 0 else self.frames_per_chunk
         latents = {"number": self._chunks_generated, "frames": n,
                    "background": _rgb(cond[0, 0]), "ball": _rgb(cond[0, 1]), "anchor": self._anchor_next}
@@ -88,6 +103,7 @@ class FakeBackend:
 
     def decode_chunk(self, latents: dict) -> np.ndarray:
         t0 = time.perf_counter()
+        self._maybe_fail("decode", latents["number"])
         frames = np.empty((latents["frames"], self.height, self.width, 3), dtype=np.uint8)
         bg = (self._shade * latents["background"]).astype(np.uint8)
         r = self.height / 8
