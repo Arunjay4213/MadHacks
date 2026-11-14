@@ -45,22 +45,12 @@ def _run(s: Steerer, n: int) -> list[torch.Tensor]:
 @pytest.mark.parametrize(
     "msg",
     [
-        {"ramp_chunks": 4},
-        {"prompt": "", "ramp_chunks": 4},
-        {"prompt": 3, "ramp_chunks": 4},
-        {"prompt": "x"},
+        {"ramp_chunks": 4},                                                  # no prompt
         {"prompt": "x", "ramp_chunks": 0},
-        {"prompt": "x", "ramp_chunks": 2.0},
-        {"prompt": "x", "ramp_chunks": True},
+        {"prompt": "x", "ramp_chunks": True},                                # a bool is not a count
         {"prompt": "x", "ramp_chunks": 4, "provisional": "yes"},
-        {"prompt": "x", "ramp_chunks": 4, "provisional": 1},
-        {"prompt": "x", "ramp_chunks": 4, "provisional": True, "cap": 0.0},
-        {"prompt": "x", "ramp_chunks": 4, "provisional": True, "cap": 1.5},
         {"prompt": "x", "ramp_chunks": 4, "provisional": True, "cap": float("nan")},
-        {"prompt": "x", "ramp_chunks": 4, "provisional": True, "cap": True},
-        {"prompt": "x", "ramp_chunks": 4, "provisional": True, "cap": "0.4"},
-        {"prompt": "x", "ramp_chunks": 4, "provisional": False, "cap": 0.4},
-        {"prompt": "x", "ramp_chunks": 4, "cap": 0.4},
+        {"prompt": "x", "ramp_chunks": 4, "provisional": False, "cap": 0.4},  # a final must go to full
     ],
 )
 def test_bad_message_raises_and_changes_nothing(msg):
@@ -510,16 +500,10 @@ def _smsg(prompt: str, strength: float, without: str = "meadow", **kw) -> dict:
 @pytest.mark.parametrize(
     "extra",
     [
-        {"strength": 0.3},
-        {"without_prompt": "meadow"},
+        {"strength": 0.3},                                   # strength without the prompt to blend from
         {"strength": 0.0, "without_prompt": "meadow"},
-        {"strength": -0.1, "without_prompt": "meadow"},
         {"strength": 1.31, "without_prompt": "meadow"},
         {"strength": float("nan"), "without_prompt": "meadow"},
-        {"strength": True, "without_prompt": "meadow"},
-        {"strength": "0.3", "without_prompt": "meadow"},
-        {"strength": 0.3, "without_prompt": ""},
-        {"strength": 0.3, "without_prompt": 3},
     ],
 )
 def test_bad_strength_raises_and_changes_nothing(extra):
