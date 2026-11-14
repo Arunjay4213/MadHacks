@@ -98,6 +98,27 @@ All on one origin; the message shapes are in `contracts/README.md`.
 | `POST /reset` | Same as a `{"type":"tap","action":"reset"}` on `/control`: goes through the reader, then starts a new video; returns when done. |
 | `GET /stats` | JSON: lifecycle state, backend, reader, last generated and shown chunk, last and average generation, decode and JPEG ms, measured fps, queue depths, encoder cache and pending encodes, clients. |
 | `GET /healthz` | 200 with the state, or 503 when FAILED or STOPPED. |
+| `GET /app/` | The demo page from `web/` (see "The demo page at /app/"). |
+
+## The demo page at /app/
+
+The server also serves the demo page from the repo's `web/` folder at `/app/`, so the page and the engine share one origin.
+On the https tunnel, `https://<address>/app/` gives the live mic with no extra setup, because the page connects to `/control` and `/frames` on the host it was loaded from when there is no `?server=`.
+Only four files are served, from an explicit allow-list: `index.html` (at `/app/`), `style.css`, `app.js` and `lib.js`.
+Every other path under `/app/` returns 404, including the rest of `web/` (`node_modules/`, `fake-server.mjs`, `test/`, `tools/`, `test-pattern/`, `package*.json`) and any path traversal.
+`/app` redirects to `/app/` and keeps the query string.
+The files are read from disk on each request with `Cache-Control: no-cache`, so an rsync of `web/` takes effect without a restart.
+If `web/` is missing, `/app/` returns a 404 that says so, and the rest of the server works as usual.
+
+## Lucid Studio at /studio/
+
+The server serves the Lucid Studio build (a Vite app) read-only at `/studio/`, from `--studio-dir` (default `<repo>/lucid-studio/dist`).
+Its asset names are hashed, so any regular file inside that folder is served, not an allow-list.
+Dotfiles, missing files, directories, path traversal and symlinks that point outside the folder all return 404.
+`/studio` redirects to `/studio/`, which serves `index.html`.
+`index.html` and other files are sent with `Cache-Control: no-cache`; hashed files under `assets/` may be cached for a year.
+If the folder is missing, `/studio/` returns "Lucid Studio build not found at <path>" with a 404, and the server still starts.
+The Vite build must use `base: './'` or `base: '/studio/'` in its config, or its asset links point at `/assets/` and fail under `/studio/`.
 
 ## Backend interface
 
