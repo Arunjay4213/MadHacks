@@ -90,3 +90,36 @@ Decided by the lead on 2026-11-14: the core feature, meaning the main thing the 
 It will be split into two separate folders, one owner each, as soon as the idea is set.
 The areas for Ani and Prateek are not decided yet.
 Ani asked for frontend first and data + AI second.
+
+## 5. Target track: Databricks
+
+Decided by the lead on 2026-11-14: we are going for the Databricks track.
+The project must use Databricks services in a way that matters to the product, not as an add-on.
+Good test: if Databricks were removed, the main demo should stop working.
+
+We use Databricks Free Edition, and Arunjay's account is already signed up.
+The project idea is not set yet.
+
+### Free Edition limits that affect design
+
+These come from the Databricks Free Edition limitations page, read on 2026-11-14.
+
+- **Daily usage quota.** If the account goes over its fair usage quota, all compute is shut down for the rest of the day.
+  Do not run heavy jobs or loops before the demo, and never leave a job or pipeline running that nobody needs.
+- **Serverless compute only**, with Python and SQL. R and Scala are not supported, and there are no GPUs.
+- **Outbound internet from Databricks compute is limited to a set of trusted domains.**
+  Do not assume a notebook or job can call an arbitrary external API. Test the call first.
+- **One SQL warehouse**, size 2X-Small.
+- **Jobs:** at most 5 concurrent job tasks.
+- **Lakeflow pipelines:** one active pipeline per pipeline type.
+- **Model serving:** a limited number of endpoints, no GPU endpoints, no provisioned throughput, and some models are unavailable.
+- **Vector search:** one endpoint with one search unit.
+- **Databricks Apps:** at most 3 apps. An app stops by itself 24 hours after it was last started or deployed, so restart it shortly before the demo.
+- **Lakebase:** one project.
+- **Not supported:** Knowledge Assistant, online tables, clean rooms, the account console, and account-level APIs.
+- One workspace and one metastore per account.
+
+### Secrets
+
+Never commit a Databricks token, host URL with a token, or any other key.
+Keep them in a local `.env` file, which is ignored by git, and never paste them on the board.

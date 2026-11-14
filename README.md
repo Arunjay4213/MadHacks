@@ -1,7 +1,8 @@
 # MadHacks
 
 Our MadHacks project.
-What we are building: TODO.
+What we are building: not decided yet.
+Target track: Databricks, using Databricks Free Edition. See section 5 of `AGENTS.md` for the limits.
 
 ## Team board setup (do this once, about 2 minutes)
 
