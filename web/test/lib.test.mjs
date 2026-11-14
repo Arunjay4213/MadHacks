@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseFrame, parseServerMessage, splitKeyword, backoffMs, isWholeInsert,
   makeFrameGate, makeLatencyTracker, makeTranscriber, changesKey, commandKey, makeInputClassifier,
-  PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
+  PUSH_TO_TALK_CODE, isPushToTalk, micErrorText, looksUnfinished, finalizeDelay,
 } from '../lib.js';
 import { loadTestPattern } from '../fake-server.mjs';
 import { wsBaseUrl, fitSize, videoNotice, formatStamps, STALL_MS, isResetShortcut } from '../lib.js';
@@ -200,6 +200,32 @@ test('fake server test pattern: real JPEG frames bigger than one pixel', () => {
     assert.ok(i > 0);
     assert.ok(f.readUInt16BE(i + 5) > 100 && f.readUInt16BE(i + 7) > 100);
   }
+});
+
+test('looksUnfinished / finalizeDelay: a sentence still being typed is never sent on a pause', () => {
+  for (const t of ['a car,', 'make it night and', 'add a', 'a car racing on', 'make it', 'add a red car -']) {
+    assert.equal(looksUnfinished(t), true, t);
+    assert.equal(finalizeDelay('typing', t), null, t);
+    assert.equal(finalizeDelay('burst', t), null, t);
+  }
+  for (const t of ['a car, car racing on a road', 'make it winter', 'go back', 'add a river.', 'undo']) {
+    assert.equal(looksUnfinished(t), false, t);
+  }
+  assert.equal(finalizeDelay('typing', 'make it winter'), 2500);
+  assert.equal(finalizeDelay('burst', 'make it winter'), 600);
+});
+
+test('transcriber hold mode (push-to-talk): Chrome splitting at a pause still sends ONE final on release', () => {
+  const out = [];
+  const t = makeTranscriber((m) => out.push([m.type, m.text]));
+  t.start({ hold: true });
+  t.handle([R('make it night')]);
+  t.handle([R('make it night', true)]); // Chrome ends a segment at the pause
+  t.handle([R('make it night', true), R('and add a car')]);
+  t.handle([R('make it night', true), R('and add a car racing on a road', true)]);
+  t.flush(); // key released
+  assert.deepEqual(out.filter(([type]) => type === 'final'), [['final', 'make it night and add a car racing on a road']]);
+  assert.deepEqual(out.at(-2), ['partial', 'make it night and add a car racing on a road']); // words line showed it all
 });
 
 const R = (transcript, isFinal = false) => ({ transcript, isFinal });
