@@ -69,7 +69,9 @@ It sits in `PROTOCOL` in `lib.js` and in `fake-server.mjs`.
 5. Delay, highlight, connection state: done. A notice over the video says connecting, connection lost (either
    socket), waiting for the first frame, or "Video paused" after 2 s without frames (`STALL_MS`). The delay line is
    short ("voice → video" plus server stamps); its full definition is in the tooltip.
-6. Big-screen layout: next.
+6. Reset button (sends the `reset` tap, Option+R / Alt+R shortcut, never Ctrl) and no "Connection lost" while the
+   sockets are still opening: done. Big-screen layout: on hold (the lead chose lucid-studio/ as the demo page for
+   now; web/ is the tested fallback).
 
 ## Open
 

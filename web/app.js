@@ -3,7 +3,7 @@ import {
   PROTOCOL, TYPING_IDLE_MS, BURST_IDLE_MS, partialMsg, finalMsg, tapMsg, parseFrame, parseServerMessage,
   splitKeyword, backoffMs, makeFrameGate, makeLatencyTracker, makeTranscriber,
   changesKey, commandKey, makeInputClassifier, PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
-  wsBaseUrl, fitSize, videoNotice, formatStamps,
+  wsBaseUrl, fitSize, videoNotice, formatStamps, isResetShortcut,
 } from './lib.js';
 
 const $ = (id) => document.getElementById(id);
@@ -11,7 +11,7 @@ const el = {
   video: $('video'), connection: $('connection'), banner: $('mode-banner'), words: $('words'),
   changes: $('changes'), form: $('command-form'), command: $('command'), mic: $('mic'),
   ptt: $('ptt'), undo: $('undo'), latency: $('latency'), timing: $('timing'), error: $('error'),
-  notice: $('video-notice'),
+  notice: $('video-notice'), reset: $('reset'),
 };
 const ctx = el.video.getContext('2d');
 // Same origin by default; `?server=host:port` points the page at another server (e.g. the engine on :8000).
@@ -59,6 +59,7 @@ function setConnected(open) {
   el.connection.textContent = open ? 'Connected' : 'Connection lost — reconnecting…';
   el.changes.dataset.stale = String(!open);
   el.undo.disabled = !open;
+  el.reset.disabled = !open;
   for (const b of el.changes.querySelectorAll('button')) b.disabled = !open;
 }
 
@@ -68,7 +69,7 @@ function connectControl() {
   ws.onopen = () => {
     attempt = 0;
     link.controlOpen = true;
-    link.everConnected = true;
+    link.everConnected ||= link.framesOpen; // "lost" only after both sockets have worked once
     setConnected(true);
     showError('');
   };
@@ -162,6 +163,7 @@ function connectFrames() {
   ws.onopen = () => {
     frameAttempt = 0;
     link.framesOpen = true;
+    link.everConnected ||= link.controlOpen;
   };
   ws.onmessage = async (e) => {
     const f = parseFrame(e.data);
@@ -244,7 +246,14 @@ window.addEventListener('focus', refocus); // returning from another app
 document.addEventListener('pointerup', refocus);
 
 el.undo.addEventListener('click', () => send(tapMsg('undo')));
-
+// Back to the starting scene (the scene reset is undoable; the picture restarts cleanly).
+el.reset.addEventListener('click', () => send(tapMsg('reset')));
+// Keyboard: Option+R (Alt+R). The key never types into the text box.
+document.addEventListener('keydown', (e) => {
+  if (!isResetShortcut(e)) return;
+  e.preventDefault();
+  if (!e.repeat && !el.reset.disabled) send(tapMsg('reset'));
+});
 // ---------- live mic ----------
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const transcriber = makeTranscriber(send);

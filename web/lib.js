@@ -21,6 +21,12 @@ export const PUSH_TO_TALK_CODE = 'Backquote';
 export const isPushToTalk = (e, code = PUSH_TO_TALK_CODE) =>
   e.code === code && !e.ctrlKey && !e.metaKey && !e.altKey;
 
+// Reset shortcut: Option+R on a Mac (Alt+R elsewhere). Not Ctrl (Wispr Flow), and with Option held
+// the key does not type into the always-focused text box (the page blocks the ® it would insert).
+export const RESET_SHORTCUT_CODE = 'KeyR';
+export const isResetShortcut = (e, code = RESET_SHORTCUT_CODE) =>
+  e.code === code && e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey;
+
 // Plain-language text for Chrome speech recognition errors; null for ones not worth showing.
 export function micErrorText(error) {
   if (error === 'no-speech' || error === 'aborted') return null;
