@@ -3,7 +3,7 @@
 An example file named "<n>-....json" is checked against "schemas/<n>-*.schema.json".
 Run from anywhere: python contracts/validate.py  (needs jsonschema)
 Exits non-zero if any example is invalid or has no schema.
-Other code can import `validate(contract_number, message)` to check a single message.
+Other code can import `errors(contract_number, message)` to check a single message.
 """
 
 import json
