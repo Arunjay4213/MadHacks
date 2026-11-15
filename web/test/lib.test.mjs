@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseFrame, parseServerMessage, splitKeyword, backoffMs, isWholeInsert,
   makeFrameGate, makeLatencyTracker, makeTranscriber, changesKey, commandKey, makeInputClassifier,
-  PUSH_TO_TALK_CODE, isPushToTalk, micErrorText, looksUnfinished, finalizeDelay, wordsLabels, makeHeardTracker, PENDING_MS,
+  PUSH_TO_TALK_CODE, isPushToTalk, micErrorText, looksUnfinished, finalizeDelay, wordsLabels, makeHeardTracker, PENDING_MS, makeOrderedFinals,
 } from '../lib.js';
 import { loadTestPattern } from '../fake-server.mjs';
 import { wsBaseUrl, fitSize, videoNotice, formatStamps, STALL_MS, isResetShortcut } from '../lib.js';
@@ -208,7 +208,8 @@ test('looksUnfinished / finalizeDelay: a sentence still being typed is never sen
     assert.equal(finalizeDelay('typing', t), null, t);
     assert.equal(finalizeDelay('burst', t), null, t);
   }
-  for (const t of ['a car, car racing on a road', 'make it winter', 'go back', 'add a river.', 'undo']) {
+  for (const t of ['a car, car racing on a road', 'make it winter', 'go back', 'add a river.', 'undo',
+    'start over', 'make it night slowly', 'suddenly make it rain', 'make it snow more', 'less snow', 'snow less', 'undo it', 'remove it']) {
     assert.equal(looksUnfinished(t), false, t);
   }
   assert.equal(finalizeDelay('typing', 'make it winter'), 2500);
@@ -255,6 +256,50 @@ test('heard tracker: own partials are pending, own finals confirmed, anything el
   g.sentPartial('add a lion', 9000);
   g.clearPartials();
   assert.equal(g.classify('add a lion', 5, 9100), 'other');
+});
+
+test('ordered finals: nothing is held or replayed across a disconnect', () => {
+  const out = [];
+  let open = true;
+  const o = makeOrderedFinals((m) => out.push(m.text), () => open);
+  const a = o.open();
+  const b = o.open();
+  b.send({ type: 'final', text: 'undo' }); // held behind a
+  open = false;
+  o.dropAll(); // the connection closed: what was held is dropped
+  b.send({ type: 'final', text: 'add a dog' }); // while down: straight to send(), which drops it
+  open = true; // reconnected before a ends
+  a.close();
+  b.close();
+  assert.deepEqual(out, ['add a dog']); // only the immediate (dropped-by-send) call; 'undo' never replayed
+});
+
+test('ordered finals: a quick second press that ends first is still sent after the first press', () => {
+  const out = [];
+  const o = makeOrderedFinals((m) => out.push(`${m.type}:${m.text}`));
+  const a = o.open(); // press 1: "make it winter", still ending
+  const b = o.open(); // press 2: "undo", ends first
+  a.send({ type: 'partial', text: 'make it win' });
+  b.send({ type: 'partial', text: 'undo' });
+  b.send({ type: 'final', text: 'undo' });
+  b.close();
+  assert.deepEqual(out, ['partial:make it win', 'partial:undo']); // partials live, the undo waits
+  a.send({ type: 'final', text: 'make it winter' });
+  a.close();
+  assert.deepEqual(out.slice(2), ['final:make it winter', 'final:undo']); // press order kept
+  // Greptile: a still-open slot (mic toggle) that becomes first must send what it buffered before
+  // its newer sentences.
+  const p1 = o.open(); // a push-to-talk press, still ending
+  const tog = o.open(); // a mic-toggle session, stays open
+  tog.send({ type: 'final', text: 'make it night' }); // buffered behind p1
+  p1.send({ type: 'final', text: 'add a river' });
+  p1.close();
+  tog.send({ type: 'final', text: 'add a lion' });
+  assert.deepEqual(out.slice(4), ['final:add a river', 'final:make it night', 'final:add a lion']);
+  tog.close();
+  const c = o.open(); // nothing earlier waiting: sent at once
+  c.send({ type: 'final', text: 'add a river' });
+  assert.equal(out.at(-1), 'final:add a river');
 });
 
 const R = (transcript, isFinal = false) => ({ transcript, isFinal });

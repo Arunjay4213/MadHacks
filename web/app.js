@@ -3,7 +3,7 @@ import {
   PROTOCOL, finalizeDelay, partialMsg, finalMsg, tapMsg, parseFrame, parseServerMessage,
   splitKeyword, backoffMs, makeFrameGate, makeLatencyTracker, makeTranscriber,
   changesKey, commandKey, makeInputClassifier, wordsLabels, makeHeardTracker, PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
-  wsBaseUrl, fitSize, videoNotice, formatStamps, isResetShortcut,
+  wsBaseUrl, fitSize, videoNotice, formatStamps, isResetShortcut, makeOrderedFinals,
 } from './lib.js';
 
 const $ = (id) => document.getElementById(id);
@@ -88,6 +88,7 @@ function connectControl() {
     link.controlOpen = false;
     renderNotice();
     latency.reset(); // a stale command can no longer be correlated
+    ordered.dropAll(); // held spoken commands are dropped, never replayed after a reconnect
     el.latency.textContent = '—'; // no number without a measured frame
     setConnected(false);
     setTimeout(connectControl, backoffMs(attempt++));
@@ -319,47 +320,71 @@ document.addEventListener('keydown', (e) => {
 });
 // ---------- live mic ----------
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-const transcriber = makeTranscriber(send);
-let rec = null;
+// Spoken commands reach the server in press order; nothing is held while disconnected.
+const ordered = makeOrderedFinals(send, () => control?.readyState === WebSocket.OPEN);
+let rec = null; // the current recognizer; an older one may still be ending
 let listening = null; // what the user asked for: 'toggle' | 'ptt' | null
 let startedAt = 0;
+let startWhenEnded = false; // only if the browser refused a second recognizer while the old one ended
 
 function startListening(mode) {
   if (!Recognition || listening) return;
   listening = mode;
-  begin();
   renderMic();
+  begin(); // at once, even if the previous press is still ending: words said now are recorded
 }
 
+// Each recognizer has its own transcriber, so a quick re-press records the new words at once while
+// the previous recognizer still sends its own sentence when it ends; the two never mix.
 function begin() {
-  rec = new Recognition();
-  rec.continuous = true;
-  rec.interimResults = true;
-  rec.lang = 'en-US';
-  transcriber.start({ hold: listening === 'ptt' }); // push-to-talk: one command per press
+  const r = new Recognition();
+  const slot = ordered.open();
+  const t = makeTranscriber(slot.send);
+  const previous = rec;
+  rec = r;
+  r.continuous = true;
+  r.interimResults = true;
+  r.lang = 'en-US';
+  t.start({ hold: listening === 'ptt' }); // push-to-talk: one command per press
   startedAt = performance.now();
-  rec.onresult = (e) => transcriber.handle(Array.from(e.results, (r) => ({ transcript: r[0].transcript, isFinal: r.isFinal })));
-  rec.onerror = (e) => {
+  r.onresult = (e) => t.handle(Array.from(e.results, (x) => ({ transcript: x[0].transcript, isFinal: x.isFinal })));
+  r.onerror = (e) => {
     const text = micErrorText(e.error);
-    if (!text) return;
+    if (!text || rec !== r) return;
     showError(text);
     listening = null; // a real failure: do not restart into it
+    startWhenEnded = false;
   };
-  rec.onend = () => {
-    transcriber.flush(); // leftover interim text becomes one final, once
+  r.onend = () => {
+    t.flush(); // this recognizer's leftover words become one final, once
+    slot.close(); // ...sent only after every earlier press has sent its own
+    if (rec !== r) return; // an older recognizer: the page's state belongs to the newer one
     rec = null;
+    if (startWhenEnded) {
+      startWhenEnded = false;
+      if (listening) return begin(); // the fallback: start the press the browser refused earlier
+    }
     // Chrome ends recognition by itself after a pause; keep listening while the mic toggle is on,
     // unless it ended at once (then restarting would just spin).
     if (listening === 'toggle' && performance.now() - startedAt > 500) return begin();
     listening = null;
     renderMic();
   };
-  rec.start();
+  try {
+    r.start();
+  } catch {
+    // The browser refuses a second recognizer while the previous one is still ending: start this
+    // press as soon as that one has flushed.
+    slot.close(); // this attempt recorded nothing
+    rec = previous;
+    startWhenEnded = true;
+  }
 }
 
 function stopListening(mode) {
   if (listening !== mode) return;
   listening = null; // so onend does not restart
+  startWhenEnded = false;
   renderMic();
   rec?.stop(); // onend flushes the last words
 }

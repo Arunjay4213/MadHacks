@@ -53,10 +53,12 @@ The page is four static files with no build step: `index.html`, `style.css`, `ap
 3. **Speak commands:**
    - **Wispr Flow:** hold **Ctrl**, speak, release. The sentence lands in the text box and is sent at once.
    - **Live mic:** hold the **backtick** key (`` ` ``, under Esc) or the **Hold to talk** button, speak, release.
-     Words show while you speak; one press is one command, sent when you release. **Mic** keeps listening
-     hands-free until clicked again.
+     Words show while you speak; one press is one command, sent when you release. Pressing again
+     quickly records at once, and commands always reach the server in the order you pressed. **Mic**
+     keeps listening hands-free until clicked again. Speech while disconnected is dropped, never replayed.
    - **Typing** works too: press Enter, or pause 2.5 s. Text that looks unfinished (ends in a comma or "and",
-     "a", "on"…) waits for Enter, so one sentence is never split into two commands.
+     "a", "on", "make it"…) waits for Enter, so one sentence is never split into two commands; endings like
+     "start over", "undo it", "slowly" and "more" send normally.
 4. **Fix mistakes:** **Undo** steps back one change; the **×** on a chip removes that change; **Reset** (or
    **Option+R** / Alt+R) goes back to the starting scene. Reset also restarts the picture, which keeps it clean
    (the live model degrades after about 30 s without one).

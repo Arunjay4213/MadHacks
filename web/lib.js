@@ -14,14 +14,20 @@ export const BURST_IDLE_MS = 600;
 
 // Typed text that ends like this is a sentence still being written ("a car," / "make it night and"),
 // so it is never sent on a pause, only on Enter: sending it would split one command into two.
+// Words that can END a real command ("start over", "undo it", "make it night slowly", "more snow" / "snow
+// more") are deliberately not here, or that command would never send on a pause (Greptile on #82).
 const CONNECTORS = new Set(['a', 'an', 'the', 'and', 'or', 'but', 'then', 'also', 'plus', 'with', 'on', 'in', 'into',
-  'onto', 'to', 'of', 'at', 'by', 'for', 'from', 'through', 'over', 'under', 'near', 'along', 'across', 'make', 'add',
-  'turn', 'remove', 'it', 'is', 'some', 'more', 'less', 'very', 'really', 'slowly', 'suddenly']);
+  'onto', 'to', 'of', 'at', 'by', 'for', 'from', 'through', 'under', 'near', 'along', 'across', 'make', 'add',
+  'turn', 'remove', 'is', 'some', 'very', 'really']);
 export function looksUnfinished(text) {
   const t = text.trim().toLowerCase();
   if (!t) return false;
   if (/[,;:\-–—]$/.test(t)) return true;
-  return CONNECTORS.has(t.split(/\s+/).pop().replace(/[^a-z']/g, ''));
+  const words = t.split(/\s+/).map((w) => w.replace(/[^a-z']/g, ''));
+  const last = words.at(-1);
+  // "it" ends "undo it" / "remove it", but "make it" / "turn it" are still waiting for what it becomes.
+  if (last === 'it') return ['make', 'turn', 'put', 'set'].includes(words.at(-2));
+  return CONNECTORS.has(last);
 }
 
 // How long typed text waits before it is sent as a command; null means wait for Enter.
@@ -282,6 +288,47 @@ export function makeLatencyTracker(maxSent = 50) {
 
 // Speech recognition results -> contract-1 messages, with no duplicate finals.
 // `results` is [{transcript, isFinal}] for the current recognition session.
+// Keeps spoken commands in the order the presses happened. Each press opens a slot; partials go out at
+// once (the live words line), but a press's finals wait until every earlier press has closed, so a quick
+// second press ("undo") that ends first can never reach the server before the command it undoes.
+// While the connection is down nothing is held back: a final goes straight to send(), which drops it
+// (never replayed), and dropAll() empties what was waiting when the connection closed.
+export function makeOrderedFinals(send, isOpen = () => true) {
+  const slots = [];
+  // Send what the first slot holds, even if it is still open (a mic-toggle session keeps producing
+  // sentences); drop it once closed and repeat, so a buffered sentence is never overtaken.
+  const drain = () => {
+    while (slots.length) {
+      const head = slots[0];
+      for (const m of head.finals.splice(0)) send(m);
+      if (!head.closed) return;
+      slots.shift();
+    }
+  };
+  return {
+    dropAll() {
+      for (const slot of slots) slot.finals.length = 0;
+    },
+    open() {
+      const slot = { finals: [], closed: false };
+      slots.push(slot);
+      return {
+        send(msg) {
+          if (msg.type !== 'final') return send(msg);
+          if (!isOpen()) return send(msg); // disconnected: dropped now, not replayed after a reconnect
+          if (slots[0] === slot) return send(msg); // nothing earlier is waiting
+          slot.finals.push(msg);
+          return true;
+        },
+        close() {
+          slot.closed = true;
+          drain();
+        },
+      };
+    },
+  };
+}
+
 // With { hold: true } (push-to-talk) Chrome's final segments are kept, not sent: Chrome splits speech
 // at pauses, and one press of the key is one command, so flush() sends the whole utterance once.
 // Partials then show the utterance so far.
