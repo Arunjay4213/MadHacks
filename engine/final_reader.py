@@ -54,7 +54,7 @@ from collections import deque
 from collections.abc import Callable
 from pathlib import Path
 
-from . import car_template
+from . import car_template, people
 from .foundry import FoundryMessages, settings_from_env
 from .slow_reader import validate as validate_operation
 
@@ -91,6 +91,7 @@ class Outcome(enum.Enum):
     FALLBACK = "fallback"  # timeout, error or invalid reply: the dictionary path; final in memory only
     PINNED = "pinned"      # from the demo prompts file: never called, never saved, never evicted
     TEMPLATE = "template"  # a measured car world composed by the engine: never called, never saved
+    PERSON = "person"      # the engine's add of a named person when the model gave nothing usable: never saved
 
 
 @dataclasses.dataclass(frozen=True)
@@ -104,7 +105,7 @@ class Entry:
     scene_before: dict | None = None
 
     def result(self) -> dict | None:
-        if self.outcome in (Outcome.SONNET, Outcome.PINNED, Outcome.TEMPLATE):
+        if self.outcome in (Outcome.SONNET, Outcome.PINNED, Outcome.TEMPLATE, Outcome.PERSON):
             return {"operations": [dict(op) for op in self.operations], "prompt": self.prompt}
         if self.outcome is Outcome.BLOCKED:
             return {"blocked": True}
@@ -158,7 +159,7 @@ PHRASE_POSITION_WORDS = POSITION_WORDS - {"shot", "closeup"} | {"near", "next", 
 # from commands/world.py (Ishaan's measured worlds, about 250) is longer than the nano slow reader's 120.
 FINAL_MAX_PHRASE = 400
 # A new object's phrase stays word for word in every later prompt, so it keeps the tighter limit it is asked for.
-OBJECT_MAX_PHRASE = 200
+OBJECT_MAX_PHRASE = 240  # a named person's description and place (engine/people.py) is about 215
 # A saved or pinned operation was checked with FINAL_MAX_PHRASE before with_lane_cue added ", " + LANE_CUE, so a
 # cache hit is checked with room for it (the 120-character default refused the pinned racing car).
 CACHED_MAX_PHRASE = FINAL_MAX_PHRASE + len(", " + LANE_CUE)
@@ -762,7 +763,7 @@ class FinalReader:
             if hit is not None:
                 with self._lock:
                     setattr(self, counter, getattr(self, counter) + 1)
-                return self._given(hit, snapshot)
+                return self._given(self._or_person(hit, text, snapshot), snapshot)
         measured = self._measured(text, snapshot)
         if measured is not None:
             with self._lock:
@@ -795,7 +796,7 @@ class FinalReader:
                      _short(text), self.timeout_s)
         if snapshot_of_cache is not None and self._file is not None:
             self._file.save(snapshot_of_cache)
-        return self._given(entry, snapshot)
+        return self._given(self._or_person(entry, text, snapshot), snapshot)
 
     def stats(self) -> dict:
         with self._lock:
@@ -820,7 +821,8 @@ class FinalReader:
 
     def _given(self, entry: Entry, snapshot: dict) -> dict | None:
         """entry.result(), remembering the prompt of a vehicle scene for the scene it leads to."""
-        if entry.prompt is not None and entry.outcome in (Outcome.SONNET, Outcome.PINNED, Outcome.TEMPLATE):
+        if entry.prompt is not None and entry.outcome in (Outcome.SONNET, Outcome.PINNED, Outcome.TEMPLATE,
+                                                          Outcome.PERSON):
             from commands.composer import compose
             try:
                 after = scene_after(snapshot, list(entry.operations))
@@ -830,6 +832,30 @@ class FinalReader:
             except (ValueError, TypeError, KeyError):
                 pass  # only a hint for the next call
         return entry.result()
+
+    def _or_person(self, entry: Entry, text: str, snapshot: dict) -> Entry:
+        """`entry`, or for a FALLBACK on a sentence that adds a named person (engine/people.py), the engine's own add
+        with the plain prompt (or the car template): the dictionary would label the chip with the description."""
+        if entry.outcome is not Outcome.FALLBACK:
+            return entry
+        add = people.person_add(text, snapshot)
+        if add is None:
+            return entry
+        from commands.composer import compose
+        try:
+            ops = expand_operations([add], snapshot)
+            after = scene_after(snapshot, ops)
+            subject = car_template.vehicle_subject(after["base"])
+            if subject is not None:
+                world = self._current_vehicle_world(snapshot, subject) or car_template.WORLDS[car_template.START_WORLD]
+                prompt = car_template.world_prompt(subject, world, car_template.scene_objects(after))
+            else:
+                prompt = self._plain(after, compose(after))
+        except (ValueError, TypeError, KeyError) as exc:
+            log.warning("final reader: the engine's add of %r does not apply (%r)", add["label"], exc)
+            return entry
+        log.info("final reader: %r -> the engine's add of %r (no usable reply)", _short(text), add["label"])
+        return Entry(Outcome.PERSON, tuple(ops), prompt)
 
     def _current_vehicle_world(self, snapshot: dict, subject: str) -> "car_template.World | None":
         """The road, scene and light of the prompt last given for this vehicle scene, else its measured world."""
@@ -925,7 +951,7 @@ class FinalReader:
         """One call. `previous` is the earlier attempt for this sentence: its reply and reasons are sent back."""
         from commands.composer import compose
         t0 = time.perf_counter()
-        user = {"scene": _scene_for_model(snapshot), "prompt": compose(snapshot), "sentence": text,
+        user = {"scene": _scene_for_model(snapshot), "prompt": compose(snapshot), "sentence": people.for_model(text),
                 "details_max_words": details_budget(self.spec, snapshot)}
         plan = car_template.plan(text, snapshot)
         if plan.route is not car_template.Route.PLAIN:
@@ -970,7 +996,7 @@ class FinalReader:
             return Attempt(Verdict.INVALID, Entry(Outcome.FALLBACK), ("the reply is not a JSON object",))
         if reply.get("blocked") is True:
             return Attempt(Verdict.BLOCKED, Entry(Outcome.BLOCKED))
-        ops = reply.get("operations")
+        ops = people.with_person(text, reply.get("operations"), snapshot)  # a named person: the engine's add
         if not isinstance(ops, list) or not 1 <= len(ops) <= MAX_OPERATIONS:
             return Attempt(Verdict.EMPTY, Entry(Outcome.FALLBACK), ("no operations",))
         try:

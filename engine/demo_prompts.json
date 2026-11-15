@@ -85,6 +85,37 @@
     "generated_at": "2026-11-15T01:24:09+00:00"
   },
   {
+    "sentence": "add jensen huang",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; bright day, clear sunny sky and warm daylight; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera",
+    "operations": [
+      {
+        "op": "add",
+        "label": "jensen huang",
+        "kind": "extra",
+        "phrase": "a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the right of the frame, facing the camera",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the right of the frame, facing the camera; bright day, clear sunny sky and warm daylight",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; bright day, clear sunny sky and warm daylight; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the right of the frame, facing the camera",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T01:33:57+00:00"
+  },
+  {
+    "sentence": "remove jensen huang",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; bright day, clear sunny sky and warm daylight; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the right of the frame, facing the camera",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c6"
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; bright day, clear sunny sky and warm daylight; crisp sunlight, deep blue sky, sparkling snow crystals, soft long shadows",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; bright day, clear sunny sky and warm daylight; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera",
+    "source": "the earlier scene's pinned prompt",
+    "generated_at": "2026-11-15T01:33:57+00:00"
+  },
+  {
     "sentence": "make it a desert",
     "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; bright day, clear sunny sky and warm daylight; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera",
     "operations": [
@@ -131,6 +162,37 @@
     "canonical": "a red sports car",
     "source": "engine car template",
     "generated_at": "2026-11-15T01:24:17+00:00"
+  },
+  {
+    "sentence": "add jensen huang",
+    "prompt_before": "a red sports car",
+    "operations": [
+      {
+        "op": "add",
+        "label": "jensen huang",
+        "kind": "extra",
+        "phrase": "a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T01:33:59+00:00"
+  },
+  {
+    "sentence": "remove jensen huang",
+    "prompt_before": "a red sports car; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c1"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car",
+    "source": "the earlier scene's pinned prompt",
+    "generated_at": "2026-11-15T01:33:59+00:00"
   },
   {
     "sentence": "make it winter",

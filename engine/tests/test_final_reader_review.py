@@ -79,7 +79,7 @@ def test_a_fresh_250_character_world_phrase_is_accepted_and_reused_after_an_undo
 def test_the_pinned_racing_car_of_the_demo_file_is_used():
     # The 7th meadow entry's phrase has 123 characters plus the lane cue.
     pinned = load_pinned(DEFAULT_DEMO_PROMPTS)
-    meadow = list(pinned)[:7]  # the meadow chain, in the file's order
+    meadow = [k for k in list(pinned)[:9] if "jensen" not in k[1]]  # the jensen add and remove undo themselves
     chat, reader, svc = service({}, pinned)
     for before, sentence in meadow:
         assert svc.handle(final(sentence))["steer"]["prompt"] == pinned[(before, sentence)].prompt, sentence

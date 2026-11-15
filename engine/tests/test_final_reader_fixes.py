@@ -146,7 +146,7 @@ def test_a_too_long_phrase_is_asked_again_with_its_length():
     chat = ReplayChat({"add a lion": [reply([huge], "soft grass"), reply([LION], "soft green grass, warm light")]})
     _, (res,) = play(chat, ["add a lion"])
     assert res["operations"] == [LION]
-    assert any("characters, the limit is 200" in r for r in chat.calls[1][1]["rejected"])
+    assert any("characters, the limit is 240" in r for r in chat.calls[1][1]["rejected"])
 
 
 def test_vehicle_wording_has_the_lane_markings_cue():
