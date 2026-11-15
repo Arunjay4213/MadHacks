@@ -381,7 +381,23 @@ The nano slow reader is not used in this mode; partials, taps and undo or reset 
   This is the engine's stand-in (`PromptSpec` "engine stand-in"); when `commands.rewriter` imports, its `SYSTEM_PROMPT` and `validate_rewrite` are used instead with no code change.
   The validator gets `{"details": ...}` only, checked against the composed prompt of the new scene, with the forward-driving words added to a vehicle subject.
   The system prompt wraps its text as the rules for the `details` field, so the model sees one reply shape.
-  Details it rejects keep the model's operations and use the composed prompt (`details_rejected`).
+  The prefix the details follow is the composed prompt reordered as subject, season and weather phrases, object phrases word for word, then the rest (world, time), so a positioned lion or "a red car parked beside the oak tree" stays in the same words and place in every later prompt.
+  On GPU, an object phrase before the winter phrase lost the winter (green grass), so the season and weather come first; a world change clears them in `commands/state.py`, so they do not come back.
+  The first object of a scene is the main one: its phrase may not say "small" and it takes the centre ("a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible"); a later one takes a free place (the lion in the left foreground).
+  The user message also has `details_max_words`, what the validator's 100-word total leaves, and the system prompt lists the words the validator and the engine refuse in details (objects, season, weather and time words the scene does not have, motion, camera, time order, negation, position words, and road words in a scene without a road).
+  Every rejected clause is logged at WARNING with its reason (the word limits, or the words `validate_rewrite` refuses, found by asking it about single words, since it returns no reason) and an excerpt.
+  The engine cuts those clauses, then clauses from the end until the details fit (`details_repaired`).
+  When nothing is left, the operations are kept with the composed prompt (`details_rejected`).
+- One retry: a reply that is invalid, has no usable details, or adds an object whose phrase breaks a rule (world words such as "in the snow", or no size or position words) is asked again once, with the reasons and the earlier reply, when the first call took under half the wait (`retries`).
+  On the live 3 s wait at about 1.8 s a call this does not happen; it does in offline runs such as the demo prompts regeneration.
+  The reply states are named in `Verdict` (accepted, repaired, phrase, plain, empty, blocked, invalid, failed).
+- An object phrase may have up to 200 characters (the nano slow reader keeps 120), so a positioned phrase is valid.
+  A vehicle added on a road gets "white dashed lane markings rush toward the viewer" at the end of its phrase; `FORWARD_MOTION` ends with the same cue.
+- A new place (an add of kind world) clears the earlier season and weather in `commands/state.py` (#115), so a desert after "make it winter" has no snow; the time of day stays.
+  The engine moves a sentence's world add before its season and weather adds, so "take me to a snowy desert" keeps the snow it asked for.
+- Anchors: "new scene of a red sports car driving along a country road" gives the base `a red sports car driving along a country road` and Ishaan's tested prompt, verbatim.
+  Every later prompt of that scene starts with its first two sentences word for word (subject, motion and camera), then the changes and the details, and ends with its style sentence (`ANCHORS` in `engine/final_reader.py`).
+- "motion blur on the road" (the stand-in's vehicle style) and road words in details are used only when the scene has a road: on GPU the oak meadow grew a road or tyre tracks from them.
   `commands.rewriter.build_messages` is not used: it is made for a separate details-only call whose command is "context only", and the engine needs one call that applies the command too (two calls in a row would not fit the 3 s wait).
 - Content block: a short word list (`BLOCKED_WORDS`) is checked first with no call, and the model sets `blocked: true` for sexual, violent or hateful requests.
   A blocked final gives no steer: the words show as unmatched, and one log line says why.
@@ -390,7 +406,7 @@ The nano slow reader is not used in this mode; partials, taps and undo or reset 
   A Sonnet result or a block is chosen once and saved to `--final-cache` (JSON, written atomically, tied to a fingerprint of the system prompt and the model), so a restart gives the same result and nothing is regenerated.
   A fallback is final for that key for the life of the process, and an answer that arrives after the wait is dropped (`late_dropped`); fallbacks are not saved, so a passing outage does not disable a sentence for good.
 - The model sees one prompt per scene state: the first rich prompt chosen for a composed prompt replaces it in every later steer (an undo back to it, a chip removal), in `likely_prompts` and in `committed_prompt`, so a state always gives the same embedding.
-- `/stats` `final_reader`: `state` (`off`, `on`, `unavailable`), `reason`, `prompt_spec`, `calls`, `cache_hits`, `blocked`, `timeouts`, `late_dropped`, `rejects`, `details_rejected`, `errors`, `pinned`, `pinned_hits`, `p50_ms`, `last_ms`, `cache_size`, `timeout_s`, `cache_file`.
+- `/stats` `final_reader`: `state` (`off`, `on`, `unavailable`), `reason`, `prompt_spec`, `calls`, `cache_hits`, `blocked`, `timeouts`, `late_dropped`, `rejects`, `details_rejected`, `details_repaired`, `retries`, `errors`, `pinned`, `pinned_hits`, `p50_ms`, `last_ms`, `cache_size`, `timeout_s`, `cache_file`.
 - It is `unavailable` (and the engine runs as with `off`, logged once) when `FOUNDRY_ENDPOINT` or `FOUNDRY_KEY` is missing or the reader is not `commands`.
 - `engine/reader.py` uses `CommandService.snapshot()` and `CommandService.apply_final(text, operations, None)` (PR #88); `engine/tests/test_final_reader.py` runs them against the real `CommandService`.
   The prompt argument stays None: the service steers to the composed prompt and the wrapper maps it to the first rich prompt of that state, so an undo back to it gives the same words.
