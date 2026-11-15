@@ -29,10 +29,23 @@ def test_add_him_and_make_it_winter_applies_both_and_sends_no_name():
     assert chat.sent[0]["person_chip"] == "jensen huang"
 
 
+def test_add_him_and_delete_the_dog_reaches_the_model():
+    # Greptile on #279: the comma is gone after normalize, so "delete the dog" was swallowed into his spot.
+    text = "add jensen huang next to the car, delete the dog"
+    no_dog = f"A wide shot of a meadow with a single oak tree, {JENSEN} standing next to the car."
+    chat, reader, svc = service({"add a dog": reply("x"), for_model(text): reply(no_dog, ["jensen huang"])})
+    svc.handle(final("add a dog"))
+    out = svc.handle(final(text))
+    assert chat.sent[-1]["sentence"] == for_model(text) and "jensen" not in chat.sent[-1]["sentence"]
+    assert reader.stats()["person_hits"] == 0 and out["steer"]["prompt"] == no_dog and "dog" not in labels(out)
+
+
 def test_the_shortcut_is_only_for_a_sentence_that_is_just_the_add():
     meadow = SceneState().snapshot()
     for text in (SENTENCE, "put jensen next to the car then make it night", "add jensen beside the tree, also add a dog",
-                 "add jensen huang next to the car and a dog"):
+                 "add jensen huang next to the car and a dog", "add jensen huang next to the car, delete the dog",
+                 "add jensen huang next to the car delete the dog", "add jensen huang next to the car, remove the lion",
+                 "add jensen huang next to the car paint the sky blue", "add jensen huang, then make it winter"):
         assert whole_sentence(text, meadow) is None, text
     assert whole_sentence("add jensen huang next to the car", meadow)["phrase"].endswith(
         "standing next to the car, facing the camera")
