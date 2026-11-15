@@ -159,12 +159,16 @@ export default function App({ adapter, source, remoteModifiers, initialPrompt }:
     {endpoint && <div className="editor-timing"><p className="editor-latency" title="Command sent → first frame tagged with its chunk drawn to the source canvas. Chunk proxy; semantic change and screen paint are not measured.">{engine.latency === null ? '—' : `${engine.latency} ms`} <span>TO FIRST CORRELATED FRAME</span></p>
       <p className="server-timing">{['decided', 'embedded', 'generated', 'shown'].filter(key => engine.stamps[key] !== undefined)
         .map(key => `${key} ${engine.stamps[key]} ms`).join(' · ') || 'Measured after your first command'}</p></div>}
-  </div><div className="voice-dock"><VoiceAgent visible={editorVisible} listening={world.listening}
-    simulateUntil={world.simulateUntil} impulse={world.impulse} reducedMotion={reducedMotion}
-    register={registerAudio} toggle={() => void world.startVoice()} disabled={disabled}
-    startPushToTalk={() => void world.startVoice('ptt')} stopPushToTalk={world.stopPushToTalk} /></div></>;
+  </div></>;
 
-  return <><ThresholdShell reducedMotion={reducedMotion} onEnter={enter} onVisibility={setEditorVisible} live={live} sourceLabel={sourceLabel} preview={preview} panel={panel}>
+  const command = <><CommandInput compact commit={localCommit} partial={localPartial} disabled={disabled} />
+    <div className="voice-dock"><VoiceAgent visible={editorVisible} listening={world.listening}
+      simulateUntil={world.simulateUntil} impulse={world.impulse} reducedMotion={reducedMotion}
+      register={registerAudio} toggle={() => void world.startVoice()} disabled={disabled}
+      startPushToTalk={() => void world.startVoice('ptt')} stopPushToTalk={world.stopPushToTalk} /></div></>;
+
+  return <><ThresholdShell reducedMotion={reducedMotion} onEnter={enter} onVisibility={setEditorVisible} live={live} sourceLabel={sourceLabel} preview={preview} panel={panel} command={command}
+    headerExtra={<div className="studio-prompt"><span>ORIGINAL PROMPT</span><p>{originalPrompt}</p></div>}>
     <div className="living-viewport" onMouseDown={event => {
       if (event.target instanceof HTMLElement && event.target.closest('button') && document.activeElement instanceof HTMLInputElement) event.preventDefault();
     }} data-mode={live ? 'live' : 'simulation'}

@@ -3,9 +3,11 @@
 This app shows the product name Mirage (decided by the lead on 2026-11-15); it was first called Lucid Studio.
 
 An independent React/TypeScript/Vite frontend for the team's stateful video engine.
-The hero scrolls normally into an editor: a contained current-generation canvas,
-the original prompt, scene memory, a quick command field, and a voice agent in a reserved
-bottom-right rail dock. Scrolling never zooms the video over the screen or locks the page.
+Demo layout (2026-11-15): the page opens straight on one screen with no scrolling.
+The top bar shows the Mirage logo and the original prompt.
+The video fills the middle.
+Below it are the command field and a particle voice orb (`src/components/ParticleOrb.tsx`) labelled "Click the orb to speak".
+The intro hero, the side panel (scene memory, timing) and the captions under the video are no longer shown.
 
 ## Run
 
@@ -42,7 +44,7 @@ agent, pressing V outside a text field, or holding backtick / Hold to talk. It s
 
 ## Controls
 
-- Click the bottom-right voice agent or press **V** outside a text field to toggle speech.
+- Hold the voice orb and talk (push-to-talk), or click it once to keep listening until clicked again; **V** outside a text field also toggles speech.
 - Hold **backtick (`)** or **Hold to talk** for push-to-talk. Chrome segments are
   combined into one final on release. Ctrl remains available to Wispr Flow.
 - Type in the prompt column; Enter sends immediately. Typing also sends after

@@ -235,3 +235,32 @@ button:disabled { cursor: default; opacity: 0.35; }
 .server-words { margin-top: 6px; min-height: 1.5em; }
 .words-status { min-height: 12px; margin: 6px 0 0; color: #9eb58c; font-size: 10px; }
 .words-status[data-unmatched="true"] { color: #efa6a0; }
+
+/* Demo layout: logo, video, one command bar; fits the window with no scrolling. */
+html:has(.studio-only), body:has(.studio-only) { overflow: hidden; height: 100%; }
+.studio-only { height: 100dvh; overflow: hidden; }
+.editor-section.studio-min { width: auto; min-height: 0; height: 100dvh; margin: 0; padding: 18px 40px 18px; box-sizing: border-box; border-top: 0; display: flex; flex-direction: column; gap: 14px; }
+.studio-bar { display: flex; align-items: center; height: 44px; flex: 0 0 auto; }
+.studio-min .world-portal { flex: 1 1 auto; height: auto; min-height: 0; max-height: none; width: 100%; }
+.studio-command { flex: 0 0 auto; display: flex; flex-direction: row; align-items: center; gap: 16px; width: 100%; max-width: 980px; margin: 0 auto; }
+.studio-command .editor-command { flex: 1 1 auto; margin: 0; }
+.studio-command .voice-dock { flex: 0 0 150px; height: 86px; margin: 0; border: 0; }
+
+/* Demo: bigger command text and a clear voice orb. */
+.studio-command { max-width: 1240px; gap: 36px; }
+.studio-command .editor-command label { font-size: 15px; letter-spacing: 2px; margin-bottom: 8px; }
+.studio-command .editor-command input { font-size: 30px; padding: 8px 0 12px; }
+.studio-command .editor-command button { font-size: 26px; }
+.studio-command .command-caption { font-size: 14px; letter-spacing: 1.5px; margin-top: 8px; }
+.studio-command .voice-dock { flex: 0 0 auto; width: auto; height: auto; margin: 0; border: 0; }
+.voice-orb-row { display: flex; flex-direction: row; align-items: center; gap: 18px; }
+.orb-button { width: 116px; height: 116px; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; flex: 0 0 auto; }
+.orb-button:disabled { cursor: default; opacity: 0.5; }
+.orb-button:focus-visible { outline: 2px solid #a9bda7; outline-offset: 4px; }
+.orb-text { display: flex; flex-direction: column; gap: 4px; }
+.orb-title { font-size: 22px; color: #eeeee9; white-space: nowrap; }
+.orb-sub { font-size: 16px; color: #92a192; white-space: nowrap; }
+.studio-bar { justify-content: space-between; gap: 32px; height: auto; }
+.studio-prompt { display: flex; flex-direction: row; align-items: baseline; gap: 14px; min-width: 0; }
+.studio-prompt span { font-size: 14px; letter-spacing: 2px; color: #92a192; white-space: nowrap; }
+.studio-prompt p { margin: 0; font: 22px var(--serif); color: #dfe8dc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

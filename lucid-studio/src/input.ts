@@ -77,7 +77,7 @@ export const isResetShortcut = (e: ShortcutEvent) => e.code === 'KeyR' && e.altK
 export function micErrorText(error: string) {
   if (error === 'no-speech' || error === 'aborted') return null;
   if (error === 'not-allowed' || error === 'service-not-allowed') return 'Microphone blocked: allow it for this site in Chrome. You can still type or use Wispr Flow.';
-  if (error === 'network') return 'Speech recognition needs the internet. Use the text box or Wispr Flow.';
+  if (error === 'network') return 'The browser speech service could not be reached. It needs Google Chrome (not Brave, Arc or Opera) and no VPN or ad blocker blocking Google. Use the text box or Wispr Flow meanwhile.';
   if (error === 'audio-capture') return 'No microphone found. Use the text box or Wispr Flow.';
   return `Microphone: ${error}`;
 }

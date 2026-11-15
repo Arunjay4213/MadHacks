@@ -522,15 +522,26 @@ S['rejected'] = f'''<section id="rejected" class="s">
 {pn()}'''
 
 # 21 ---- overnight ----------------------------------------------------------------------------------------------------
-ov = [('164', 'pull requests merged', ' acc'), ('556', 'commits on main', ''), ('969', 'automated tests passing', ''),
-      ('406', 'posts on our team board, where the four of us and our coding agents hand off work', ''), ('34', 'frame sheets of measured experiments in the repo', ''),
-      ('133', 'demo sentences checked on the GPU and pinned', '')]
-oc = ''.join(f'<div class="rule2 in d{i+2}" style="padding-top:20px; display:flex; flex-direction:column; gap:16px"><p class="num{a}" style="font-size:150px">{n}</p><p class="cap">{l}</p></div>' for i, (n, l, a) in enumerate(ov))
+GREP = ('84', 'also reviewed by the Greptile code-review bot')
+ov = [('185', 'pull requests merged', ' acc'), ('617', 'commits on main', ''), ('846', 'automated tests', ''), (GREP[0], GREP[1], '')]
+oc = ''.join(f'<div class="rule2 in d{i+2}" style="padding-top:20px; display:flex; flex-direction:column; gap:14px"><p class="num{a}" style="font-size:136px">{n}</p><p class="cap">{l}</p></div>' for i, (n, l, a) in enumerate(ov))
+def gpu(lab, head, cap, d):
+    return (f'<div class="in {d}" style="flex:1; background:var(--paper); padding:32px 40px 36px; display:flex; flex-direction:column; gap:12px">'
+            f'<p class="lab">{lab}</p><p class="h">{head}</p><p class="cap">{cap}</p></div>')
 S['overnight'] = f'''<section id="overnight" class="s alt">
-<p class="k in">By the numbers</p>
-<h2 class="t in d1" style="margin-top:28px">What four people built in one night</h2>
-<div style="display:grid; grid-template-columns:repeat(3, 1fr); column-gap:72px; row-gap:44px; margin-top:52px">{oc}</div>
-{foot('Counted from git and GitHub at 05:20 UTC on 15 Nov 2026. First commit: 16:34 UTC on 14 Nov. Last merge counted: 04:54 UTC.')}
+<p class="k in">Four people directing AI agents</p>
+<h2 class="t in d1" style="margin-top:28px">Built fast, checked at every step</h2>
+<div style="display:grid; grid-template-columns:repeat(4, 1fr); column-gap:64px; margin-top:52px">{oc}</div>
+<p class="k in d6" style="margin-top:auto">Two GPUs, side by side</p>
+<div style="display:flex; align-items:center; margin-top:24px">
+{gpu('Test bench · NVIDIA L40S', 'Agents measure it', 'Frame sheets, fixed seeds, a vision judge', 'd6')}
+<div class="in d7" style="width:380px; flex:none; display:flex; flex-direction:column; align-items:center; gap:6px; padding:0 24px">
+<p class="cap" style="font-size:24px; text-align:center; font-style:italic; white-space:nowrap">only measured changes go live</p>
+{ARROW(220)}
+</div>
+{gpu('Live engine · NVIDIA L40S', 'People test it', 'By hand, all night', 'd8')}
+</div>
+{foot('Counted 17:55 UTC, 15 Nov: gh pr list --state merged, git log origin/main, def test_ in */tests/*.py, Greptile reviews per PR')}
 {pn()}'''
 
 # 22 ---- hardware ------------------------------------------------------------------------------------------------------
