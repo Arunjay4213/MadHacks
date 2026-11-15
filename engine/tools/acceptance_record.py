@@ -47,6 +47,7 @@ class RecordingChat(ReplayChat):
         if len(messages) > 1:
             raise RetryRefused("no retry on the live timing")
         key = reply_key(json.loads(messages[-1]["content"]))
+        self.used.append(key)
         if key in self.replies:
             return self.replies[key]
         time.sleep(max(0.0, self._last + MIN_GAP_S - time.monotonic()))
@@ -91,6 +92,8 @@ def main(argv=None) -> int:
         run_case(case, Mode.SONNET, chat, timeout_s=RECORD_WAIT_S)
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     merged = {entry_key(e): e for e in existing}
+    if not args.case:  # every case ran: an entry no case asked for any more is dropped
+        merged = {k: e for k, e in merged.items() if k in set(chat.used)}
     merged.update({(p, s, ids): {"sentence": s, "prompt_before": p, "ids": ids, "reply": r, "model": real.model,
                                  "fingerprint": fp, "recorded_at": now}
                    for (p, s, ids), r in chat.new.items()})

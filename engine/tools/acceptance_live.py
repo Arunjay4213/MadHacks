@@ -373,7 +373,45 @@ def write_report(out: Path, played: list[Played], frames: list, calib: dict | No
         if s.get("note"):
             lines += [f"Note: {s['note']}", ""]
     (out / "report.md").write_text("\n".join(lines) + "\n")
+    make_sheet(out, steps, summary)
     return summary
+
+
+VERDICT_COLOURS = {"pass": (60, 170, 90), "fail": (220, 60, 60), "unjudged": (230, 160, 40),
+                   "no frame": (220, 60, 60)}
+
+
+def make_sheet(out: Path, steps: list[dict], summary: dict, cols: int = 4, width: int = 336) -> None:
+    """OUT/sheet.jpg: every judged step's frame, labelled with the case, the sentence, the verdict, the delay and
+    the questions answered wrong, so a failure can be seen without opening the report."""
+    from PIL import Image, ImageDraw
+    from engine.tools.demo_run import fit, font
+    shown = [s for s in steps if s.get("verdict")]
+    if not shown:
+        return
+    f, fb = font(13), font(16)
+    height = round(width * 384 / 672)
+    cell_h = height + 64
+    rows = (len(shown) + cols - 1) // cols
+    sheet = Image.new("RGB", (cols * (width + 8) + 8, rows * cell_h + 40), (18, 18, 22))
+    d = ImageDraw.Draw(sheet)
+    d.text((8, 10), fit(d, f"acceptance run {summary.get('started')}: {summary['overall'].upper()}, "
+                           f"{summary['passed']} of {summary['judged']} judged steps pass, delay median "
+                           f"{summary['delay_ms_median']} ms", fb, sheet.width - 16), fill=(235, 235, 235), font=fb)
+    for n, s in enumerate(shown):
+        x, y = 8 + (n % cols) * (width + 8), 40 + (n // cols) * cell_h
+        if s.get("frame"):
+            im = Image.open(out / s["frame"]).convert("RGB")
+            im.thumbnail((width, height))
+            sheet.paste(im, (x, y))
+        colour = VERDICT_COLOURS.get(s["verdict"], (200, 200, 200))
+        d.rectangle([x, y + height, x + width, y + height + 4], fill=colour)
+        delay = s.get("timing", {}).get("delay_ms")
+        d.text((x, y + height + 7), fit(d, f"{s['case']}: {s['label']}", f, width), fill=(235, 235, 235), font=f)
+        d.text((x, y + height + 24), fit(d, f"{s['verdict'].upper()}  delay {delay} ms", f, width), fill=colour, font=f)
+        wrong = "; ".join(f"{r['q'][:40]} -> {r['answer']}" for r in s.get("questions", []) if r["ok"] is False)
+        d.text((x, y + height + 41), fit(d, wrong or s.get("note") or "", f, width), fill=(200, 200, 200), font=f)
+    sheet.save(out / "sheet.jpg", quality=85)
 
 
 def judge_played(judge: Judge, played: list[Played], frames: list, out: Path) -> None:

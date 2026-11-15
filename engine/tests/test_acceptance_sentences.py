@@ -40,15 +40,20 @@ def test_the_table_covers_every_demo_prompt_line():
 
 
 def test_recorded_replies_are_from_the_current_rules():
-    """A reply recorded under an older system prompt says nothing about what the live engine does now."""
+    """A reply recorded under an older system prompt says nothing about what the live engine does now. Only the
+    replies the cases use are checked; a full `acceptance_record` run drops the others."""
     import json
     import logging
     from engine.final_reader import fingerprint, load
-    from engine.tools.acceptance import REPLIES_FILE, DownChat
+    from engine.tools.acceptance import REPLIES_FILE, DownChat, entry_key
     logging.getLogger("engine.final_reader").setLevel(logging.ERROR)
     system = load("sonnet", chat=DownChat(), cache_path=None, demo_prompts=None).system_prompt
+    used = set()
+    for case in load_cases():
+        if Mode.SONNET in case_modes(case):
+            used |= set(run_case(case, Mode.SONNET)[1].used)
     stale = sorted({e["sentence"] for e in json.loads(REPLIES_FILE.read_text())["replies"]
-                    if e.get("fingerprint") != fingerprint(system, e.get("model", ""))})
+                    if entry_key(e) in used and e.get("fingerprint") != fingerprint(system, e.get("model", ""))})
     assert not stale, ("replies recorded under another final reader system prompt; run "
                        f"`python -m engine.tools.acceptance_record --refresh-stale` with the Foundry key: {stale}")
 
@@ -92,3 +97,6 @@ def test_refreshing_one_case_keeps_the_other_replies(tmp_path, monkeypatch):
     assert R.main(["--refresh-stale", "--case", "a"]) == 0
     saved = {e["sentence"]: e["reply"] for e in json.loads(path.read_text())["replies"]}
     assert saved == {"s1": "new", "s2": "r2"}
+    # a full run (no --case) drops the entry no case asked for
+    assert R.main([]) == 0
+    assert [e["sentence"] for e in json.loads(path.read_text())["replies"]] == ["s1"]
