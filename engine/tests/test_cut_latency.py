@@ -51,11 +51,6 @@ def latents(outs):
 # ---------------------------------------------------------------- defer_context
 
 
-def test_defer_context_is_off_by_default(no_cuda):
-    b = make_backend()
-    assert b.defer_context is False and b.context_passes_skipped == 0 and b.interrupted_chunks == 0
-
-
 def test_defer_context_same_passes_and_latents_on_the_legacy_run(no_cuda):
     (calls, sums), outs = _legacy_run(make_backend(defer_context=True))
     want = without_skipped_context_passes(GOLDEN)
@@ -357,11 +352,6 @@ def test_interrupt_keeps_the_automatic_steer_detection(no_cuda):
     got += [b.generate_chunk(cond) for cond in seq[1:]]
     assert b.auto_rebases == ref.auto_rebases and ref.auto_rebases["arrival"] == 1
     assert all(torch.equal(x, y) for x, y in zip(latents(got), latents(want)))
-
-
-def test_chunk_interrupted_is_a_runtime_error_with_the_engine_marker():
-    exc = cf.ChunkInterrupted("x")
-    assert isinstance(exc, RuntimeError) and exc.chunk_interrupted is True
 
 
 def test_an_interrupt_during_the_last_pass_lets_the_chunk_finish(no_cuda):

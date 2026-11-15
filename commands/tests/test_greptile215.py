@@ -18,28 +18,25 @@ def prompt(*lines, base=None):
 
 class DayAfterSummerStaysSummerTest(unittest.TestCase):
     def test_snowy_mountains_then_summer_then_day_has_no_winter_sunshine(self):
-        p = prompt("move us to the snowy mountains", "make it summer", "make it day")
-        self.assertIn("bright summer scenery", p)
-        self.assertIn("bright daytime sunlight", p)
-        self.assertNotIn(WINTER_SUN, p)
-        self.assertNotIn("sparkling snow", p)
-
-    def test_on_the_car_scene_too(self):
-        p = prompt("move us to the snowy mountains", "make it summer", "make it day", base=CAR_ON_SNOW)
-        self.assertIn("Bright summer scenery", p)
-        self.assertNotIn(WINTER_SUN, p.lower())
+        for base in (None, CAR_ON_SNOW):
+            with self.subTest(base=base):
+                p = prompt("move us to the snowy mountains", "make it summer", "make it day", base=base)
+                self.assertIn("bright summer scenery", p.lower())
+                self.assertNotIn(WINTER_SUN, p.lower())
+                if base is None:
+                    self.assertIn("bright daytime sunlight", p)
+                    self.assertNotIn("sparkling snow", p)
 
 
 class SnowyRoadDayWithoutSeasonChangeTest(unittest.TestCase):
-    def test_snowy_mountains_then_day_is_winter_sunshine(self):
-        self.assertIn(WINTER_SUN, prompt("move us to the snowy mountains", "make it day"))
-
-    def test_car_scene_winter_then_day_is_winter_sunshine(self):
-        self.assertIn(WINTER_SUN, prompt("make it winter", "make it day", base=CAR_ON_SNOW).lower())
-
-    def test_undoing_summer_brings_the_snowy_day_back(self):
-        p = prompt("move us to the snowy mountains", "make it summer", "make it day", "remove the summer")
-        self.assertIn(WINTER_SUN, p)
+    def test_day_on_the_snowy_road_is_winter_sunshine(self):
+        for lines, base in [
+            (["move us to the snowy mountains", "make it day"], None),
+            (["make it winter", "make it day"], CAR_ON_SNOW),
+            (["move us to the snowy mountains", "make it summer", "make it day", "remove the summer"], None),
+        ]:
+            with self.subTest(lines=lines, base=base):
+                self.assertIn(WINTER_SUN, prompt(*lines, base=base).lower())
 
 
 if __name__ == "__main__":
