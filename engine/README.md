@@ -469,6 +469,7 @@ It is used only when the Sonnet final reader is off; the live engine runs `--fin
 
 - The model is an Azure AI Foundry deployment, by default `gpt-4.1-nano`, called as Azure OpenAI chat completions with JSON mode, temperature 0 and at most 120 tokens.
 - It gets the current scene (base and changes with their ids) and the sentence, and returns one operation for `commands/state.py`: add (any object goes in as kind `extra`), remove, set_strength, undo, reset, new_scene, or none.
+  A base edit ("turn the tree into a lighthouse") is `edit_base`, which becomes one batch of `new_scene` plus one `add` per existing change, so the other changes stay and one undo reverts it; `new_scene` alone clears every change.
 - The reply is checked before use: a bad JSON reply, an unknown kind, an id that is not in the scene or a strength out of range gives None, and the words show as unmatched.
 - `CommandService` waits up to 1.5 s for it; the HTTP call itself gives up after 2 s.
 - Measured from the engine machine on 2026-11-14: 390 to 550 ms per call with `gpt-4.1-nano` (`gpt-4.1-mini` took 1.0 to 1.3 s).

@@ -46,6 +46,7 @@ Operations, as JSON:
 {{"op": "set_strength", "id": "<id of an existing change>", "strength": <0 to 1.3>}}
 {{"op": "undo"}}
 {{"op": "reset"}}
+{{"op": "edit_base", "base": "<the base sentence rewritten, changing only what the user asked>"}}
 {{"op": "new_scene", "base": "<one sentence describing the whole new scene>"}}
 {{"op": "none"}}
 
@@ -53,7 +54,9 @@ Rules:
 - Write phrases as concrete visual descriptions for an image model, under 12 words, for example
   "a lion standing in the grass" or "bright daytime under a clear blue sky".
 - To change something that is part of the base sentence (for example "turn the tree into a lighthouse"),
-  use new_scene with the base sentence rewritten, changing only that thing.
+  use edit_base with the base sentence rewritten, changing only that thing. It keeps every change.
+- Use new_scene only when the user asks for a new scene in so many words ("new scene of a beach"); it clears
+  every change.
 - To remove or weaken something, use the id of the matching change from the current scene.
   If nothing matches, reply {{"op": "none"}}.
 - "a little" means strength 0.3, "a lot" or "very" means 1.3.
@@ -100,7 +103,32 @@ def validate(reply, snapshot: dict, max_phrase: int = MAX_PHRASE) -> dict | None
     if op == "new_scene":
         base = _text(reply.get("base"), MAX_BASE)
         return {"op": "new_scene", "base": base} if base else None
+    if op == "edit_base":
+        base = _text(reply.get("base"), MAX_BASE)
+        return edit_base(base, snapshot) if base else None
     return None  # "none" or anything unknown
+
+
+BATCH_LIMIT = 16  # commands.state: a batch holds 1 to 16 operations
+
+
+def edit_base(base: str, snapshot: dict) -> dict | None:
+    """A base edit that keeps the changes, as one batch: new_scene `base`, then one add per existing change.
+
+    commands/state.py has no operation that rewrites only the base, and new_scene alone clears every change
+    ("turn the tree into a lighthouse" after winter and a lion lost both). Applied as one batch, one undo reverts
+    it. World changes are added first: a world add clears the season and weather, so added later it would drop
+    the ones being copied. None if the batch would be longer than commands.state allows.
+    """
+    changes = snapshot.get("changes", [])
+    if len(changes) + 1 > BATCH_LIMIT:
+        return None
+    ordered = [c for c in changes if c["kind"] == "world"] + [c for c in changes if c["kind"] != "world"]
+    adds = [{"op": "add", "label": c["label"], "kind": c["kind"], "phrase": c["phrase"], "strength": c["strength"]}
+            for c in ordered]
+    if not adds:
+        return {"op": "new_scene", "base": base}
+    return {"op": "batch", "operations": [{"op": "new_scene", "base": base}, *adds]}
 
 
 def _scene_for_model(snapshot: dict) -> dict:
