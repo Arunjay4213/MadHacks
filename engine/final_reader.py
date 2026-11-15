@@ -978,9 +978,10 @@ def fingerprint(system_prompt: str, model: str, build: str = PROMPT_BUILD) -> st
 
 
 def call_options(environ=os.environ) -> dict:
-    """The Sonnet call's effort, thinking and max_tokens from FINAL_READER_EFFORT (low, medium, high; default medium),
-    FINAL_READER_THINKING (the thinking type; default adaptive; between_tools is thinking off) and
-    FINAL_READER_MAX_TOKENS (default 4096), so they can be measured against each other without a code change."""
+    """The Sonnet call's effort, thinking and max_tokens from FINAL_READER_EFFORT (low, medium, high; default
+    DEFAULT_EFFORT, low), FINAL_READER_THINKING (the thinking type; default DEFAULT_THINKING, between_tools, which is
+    thinking off; adaptive turns it on) and FINAL_READER_MAX_TOKENS (default DEFAULT_MAX_TOKENS, 1024), so they can be
+    measured against each other without a code change."""
     out = {"effort": environ.get("FINAL_READER_EFFORT") or DEFAULT_EFFORT,
            "thinking": environ.get("FINAL_READER_THINKING") or DEFAULT_THINKING}
     if out["effort"] not in ("low", "medium", "high"):
