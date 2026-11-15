@@ -25,7 +25,7 @@ Start: press reset (the meadow with one oak tree).
 | 5 | zoom out | The camera pulls back: Jensen, the car and the tree smaller in a wide snowy field. | MEADOW5 | now zoom out, zoom out please, zoom out a bit, pull back, pull the camera back, show me a wider shot, wide shot |
 | 6 | now take me to tokyo at night with neon signs | A neon street in Tokyo at night; Jensen (large, in front) and the red car come along. | MEADOW6 | take me to tokyo at night with neon signs, now take me to tokyo at night, take me to tokyo at night, take me to tokyo, now take me to tokyo, tokyo at night with neon signs, now take me to tokyo at night with neon lights |
 | 7 | make it snow | Snow on the Tokyo street under the neon. | MEADOW7 | let it snow, make it snowy, add snow, now make it snow, make it winter |
-| 8 | undo | Back to Tokyo without the snow. | MEADOW8 | the undo button |
+| 8 | undo (optional) | Back to Tokyo without the snow. In 2 of 5 GPU runs Jensen did not come back at once, so use undo in the car chain for the wow. | MEADOW8 | the undo button |
 
 ## Chain 2: the car
 
