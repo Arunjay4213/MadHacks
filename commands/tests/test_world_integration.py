@@ -31,12 +31,12 @@ class WorldIntegrationTests(unittest.TestCase):
         send(service, 'remove the forest')
         self.assertIn('meadow', service.committed_prompt)
 
-    def test_world_change_does_not_drop_existing_modifiers(self):
+    def test_world_change_keeps_objects_and_replaces_season(self):
         service = CommandService()
         send(service, 'make it winter')
         send(service, 'add a river')
         send(service, 'make it a desert')
-        self.assertIn('winter', service.committed_prompt)
+        self.assertNotIn('winter', service.committed_prompt)  # the new world brings its own season (issue #112)
         self.assertIn('river', service.committed_prompt)
         self.assertNotIn('summer', service.committed_prompt)
         send(service, 'make it night')

@@ -5,6 +5,7 @@ from copy import deepcopy
 
 DEFAULT_BASE = "a wide shot of a meadow with a single oak tree"
 KINDS = ("world", "season", "weather", "time", "extra")
+WORLD_CLEARS = {"world", "season", "weather"}
 
 
 def _text(value, field):
@@ -66,13 +67,17 @@ class SceneState:
                 raise ValueError("unknown change kind")
             strength = _strength(operation.get("strength", 1.0))
             existing = next((c for c in changes if c["label"].casefold() == label.casefold()), None)
-            if existing and existing["kind"] == kind and existing["phrase"].casefold() == phrase.casefold() and existing["strength"] == strength:
+            clears_more = kind == "world" and any(c["kind"] in WORLD_CLEARS - {"world"} for c in changes)
+            if (existing and existing["kind"] == kind and existing["phrase"].casefold() == phrase.casefold()
+                    and existing["strength"] == strength and not clears_more):  # a repeated world still clears a season
                 return False
             item = dict(id=existing["id"] if existing else f"c{self._next_id}",
                         label=label, kind=kind, phrase=phrase, strength=strength)
             new_id = existing is None
             if kind != "extra":
-                changes[:] = [c for c in changes if c["kind"] != kind or c is existing]
+                # A new world brings its own season and weather, so it also clears those; time and objects stay.
+                cleared = WORLD_CLEARS if kind == "world" else {kind}
+                changes[:] = [c for c in changes if c["kind"] not in cleared or c is existing]
             if existing:
                 changes[changes.index(existing)] = item
             else:
