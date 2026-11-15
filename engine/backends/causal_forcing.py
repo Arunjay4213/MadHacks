@@ -262,6 +262,7 @@ class _Decoder:
         if cut:
             self._restart_stream()
             self.restarts += 1
+            self._fade_from, self._fade_done = None, 0  # a cut without `fade` also ends a running dissolve
             if chunk.fade and self.cut_fade_frames > 0 and self._last_frame is not None:
                 self._fade_from, self._fade_done = self._last_frame, 0
 

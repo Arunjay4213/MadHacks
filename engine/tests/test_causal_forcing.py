@@ -593,3 +593,14 @@ def test_backend_sets_the_fade_flag_on_re_anchor_chunks(no_cuda):
 def test_cut_fade_options_are_checked():
     with pytest.raises(ValueError):
         make_backend(cut_fade_frames=-1)
+
+
+def test_cut_without_fade_ends_a_running_dissolve(no_cuda, monkeypatch):
+    d = make_decoder(monkeypatch, fade=8)
+    F = cf.ChunkStart.FIRST_FRAME
+    for i in range(5):
+        d.decode(chunk(i, 0.1 * (i + 1), F if i == 0 else cf.ChunkStart.CONTINUE))
+    d.decode(chunk(5, 0.8, F, fade=True))  # a steer: the dissolve starts
+    out = d.decode(chunk(6, 0.2, F, fade=False))  # a refresh with cut_fade_refresh=0, mid-dissolve
+    assert values(out) == [px(0.2)] * 4
+    assert values(d.decode(chunk(7, 0.3))) == [px(0.3)] * 4
