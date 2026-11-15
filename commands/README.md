@@ -35,8 +35,8 @@ The default base is "a wide shot of a meadow with a single oak tree".
 | `keywords.json`, `dictionary.py` | embedded canonical vocabulary, aliases, validated loader and compiled whole-word matching |
 | `world.py` | place commands ("make it a desert") and the table of tested world sentences |
 | `semantic.py` | optional final-only CPU vector retrieval |
-| `rewriter.py` | the rules and the validator for the engine's Sonnet prompt enrichment (no network) |
-| `service.py` | `CommandService`: ties them together, early-steering guesses and rollback, optional slow reader, `snapshot()` and `apply_final()` for the engine |
+| `rewriter.py` | the old rules and validator for Sonnet's details (no caller in the engine since #271; `MAX_TOTAL_WORDS`) |
+| `service.py` | `CommandService`: ties them together, early-steering guesses and rollback, optional slow reader, `snapshot()` and `apply_final()` for the engine, and `dictionary_reading()`, the engine's fast-path rule |
 
 ## Scene state
 
@@ -46,6 +46,21 @@ The kinds are `world`, `season`, `weather`, `time` and `extra` (objects, animals
 `world`, `season`, `weather` and `time` hold one change each: a new one replaces the old one of the same kind, so "make it night" replaces "day" and "sunny" replaces "night".
 Ramps: a normal or confirmed command uses `ramp_chunks` 1, "slowly" uses 12, and a provisional guess uses 4 with a cap of 0.4 (`RAMP` in `reader.py`, `PROVISIONAL_CAP` in `service.py`).
 The ramp is 1 because the engine's re-anchor fires once the target is reached in full, so a longer ramp only adds delay.
+
+A scene is in one of two named states, `state.Origin` (the snapshot's `origin` field, issue #271):
+
+- `composed`: the base plus the changes, written into one prompt by `composer.compose`.
+- `free`: a full prompt written by the engine's Sonnet final reader (the snapshot's `prompt`), with the chips Sonnet named as changes of kind `free` (`{"id", "label", "kind": "free", "phrase": "", "strength": 1.0}`).
+  The base is kept as it was and is unused while free, so every snapshot has the same shape.
+
+`{"op": "free_scene", "prompt": str, "chips": [str, ...]}` makes the scene free in one undo step, from either state: the prompt is nonempty text of at most 1600 characters (`MAX_FREE_PROMPT_CHARS`), and the chips are 0 to 16 labels of at most 24 characters, lower case, without duplicates.
+A chip that keeps its label keeps its id, so the page does not redraw it.
+On a free scene only undo, reset, `new_scene` (which makes the scene composed again) and another `free_scene` apply; `add`, `remove` and `set_strength` raise `ValueError`, so the dictionary never edits a prompt it did not write.
+`compose` of a free scene is its prompt, so the engine's pinned and cache keys (`compose(snapshot)`, sentence) are one rule for both states.
+On a free scene a partial guesses nothing and `likely_prompts` is only the committed prompt; a final the dictionary reads shows as not understood (the engine asks Sonnet first).
+
+`service.dictionary_reading(text, snapshot)` is the rule the engine uses for its fast path: the operations when the keyword table reads every word of every clause by itself (`fully_read`: a tested place sentence, an explicit "new scene of", a remove or strength change of an existing chip, undo or reset with only filler words, or an add of a keyword-table entry with only filler, pace and strength words besides), every operation applies and composes on a trial copy, and the scene is composed; otherwise None.
+"make it winter" and "add a dog and a cat" are read whole; "add a red car" (the colour), "kill the tree's leaves", "now i want a savannah" and an unknown object ("add a glowing unicorn") are not.
 
 ## Dictionary and open vocabulary
 
@@ -75,7 +90,7 @@ Ocean coast was "a coastal cliff road. A bright turquoise ocean with white waves
 Each known world has two forms (`world.Form`): the road form above, and a landscape form (`world._LANDSCAPE`) with the same scene and light words and no road ("a vast open desert ...", "a wide sandy beach ...").
 The composer writes the road form only when the scene has a vehicle, as its base ("a red sports car") or as an object ("a red car parked beside the oak tree"), because a vehicle needs a road to stand or drive on; any other scene gets the landscape, so "make it a desert" and "take me to the beach" on the meadow add no highway (issue #259).
 The state always keeps the road form's phrase, so the change and its undo are the same in both forms.
-The landscape forms use no word of `engine/final_reader.py`'s `ROAD_WORDS` (the city says "puddles on the ground", not "pavement"), so the engine keeps road words out of Sonnet's details there.
+The landscape forms name no road (the city says "puddles on the ground", not "pavement").
 A world's strength is worded like any change's ("an intense snowy mountain road" at 1.3), so "a little more snow" on the car in winter is a different composed prompt from winter at 1.0 and the engine does not reuse the old rich prompt for it.
 When an object is on a road ("a red car racing along a road") and neither the base nor the world has one, the composer adds `ROAD_CLAUSE` ("a straight grey asphalt road with white lane markings runs across the scene") right after the base: with the road only inside the car's phrase, the meadow showed no road.
 A later season, weather or time change removes the matching built-in part of the world sentence (for example the desert's afternoon sun after "make it night").
@@ -162,17 +177,12 @@ Sources: [model card](https://huggingface.co/sentence-transformers/all-MiniLM-L6
 `rewriter.py` holds the rules for prompt enrichment, with no network call and no cache.
 `SYSTEM_PROMPT` tells a language model to write only a `details` sentence of world, light, texture and atmosphere for the scene; `validate_rewrite(prompt, reply)` keeps the composed prompt word for word as the prefix and checks the details (at most 60 added words and 180 in total; no camera, motion, events, history words, negation, or objects and weather the scene does not have).
 
-The engine's Sonnet final reader (`engine/final_reader.py`, live since engine PR #125) uses `SYSTEM_PROMPT` and `validate_rewrite` in one call that returns the operations and the details together within its 3 s wait.
-For every final sentence the engine:
-
-1. takes the full scene with `CommandService.snapshot()`,
-2. asks Sonnet for the operations and the details in one call,
-3. applies the operations with `CommandService.apply_final(text, operations)`, which validates them and applies them as one edit with the same `steer` and `state` shape as `handle()`,
-4. checks the details with `validate_rewrite` and uses the rich prompt for that scene state from then on.
-
-Partials, taps, undo and reset still go through `handle()`, and so does any final where Sonnet times out or fails.
+Since issue #271 the engine's Sonnet final reader no longer uses `rewriter.py`: it no longer merges Sonnet operations and details into the composed scene.
+For a final the dictionary does not read whole (`dictionary_reading`), Sonnet writes the complete new prompt and the chips, and the engine applies them with `CommandService.apply_final(text, [{"op": "free_scene", ...}])`, which validates and applies them as one edit with the same `steer` and `state` shape as `handle()`.
+Pinned, measured and named-person answers still come as composed operations through `apply_final`.
+Partials, taps (except the x on a free chip, which the engine reads as "remove the <label>"), undo and reset still go through `handle()`, and so does any final where Sonnet times out or fails.
 Empty operations reject a final without changing state and roll back any provisional guess.
-Open items from engine PR #120 (board post at 00:10 UTC): `validate_rewrite` returns None with no reason and refused details over single words such as "still", "haze" and "mist", and `MAX_TOTAL_WORDS` counts the composed prefix, so a long scene leaves few words for details; the engine works around both by cutting the refused clauses.
+`rewriter.MAX_TOTAL_WORDS` (180) is still the most words of a prompt; `SYSTEM_PROMPT` and `validate_rewrite` have no caller in the engine any more.
 See `engine/README.md`, "Final reader (Sonnet)", for the engine side.
 
 ## Motion and continuity
