@@ -31,7 +31,9 @@ class Person:
 
 
 PEOPLE = (
-    Person("jensen huang", ("jensen huang", "the nvidia ceo", "nvidia ceo", "jensen"),
+    # Speech-to-text spellings of his name ("jensen wong", "jenson huang") are aliases too, so a spoken add still finds him.
+    Person("jensen huang", ("jensen huang", "jensen wong", "jensen hwang", "jenson huang", "jensen hwong", "the nvidia ceo",
+                            "nvidia ceo", "jensen"),
            "a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black "
            "leather jacket over a black t-shirt"),
 )
