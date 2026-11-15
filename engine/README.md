@@ -460,8 +460,9 @@ So a new sentence costs about 1.8 s extra, and a pinned or cached sentence costs
   A vehicle added on a road gets "white dashed lane markings rush toward the viewer" at the end of its phrase; `FORWARD_MOTION` ends with the same cue.
 - A new place (an add of kind world) clears the earlier season and weather in `commands/state.py` (#115), so a desert after "make it winter" has no snow; the time of day stays.
   The engine moves a sentence's world add before its season and weather adds, so "take me to a snowy desert" keeps the snow it asked for.
-- Anchors: "new scene of a red sports car driving along a country road" gives the base `a red sports car driving along a country road` and Ishaan's tested prompt, verbatim.
-  Every later prompt of that scene starts with its first two sentences word for word (subject, motion and camera), then the changes and the details, and ends with its style sentence (`ANCHORS` in `engine/final_reader.py`).
+- Vehicle scenes (`engine/car_template.py`): a scene whose base is a vehicle on a road gets Ishaan's measured car template, and the base is kept as the bare vehicle ("a red sports car") with its world as one change of kind world.
+  A sentence that names one measured world (country, winter, desert, neon city, ocean coast, sunset, autumn, rain; "make it night" is the neon city) is composed by the engine with no call (`template_hits`): it swaps road, scene and light together, and the subject and camera sentences stay word for word.
+  Any other sentence on a vehicle scene asks Sonnet for `road`, `scene` and `light`; the engine checks them (one sentence each, no camera words) and builds the template itself.
 - "motion blur on the road" (the stand-in's vehicle style) and road words in details are used only when the scene has a road: on GPU the oak meadow grew a road or tyre tracks from them.
   `commands.rewriter.build_messages` is not used: it is made for a separate details-only call whose command is "context only", and the engine needs one call that applies the command too (two calls in a row would not fit the 3 s wait).
 - Content block: a short word list (`BLOCKED_WORDS`) is checked first with no call, and the model sets `blocked: true` for sexual, violent or hateful requests.

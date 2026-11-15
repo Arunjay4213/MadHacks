@@ -167,8 +167,8 @@ def test_one_reply_shape_and_forward_motion_with_commands_rewriter():
                                                "phrase": "snow on the ground", "strength": 1.0}], details)})
     r = FinalReader(FinalReaderState.ON, chat=chat, spec=spec)
     from commands.state import SceneState
-    out = r("make it winter", SceneState("a red car on a mountain road").snapshot())
-    assert out["prompt"].startswith("a red car on a mountain road, " + FORWARD_MOTION + "; ")
+    out = r("make it winter", SceneState("a wide shot of a red car on a mountain road").snapshot())
+    assert out["prompt"].startswith("a wide shot of a red car on a mountain road, " + FORWARD_MOTION + "; ")
     assert out["prompt"].endswith(details)
     system = chat.calls[0][0]
     assert rewriter.SYSTEM_PROMPT in system

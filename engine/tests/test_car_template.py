@@ -1,0 +1,208 @@
+"""The car template (engine/car_template.py) through the final reader and the real CommandService, on CPU.
+
+Sentences are the demo's spoken sentences. A fake chat stands in for Sonnet where the template needs the model.
+"""
+
+import json
+
+from commands.service import CommandService
+from commands.state import SceneState
+from engine import car_template as ct
+from engine.final_reader import DEFAULT_DEMO_PROMPTS, FinalReader, FinalReaderState, load_pinned, prompt_spec
+from engine.reader import FinalReadingService
+
+NEW_SCENE = "new scene of a red sports car driving along a country road"
+HEAD = "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along "
+CAMERA = ("The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the "
+          "car centred in the frame while the white dashed centre line rushes toward the viewer.")
+STYLE = "Cinematic, highly detailed, realistic, sharp focus, motion blur on the road."
+CHAIN = [  # sentence -> world
+    (NEW_SCENE, "country"), ("make it winter", "winter"), ("make it a desert", "desert"),
+    ("make it night", "neon city"), ("make it autumn", "autumn"), ("make it sunset", "sunset"),
+    ("make it rain", "rain"), ("take me to the beach", "ocean coast"),
+]
+
+
+class NoChat:
+    model = "fake-sonnet"
+
+    def __init__(self):
+        self.calls = []
+
+    def complete(self, system, messages):
+        self.calls.append(json.loads(messages[-1]["content"]))
+        raise AssertionError("a measured car world must not call the model")
+
+
+class ReplayChat:
+    model = "fake-sonnet"
+
+    def __init__(self, replies):
+        self.replies = {k: list(v) for k, v in replies.items()}
+        self.calls = []
+
+    def complete(self, system, messages):
+        user = json.loads(messages[-1]["content"])
+        self.calls.append((system, user))
+        queue = self.replies[user["sentence"]]
+        return json.dumps(queue.pop(0) if len(queue) > 1 else queue[0])
+
+
+def final(text):
+    return {"type": "final", "text": text, "t_client": 1}
+
+
+def service(chat):
+    reader = FinalReader(FinalReaderState.ON, chat=chat, spec=prompt_spec())
+    return reader, FinalReadingService(CommandService(semantic_reader=lambda *a: None), reader)
+
+
+def test_the_new_car_scene_is_the_template_word_for_word():
+    chat = NoChat()
+    reader, svc = service(chat)
+    out = svc.handle(final(NEW_SCENE))
+    assert out["steer"]["prompt"] == (
+        "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a "
+        "straight two-lane country road, moving forward away from the camera. The camera follows directly behind "
+        "the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the "
+        "white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the "
+        "road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, "
+        "realistic, sharp focus, motion blur on the road.")
+    assert svc._svc.snapshot()["base"] == "a red sports car"
+    assert [c["label"] for c in out["state"]["changes"]] == ["country"]
+    assert chat.calls == [] and reader.stats()["template_hits"] == 1
+
+
+def test_each_world_swaps_road_scene_and_light_and_keeps_subject_and_camera():
+    reader, svc = service(NoChat())
+    for sentence, name in CHAIN:
+        out = svc.handle(final(sentence))
+        world = ct.WORLDS[name]
+        assert not out["state"]["unmatched"], sentence
+        assert out["steer"]["prompt"] == (f"{HEAD}{world.road}, moving forward away from the camera. {CAMERA} "
+                                          f"{world.scene} {world.light} {STYLE}"), sentence
+        assert [c["label"] for c in out["state"]["changes"]] == [name], sentence
+    assert reader.stats()["calls"] == 0 and reader.stats()["template_hits"] == len(CHAIN)
+    # an undo goes back to the earlier scene and its same words
+    out = svc.handle({"type": "tap", "action": "undo"})
+    assert out["steer"]["prompt"] == ct.world_prompt("a red sports car", ct.WORLDS["rain"])
+
+
+def test_night_on_a_car_scene_is_the_neon_city_not_a_night_highway():
+    _, svc = service(NoChat())
+    svc.handle(final(NEW_SCENE))
+    prompt = svc.handle(final("make it night"))["steer"]["prompt"]
+    assert "along a wide city street at night," in prompt and "neon signs" in prompt
+
+
+def test_the_worlds_are_ishaans_text_character_for_character():
+    w = ct.WORLDS
+    assert (w["winter"].road, w["winter"].light) == ("a snowy mountain road",
+                                                     "Cold blue overcast winter light, soft diffuse shadows.")
+    assert w["desert"].scene == ("Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry "
+                                 "scrub along the roadside, heat haze shimmering above the asphalt.")
+    assert w["rain"].scene == ("Rain pours down, puddles and spray on the dark asphalt, water kicked up behind the "
+                               "tyres, green fields and trees blurred by the rain.")
+    assert set(w) == {"country", "winter", "desert", "neon city", "ocean coast", "sunset", "autumn", "rain"}
+    for world in w.values():
+        assert ct.check_prompt(ct.world_prompt("a red sports car", world), "a red sports car"), world.name
+
+
+def test_desert_in_the_car_chain_even_when_the_base_names_its_road():
+    # commands.world.compose_base raises ValueError for this base plus any world change, so commands' own reading
+    # of "make it a desert" is unmatched. The engine keeps the base as the bare subject instead.
+    plain = CommandService(semantic_reader=lambda *a: None)
+    plain.handle(final(NEW_SCENE))  # the dictionary path: the whole sentence as the base
+    assert plain.snapshot()["base"] == "a red sports car driving along a country road"
+    assert plain.handle(final("make it a desert"))["state"]["unmatched"]
+    reader = FinalReader(FinalReaderState.ON, chat=NoChat(), spec=prompt_spec())
+    res = reader("make it a desert", plain.snapshot())
+    assert res["operations"][0] == {"op": "new_scene", "base": "a red sports car"}
+    assert res["prompt"] == ct.world_prompt("a red sports car", ct.WORLDS["desert"])
+    out = plain.apply_final("make it a desert", res["operations"], None)
+    assert not out["state"]["unmatched"] and [c["label"] for c in out["state"]["changes"]] == ["desert"]
+
+
+def test_no_measured_world_asks_the_model_and_the_engine_enforces_the_template():
+    fog = {"op": "add", "label": "fog", "kind": "weather", "phrase": "thick fog", "strength": 1.0}
+    good = {"blocked": False, "operations": [fog], "details": "", "road": "a misty country road",
+            "scene": "Green fields and rows of trees fade into thick grey fog on both sides of the road.",
+            "light": "Soft grey morning light, no shadows."}
+    reframed = {**good, "scene": "Fields in thick fog. The camera pans to the left of the frame.",
+                "light": "Soft grey light"}
+    chat = ReplayChat({"make it foggy": [reframed, good]})
+    reader, svc = service(chat)
+    svc.handle(final(NEW_SCENE))
+    out = svc.handle(final("make it foggy"))
+    prompt = out["steer"]["prompt"]
+    assert prompt == (f"{HEAD}a misty country road, moving forward away from the camera. {CAMERA} {good['scene']} "
+                      f"{good['light']} {STYLE}")
+    assert ct.check_prompt(prompt, "a red sports car")
+    (system, first), (_, retry) = chat.calls
+    assert first["car_template"] == {"subject": "a red sports car", "road": "a straight two-lane country road",
+                                     "scene": ct.WORLDS["country"].scene, "light": ct.WORLDS["country"].light}
+    assert any("camera or framing words" in r for r in retry["rejected"])
+    assert any('"scene" must be one sentence' in r for r in retry["rejected"])
+    assert any('"light" must be one sentence' in r for r in retry["rejected"])
+    assert "Vehicle scenes." in system and ct.WORLDS["winter"].scene in system
+    assert [c["label"] for c in out["state"]["changes"]] == ["country", "fog"]
+
+
+def test_a_reply_without_the_fields_is_not_used():
+    chat = ReplayChat({"make it foggy": [{"blocked": False, "operations": [
+        {"op": "add", "label": "fog", "kind": "weather", "phrase": "thick fog", "strength": 1.0}],
+        "details": "thick grey fog over the fields"}]})
+    reader = FinalReader(FinalReaderState.ON, chat=chat, spec=prompt_spec())
+    snap = SceneState("a red sports car").snapshot()
+    assert reader("make it foggy", snap) is None  # the dictionary path, never a prompt without the template
+    assert reader.stats()["rejects"] == 1
+
+
+def test_a_model_new_vehicle_scene_keeps_only_the_vehicle_in_the_base():
+    reply = {"blocked": False, "operations": [
+        {"op": "new_scene", "base": "a blue pickup truck driving across Mars"},
+        {"op": "add", "label": "mars", "kind": "world", "phrase": "mars", "strength": 1.0}], "details": "",
+        "road": "a dusty road across the red rocky surface of Mars",
+        "scene": "Craters and red mountains stretch away on both sides under a pale pink sky.",
+        "light": "Hazy daylight, soft dusty shadows."}
+    chat = ReplayChat({"new scene of a blue pickup truck driving across mars": [reply]})
+    reader, svc = service(chat)
+    out = svc.handle(final("new scene of a blue pickup truck driving across mars"))
+    assert svc._svc.snapshot()["base"] == "a blue pickup truck"
+    assert out["steer"]["prompt"].startswith("A blue pickup truck, seen from directly behind with its rear lights")
+    assert ct.check_prompt(out["steer"]["prompt"], "a blue pickup truck")
+    assert chat.calls[0][1]["car_template"] == {"subject": "a blue pickup truck"}
+
+
+def test_routes_for_real_sentences():
+    car = SceneState("a red sports car").snapshot()
+    meadow = SceneState().snapshot()
+    route = lambda text, snap: ct.plan(text, snap).route
+    assert route("make it winter", car) is ct.Route.MEASURED
+    assert route("take me to the city", car) is ct.Route.MEASURED
+    assert route("make it a snowy desert", car) is ct.Route.MODEL     # two worlds
+    assert route("make it a little rainy", car) is ct.Route.MODEL     # a strength word
+    assert route("no more snow", car) is ct.Route.MODEL               # negation
+    assert route("add a lion", car) is ct.Route.MODEL
+    assert route("make it winter", meadow) is ct.Route.PLAIN
+    assert route("make it a desert", meadow) is ct.Route.PLAIN
+    assert route("new scene of a beach", meadow) is ct.Route.PLAIN
+    assert route("new scene of a red sports car", meadow) is ct.Route.MEASURED
+    assert ct.vehicle_subject("a red car parked beside the oak tree") is None
+    assert ct.vehicle_subject("a wide shot of a meadow with a single oak tree") is None
+
+
+def test_the_meadow_chain_is_unchanged():
+    pinned = load_pinned(DEFAULT_DEMO_PROMPTS)
+    meadow = [k for k in pinned if k[0].startswith("a wide shot of a")]
+    assert [s for _, s in meadow] == ["make it winter", "add a red car", "make it night", "add a lion", "sunny",
+                                      "make it a desert", "add a red car racing on a road"]
+    reader = FinalReader(FinalReaderState.ON, chat=NoChat(), spec=prompt_spec(), pinned=pinned)
+    svc = FinalReadingService(CommandService(semantic_reader=lambda *a: None), reader)
+    # The 7th ("add a red car racing on a road") has a phrase over 120 characters, which _from_cache refuses
+    # today (Greptile on PR #125); that is fixed separately.
+    for before, sentence in meadow[:6]:
+        out = svc.handle(final(sentence))
+        assert "seen from directly behind" not in out["steer"]["prompt"], sentence
+        assert out["steer"]["prompt"] == pinned[(before, sentence)].prompt, sentence
+    assert reader.stats()["template_hits"] == 0 and reader.stats()["pinned_hits"] == 6
