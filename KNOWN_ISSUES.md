@@ -6,10 +6,19 @@ Last updated 2026-11-15 by Arunjay's Claude.
 
 ## 1. Two plan gates had no measured result
 
-Gate 3 (stacking several changes and undo) and Gate 4 (pace words such as "slowly", strength words such as "a little", and early steering on partial speech) were never measured on the real model until a run on 2026-11-15 about 03:00 UTC.
-The result of that run is in the "Status" section of PLAN.md.
-Early steering probably does not show: a provisional guess never triggers a re-anchor, and without a re-anchor the picture does not change (Gate 2 finding).
-The pitch must only claim what that run shows.
+Gate 3 (stacking several changes and undo) and Gate 4 (pace words such as "slowly", strength words such as "a little", and early steering on partial speech) were measured on the live engine on 2026-11-15 about 03:00 UTC (PR #206, sheets in engine/samples/gate3_* and gate4*).
+- **Gate 3: state is right, the picture is not, past about 5 objects.**
+  All 14 steps were understood and the chips were right after every step, including 3 undos and "remove the lion".
+  But with about 5 or more objects in the scene the model drops some: "add a tree" never showed a second tree and the lion vanished, and one undo showed fewer objects than the chips.
+  Keep demo chains to about 4 objects at once.
+- **Gate 4a, "slowly": partly.**
+  It ramps over about 3 s, but "slowly" also lowered the strength to 0.6, so winter never fully arrived (a bug, fix in progress).
+- **Gate 4b, strength: shown.**
+  "a little snowy" gives frosted grass, "snowy" gives deep snow; "a lot more snow" after winter is only a modest change.
+- **Gate 4c, early steering: not shown.**
+  A partial guess never re-anchors, so nothing visible changes before the sentence is final.
+  The pitch must not claim that the scene changes before the speaker finishes.
+- **Delay:** pinned sentences and undo about 0.5 s; sentences that need a new Sonnet call 1.7 to 3.2 s.
 
 ## 2. Two frontends and two product names
 
