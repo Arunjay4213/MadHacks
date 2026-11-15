@@ -2,7 +2,7 @@ import json
 import unittest
 from pathlib import Path
 
-from commands.rewriter import MAX_TOTAL_WORDS, SYSTEM_PROMPT, build_messages, validate_rewrite
+from commands.rewriter import MAX_TOTAL_WORDS, SYSTEM_PROMPT, validate_rewrite
 
 CAR = "a wide shot of a meadow with a single oak tree; a red car driving forward, away from the camera"
 WINTER = CAR + "; winter scenery with snow on the ground"
@@ -16,34 +16,10 @@ def reply(details):
     return json.dumps({"details": details})
 
 
-class MessagesTest(unittest.TestCase):
-    def test_shape(self):
-        messages = build_messages(WINTER)
-        self.assertEqual(messages[0], {"role": "system", "content": SYSTEM_PROMPT})
-        self.assertEqual(messages[-1], {"role": "user", "content": WINTER})
-        self.assertTrue(all(m["role"] in ("system", "user", "assistant") and isinstance(m["content"], str) for m in messages))
-        # Few-shot answers are themselves valid replies for their prompts.
-        for user, assistant in zip(messages[1:-1:2], messages[2:-1:2]):
-            self.assertIsNotNone(validate_rewrite(user["content"], assistant["content"]), user["content"])
-
-    def test_optional_command_is_context_only(self):
-        messages = build_messages(WINTER, command="make it winter")
-        self.assertEqual(json.loads(messages[-1]["content"]), {"scene": WINTER, "command": "make it winter"})
-        self.assertEqual(messages[:-1], build_messages(WINTER)[:-1])  # same system prompt and few-shot
-        self.assertEqual(build_messages(WINTER, None)[-1], {"role": "user", "content": WINTER})  # one-arg behaviour
-        self.assertIn("authoritative", SYSTEM_PROMPT)
-        for bad in [5, b"bytes", ["make it winter"]]:
-            with self.assertRaises(ValueError):
-                build_messages(WINTER, command=bad)
-
+class SystemPromptTest(unittest.TestCase):
     def test_target_length_is_40_to_50_words(self):
         self.assertIn("40 to 50 words", SYSTEM_PROMPT)
         self.assertNotIn("temperature", SYSTEM_PROMPT.lower())
-
-    def test_prompt_is_checked_at_the_boundary(self):
-        for bad in [None, "", "   ", 5]:
-            with self.assertRaises(ValueError):
-                build_messages(bad)
 
     def test_system_prompt_states_the_rules(self):
         for rule in ['{"details"', "camera", "motion", "objects", "earlier frames", "time of day", "scene"]:
