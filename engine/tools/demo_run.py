@@ -378,7 +378,8 @@ async def run(args, script: Script) -> int:
         for step in script.steps:
             delay = t0 + step.at - time.monotonic()
             if delay > 0:
-                await asyncio.sleep(delay)
+                # Wakes at the step time, or at once when /control closes (its reader task ends).
+                await asyncio.wait({control_task}, timeout=delay)
             if rec.control_closed:
                 break
             # Strictly increasing, so two steps at the same second never share a t_client (replies are matched by it).
@@ -398,7 +399,7 @@ async def run(args, script: Script) -> int:
         # A closed /control ends the run early: no more steps can be sent, and what was recorded is still saved.
         rest = t0 + script.end - time.monotonic()
         if rest > 0 and not rec.control_closed:
-            await wait_for(lambda: rec.control_closed, rest)
+            await asyncio.wait({control_task}, timeout=rest)
         t_stop = time.monotonic()
         if rec.control_closed:
             print(f"  /control closed ({rec.control_closed.reason}), stopping the run early")
