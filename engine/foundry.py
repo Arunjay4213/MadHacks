@@ -79,7 +79,7 @@ class FoundryMessages:
     """One Anthropic Messages API call per `complete(system, messages)`; returns the reply's text.
 
     Request body: {"model", "max_tokens", "system", "messages", "thinking": {"type": "between_tools"},
-    "output_config": {"effort": "low"}}. No temperature: the model rejects it. "between_tools" is how Claude
+    "output_config": {"effort": "low"}} by default; effort, thinking and max_tokens can be set (from_settings). No temperature: the model rejects it. "between_tools" is how Claude
     Sonnet 5.5 runs with thinking off (it is accepted at effort high or below and takes no other field).
     The text is the content blocks of type "text", joined. A refusal (stop_reason "refusal") has no text, so it
     returns "" and the caller's validation rejects it.
@@ -88,21 +88,26 @@ class FoundryMessages:
     """
 
     MAX_TOKENS = 1024
+    EFFORT = "low"                # output_config.effort: low, medium or high
+    THINKING = "between_tools"    # thinking.type: between_tools is thinking off; others are passed as given
 
     def __init__(self, url: str, key: str, model: str = DEFAULT_REWRITE_DEPLOYMENT, timeout_s: float = 5.0,
-                 client: httpx.Client | None = None) -> None:
+                 client: httpx.Client | None = None, effort: str = EFFORT, thinking: str = THINKING,
+                 max_tokens: int = MAX_TOKENS) -> None:
         self.model = model
+        self.effort, self.thinking, self.max_tokens = effort, thinking, max_tokens
         self._url = url
         self._client = client or httpx.Client(
             timeout=timeout_s, headers={"x-api-key": key, "anthropic-version": ANTHROPIC_VERSION})
 
     @classmethod
-    def from_settings(cls, settings: FoundrySettings, timeout_s: float) -> "FoundryMessages":
-        return cls(settings.anthropic_url, settings.key, settings.rewrite_deployment, timeout_s=timeout_s)
+    def from_settings(cls, settings: FoundrySettings, timeout_s: float, **options) -> "FoundryMessages":
+        """`options`: effort, thinking and max_tokens (engine/final_reader.py reads them from the environment)."""
+        return cls(settings.anthropic_url, settings.key, settings.rewrite_deployment, timeout_s=timeout_s, **options)
 
     def body(self, system: str, messages: list[dict]) -> dict:
-        return {"model": self.model, "max_tokens": self.MAX_TOKENS, "system": system, "messages": messages,
-                "thinking": {"type": "between_tools"}, "output_config": {"effort": "low"}}
+        return {"model": self.model, "max_tokens": self.max_tokens, "system": system, "messages": messages,
+                "thinking": {"type": self.thinking}, "output_config": {"effort": self.effort}}
 
     def complete(self, system: str, messages: list[dict]) -> str:
         r = self._client.post(self._url, json=self.body(system, messages))

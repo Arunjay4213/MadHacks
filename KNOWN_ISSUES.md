@@ -49,6 +49,7 @@ Options: pick one page for the demo and keep the other as a fallback, and pick o
   The car template wording ("A red car, seen from directly behind ..., drives fast along a straight grey asphalt road through a green meadow ...") kept a large car on the road in 2 of 2.
   In the demo chain the same sentence after "make it a desert" works, because the desert world names its highway.
   Options: write a moving vehicle object on a scene without a vehicle base with the car template (a composer change that moves the chain's keys and pins), or keep the demo to the car scene for driving.
+  Since #271 a sentence like this that is not pinned goes to Sonnet, which writes the car template itself when a vehicle drives on a road (the real-Sonnet run gave "A red car, seen from directly behind ..., drives fast along a straight two-lane country road ..."); the pinned meadow entry is unchanged.
 - **No real faces.**
   The 1.3B model cannot draw a specific person.
   Named people are mapped to a description of their look (Jensen Huang becomes a man in a black leather jacket).
@@ -64,9 +65,8 @@ Options: pick one page for the demo and keep the other as a fallback, and pick o
   Done, with limits: a sentence that names exactly one measured car world and nothing else skips Sonnet (`FinalReader._measured` in `engine/final_reader.py`, counted in `template_hits`), and so does a sentence that starts a new car scene in a measured world.
   It applies only while the car scene has no added objects: after "add a lion", "make it winter" goes to Sonnet (`car_template.plan`, `has_objects`).
   It also goes to Sonnet when the measured operations do not apply to the scene.
-  Not done: skipping Sonnet for any other sentence the dictionary fully understood (objects, weather and time on any scene, and worlds on a scene without the car).
+  Done in #271: a sentence the keyword table reads word for word on a composed scene (`commands.service.dictionary_reading`) skips Sonnet on any scene.
   Not fixed, because it is outside the demo: after a pace sentence such as "slowly make it winter" on the car scene, or "slowly make it night" on the winter meadow, the next pinned step ("add a dog") misses its pin and waits for Sonnet.
   The pinned "slowly" sentence saves a different change than the plain one (a season change instead of the snowy-road world), and pins are keyed by the scene before the sentence (Greptile on #245).
-- **A base edit with 16 or more chips is dropped.**
-  "turn the tree into a lighthouse" is applied as a new scene plus one add for every existing change, and `commands/state.py` allows at most 16 operations in one batch, so with 16 or more chips it is rejected on both the Sonnet and the dictionary path, and with 15 when the same sentence also adds something ("... and add a dog") (Greptile on #210).
-  Not fixed: the demo keeps about 4 objects at once (Gate 3). A fix would add a base-only operation to `SceneState`.
+- **A base edit with 16 or more chips was dropped.**
+  Gone with #271: "turn the tree into a lighthouse" is no longer expanded into a new scene plus one add per chip; Sonnet rewrites the whole prompt (a free scene), so the batch limit does not apply.

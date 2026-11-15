@@ -57,26 +57,27 @@ SONNET_CHAINS = {
         "remove jensen huang", "make it winter", "make it a desert", "make it night", "make it autumn",
         "make it sunset", "make it rain", "take me to the beach", "make it foggy", "make it country", "undo",
         "add a dog", "tap:reset"],
+    "sonnet free": [
+        "tap:reset", "make it winter", "kill the tree's leaves", "partial:add a dog", "add a dog", "now i want a savannah",
+        "tap:remove:c2", "undo", "undo", "undo", "start over with a beach", "tap:reset"],
     "sonnet control": [
         "tap:reset", "make it winter", "undo", "reset", "make it winter and undo", "reset and add a dog",
         "start over with a beach"],
 }
 
+def _free(prompt, chips, new_scene=False):
+    return {"blocked": False, "understood": True, "new_scene": new_scene, "prompt": prompt, "chips": chips}
+
+
 FAKE_REPLIES = {
-    "add a small dog": {"blocked": False, "operations": [
-        {"op": "add", "label": "dog", "kind": "extra",
-         "phrase": "a large brown dog standing in the foreground at the right of the frame, facing the camera",
-         "strength": 1.0}],
-        "details": "fresh green grass, soft shadows under the oak, warm afternoon light, clear air"},
-    "make it foggy": {"blocked": False, "operations": [
-        {"op": "add", "label": "fog", "kind": "weather", "phrase": "thick fog", "strength": 1.0}],
-        "details": "grey fog over the grass, soft diffuse light, damp air, muted colours",
-        "road": "a quiet country road in thick fog",
-        "scene": "Pale fields and dim trees fade into the fog on both sides.",
-        "light": "Soft grey diffuse light under a white sky."},
-    "start over with a beach": {"blocked": False, "operations": [
-        {"op": "new_scene", "base": "a wide shot of a sandy beach"}],
-        "details": "white sand, gentle waves, bright sun, clear blue sky"},
+    "add a small dog": _free("A wide shot of a meadow with a single oak tree, a large brown dog standing in the "
+                             "foreground at the right of the frame, facing the camera.", ["dog"]),
+    "start over with a beach": _free("A wide shot of a sandy beach with gentle waves.", ["beach"], new_scene=True),
+    "kill the tree's leaves": _free("A wide shot of a meadow with a single oak tree with bare branches.", ["bare tree"]),
+    "now i want a savannah": _free("A wide shot of a golden savannah with a single bare acacia tree, a large lion "
+                                   "standing in the foreground at the left of the frame, facing the camera.",
+                                   ["bare tree", "savannah"]),
+    "remove the bare tree": _free("A wide shot of an open golden savannah.", ["savannah"]),
 }
 
 

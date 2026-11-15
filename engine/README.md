@@ -498,83 +498,72 @@ It is used only when the Sonnet final reader is off; the live engine runs `--fin
 
 ## Final reader (Sonnet)
 
-With `--reader commands --final-reader sonnet`, every `final` sentence goes to one Claude Sonnet 5.5 call before the keyword table, in `engine/final_reader.py`.
-The one reply gives both the scene operations and the rich prompt the video model sees.
-The nano slow reader is not used in this mode; partials, taps and undo or reset sentences still go to the keyword table only.
-The live engine runs it since PR #125.
-First measurement, on a test engine with the fake backend and the draft script: 5 calls, p50 1.87 s, no timeouts or rejects, 2.3 to 3.1 s command to screen against 0.52 to 0.62 s without it (board post at 23:31 UTC).
-So a new sentence costs about 1.8 s extra, and a pinned or cached sentence costs nothing.
+With `--reader commands --final-reader sonnet` (live since PR #125), `engine/reader.py` `FinalReadingService` decides who reads each `final` sentence, in this order (issue #271, free scenes):
 
-- The call is the Anthropic Messages API on the team's Foundry resource: `POST https://<resource>.services.ai.azure.com/anthropic/v1/messages`, where `<resource>` is the first label of `FOUNDRY_ENDPOINT`'s host.
+1. A sentence made only of undo and reset clauses ("undo", "reset", "undo that and start over") goes to the keyword table, with no call.
+2. The content block: a short word list (`BLOCKED_WORDS`) with no call; the model also sets `blocked: true` for sexual, violent or hateful requests.
+   A blocked final gives no steer: the words show as unmatched.
+3. A pinned entry (`engine/demo_prompts.json`), then a cached one (keys below).
+4. A named person on a composed scene, when the sentence is nothing but adding or removing them ("jensen", "jensen huang", "add jensen huang next to the car", "remove jensen"; `people.whole_sentence`): the engine's own add (his hardcoded look, `people.PEOPLE`) or remove, with no call (`person_hits`).
+   A bare name is an add.
+5. A measured car world (`car_template.plan`, `Route.MEASURED`): "make it winter" on the car scene, or a new car scene, composed by the engine with no call (`template_hits`).
+6. The fast path: on a composed scene, when the keyword table reads every word of every clause by itself (`commands.service.dictionary_reading`: no vector matcher, no style fallback, no pass-through guess of an unknown object), the dictionary applies it with no call.
+   On a vehicle scene its result still gets the car template (`fallback_prompt`, PR #238).
+   "make it winter", "add a dog and a cat", "take me to the beach" and "remove the dog" are read whole; "add a red car", "kill the tree's leaves", "now i want a savannah", "add a lion" (not in the table) and "zoom out" are not.
+7. Otherwise one Sonnet call writes the complete new prompt: a free scene.
+   The scene becomes `commands.state.Origin.FREE`, its prompt is Sonnet's text word for word, and its chips are the labels Sonnet names.
+8. When the call times out, fails or the reply is not a JSON object, the dictionary reads the sentence (the fallback).
+   On a free scene the dictionary can only start a new scene, so anything else shows as not understood; the old scene is never silently redrawn.
+
+A sentence that mixes undo or reset with edits goes to the dictionary after the content check (Sonnet is asked first only when the dictionary does not read every clause by itself).
+A tap on the x of a free scene's chip is read as the sentence "remove the <label>" through steps 2 to 7.
+Undo works across composed and free scenes: the scene history is a stack of snapshots, each with its `origin`.
+
+The call:
+
+- The Anthropic Messages API on the team's Foundry resource: `POST https://<resource>.services.ai.azure.com/anthropic/v1/messages`, where `<resource>` is the first label of `FOUNDRY_ENDPOINT`'s host.
   `FOUNDRY_ANTHROPIC_URL` replaces the whole URL (a local fake endpoint), and `FOUNDRY_REWRITE_DEPLOYMENT` the model (default `claude-sonnet-5-5`).
 - Headers `x-api-key: $FOUNDRY_KEY` and `anthropic-version: 2023-06-01`.
   Body: `{"model": "claude-sonnet-5-5", "max_tokens": 1024, "system": <system prompt>, "messages": [{"role": "user", "content": <JSON>}], "thinking": {"type": "between_tools"}, "output_config": {"effort": "low"}}`.
   No `temperature`: the model rejects it, and `between_tools` is how Sonnet 5.5 runs with thinking off.
-- The user message is JSON: `{"scene": {"base", "changes": [{"id", "label", "kind", "phrase", "strength"}]}, "prompt": <the current composed prompt>, "sentence": <what the user said>}`.
-- The reply (```json fences are stripped) is `{"blocked": bool, "operations": [op, ...], "details": str}`.
-  Operations are the shapes of `commands/state.py` (add, remove, set_strength, new_scene), at most 6, each checked with `slow_reader.validate`.
-  A place ("take me to the desert", "make it a desert") is one `add` of kind `world`: it replaces the earlier place and keeps the car and every other change.
-  A known place gets the label and tested phrase of `commands.world.WORLDS`, the same change the keyword table makes.
-  Season, weather and time adds get the label and kind of `commands.dictionary.KEYWORDS` ("sunny" is `day`, kind `time`, so it replaces night), and the system prompt lists those labels and their words.
-  A new object, animal or person gets size and position words in its `phrase` ("a large male lion standing in the foreground at the left of the frame, facing the camera").
-  `{"op": "edit_base", "base": ...}` is a base edit ("turn the tree into a lighthouse"): the engine expands it into `new_scene` plus one `add` per existing change, applied as one batch, so the changes stay and one undo reverts it.
-  `commands/state.py` has no operation that rewrites only the base, so this expansion stays.
-  `new_scene` is only for an explicit new scene ("new scene of a beach", "start over with a beach") and clears the changes.
-  A sentence made only of undo and reset clauses ("undo", "reset", "undo that and start over") skips the final reader and goes to the keyword table.
-  Any other sentence, including a compound such as "reset and add a dog", goes through the content check and the final reader first (PR #147), so a blocked word in any clause blocks the whole sentence.
-- The prompt is the composed prompt of the new scene, reordered (below), with the model's `details` after it: the ground, light, air and colours of the place.
-  The rules for `details` are `commands.rewriter.SYSTEM_PROMPT`, and `commands.rewriter.validate_rewrite` checks them (`PromptSpec` "commands.rewriter").
-  A colour, type or size the user names always wins over making a second car look different.
-  The validator gets `{"details": ...}` only, checked against the composed prompt of the new scene, with the forward-driving words added to a vehicle subject.
-  The system prompt wraps its text as the rules for the `details` field, so the model sees one reply shape.
-  The prefix the details follow is the composed prompt reordered as subject, season and weather phrases, object phrases word for word, then the rest (world, time), so a positioned lion or "a red car parked beside the oak tree" stays in the same words and place in every later prompt.
-  On GPU, an object phrase before the winter phrase lost the winter (green grass), so the season and weather come first; a world change clears them in `commands/state.py`, so they do not come back.
-  The first object of a scene is the main one: its phrase may not say "small" and it takes the centre ("a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible"); a later one takes a free place (the lion in the left foreground).
-  The user message also has `details_max_words`, what the validator's total word limit (`commands.rewriter.MAX_TOTAL_WORDS`, 180) leaves after the prompt, less 15 words, between 12 and 45, and the system prompt lists the words the validator and the engine refuse in details (objects, season, weather and time words the scene does not have, motion, camera, time order, negation, position words, and road words in a scene without a road).
-  Every rejected clause is logged at WARNING with its reason (the word limits, or the words `validate_rewrite` refuses, found by asking it about single words, since it returns no reason) and an excerpt.
-  The engine cuts those clauses, then clauses from the end until the details fit (`details_repaired`).
-  When nothing is left, the operations are kept with the composed prompt (`details_rejected`).
-- One retry: a reply that is invalid, has no usable details, or adds an object whose phrase breaks a rule (world words such as "in the snow", or no size or position words) is asked again once, with the reasons and the earlier reply, when the first call took under half the wait (`retries`).
-  On the live 3 s wait at about 1.8 s a call this does not happen; it does in offline runs such as the demo prompts regeneration.
-  The reply states are named in `Verdict` (accepted, repaired, phrase, plain, empty, blocked, invalid, failed).
-- An object phrase may have up to 240 characters (the nano slow reader keeps 120), so a positioned phrase is valid; any other phrase (a world sentence from `commands/world.py`, about 250 characters) up to 400 (`FINAL_MAX_PHRASE`).
-  A cached or pinned operation is checked with the same limits plus room for the lane cue (`CACHED_MAX_PHRASE`), so a saved edit replays instead of falling back.
-  A vehicle added on a road gets "white dashed lane markings rush toward the viewer" at the end of its phrase; `FORWARD_MOTION` ends with the same cue.
-- A new place (an add of kind world) clears the earlier season and weather in `commands/state.py` (#115), so a desert after "make it winter" has no snow; the time of day stays.
-  The engine moves a sentence's world add before its season and weather adds, so "take me to a snowy desert" keeps the snow it asked for.
-- Pace words (slowly, gradually, gently, little by little, suddenly) set how fast a change appears, never its strength (PR #226).
-  The pace is read from the sentence by `CommandService.apply_final` (slow is 12 chunks), and strength stays 1.0 unless the sentence also has a strength word (such as "a little", "slightly", "a lot", "very", "more", "less").
-  The model sometimes reads "slowly" as weaker (winter at 0.6, so winter never fully arrives), so `pace_keeps_strength` sets every other non-zero strength to 1.0 after the reply when the sentence has a pace word and no strength word, and logs it at INFO.
-  A strength of 0 is a removal and stays 0; the word lists are the ones `commands/reader.py` uses.
-- Stuck base stopgap (#272, live test 2026-11-15 07:27): a base that names its own place no longer blocks every later place change.
-  An edited oak scene base ("a wide shot of a meadow with freshly cut short grass and a single bare oak tree") keeps its subject and drops its meadow (`commands.world.compose_base`), and any other base that names a place is rebuilt around the new place (`final_reader.place_as_new_scene`: base `PLACE_BASE` "a wide shot", the world change, the objects and the time of day), unless the reply writes its own base.
-  The system prompt says a base edit never holds the ground, grass, climate or place, an object's phrase never names another object, and every moving thing states its direction relative to the camera (on the car scene: forward with the car, seen from behind).
-  With Sonnet down, a mover the dictionary adds on the car scene gets that heading (`with_heading`), and an object the sentence only mentions as context ("i want to see the car's side profile") is never added.
-  The car template's scene and light limits are 60 and 30 words (a good reply was refused at 43).
-- Place changes and placement (rules in the system prompt, from the acceptance runs of 2026-11-15): the video model cannot guess what happens to the scene's objects when the place changes, so a place change also re-adds every object whose phrase no longer fits, with the same label and a phrase saying where it is and what it stands or drives on ("a red car parked on the road ..."), never naming the place itself. A place after "near", "by", "beside" only places the new thing ("add snow near the river" adds no river). Removing a place removes only its world change (the trees the user added stay).
-- On a vehicle scene, "take me to X", "go to X", "drive to X" and "turn it into X" keep the vehicle driving on a road in X; the vehicle goes only when the user says so ("just the beach, no car": one new_scene of X). The template's `road` field must name a drivable surface (`car_template.DRIVABLE`: road, highway, street, ...), or the reply is asked again: a road slot without one put the car on sand or water.
-- Named people (`engine/people.py`): the video model cannot draw real faces, so "add jensen huang" (also "jensen", "the nvidia ceo") reaches Sonnet with a visual description instead of the name, and the engine sets the add itself: the chip label stays "jensen huang" (so "remove jensen huang" and undo find it) and the phrase is the description plus "a large figure standing <spot>, facing the camera", where the spot is the sentence's own ("next to the car") or the first free one (left, right, centre foreground).
-  When the model gives nothing usable, "remove jensen" (any alias) is removed by the engine too (`people.person_remove`), since the keyword table knows only the chip label.
-  Only adds are rewritten; with no usable reply the engine's add is used (`Outcome.PERSON`). An object phrase may have 240 characters for this.
-- Vehicle scenes (`engine/car_template.py`): a scene whose base is a vehicle on a road gets Ishaan's measured car template, and the base is kept as the bare vehicle ("a red sports car") with its world as one change of kind world.
-  A sentence that names one measured world (country, winter, desert, neon city, ocean coast, sunset, autumn, rain; "make it night" is the neon city) is composed by the engine with no call (`template_hits`): it swaps road, scene and light together, and the subject and camera sentences stay word for word.
-  Any other sentence on a vehicle scene asks Sonnet for `road`, `scene` and `light`; the engine checks them (one sentence each, no camera words) and builds the template itself.
-- Road words in details are used only when the scene has a road: on GPU the oak meadow grew a road or tyre tracks from them.
-- Content block: a short word list (`BLOCKED_WORDS`) is checked first with no call, and the model sets `blocked: true` for sexual, violent or hateful requests.
-  A blocked final gives no steer: the words show as unmatched, and one log line says why.
-- A timeout (`--final-timeout-s`, 3.0 s), a failed call or a reply that does not validate keeps the keyword table's result.
-  On a scene without a vehicle the prompt is then the short composed prompt.
-  On a vehicle scene the fallback still gets the car template (PR #238): the road, scene and light on screen are kept unless the sentence changed the world, season, weather or time, new objects become object sentences, and an undo back to that state gives the same words.
-- The cache is keyed by (composed prompt before the sentence, sentence).
-  The sentence part of every pinned and cache key is normalized (`sentence_key`: lower case, trimmed, spaces collapsed, end punctuation `. , ! ? ; :` and surrounding quotes stripped, inner words kept), at load, at lookup and in the disk cache, so "Make it winter." from voice hits the pinned "make it winter"; the content check and Sonnet still get the original text.
-  A Sonnet result or a block is chosen once and saved to `--final-cache` (JSON, written atomically, tied to a fingerprint of the system prompt, the model and `final_reader.PROMPT_BUILD`), so a restart gives the same result and nothing is regenerated.
-  Change `PROMPT_BUILD` whenever the engine or `commands/` composes prompts differently from the same reply (for example a world's wording, #269), so saved prompts with the old wording are not reused.
-  A fallback is final for that key for the life of the process, and an answer that arrives after the wait is dropped (`late_dropped`); fallbacks are not saved, so a passing outage does not disable a sentence for good.
-- The model sees one prompt per scene state: the first rich prompt chosen for a composed prompt replaces it in every later steer (an undo back to it, a chip removal), in `likely_prompts` and in `committed_prompt`, so a state always gives the same embedding.
-- `/stats` `final_reader`: `state` (`off`, `on`, `unavailable`), `reason`, `prompt_spec`, `calls`, `cache_hits`, `blocked`, `timeouts`, `late_dropped`, `rejects`, `details_rejected`, `details_repaired`, `retries`, `errors`, `pinned`, `pinned_hits`, `p50_ms`, `last_ms`, `cache_size`, `timeout_s`, `cache_file`.
+- The call runs with adaptive thinking at effort medium and `max_tokens` 4096 (defaults since 2026-11-15), within the time budget `--final-timeout-s` (default 3.0 s): blind-graded calls took 1.84 s p50, 2.09 s p90 and 2.21 s at most (none of 50 over 3 s), graded 4.54 against 4.40 for thinking off at effort low, and always wrote a prompt for "undo that, put the ocean back", which thinking off answered in prose (a reply that is not one JSON object is never used: asked again or the dictionary). Effort high graded 4.64 but took 3.41 s p90.
+  `FINAL_READER_EFFORT` (low, medium or high), `FINAL_READER_THINKING` (the thinking type, passed as given; `between_tools` is thinking off) and `FINAL_READER_MAX_TOKENS` change the call without a code change, for measuring.
+- The user message: `{"prompt": <the prompt the video model sees now, the rich one>, "chips": [<labels shown>], "sentence": <the sentence, a named person replaced by their description>, "car_scene": <true when the prompt on screen is the car template>}`, plus `"view_change": true` on a car scene when the sentence asks for another camera or view (`car_template.asks_view_change`) and `"person_chip"` when the sentence adds a named person.
+- The reply: `{"blocked": bool, "understood": bool, "new_scene": bool, "prompt": str, "chips": [str]}`.
+- The system prompt (`final_reader.SYSTEM_PROMPT` plus `car_template.instructions()`) asks for one complete scene description of at most 150 words: the subject and its place in the frame, its direction of travel, the camera, the setting, the light and the style, with Ishaan's measured car template and worlds as the example.
+  Its rules: keep everything the sentence does not change word for word; on a change of place say for every object where it is, what it stands or drives on and which way it faces (a car goes on a road); explicit size and position words for objects; every moving thing states its direction of travel, and on the car scene it travels forward away from the camera like the car; counts agree in the whole prompt ("two oak trees", never "a single oak tree" and "a second tree"); a "no" becomes a positive description ("no clouds" is "a clear, cloudless deep blue sky"); a request repeated for something already in the prompt makes it stronger; the camera wording changes only when asked (zoom, wider or closer, side, aerial, front, low angle, pan); `new_scene` only for an explicit new scene or a new main subject; one short chip per thing the user added or changed.
+  "understood" is false only for a sentence that is not about the picture.
+
+The light check (`final_reader.check_reply`) repairs what it can and never refuses a reasonable sentence:
+
+- `blocked`: no steer. `understood` false, or an empty prompt: not understood (unmatched, a provisional guess is rolled back), saved like a block.
+- A prompt over 180 words (`MAX_PROMPT_WORDS`) or 1600 characters is cut sentence by sentence from the end (the car template's style sentence stays last).
+- Chips are cleaned (lower case, whole words up to 24 characters, at most 16, no duplicates), never a reason to drop the reply.
+- On a car scene that is not a new scene, the prompt must still start with the template's subject sentence (any subject, any road) and its camera sentence word for word, and the road must name a drivable surface (`car_template.DRIVABLE`).
+  With `view_change` only a drivable road is needed, so "I want to see the car's side profile" can rewrite the camera.
+  A reply that breaks this is still used and logged (`Verdict.REPAIRED`).
+- A REPAIRED or unusable reply is asked again once, with the reasons, when the first call took under half the wait; a REPAIRED first reply is kept if the retry runs past the wait.
+  On the live 3 s wait at about 2 s a call the retry happens only in offline runs.
+- The reply states are named in `Verdict` (accepted, repaired, not_understood, blocked, invalid, failed); `/stats` counts the final verdict of every call in `verdicts`.
+
+The cache and the prompts:
+
+- The cache is keyed by (composed prompt before the sentence, sentence); a free scene's composed prompt is its own prompt.
+  The sentence part of every pinned and cache key is normalized (`sentence_key`: lower case, trimmed, spaces collapsed, end punctuation `. , ! ? ; :` and surrounding quotes stripped, inner words kept), so "Make it winter." from voice hits the pinned "make it winter"; the content check and Sonnet still get the original text.
+  A hit is used only on the scene it was made for (`scene_ids`: origin, free prompt, base and every chip in order), with its chip ids mapped to the live ones.
+- A Sonnet result, a block or a "not understood" is chosen once and saved to `--final-cache` (JSON, written atomically, tied to a fingerprint of the system prompt, the model and `final_reader.PROMPT_BUILD`), so a restart gives the same result.
+  Change `PROMPT_BUILD` whenever the engine or `commands/` composes prompts differently from the same reply.
+  A fallback is final for that key for the life of the process, and an answer that arrives after the wait is dropped (`late_dropped`); fallbacks are not saved.
+- The model sees one prompt per composed scene state: the first rich prompt chosen for a composed prompt (pinned, measured or a car template fallback) replaces it in every later steer, in `likely_prompts` and in `committed_prompt`.
+- Named people (`engine/people.py`): "add jensen huang" (also "jensen", "the nvidia ceo", or the bare name "jensen huang") on a composed scene is the engine's own add with no call (step 4). On a free scene it reaches Sonnet as "add <his visual description>" instead of the name, with `person_chip: "jensen huang"`, so his chip keeps the name; when the model gives nothing usable on a composed scene, the engine adds or removes him itself (`Outcome.PERSON`).
+- Pinned, measured and named-person answers are composed operations, checked by `checked_operations` (`slow_reader.validate`, and `canonical_world` gives a known place its tested phrase).
+- From the #272 stopgap, kept: `commands.world.compose_base` reads an edited oak scene base, an object the sentence only mentions as context ("i want to see the car's side profile") is never added by the keyword table, and a mover the dictionary adds on the car scene gets a heading with the car (`with_heading`) in `fallback_prompt`.
+  Its `place_as_new_scene` went with the operations merge: Sonnet now writes the whole prompt, so a base that names a place cannot block a later change.
+- `/stats` `final_reader`: `state` (`off`, `on`, `unavailable`), `reason`, `prompt_spec` (`free scene`), `calls`, `cache_hits`, `blocked`, `not_understood`, `timeouts`, `late_dropped`, `rejects`, `repaired`, `retries`, `errors`, `verdicts`, `pinned`, `pinned_hits`, `template_hits`, `person_hits`, `p50_ms`, `last_ms`, `cache_size`, `timeout_s`, `cache_file`.
 - It is `unavailable` (and the engine runs as with `off`, logged once) when `FOUNDRY_ENDPOINT` or `FOUNDRY_KEY` is missing or the reader is not `commands`.
-- `engine/reader.py` uses `CommandService.snapshot()` and `CommandService.apply_final(text, operations)` (PR #88); `engine/tests/test_final_reader.py` runs them against the real `CommandService`.
-  The service steers to the composed prompt and the wrapper maps it to the first rich prompt of that state, so an undo back to it gives the same words.
+- `engine/reader.py` uses `CommandService.snapshot()` and `CommandService.apply_final(text, operations)`; `engine/tests/test_final_reader.py` runs them against the real `CommandService`.
+
+Removed in #271 (they only existed to merge Sonnet operations into the composed scene): the `details` field and its repair (`PromptSpec`, `repair_details`, `why_rejected`, `engine_banned`, `details_budget`), the operations prompt, `_check`, `_check_vehicle`, `bare_vehicle_operations`, `expand_operations` with its base edit expansion, `world_first`, `distinct_label`, `canonical_change`, `with_lane_cue`, `pace_keeps_strength`, `phrase_problems`, `people.with_person`, and the car template's `field_problems` and `model_world`.
 
 Local end-to-end run with a fake Sonnet endpoint (no key needed):
 

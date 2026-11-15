@@ -2,7 +2,7 @@
 
 import re
 
-from .state import KINDS
+from .state import KINDS, is_free
 from .world import (Form, car_prompt, change_wording, compose_base, is_road_scene, road_scene_subject,
                     road_scene_world, world_with_overrides)
 
@@ -45,6 +45,10 @@ def _phrases(changes, world_change=None):
 
 
 def compose(snapshot):
+    """The prompt of a scene. A free scene (commands.state.Origin.FREE) is its own prompt, so the pinned and cache
+    keys (compose(snapshot), sentence) of the engine stay one rule for both states."""
+    if is_free(snapshot):
+        return snapshot['prompt']
     base, changes = snapshot['base'], snapshot['changes']
     if is_road_scene(base):
         # A road scene is always Ishaan's car template, and on it a winter season is the snowy mountain road.
