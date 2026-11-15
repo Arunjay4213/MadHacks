@@ -558,6 +558,30 @@
         {"say": "make it winter", "chips": ["winter"], "has": ["snowy mountain road"]},
         {"say": "a little more snow", "chips": ["winter"], "strength": {"winter": "up"}, "has": ["snowy mountain road", "heavy"], "lacks": ["green fields"], "visible": ["Is there a red car seen from behind?", "Is the road covered in snow?"]}
       ]
+    },
+    {
+      "name": "car-airplane-flies-forward",
+      "note": "Bug from the live test 2026-11-15: the airplane had no heading and flew backwards against the forward camera.",
+      "start": "car",
+      "live": true,
+      "steps": [
+        {"say": "add an airplane in the sky", "chips": ["airplane"], "has": ["airplane", "behind"], "visible": ["Is there an airplane in the sky?", "Is the airplane seen from behind, flying away from the camera?", "Is there a red car seen from behind?"]}
+      ]
+    },
+    {
+      "name": "stuck-base-live-sequence",
+      "note": "Bug from the live test 2026-11-15 07:27: after a base edit wrote the place into the base, every later place change was refused and nothing changed on screen. A new place now rebuilds the scene around it and keeps the objects.",
+      "start": "meadow",
+      "modes": ["sonnet"],
+      "live": true,
+      "steps": [
+        {"say": "kill the tree's leaves", "has": ["no leaves"]},
+        {"say": "cut the grass", "has": ["grass"]},
+        {"say": "i want no grass. arid environment", "lacks": ["lush"]},
+        {"say": "add a lion", "chips": ["lion"], "has": ["lion"]},
+        {"say": "now i want a savannah", "chips": ["lion"], "has": ["savannah", "lion"], "lacks": ["arid meadow"], "visible": ["Is there a lion?", "Is the ground covered in tall dry grass, like a savannah?"]},
+        {"say": "i now want a city in the night with a car driving on the road", "chips": ["car"], "has": ["city", "car"], "lacks": ["savannah"], "visible": ["Is it a city at night?", "Is there a car on a road?"]}
+      ]
     }
   ]
 }

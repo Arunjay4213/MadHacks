@@ -254,8 +254,10 @@ MAX_ROAD_WORDS = 14
 # A road slot without one of these words left the car on the sand or in the water (live acceptance run, 2026-11-15).
 DRIVABLE = frozenset({"road", "roads", "highway", "street", "lane", "avenue", "boulevard", "bridge", "motorway",
                       "freeway", "causeway", "drive", "promenade", "track", "asphalt"})
-MAX_SCENE_WORDS = 40
-MAX_LIGHT_WORDS = 20
+# Raised from 40 and 20 (live, 2026-11-15): a good reply on the ocean coast was refused for 43 words, as long as the
+# measured world's own scene sentence.
+MAX_SCENE_WORDS = 60
+MAX_LIGHT_WORDS = 30
 # The subject and camera sentences are the engine's; the fields never move the camera or re-frame the shot.
 CAMERA_WORDS = frozenset("""
     camera cameras shot shots tracking frame framing framed zoom zooms zooming pan pans panning lens angle
@@ -338,10 +340,10 @@ leave "details" empty: {"blocked": ..., "operations": [...], "details": "", "roa
   road in X. The vehicle goes only when the user says so ("remove the car", "just the beach, no car"): then reply
   with ONE new_scene whose base describes X itself ("a wide sandy beach with gentle turquoise waves") and no add
   of kind world (a base that names a place cannot take another place).
-- "scene": ONE sentence (at most 40 words) about what lines both sides of the road: landscape, buildings, weather
+- "scene": ONE sentence (at most 60 words) about what lines both sides of the road: landscape, buildings, weather
   you can see. Never the camera, the shot or the frame. The scene's objects (kind extra) are added by the engine
   from their phrases, word for word: do not describe them again.
-- "light": ONE short sentence (at most 20 words) about the light and the sky.
+- "light": ONE short sentence (at most 30 words) about the light and the sky.
 - The world of the new scene: its place, season, weather and time of day. A change of place replaces the road,
   the scene and the light together. If "car_template" in the user message gives the current road, scene and
   light, keep what the sentence does not change.

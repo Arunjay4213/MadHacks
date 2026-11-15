@@ -182,6 +182,23 @@ MOTION_SAID_WORDS = frozenset({"forward", "away", "behind", "reversing", "revers
                                "wrecked", "sitting"})
 
 
+# Things that move by themselves. On a vehicle scene the camera follows the car forward, so one with no direction of its
+# own is drawn moving backwards (live, 2026-11-15: "an airplane in the sky" from the dictionary flew backwards).
+MOVER_WORDS = frozenset({"airplane", "aeroplane", "plane", "jet", "helicopter", "bird", "birds", "eagle", "drone",
+                         "balloon", "car", "truck", "van", "bus", "motorcycle", "motorbike", "bike", "bicycle", "horse",
+                         "horses", "dog", "deer", "boat"})
+HEADING = "seen from behind, moving forward away from the camera in the same direction as the car"
+STAYING_WORDS = frozenset({"anchored", "moored", "docked", "sleeping", "asleep", "perched", "resting", "lying", "lies",
+                           "grazing", "sits", "landed", "hovering", "floating", "stands", "still"})
+
+
+def with_heading(phrase: str) -> str:
+    """An object phrase on a vehicle scene with HEADING when it names a mover and says nothing about its direction."""
+    if _words(phrase) & MOVER_WORDS and not _words(phrase) & (MOTION_SAID_WORDS | STAYING_WORDS):
+        return f"{phrase.rstrip(' .,')}, {HEADING}"
+    return phrase
+
+
 def with_forward_motion(subject: str) -> str:
     """`subject` plus FORWARD_MOTION when it names a vehicle and says nothing about its direction or standing yet."""
     if is_vehicle(subject) and not _words(subject) & MOTION_SAID_WORDS:
@@ -403,6 +420,13 @@ Rules for operations:
   replaces that change.
   Only when the user names no attribute ("add a car"), give the second one another colour or type.
 - A vehicle on a road ("add a red car racing on a road") gets this cue at the end of its phrase: "{lane_cue}".
+- An object's phrase never names another object of the scene ("smaller than the lion"): it stays word for word
+  after that object is removed.
+- Every moving thing (vehicle, aircraft, boat, animal, person) says which way it travels relative to the camera,
+  consistent with the camera's motion, or the video model draws it moving backwards. On a vehicle scene (the camera
+  follows the car), anything moving travels forward away from the camera in the same direction as the car, seen
+  from behind: "a passenger airplane seen from behind, flying forward away from the camera in the same direction as
+  the car, high above the road". Only a direction the user names overrides this ("a plane flying toward us").
 {place_rule}
 - Seasons, weather and times of day use the keyword table's labels and kinds, so a sentence gives the same
   change however it is read: label (kind): words that mean it.
@@ -410,6 +434,10 @@ Rules for operations:
   "sunny" is the time change day: it replaces night. Use one of these labels whenever the words fit.
 - A BASE EDIT turns something the base sentence names into something else and KEEPS every change ("turn the
   tree into a lighthouse"): use edit_base. The engine keeps the changes; never copy them yourself.
+  A base edit changes only the things the base names (the tree and its leaves), never the ground, the grass, the
+  climate or the place: those are a world change ("i want no grass, arid environment" is one add of kind world,
+  label "arid land", phrase "bare dry cracked earth with no grass, an arid landscape"), so a later place replaces
+  them. Keep the rest of the base word for word.
 - A NEW SCENE only when the user asks for one in so many words ("new scene of a beach", "start over with a
   beach"): use new_scene, which clears every change. Its base is the user's words for the scene, as said.
 - edit_base and new_scene come before any other operation of the sentence.
@@ -879,7 +907,8 @@ class FinalReader:
             return None
         said = (*earlier, *(strength_phrase(c["phrase"], c["strength"]) for c in added
                             if c["kind"] in ("season", "weather", "time") and c["strength"] > 0))
-        prompt = car_template.world_prompt(subject, world, [*car_template.scene_objects(after), *said])
+        objects = [with_heading(o) for o in car_template.scene_objects(after)]
+        prompt = car_template.world_prompt(subject, world, [*objects, *said])
         with self._lock:
             self._given_vehicle[compose(after)] = prompt
             self._fallback_vehicle[compose(after)] = (prompt, world, said)
@@ -1058,7 +1087,19 @@ class FinalReader:
         try:
             canonical = compose(after)  # with PR #88 a world the base cannot take raises ValueError
         except (ValueError, TypeError, KeyError) as exc:
-            return Attempt(Verdict.INVALID, Entry(Outcome.FALLBACK), (f"the new scene does not compose: {exc!r}",))
+            # A base that names its own place ("a wide shot of an arid meadow with ...", written by an earlier base
+            # edit) cannot take a world change, and asking again rarely fits in the wait, so the user saw nothing
+            # change for every later place (live, 2026-11-15 07:27). The place becomes the new scene instead.
+            rebased = place_as_new_scene(clean, snapshot) if "names its own world" in str(exc) else None
+            try:
+                after = scene_after(snapshot, rebased) if rebased else None
+                canonical = compose(after) if after else None
+            except (ValueError, TypeError, KeyError):
+                canonical = None
+            if canonical is None:
+                return Attempt(Verdict.INVALID, Entry(Outcome.FALLBACK), (f"the new scene does not compose: {exc!r}",))
+            log.info("final reader: %r: the base names its own place; the new place is a new scene", _short(text))
+            clean = rebased
         problems = new_object_problems(snapshot, after)
         for p in problems:
             log.warning("final reader: %r: %s", _short(text), p)
@@ -1193,6 +1234,29 @@ def expand_operations(ops: list, snapshot: dict) -> list[dict] | None:
         rebuilt = rebuilt or clean["op"] == "new_scene"
         out.append(with_lane_cue(distinct_label(canonical_change(canonical_world(clean)), snapshot, out)))
     out = world_first(out, copied)
+    return out if len(out) <= MAX_BATCH else None
+
+
+PLACE_BASE = "a wide shot"  # the base of a scene rebuilt around a new place: it names no place of its own
+
+
+def place_as_new_scene(ops: list[dict], snapshot: dict) -> list[dict] | None:
+    """`ops` (expanded) whose world add the scene's base cannot take (the base names its own place), as a new scene:
+    a new_scene of PLACE_BASE, the sentence's world change, then the objects and the time of day the scene has after
+    the sentence's other operations (removals and re-adds kept). PLACE_BASE names no place, so every later place
+    change replaces the world as usual. None when the sentence adds no world or its other operations do not apply."""
+    worlds = [o for o in ops if o["op"] == "add" and o["kind"] == "world"]
+    if not worlds or any(o["op"] == "new_scene" for o in ops):
+        return None  # a reply that writes its own base (a base edit, a new scene) is the model's: never rebuilt here
+    try:
+        rest = scene_after(snapshot, [o for o in ops if not any(o is w for w in worlds)])
+    except (ValueError, TypeError, KeyError):
+        return None
+    kept = [c for c in rest["changes"] if c["kind"] in ("extra", "time") and c["strength"] > 0]
+    said = [o for o in ops if o["op"] == "add" and o["kind"] in ("season", "weather")]  # "a snowy desert": kept
+    out = [{"op": "new_scene", "base": PLACE_BASE}, worlds[-1], *said,
+           *({"op": "add", "label": c["label"], "kind": c["kind"], "phrase": c["phrase"], "strength": c["strength"]}
+             for c in kept)]
     return out if len(out) <= MAX_BATCH else None
 
 
