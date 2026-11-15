@@ -22,6 +22,18 @@ fail_on_chunk=N injects a crash to test recovery: from chunk N on (chunks count 
 
 short_on_chunks=40,80 makes those chunks (numbered as fail_on_chunk, across resets) 1 frame long, as the real model's
 chunk after a rebase decodes to only its first frame. Their frames say "short chunk", so a recording shows them.
+
+Model passes, to measure the cost of a cut on the CPU (all off by default):
+    pass_ms=0, denoise_passes=2, cut_passes=4, defer_context=false, cut_fade_frames=0
+pass_ms > 0 replaces the single gen_ms sleep with the real model's passes, pass_ms each: denoise_passes denoising
+passes and one context pass (the KV-cache write) per chunk, and cut_passes denoising passes for a re-anchor chunk
+(4 today, 2 with the real backend's steer_steps=1000,500). defer_context=true runs a chunk's context pass at the start
+of the next chunk and skips it when that chunk re-anchors, as the real backend's option does.
+interrupt() stops the chunk in flight at its next pass boundary with ChunkInterrupted, but only a chunk that
+continues the video (not a re-anchor chunk, not the first chunk after reset); the stopped call changes nothing,
+so the next call takes the same chunk number. With pass_ms=0 a chunk is one pass and has no boundary.
+cut_fade_frames=N dissolves into a re-anchor chunk from the last frame decoded before it over N frames, with the
+real decoder's formula, so the engine's flush can be checked against it.
 """
 
 import hashlib
@@ -62,6 +74,12 @@ class SharedDevice:
                 self._jobs -= 1
 
 
+class ChunkInterrupted(RuntimeError):
+    """generate_chunk was stopped by interrupt(); the engine knows it by `chunk_interrupted`."""
+
+    chunk_interrupted = True
+
+
 def load(width: int, height: int, steps: int, device: str = "cpu", decode_device: str = "cpu", **options):
     return FakeBackend(width, height, steps, **options)
 
@@ -81,6 +99,11 @@ def _chunk_numbers(value: str | int | None) -> frozenset[int]:
         raise ValueError(f"short_on_chunks expects comma-separated chunk numbers, got {value!r}") from None
 
 
+def _flag(value: bool | str) -> bool:
+    """A --backend-opt flag: a bool, or a string such as 1, true, yes, on."""
+    return value if isinstance(value, bool) else str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
 def _rgb(vec: torch.Tensor) -> np.ndarray:
     """Map the first three values of a token vector to a colour, smoothly."""
     return (127.5 + 127.5 * torch.tanh(vec[:3].float() * 1.5)).numpy()
@@ -90,13 +113,30 @@ class FakeBackend:
     def __init__(self, width: int, height: int, steps: int, gen_ms: float = 170, decode_ms: float = 60,
                  encode_ms: float = 80, frames_per_chunk: int = 4, first_chunk_frames: int = 1, fps: int = 16,
                  fail_on_chunk: int = -1, fail_count: int = 1, fail_in: str = "generate",
-                 shared_device: bool = False, short_on_chunks: str | int | None = None):
+                 shared_device: bool = False, short_on_chunks: str | int | None = None, pass_ms: float = 0,
+                 denoise_passes: int = 2, cut_passes: int = 4, defer_context: bool | str = False,
+                 cut_fade_frames: int = 0):
         self.width, self.height, self.steps = int(width), int(height), int(steps)
         self.fps = int(fps)
         self.frames_per_chunk = int(frames_per_chunk)
         self.first_chunk_frames = int(first_chunk_frames)
         self.gen_s, self.decode_s, self.encode_s = float(gen_ms) / 1e3, float(decode_ms) / 1e3, float(encode_ms) / 1e3
         self.device = SharedDevice() if shared_device else None
+        self.pass_s = float(pass_ms) / 1e3  # 0: a chunk is one gen_ms sleep
+        self.denoise_passes, self.cut_passes = int(denoise_passes), int(cut_passes)
+        if self.denoise_passes < 1 or self.cut_passes < 1:
+            raise ValueError("denoise_passes and cut_passes must be at least 1")
+        self.defer_context = _flag(defer_context)
+        self._context_pending = False  # defer_context: the last chunk's context pass has not run yet
+        self.context_passes_skipped = 0
+        self._interrupt = threading.Event()
+        self.interrupted_chunks = 0
+        self.cut_fade_frames = int(cut_fade_frames)
+        if self.cut_fade_frames < 0:
+            raise ValueError(f"cut_fade_frames must be >= 0, got {cut_fade_frames}")
+        self._last_frame: np.ndarray | None = None  # decoder state: the last frame decoded since reset
+        self._fade_from: np.ndarray | None = None  # the frame a running dissolve starts from
+        self._fade_done = 0
         self._chunks_generated = 0       # counts every generate_chunk call; not cleared by reset
         self._chunks_since_reset = 0     # the "frame cache": restarts the motion after reset
         self._frame_phase = 0            # decoder state: frames decoded since reset
@@ -138,6 +178,13 @@ class FakeBackend:
     def reset(self) -> None:
         self._chunks_since_reset = 0
         self._frame_phase = 0
+        self._context_pending = False
+        self._interrupt.clear()
+        self._last_frame, self._fade_from, self._fade_done = None, None, 0
+
+    def interrupt(self) -> None:
+        """Any thread: stop the chunk in flight at its next pass boundary (see the module docstring)."""
+        self._interrupt.set()
 
     def reanchor(self, strength: float, source: str = "last") -> None:
         """Re-anchor the next generate_chunk with `strength` in (0, 1], from the "last" latent or the "clean" anchor."""
@@ -156,8 +203,41 @@ class FakeBackend:
             self.failures_left -= 1
             raise RuntimeError(f"fake backend: injected {where} failure at chunk {chunk}")
 
+    def _passes(self) -> None:
+        """The chunk's model passes (pass_ms > 0); raises ChunkInterrupted at a boundary when interrupt() was called."""
+        self._interrupt.clear()  # an interrupt that missed the previous chunk is moot
+        anchor = self._anchor_next is not None
+        stoppable = not anchor and self._chunks_since_reset > 0
+        done = 0
+        if self._context_pending:
+            self._context_pending = False
+            if anchor:
+                self.context_passes_skipped += 1  # the re-anchor drops the frame cache it would write
+            else:
+                self._work(self.pass_s)
+                done += 1
+        for _ in range(self.cut_passes if anchor else self.denoise_passes):
+            self._stop_if_interrupted(done, stoppable)
+            self._work(self.pass_s)
+            done += 1
+        if self.defer_context:
+            self._context_pending = True
+        else:
+            self._stop_if_interrupted(done, stoppable)
+            self._work(self.pass_s)
+
+    def _stop_if_interrupted(self, done: int, stoppable: bool) -> None:
+        if done and stoppable and self._interrupt.is_set():
+            self._interrupt.clear()
+            self.interrupted_chunks += 1
+            raise ChunkInterrupted(f"fake chunk {self._chunks_generated} stopped at a pass boundary by interrupt()")
+
     def generate_chunk(self, cond: torch.Tensor) -> dict:
-        self._work(self.gen_s)
+        if self.pass_s > 0:
+            self._passes()
+        else:
+            self._interrupt.clear()  # one pass: no boundary to stop at
+            self._work(self.gen_s)
         self._maybe_fail("generate", self._chunks_generated)
         short = self._chunks_since_reset > 0 and self._chunks_generated in self.short_on_chunks
         if self._chunks_since_reset == 0:
@@ -165,7 +245,8 @@ class FakeBackend:
         else:
             n = 1 if short else self.frames_per_chunk
         latents = {"number": self._chunks_generated, "frames": n, "short": short,
-                   "background": _rgb(cond[0, 0]), "ball": _rgb(cond[0, 1]), "anchor": self._anchor_next}
+                   "background": _rgb(cond[0, 0]), "ball": _rgb(cond[0, 1]), "anchor": self._anchor_next,
+                   "fade": self._anchor_next is not None and self.cut_fade_frames > 0}
         self._anchor_next = None
         self._chunks_generated += 1
         self._chunks_since_reset += 1
@@ -174,6 +255,12 @@ class FakeBackend:
     def decode_chunk(self, latents: dict) -> np.ndarray:
         t0 = time.perf_counter()
         self._maybe_fail("decode", latents["number"])
+        frames = self._fade_in(self._draw(latents), latents)
+        self._work(self.decode_s - (time.perf_counter() - t0))
+        return frames
+
+    def _draw(self, latents: dict) -> np.ndarray:
+        """The chunk's frames: the background, the moving ball, and the labels."""
         frames = np.empty((latents["frames"], self.height, self.width, 3), dtype=np.uint8)
         bg = (self._shade * latents["background"]).astype(np.uint8)
         r = self.height / 8
@@ -196,5 +283,27 @@ class FakeBackend:
                           font=self._font, stroke_width=2, stroke_fill=(0, 0, 0))
             frames[i] = np.asarray(img)
             self._frame_phase += 1
-        self._work(self.decode_s - (time.perf_counter() - t0))
         return frames
+
+    def _fade_in(self, frames: np.ndarray, latents: dict) -> np.ndarray:
+        """Decoder state after drawing: the dissolve into a re-anchor chunk (cut_fade_frames), and the last frame."""
+        if latents["fade"] and self._last_frame is not None:
+            self._fade_from, self._fade_done = self._last_frame, 0
+        elif latents["anchor"] is not None:
+            self._fade_from, self._fade_done = None, 0  # a cut without a fade ends a running dissolve
+        if self._fade_from is not None and len(frames):
+            frames = self._fade(frames)
+        if len(frames):
+            self._last_frame = frames[-1]
+        return frames
+
+    def _fade(self, out: np.ndarray) -> np.ndarray:
+        """The real decoder's dissolve: output frame k after the cut is (1 - a) * old + a * new, a = (k + 1) / (N + 1)."""
+        n = self.cut_fade_frames
+        k = np.arange(len(out), dtype=np.float32) + self._fade_done
+        a = np.minimum((k + 1) / (n + 1), 1.0).reshape(-1, 1, 1, 1)
+        out = np.rint(self._fade_from.astype(np.float32) * (1 - a) + out.astype(np.float32) * a).astype(np.uint8)
+        self._fade_done += len(out)
+        if self._fade_done >= n:
+            self._fade_from = None
+        return out

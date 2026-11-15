@@ -21,7 +21,7 @@ from starlette.responses import FileResponse, JSONResponse, PlainTextResponse, R
 from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
-from .engine import Engine, EngineConfig, ShortChunkMode, reanchor_config
+from .engine import Engine, EngineConfig, FlushOnCut, ShortChunkMode, reanchor_config
 from .lifecycle import Lifecycle
 from .messages import BadMessage, parse_json
 
@@ -315,6 +315,12 @@ def parse_args(argv=None) -> argparse.Namespace:
                    help="JSON file of the Sonnet results, kept across restarts; none keeps them in memory only")
     p.add_argument("--short-chunk", default=EngineConfig.short_chunk, choices=[m.value for m in ShortChunkMode],
                    help="how a chunk with fewer than frames_per_chunk frames (after a rebase) is padded before playout")
+    p.add_argument("--flush-on-cut", default=EngineConfig.flush_on_cut, choices=[m.value for m in FlushOnCut],
+                   help="on: when a steer cut's frames are decoded, drop the old frames still waiting to be sent, so "
+                        "the cut is the next frame on screen")
+    p.add_argument("--interrupt-on-steer", default=EngineConfig.interrupt_on_steer, choices=["off", "on"],
+                   help="on: a steer that re-anchors on the next chunk stops the old-scene chunk being generated "
+                        "(backend.interrupt()); needs --reanchor on")
     p.add_argument("--demo-prompts", default=EngineConfig.demo_prompts, metavar="PATH",
                    help="JSON file of pinned final reader results for the demo sentences (never regenerated); "
                         "none turns it off")
@@ -355,7 +361,8 @@ def main(argv=None) -> None:
                           reanchor=args.reanchor, reanchor_options=reanchor_options,
                           final_reader=args.final_reader, final_timeout_s=args.final_timeout_s,
                           final_cache=None if args.final_cache.lower() == "none" else args.final_cache,
-                          short_chunk=args.short_chunk,
+                          short_chunk=args.short_chunk, flush_on_cut=args.flush_on_cut,
+                          interrupt_on_steer=args.interrupt_on_steer,
                           demo_prompts=None if args.demo_prompts.lower() == "none" else args.demo_prompts,
                           record_dir=None if args.record_dir.lower() == "none" else args.record_dir,
                           record_max_bytes=int(args.record_max_gb * 1e9))
