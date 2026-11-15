@@ -248,6 +248,13 @@ def change_wording(world_change: dict | None, change: dict, changes: list) -> st
 
 _WORLD_ALIAS_RX = re.compile(r"\b(?:" + "|".join(sorted(map(re.escape, WORLDS), key=len, reverse=True)) + r")\b")
 _OAK_SUBJECT = "a wide shot of a single oak tree"
+# The oak scene's base with its meadow described ("a wide shot of a meadow of freshly cut short grass with a single
+# bare oak tree"): up to three words before "meadow", an optional "of ..." clause, then "with" and the subject.
+_MEADOW_BASE_RX = re.compile(r"^a wide shot of (?:an? )?(?:[\w,'-]+ ){0,3}?meadow(?: of [^;]+?)?,? with (?P<subject>[^;]+)$",
+                             re.IGNORECASE)
+# A ground description said before the subject ("freshly cut short grass and ..."): it belongs to the meadow.
+_GROUND_FIRST_RX = re.compile(r"^[\w,' -]*?\b(?:grass|earth|ground|soil|sand|dirt|mud|snow|flowers|wildflowers)\b"
+                              r"[\w,' -]*? and (?=an? |the |\w+ \w+ tree)", re.IGNORECASE)
 
 
 def compose_base(base: str, world: str) -> str:
@@ -260,6 +267,12 @@ def compose_base(base: str, world: str) -> str:
     """
     if base == DEFAULT_BASE:
         return f"{_OAK_SUBJECT}; {world}"
+    meadow = _MEADOW_BASE_RX.match(base)
+    if meadow and not _WORLD_ALIAS_RX.search(normalize(meadow.group("subject"))):
+        # The oak scene after a base edit ("a wide shot of a meadow with a single bare oak tree with no leaves"):
+        # the meadow is its place and the rest its subject, so a new place still replaces the meadow.
+        subject = _GROUND_FIRST_RX.sub("", meadow.group("subject"))  # "freshly cut grass and a single oak tree"
+        return f"a wide shot of {subject}; {world}"
     if _WORLD_ALIAS_RX.search(normalize(base)):
         raise ValueError(f"base names its own world; cannot replace it safely: {base!r}")
     return f"{base}; {world}"

@@ -174,6 +174,15 @@ class ComposeBaseTest(unittest.TestCase):
         self.assertEqual(compose_base("a red car driving along a road", ISHAAN["desert"]),
                          "a red car driving along a road; " + ISHAAN["desert"])
 
+    def test_an_edited_oak_scene_base_keeps_its_subject_and_drops_its_meadow(self):
+        # Live 2026-11-15: a base edit wrote the meadow's look into the base, and every later place was refused.
+        for base in ["a wide shot of a meadow with a single bare oak tree with no leaves",
+                     "a wide shot of a meadow of freshly cut short grass with a single bare oak tree with no leaves",
+                     "a wide shot of a meadow with freshly cut short grass and a single bare oak tree with no leaves",
+                     "a wide shot of an arid meadow with bare, dry cracked earth and a single bare oak tree with no leaves"]:
+            self.assertEqual(compose_base(base, ISHAAN["desert"]),
+                             "a wide shot of a single bare oak tree with no leaves; " + ISHAAN["desert"], base)
+
     def test_unknown_base_with_its_own_world_is_refused(self):
         for base in ["a wide shot of a busy city street", "a quiet beach at dawn", "a dense forest clearing"]:
             with self.assertRaises(ValueError):

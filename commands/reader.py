@@ -338,6 +338,10 @@ def read(text: str, snapshot: dict) -> dict:
         if description_match:
             article, description = description_match.groups()
             description = _FILLER_TAIL_RX.sub("", description).strip()
+            if re.match(r"^to\b", description) or (article == "the" and _names(snapshot.get("base", ""), entry)):
+                # "i want to see the car's side profile", "show me the car" on the car scene: the object is only
+                # context (the car of the base is already there), never a second one (live, 2026-11-15).
+                return out(None, keyword)
             # Bare aliases keep their stable dictionary phrase; explicit visual details survive.
             detail = KEYWORD_RX.sub(lambda m: " " if KEYWORDS[m.group()]["label"] == entry["label"] else m.group(), description)
             for rx in (_LOW_RX, _HIGH_RX, _MORE_RX, _LESS_RX):
@@ -353,7 +357,22 @@ def read(text: str, snapshot: dict) -> dict:
             # nothing and still look understood; unmatched shows the user the words were not used.
             return out(None, keyword)
         return out({"op": "set_strength", "id": existing["id"], "strength": strength}, keyword)
+    if entry["kind"] == "extra" and not description_match and (
+            _CONTEXT_START_RX.match(t)
+            or (re.search(r"\bthe\s+(?:[a-z'-]+\s+)?" + re.escape(keyword) + r"\b", t) and _names(snapshot.get("base", ""), entry))):
+        # An object named after a verb that changes something else ("change the view of the car") is context, not a
+        # request to add one.
+        return out(None, keyword)
     return out({"op": "add", "label": entry["label"], "kind": entry["kind"], "phrase": _additional(entry["phrase"], entry, keyword, snapshot) if entry["kind"] == "extra" else entry["phrase"], "strength": strength}, keyword)
+
+
+_CONTEXT_START_RX = re.compile(r"^(?:please\s+)?(?:change|make|turn|set|switch|move|rotate|zoom|look|view|face|pan|tilt)\b")
+
+
+def _names(base: str, entry: dict) -> bool:
+    """True when the scene's base names the keyword entry's object ("a red sports car" names the car)."""
+    words = set(re.findall(r"[a-z]+", normalize(base or "")))
+    return bool(words & {normalize(a) for a in [entry["label"], *entry.get("aliases", [])]})
 
 
 # A clause starts with an explicit action (optionally after "also/then/please/now" and a pace word).
