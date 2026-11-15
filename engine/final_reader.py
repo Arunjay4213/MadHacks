@@ -98,6 +98,10 @@ class Entry:
     outcome: Outcome
     operations: tuple = ()
     prompt: str | None = None
+    # The scene the operations were made for ({"base", "changes"} with ids). The key holds only its composed
+    # prompt, which leaves out zero-strength chips and sorts changes by kind; a hit is used only on this same scene,
+    # with its change ids mapped to the live ones (scene_ids). None: an entry with no operations to map.
+    scene_before: dict | None = None
 
     def result(self) -> dict | None:
         if self.outcome in (Outcome.SONNET, Outcome.PINNED, Outcome.TEMPLATE):
@@ -105,6 +109,21 @@ class Entry:
         if self.outcome is Outcome.BLOCKED:
             return {"blocked": True}
         return None
+
+
+def scene_record(snapshot: dict) -> dict:
+    """The part of a snapshot a cached entry is tied to: the base and the changes in order, with their ids."""
+    return {"base": snapshot["base"], "changes": [{k: c[k] for k in ("id", "label", "kind", "phrase", "strength")}
+                                                  for c in snapshot["changes"]]}
+
+
+def scene_ids(before: dict, snapshot: dict) -> dict[str, str] | None:
+    """{id in `before`: id in `snapshot`} when both are the same scene (base, and every change's label, kind,
+    phrase and strength in the same order); None when they differ."""
+    shape = lambda s: (s["base"], [(c["label"], c["kind"], c["phrase"], c["strength"]) for c in s["changes"]])
+    if shape(before) != shape(snapshot):
+        return None
+    return {b["id"]: c["id"] for b, c in zip(before["changes"], snapshot["changes"])}
 
 
 def blocked_word(text: str) -> str | None:
@@ -201,9 +220,17 @@ def has_road(text: str) -> bool:
     return bool(_words(text) & ROAD_WORDS)
 
 
+# Words that already say how a vehicle moves, or that it stands still: FORWARD_MOTION would contradict them
+# ("a red car parked beside the oak tree" was told to speed forward).
+MOTION_SAID_WORDS = frozenset({"forward", "away", "behind", "reversing", "reverse", "backwards", "backward", "toward",
+                               "towards", "approaching", "approaches", "oncoming", "parked", "parking", "stopped",
+                               "stationary", "standing", "idle", "idling", "still", "waiting", "abandoned", "crashed",
+                               "wrecked", "sitting"})
+
+
 def with_forward_motion(subject: str) -> str:
-    """`subject` plus FORWARD_MOTION when it names a vehicle and says nothing about its direction yet."""
-    if is_vehicle(subject) and not _words(subject) & {"forward", "away", "behind", "reversing", "backwards"}:
+    """`subject` plus FORWARD_MOTION when it names a vehicle and says nothing about its direction or standing yet."""
+    if is_vehicle(subject) and not _words(subject) & MOTION_SAID_WORDS:
         return f"{subject}, {FORWARD_MOTION}"
     return subject
 
@@ -569,15 +596,18 @@ class CacheFile:
                 outcome = Outcome(e["outcome"])
                 if outcome not in (Outcome.SONNET, Outcome.BLOCKED):
                     continue
+                scene = e.get("scene_before")
+                if outcome is Outcome.SONNET and not isinstance(scene, dict):
+                    continue  # written before entries kept their scene: its ids cannot be mapped
                 out[(e["prompt_before"], e["sentence"])] = Entry(
-                    outcome, tuple(e.get("operations") or ()), e.get("prompt"))
+                    outcome, tuple(e.get("operations") or ()), e.get("prompt"), scene)
             except (KeyError, TypeError, ValueError):
                 continue
         return out
 
     def save(self, cache: dict[tuple[str, str], Entry]) -> None:
         entries = [{"prompt_before": k[0], "sentence": k[1], "outcome": v.outcome.value,
-                    "operations": list(v.operations), "prompt": v.prompt}
+                    "operations": list(v.operations), "prompt": v.prompt, "scene_before": v.scene_before}
                    for k, v in cache.items() if v.outcome in (Outcome.SONNET, Outcome.BLOCKED)]
         with self._lock:
             try:
@@ -649,8 +679,8 @@ def load_pinned(path: str | Path | None) -> dict[tuple[str, str], Entry]:
         except Exception as exc:  # noqa: BLE001 - skip the entry, keep the others
             log.warning("final reader: demo prompt %d (%r) skipped: %r", n, _short(e.get("sentence") if isinstance(e, dict) else e), exc)
             continue
+        pinned[(before, sentence)] = Entry(Outcome.PINNED, tuple(ops), prompt, scene_record(scene.snapshot()))
         scene = trial
-        pinned[(before, sentence)] = Entry(Outcome.PINNED, tuple(ops), prompt)
     log.info("final reader: %d of %d demo prompts pinned from %s", len(pinned), len(entries), path)
     return pinned
 
@@ -726,18 +756,13 @@ class FinalReader:
         from commands.composer import compose  # the commands/ owner's composer; imported only when ON
         key = (compose(snapshot), text)
         with self._lock:
-            entry = self._pinned.get(key)
-            if entry is not None:
-                self.pinned_hits += 1
-            else:
-                entry = self._cache.get(key)
-                if entry is not None:
-                    self.cache_hits += 1
-        if entry is not None:
-            result = self._from_cache(key, entry, snapshot)
-            if result is not None:
-                self._given(entry, snapshot)
-            return result
+            pinned, cached = self._pinned.get(key), self._cache.get(key)
+        for found, counter in ((pinned, "pinned_hits"), (cached, "cache_hits")):
+            hit = self._from_cache(key, found, snapshot) if found is not None else None
+            if hit is not None:
+                with self._lock:
+                    setattr(self, counter, getattr(self, counter) + 1)
+                return self._given(hit, snapshot)
         measured = self._measured(text, snapshot)
         if measured is not None:
             with self._lock:
@@ -745,16 +770,21 @@ class FinalReader:
             return self._given(measured, snapshot)
         with self._lock:
             self.calls += 1
-        fut = self._pool.submit(self._call, text, snapshot)
+        first_usable: list[Entry] = []  # set by the worker before a retry, when its first reply is usable
+        fut = self._pool.submit(self._call, text, snapshot, first_usable)
         try:
             entry = fut.result(timeout=self.timeout_s)
         except concurrent.futures.TimeoutError:
-            entry = None
+            entry = first_usable[0] if first_usable else None
+            if entry is not None:
+                log.info("final reader: the retry for %r ran out of time; using its first reply", _short(text))
         late = entry is None
         with self._lock:
             if late:
                 self.timeouts += 1
                 entry = Entry(Outcome.FALLBACK)
+            if entry.outcome is Outcome.SONNET:
+                entry = dataclasses.replace(entry, scene_before=scene_record(snapshot))
             self._cache[key] = entry
             if entry.outcome is Outcome.BLOCKED:
                 self.blocked += 1
@@ -831,22 +861,32 @@ class FinalReader:
         log.info("final reader: %r -> measured car world %r, no call", _short(text), plan.world.name)
         return Entry(Outcome.TEMPLATE, tuple(ops), prompt)
 
-    def _from_cache(self, key, entry: Entry, snapshot: dict) -> dict | None:
-        """A cached SONNET or PINNED result's operations name change ids; check they still fit this snapshot."""
+    def _from_cache(self, key, entry: Entry, snapshot: dict) -> Entry | None:
+        """The cached or pinned `entry` for `snapshot`, or None when it does not apply (a miss: the sentence is read
+        again). A SONNET or PINNED entry applies only to the scene it was made for (scene_ids), with its change
+        ids mapped to the live ones, and only when every operation still validates. BLOCKED and FALLBACK apply."""
         if entry.outcome not in (Outcome.SONNET, Outcome.PINNED):
-            return entry.result()
-        if all(validate_operation(dict(op), snapshot, CACHED_MAX_PHRASE) == dict(op) for op in entry.operations):
-            return entry.result()
-        log.info("final reader: the cached operations for %r no longer fit the scene; dictionary path", _short(key[1]))
+            return entry
+        ids = scene_ids(entry.scene_before, snapshot) if entry.scene_before is not None else None
+        if ids is None:
+            log.info("final reader: the saved result for %r was made for another scene with the same prompt; "
+                     "reading it again", _short(key[1]))
+            return None
+        ops = tuple({**op, "id": ids[op["id"]]} if "id" in op else dict(op) for op in entry.operations)
+        if all(validate_operation(dict(op), snapshot, CACHED_MAX_PHRASE) == dict(op) for op in ops):
+            return dataclasses.replace(entry, operations=ops, scene_before=scene_record(snapshot))
+        log.info("final reader: the cached operations for %r no longer fit the scene; reading it again", _short(key[1]))
         return None
 
-    def _call(self, text: str, snapshot: dict) -> Entry | None:
+    def _call(self, text: str, snapshot: dict, first_usable: list | None = None) -> Entry | None:
         """Worker thread: one Sonnet call, checked, and one retry with the reasons when the first reply is not
         fully usable and the first call took less than half the wait (so on the live 3 s wait at 1.8 s a call,
         the retry happens only in offline runs such as the demo prompts regeneration). Never raises."""
         t0 = time.perf_counter()
         first = self._attempt(text, snapshot, None)
         best = first
+        if first.verdict in RETRY_VERDICTS and first.entry.outcome is Outcome.SONNET and first_usable is not None:
+            first_usable.append(first.entry)  # a retry that runs past the wait must not lose this edit
         if first.verdict in RETRY_VERDICTS:
             elapsed = time.perf_counter() - t0
             if elapsed < self.timeout_s / 2:
@@ -1063,10 +1103,12 @@ def expand_operations(ops: list, snapshot: dict) -> list[dict] | None:
     An operation naming a change id after a base edit or a new scene is invalid (those ids are gone), and undo
     and reset stay with the dictionary.
     A world add clears the earlier season and weather in commands.state (#115); world_first keeps a season said
-    in the same sentence.
+    in the same sentence, and drops the season and weather a base edit copied when the sentence also adds a world
+    ("turn the tree into a lighthouse and make it a desert" after winter has no snow).
     A vehicle added on a road gets LANE_CUE.
     """
     out: list[dict] = []
+    copied: list[dict] = []  # the adds a base edit copied from the scene (compared by identity)
     rebuilt = False  # an edit_base or new_scene came first: the old ids no longer exist
     for op in ops:
         if isinstance(op, dict) and op.get("op") == "edit_base":
@@ -1075,8 +1117,10 @@ def expand_operations(ops: list, snapshot: dict) -> list[dict] | None:
                 return None
             current = scene_after(snapshot, out)["changes"]
             out.append(clean)
-            out += [{"op": "add", "label": c["label"], "kind": c["kind"], "phrase": c["phrase"],
-                     "strength": c["strength"]} for c in current]
+            copies = [{"op": "add", "label": c["label"], "kind": c["kind"], "phrase": c["phrase"],
+                       "strength": c["strength"]} for c in current]
+            out += copies
+            copied += copies
             rebuilt = True
             continue
         clean = validate_operation(op, snapshot, FINAL_MAX_PHRASE)
@@ -1086,7 +1130,8 @@ def expand_operations(ops: list, snapshot: dict) -> list[dict] | None:
             return None
         rebuilt = rebuilt or clean["op"] == "new_scene"
         out.append(with_lane_cue(distinct_label(canonical_change(canonical_world(clean)), snapshot, out)))
-    return world_first(out) if len(out) <= BATCH_LIMIT else None
+    out = world_first(out, copied)
+    return out if len(out) <= BATCH_LIMIT else None
 
 
 def bare_vehicle_operations(ops: list[dict], snapshot: dict, subject: str) -> list[dict] | None:
@@ -1101,13 +1146,17 @@ def bare_vehicle_operations(ops: list[dict], snapshot: dict, subject: str) -> li
     return expand_operations([{"op": "edit_base", "base": subject}, *ops], snapshot)
 
 
-def world_first(ops: list[dict]) -> list[dict]:
+def world_first(ops: list[dict], copied: list[dict] = ()) -> list[dict]:
     """The world adds of a sentence moved before its season and weather adds (each group keeps its order).
     commands.state clears season and weather on a world add (#115), so "take me to a snowy desert" read as
-    winter then desert would lose the winter it asked for. A new_scene or edit_base stays first."""
-    worlds = [o for o in ops if o["op"] == "add" and o["kind"] == "world"]
+    winter then desert would lose the winter it asked for. A new_scene or edit_base stays first.
+    `copied` are the adds a base edit copied from the scene: when the sentence adds a world, its copied season and
+    weather are dropped (the new place brings its own), and a copied world is never moved."""
+    is_copy = lambda o: any(o is c for c in copied)
+    worlds = [o for o in ops if o["op"] == "add" and o["kind"] == "world" and not is_copy(o)]
     if not worlds:
         return ops
+    ops = [o for o in ops if not (is_copy(o) and o["op"] == "add" and o["kind"] in ("season", "weather"))]
     first = next((i for i, o in enumerate(ops) if o["op"] == "add" and o["kind"] in ("season", "weather")), None)
     if first is None or first > ops.index(worlds[0]):
         return ops
@@ -1194,8 +1243,13 @@ def _scene_for_model(snapshot: dict) -> dict:
                         for c in snapshot.get("changes", [])]}
 
 
-def fingerprint(system_prompt: str, model: str) -> str:
-    return hashlib.sha256(json.dumps([system_prompt, model]).encode()).hexdigest()[:16]
+# Changed whenever the engine builds prompts differently from the same reply (the car template, forward motion,
+# the object order, ...), so the disk cache is not reused across that change even when the system prompt is the same.
+PROMPT_BUILD = "2026-11-15 car template, motion words, scene-matched cache"
+
+
+def fingerprint(system_prompt: str, model: str, build: str = PROMPT_BUILD) -> str:
+    return hashlib.sha256(json.dumps([system_prompt, model, build]).encode()).hexdigest()[:16]
 
 
 def load(mode: str, timeout_s: float = DEFAULT_TIMEOUT_S, cache_path: str | None = DEFAULT_CACHE_FILE,
