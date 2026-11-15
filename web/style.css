@@ -1,4 +1,4 @@
-/* Mirage: the demo page. One centred column on a static gradient: header, the video box, the heard
+/* Mirage: the demo page. One centred column on a flat dark background: header, the video box, the heard
    caption, and the command bar pinned near the bottom. Blur is only ever on the small glass panels,
    never on the video. Nothing animates continuously. */
 :root {
@@ -24,13 +24,7 @@ body {
   min-height: 100vh;
   color: var(--text);
   font: 400 15px/1.4 var(--ui);
-  /* Static, fixed gradient: painted once, never animated. */
-  background:
-    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(245, 181, 68, 0.55) 0%, rgba(245, 181, 68, 0.18) 35%, transparent 65%),
-    radial-gradient(ellipse 65% 60% at 95% 105%, rgba(124, 92, 255, 0.50) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 55% at 0% 100%, rgba(30, 120, 200, 0.42) 0%, transparent 60%),
-    linear-gradient(180deg, #120e0a 0%, #0a0910 100%);
-  background-attachment: fixed;
+  background: #0e0d0b; /* flat, no gradient */
   overflow: hidden; /* no page scroll on desktop */
   -webkit-font-smoothing: antialiased;
 }
