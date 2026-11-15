@@ -11,10 +11,10 @@
         "strength": 1.0
       }
     ],
-    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; pale frozen ground, crisp cold air, soft white drifts, faint frost glitter, muted silver and blue tones, cold diffuse light",
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a soft white blanket over the grass, frost-dusted textures, pale cold light, muted silver and blue tones",
     "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
     "source": "claude-sonnet-5-5",
-    "generated_at": "2026-11-15T01:23:42+00:00"
+    "generated_at": "2026-11-15T02:13:42+00:00"
   },
   {
     "sentence": "add a red car",
@@ -24,35 +24,35 @@
         "op": "add",
         "label": "red car",
         "kind": "extra",
-        "phrase": "a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible",
+        "phrase": "a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible",
         "strength": 1.0
       }
     ],
-    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; cold crisp air, soft pale light across the ground, fine frost texture on surfaces, muted white and grey tones",
-    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible",
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; pale frozen ground, crisp white drifts, soft diffuse light, cold clear air, muted grey and white tones",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible",
     "source": "claude-sonnet-5-5",
-    "generated_at": "2026-11-15T01:24:04+00:00"
+    "generated_at": "2026-11-15T02:13:44+00:00"
   },
   {
     "sentence": "make it night",
-    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible",
     "operations": [
       {
         "op": "add",
         "label": "night",
         "kind": "time",
-        "phrase": "night, dark sky lit by a bright full moon and cold moonlight",
+        "phrase": "night time, dark sky lit by a bright full moon casting cool silvery light",
         "strength": 1.0
       }
     ],
-    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; night, dark sky lit by a bright full moon and cold moonlight; deep blue shadows, frost glittering on the ground, cold silver moonlight, soft pale glow on the snow",
-    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; night, dark sky lit by a bright full moon and cold moonlight; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible",
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; night time, dark sky lit by a bright full moon casting cool silvery light; cold silvery glow on the snow, deep blue shadows, crisp frosty air, pale sparkling highlights on the ground",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; night time, dark sky lit by a bright full moon casting cool silvery light; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible",
     "source": "claude-sonnet-5-5",
-    "generated_at": "2026-11-15T01:24:06+00:00"
+    "generated_at": "2026-11-15T02:13:45+00:00"
   },
   {
     "sentence": "add a lion",
-    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; night, dark sky lit by a bright full moon and cold moonlight; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; night time, dark sky lit by a bright full moon casting cool silvery light; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible",
     "operations": [
       {
         "op": "add",
@@ -62,31 +62,31 @@
         "strength": 1.0
       }
     ],
-    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; night, dark sky lit by a bright full moon and cold moonlight; frost glittering on the ground, pale blue shadows, crisp cold air, silvery light",
-    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; night, dark sky lit by a bright full moon and cold moonlight; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera",
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; night time, dark sky lit by a bright full moon casting cool silvery light; crisp powdery ground texture, cold silvery light, frosted grass, deep blue shadows",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; night time, dark sky lit by a bright full moon casting cool silvery light; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera",
     "source": "claude-sonnet-5-5",
-    "generated_at": "2026-11-15T01:24:08+00:00"
+    "generated_at": "2026-11-15T02:13:47+00:00"
   },
   {
     "sentence": "sunny",
-    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; night, dark sky lit by a bright full moon and cold moonlight; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; night time, dark sky lit by a bright full moon casting cool silvery light; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera",
     "operations": [
       {
         "op": "add",
         "label": "day",
         "kind": "time",
-        "phrase": "bright day, clear sunny sky and warm daylight",
+        "phrase": "bright daytime, clear sunny sky with warm sunlight and crisp shadows",
         "strength": 1.0
       }
     ],
-    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; bright day, clear sunny sky and warm daylight; crisp sunlight, deep blue sky, sparkling snow crystals, soft long shadows",
-    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; bright day, clear sunny sky and warm daylight; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera",
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; bright daytime, clear sunny sky with warm sunlight and crisp shadows; crisp snow-dusted ground glittering under strong sunlight, sharp clear shadows, cold fresh air, bright pale blue sky, soft white and silver tones",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; bright daytime, clear sunny sky with warm sunlight and crisp shadows; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera",
     "source": "claude-sonnet-5-5",
-    "generated_at": "2026-11-15T01:24:09+00:00"
+    "generated_at": "2026-11-15T02:13:49+00:00"
   },
   {
     "sentence": "add jensen huang",
-    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; bright day, clear sunny sky and warm daylight; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; bright daytime, clear sunny sky with warm sunlight and crisp shadows; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera",
     "operations": [
       {
         "op": "add",
@@ -96,28 +96,28 @@
         "strength": 1.0
       }
     ],
-    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the right of the frame, facing the camera; bright day, clear sunny sky and warm daylight",
-    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; bright day, clear sunny sky and warm daylight; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the right of the frame, facing the camera",
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the right of the frame, facing the camera; bright daytime, clear sunny sky with warm sunlight and crisp shadows; crisp snow crust glittering on the ground, frost on bare twigs, cold clear air, long sharp shadows, pale blue and white tones, warm sunlight on soft snowdrifts",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; bright daytime, clear sunny sky with warm sunlight and crisp shadows; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the right of the frame, facing the camera",
     "source": "claude-sonnet-5-5",
-    "generated_at": "2026-11-15T01:33:57+00:00"
+    "generated_at": "2026-11-15T02:13:50+00:00"
   },
   {
     "sentence": "remove jensen huang",
-    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; bright day, clear sunny sky and warm daylight; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the right of the frame, facing the camera",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; bright daytime, clear sunny sky with warm sunlight and crisp shadows; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the right of the frame, facing the camera",
     "operations": [
       {
         "op": "remove",
         "id": "c6"
       }
     ],
-    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; bright day, clear sunny sky and warm daylight; crisp sunlight, deep blue sky, sparkling snow crystals, soft long shadows",
-    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; bright day, clear sunny sky and warm daylight; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera",
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; bright daytime, clear sunny sky with warm sunlight and crisp shadows; crisp snow-dusted ground glittering under strong sunlight, sharp clear shadows, cold fresh air, bright pale blue sky, soft white and silver tones",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; bright daytime, clear sunny sky with warm sunlight and crisp shadows; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera",
     "source": "the earlier scene's pinned prompt",
-    "generated_at": "2026-11-15T01:33:57+00:00"
+    "generated_at": "2026-11-15T02:13:50+00:00"
   },
   {
     "sentence": "make it a desert",
-    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; bright day, clear sunny sky and warm daylight; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; bright daytime, clear sunny sky with warm sunlight and crisp shadows; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera",
     "operations": [
       {
         "op": "add",
@@ -127,27 +127,27 @@
         "strength": 1.0
       }
     ],
-    "prompt": "a wide shot of a single oak tree; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows; bright day, clear sunny sky and warm daylight; warm ochre tones",
-    "canonical": "a wide shot of a single oak tree; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows; bright day, clear sunny sky and warm daylight",
+    "prompt": "a wide shot of a single oak tree; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows; bright daytime, clear sunny sky with warm sunlight and crisp shadows; rippled golden sand, fine windblown grains, dry cracked earth, pale hazy horizon, warm amber tones, sharp crisp shadows",
+    "canonical": "a wide shot of a single oak tree; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows; bright daytime, clear sunny sky with warm sunlight and crisp shadows",
     "source": "claude-sonnet-5-5",
-    "generated_at": "2026-11-15T01:24:11+00:00"
+    "generated_at": "2026-11-15T02:13:52+00:00"
   },
   {
     "sentence": "add a red car racing on a road",
-    "prompt_before": "a wide shot of a single oak tree; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows; bright day, clear sunny sky and warm daylight",
+    "prompt_before": "a wide shot of a single oak tree; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows; bright daytime, clear sunny sky with warm sunlight and crisp shadows",
     "operations": [
       {
         "op": "add",
         "label": "second red car",
         "kind": "extra",
-        "phrase": "a second small red car racing in the next lane at the right of the frame, white dashed lane markings rush toward the viewer",
+        "phrase": "a second small red car racing along the road in the next lane at the right of the frame, white dashed lane markings rush toward the viewer",
         "strength": 1.0
       }
     ],
-    "prompt": "a wide shot of a single oak tree; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a second small red car racing in the next lane at the right of the frame, white dashed lane markings rush toward the viewer; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows; bright day, clear sunny sky and warm daylight",
-    "canonical": "a wide shot of a single oak tree; a large red car parked beside the oak tree in the centre of the frame, facing the camera, clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a second small red car racing in the next lane at the right of the frame, white dashed lane markings rush toward the viewer; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows; bright day, clear sunny sky and warm daylight",
+    "prompt": "a wide shot of a single oak tree; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a second small red car racing along the road in the next lane at the right of the frame, white dashed lane markings rush toward the viewer; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows; bright daytime, clear sunny sky with warm sunlight and crisp shadows; warm golden sand, dry cracked ground, fine dust in the air, rough red rock textures, hard bright light",
+    "canonical": "a wide shot of a single oak tree; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a second small red car racing along the road in the next lane at the right of the frame, white dashed lane markings rush toward the viewer; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows; bright daytime, clear sunny sky with warm sunlight and crisp shadows",
     "source": "claude-sonnet-5-5",
-    "generated_at": "2026-11-15T01:24:17+00:00"
+    "generated_at": "2026-11-15T02:13:54+00:00"
   },
   {
     "sentence": "new scene of a red sports car driving along a country road",
