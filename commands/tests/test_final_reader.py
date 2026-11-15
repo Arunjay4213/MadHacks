@@ -37,30 +37,11 @@ class ApplyFinalTest(unittest.TestCase):
         u = s.handle({"type": "tap", "action": "undo"})
         self.assertEqual(labels(u), [])  # one undo step for the whole sentence
 
-    def test_prompt_override_persists_and_undo_returns_canonical(self):
-        s = svc()
-        r = s.apply_final("add a dog", [DOG], prompt="  A cinematic shot of a dog in a meadow.  ")
-        self.assertEqual(r["steer"]["prompt"], "A cinematic shot of a dog in a meadow.")
-        self.assertEqual(s.committed_prompt, "A cinematic shot of a dog in a meadow.")
-        # A partial guess that is then rejected rolls back to the overridden prompt, not the canonical one.
-        s.handle({"type": "partial", "text": "make it night", "t_client": 2})
-        back = s.handle({"type": "final", "text": "make it nice", "t_client": 3})
-        self.assertEqual(back["steer"]["prompt"], "A cinematic shot of a dog in a meadow.")
-        u = s.handle({"type": "tap", "action": "undo"})
-        self.assertEqual(labels(u), [])
-        self.assertNotIn("cinematic", s.committed_prompt)
-
     def test_invalid_operations_roll_back_everything(self):
         for ops in [[DOG, {"op": "explode"}], [DOG] * 17, "x", [3], [{"op": "add", "label": "x", "kind": "planet", "phrase": "p"}]]:
             s = svc()
             r = s.apply_final("bad", ops)
             self.assertEqual((labels(r), r["state"]["unmatched"], r["steer"]), ([], True, None), ops)
-
-    def test_invalid_prompt_rejects_the_whole_final(self):
-        for prompt in ["", "   ", 5, "p" * 4001]:
-            s = svc()
-            r = s.apply_final("add a dog", [DOG], prompt=prompt)
-            self.assertEqual((labels(r), r["state"]["unmatched"]), ([], True), repr(prompt)[:20])
 
     def test_world_base_conflict_is_caught_before_state_changes(self):
         s = CommandService(base="a quiet beach at dawn", semantic_reader=lambda t, s: None)
@@ -80,10 +61,8 @@ class ApplyFinalTest(unittest.TestCase):
 
     def test_valid_noop(self):
         s = svc()
-        self.assertIsNone(s.apply_final("undo", [{"op": "undo"}])["steer"])  # nothing changed, same prompt
-        r = s.apply_final("say it richer", [{"op": "undo"}], prompt="Same scene, richer words.")
-        self.assertEqual((r["steer"]["prompt"], r["state"]["unmatched"]), ("Same scene, richer words.", False))
-        self.assertEqual(s.committed_prompt, "Same scene, richer words.")
+        r = s.apply_final("undo", [{"op": "undo"}])
+        self.assertEqual((r["steer"], r["state"]["unmatched"]), (None, False))  # valid, nothing changed, same prompt
 
     def test_constructor_hook_is_gone(self):
         with self.assertRaises(TypeError):

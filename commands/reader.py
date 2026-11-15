@@ -12,12 +12,12 @@ from .dictionary import KEYWORD_RX, KEYWORDS, normalize
 from .state import MAX_BATCH
 from .world import WORLDS, world_op
 
-__all__ = ["KEYWORDS", "MAX_CLAUSES", "RAMP", "is_blocked", "read", "remove_target", "resolve", "split_commands", "spot",
+__all__ = ["KEYWORDS", "MAX_CLAUSES", "RAMP", "is_blocked", "ramp_for", "read", "remove_target", "resolve", "split_commands", "spot",
            "style_fallback"]
 
 MAX_CLAUSES = MAX_BATCH  # callers reject a sentence that splits into more
 
-RAMP = {"default": 1, "slow": 12, "sudden": 1, "confirm": 1, "provisional": 4}  # anchor fires at full target
+RAMP = {"default": 1, "slow": 12, "sudden": 1, "provisional": 4}  # anchor fires at full target
 
 _STRENGTH_LOW = 0.3
 _STRENGTH_HIGH = 1.3  # "a lot": heavy wording in the composer
@@ -96,6 +96,11 @@ def _norm(text: str) -> str:
 
 def _pace(t: str):
     return "slow" if _SLOW_RX.search(t) else "sudden" if _SUDDEN_RX.search(t) else None
+
+
+def ramp_for(text: str) -> int:
+    """The ramp of a sentence from its pace words: RAMP["slow"] for "slowly", else RAMP["default"]."""
+    return RAMP.get(_pace(normalize(text)) or "default", RAMP["default"])
 
 
 def strength_for(text, current=0.0):

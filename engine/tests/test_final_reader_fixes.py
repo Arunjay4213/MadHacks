@@ -53,7 +53,7 @@ def play(chat, sentences, base=None):
     for s in sentences:
         res = reader(s, svc.snapshot())
         assert res is not None and not res.get("blocked"), (s, res)
-        svc.apply_final(s, res["operations"], None)
+        svc.apply_final(s, res["operations"])
         out.append({**res, "scene": svc.snapshot(), "canonical": compose(svc.snapshot())})
     return reader, out
 

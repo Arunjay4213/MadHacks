@@ -251,11 +251,11 @@ def service():
 def test_public_service_methods_used_by_the_wrapper():
     svc = service()
     assert svc.snapshot()["base"] == "a wide shot of a meadow with a single oak tree"
-    out = svc.apply_final("winter and a lion", [WINTER, LION], None)
+    out = svc.apply_final("winter and a lion", [WINTER, LION])
     assert [c["label"] for c in out["state"]["changes"]] == ["winter", "lion"]
     assert out["state"]["heard"] == "winter and a lion" and not out["state"]["unmatched"]
     assert out["steer"]["prompt"] == svc.committed_prompt and not out["steer"]["provisional"]
-    out = svc.apply_final("blocked words", [], None)
+    out = svc.apply_final("blocked words", [])
     assert out["steer"] is None and out["state"]["unmatched"]
     out = svc.handle(final("undo"))
     assert out["state"]["changes"] == []  # the two operations were one edit

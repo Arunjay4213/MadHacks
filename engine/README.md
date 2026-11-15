@@ -546,8 +546,8 @@ So a new sentence costs about 1.8 s extra, and a pinned or cached sentence costs
 - The model sees one prompt per scene state: the first rich prompt chosen for a composed prompt replaces it in every later steer (an undo back to it, a chip removal), in `likely_prompts` and in `committed_prompt`, so a state always gives the same embedding.
 - `/stats` `final_reader`: `state` (`off`, `on`, `unavailable`), `reason`, `prompt_spec`, `calls`, `cache_hits`, `blocked`, `timeouts`, `late_dropped`, `rejects`, `details_rejected`, `details_repaired`, `retries`, `errors`, `pinned`, `pinned_hits`, `p50_ms`, `last_ms`, `cache_size`, `timeout_s`, `cache_file`.
 - It is `unavailable` (and the engine runs as with `off`, logged once) when `FOUNDRY_ENDPOINT` or `FOUNDRY_KEY` is missing or the reader is not `commands`.
-- `engine/reader.py` uses `CommandService.snapshot()` and `CommandService.apply_final(text, operations, None)` (PR #88); `engine/tests/test_final_reader.py` runs them against the real `CommandService`.
-  The prompt argument stays None: the service steers to the composed prompt and the wrapper maps it to the first rich prompt of that state, so an undo back to it gives the same words.
+- `engine/reader.py` uses `CommandService.snapshot()` and `CommandService.apply_final(text, operations)` (PR #88); `engine/tests/test_final_reader.py` runs them against the real `CommandService`.
+  The service steers to the composed prompt and the wrapper maps it to the first rich prompt of that state, so an undo back to it gives the same words.
 
 Local end-to-end run with a fake Sonnet endpoint (no key needed):
 

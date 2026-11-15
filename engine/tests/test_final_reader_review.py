@@ -137,12 +137,12 @@ def test_a_pinned_removal_removes_the_change_it_names_not_the_one_with_its_old_i
     chat = ReplayChat({"no more snow": reply([{"op": "remove", "id": "c2"}], "green grass")})
     reader = FinalReader(FinalReaderState.ON, chat=chat, spec=prompt_spec(), pinned=load_pinned(path))
     live = CommandService(semantic_reader=lambda *a: None)
-    live.apply_final("add a lion", [LION], None)      # lion is c1
-    live.apply_final("make it winter", [WINTER], None)  # winter is c2
+    live.apply_final("add a lion", [LION])      # lion is c1
+    live.apply_final("make it winter", [WINTER])  # winter is c2
     assert compose(live.snapshot()) == entries[2]["prompt_before"]
     res = reader("no more snow", live.snapshot())
     assert res["operations"] == [{"op": "remove", "id": "c2"}]
-    out = live.apply_final("no more snow", res["operations"], None)
+    out = live.apply_final("no more snow", res["operations"])
     assert [c["label"] for c in out["state"]["changes"]] == ["lion"]
     # in the file's own order the pinned entry is used, with its own ids
     same = SceneState()
@@ -162,7 +162,7 @@ def test_a_cached_base_edit_does_not_bring_back_a_removed_chip():
     })
     svc.handle(final("add a lion"))
     lion = svc.state_fields()["changes"][0]["id"]
-    svc._svc.apply_final("weaken the lion", [{"op": "set_strength", "id": lion, "strength": 0}], None)
+    svc._svc.apply_final("weaken the lion", [{"op": "set_strength", "id": lion, "strength": 0}])
     assert "lighthouse" in svc.handle(final(sentence))["steer"]["prompt"]
     svc.handle({"type": "tap", "action": "undo"})
     svc.handle({"type": "tap", "action": "remove", "id": lion})

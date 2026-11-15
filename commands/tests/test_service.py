@@ -72,7 +72,7 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(self.svc.state_fields()["changes"], [])  # a guess never touches the state
         self.assertIsNone(self.svc.handle(partial("make it winter and cold"))["steer"])  # same guess
         r = self.svc.handle(final("make it winter"))
-        self.assertEqual((r["steer"]["ramp_chunks"], r["steer"]["provisional"]), (RAMP["confirm"], False))
+        self.assertEqual((r["steer"]["ramp_chunks"], r["steer"]["provisional"]), (RAMP["default"], False))
 
     def test_wrong_guess_rolls_back_on_unmatched_or_noop_final(self):
         base_prompt = self.svc.committed_prompt

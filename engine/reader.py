@@ -71,16 +71,15 @@ class FinalReadingService:
             result = self._final_reader(msg["text"], snapshot)  # the content check, for every other sentence
             if result is not None and result.get("blocked"):
                 log.info("final reader: %r blocked, no steer", msg["text"][:100])
-                return self._mapped(self._svc.apply_final(msg["text"], [], None))
+                return self._mapped(self._svc.apply_final(msg["text"], []))
             if kind is SentenceKind.MIXED:
                 # Not blocked. The final reader leaves undo and reset to the dictionary, so its operations would
                 # drop them: the dictionary reads the whole sentence, as it would without this wrapper.
                 return self._mapped(self._svc.handle(msg))
             if result is not None:
-                # prompt None: the service steers to the composed prompt and _mapped gives the rich one. Passing
-                # the rich prompt would make an undo back to this state steer to the composed prompt (another
-                # embedding for the same scene), and another sentence reaching it could pick other wording.
-                out = self._svc.apply_final(msg["text"], result["operations"], None)
+                # The service steers to the composed prompt and _mapped gives the rich one, so an undo back to
+                # this state, or another sentence reaching it, gives the same words (the same embedding).
+                out = self._svc.apply_final(msg["text"], result["operations"])
                 if out["steer"] is not None:
                     self._model_prompts.setdefault(out["steer"]["prompt"], result["prompt"])
                 return self._mapped(out)
