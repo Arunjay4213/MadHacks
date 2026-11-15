@@ -119,6 +119,9 @@ class OverridesTest(unittest.TestCase):
         self.assertEqual(world_with_overrides(snowy, [snowy, change("night", "time")]),
                          "a snowy mountain road. Pine forests covered in thick white snow line both sides, high snowbanks "
                          "along the edges of the road, snowflakes falling.")
+        self.assertEqual(world_with_overrides(snowy, [snowy, change("summer", "season")]),  # no winter light in summer
+                         "a snowy mountain road. Pine forests covered in thick white snow line both sides, high snowbanks "
+                         "along the edges of the road.")
         coast = change("ocean coast", "world", ISHAAN["ocean coast"])
         self.assertEqual(world_with_overrides(coast, [coast, change("rain", "weather")]),
                          "a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one "

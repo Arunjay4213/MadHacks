@@ -37,7 +37,8 @@ _TABLE = [
                              (". Pine forests covered in thick white snow line both sides, high snowbanks along the edges "
                               "of the road", {}),
                              (", snowflakes falling", {"weather": "snow", "season": "winter"}),
-                             (". Cold blue overcast winter light, soft diffuse shadows", {"time": "day", "weather": "overcast"})],
+                             (". Cold blue overcast winter light, soft diffuse shadows",
+                              {"time": "day", "weather": "overcast", "season": "winter"})],
      ["snowy mountains", "snowy mountain road", "mountain road", "the mountains"]),
     ("neon city", [("a wide city street", {}), (" at night", _N),
                    (". Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet "
