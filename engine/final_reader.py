@@ -12,7 +12,10 @@ The prompt is built from the composed (canonical) prompt of the new scene and th
 PromptSpec: the engine's stand-in below, or commands.rewriter (SYSTEM_PROMPT, validate_rewrite) once it exists.
 
 The model's reply, JSON: {"blocked": bool, "operations": [op, ...], "details": str}.
-The validator gets {"details": str} only. Details it rejects keep the operations and use the composed prompt.
+The validator gets {"details": str} only. A clause of the details it rejects is logged with the reason and cut;
+details with nothing left keep the operations and use the composed prompt. An unusable reply is asked again once,
+with the reasons, when there is time (Verdict, RETRY_VERDICTS). An anchored scene (ANCHORS) keeps the first two
+sentences of its tested prompt word for word in every prompt.
 
 Places: "take me to the desert" is one change of kind world (commands/world.py) that replaces the old world and
 keeps the other changes. Only an explicit "new scene of ..." resets. Season, weather and time adds get the
@@ -105,15 +108,77 @@ def blocked_word(text: str) -> str | None:
 # --- the prompt part ------------------------------------------------------------------------------------
 
 STYLE = "Cinematic, highly detailed, realistic, sharp focus."
-# "motion blur on the road" only fits a vehicle on a road; on a meadow with a lion it is wrong.
+# "motion blur on the road" only fits a vehicle on a road. Measured on GPU (2026-11-14): with that tail every
+# winter and night frame of the oak meadow grew a road or a tyre track, so it is used only when the scene has a road.
 VEHICLE_STYLE = "Cinematic, highly detailed, realistic, sharp focus, motion blur on the road."
 
 # Measured by the steering owner with optical flow (board, 2026-11-14): a vehicle subject drives backwards in 1 of
 # 3 seeds with a short prompt, and forward in 3 of 3 with this wording. Added to SUBJECT when the subject is a
-# vehicle and does not already say how it moves.
+# vehicle and does not already say how it moves. LANE_CUE is also added to the phrase of a vehicle added on a road.
 VEHICLE_WORDS = ("car", "truck", "van", "bus", "motorcycle", "motorbike", "jeep", "taxi", "vehicle")
-FORWARD_MOTION = ("speeding forward, driving away from the camera, the camera follows directly behind, "
-                  "lane markings rush toward the viewer")
+LANE_CUE = "white dashed lane markings rush toward the viewer"
+FORWARD_MOTION = f"speeding forward, driving away from the camera, the camera follows directly behind, {LANE_CUE}"
+ROAD_WORDS = frozenset({"road", "roads", "roadside", "highway", "highways", "street", "streets", "lane", "lanes",
+                        "asphalt", "motorway", "freeway", "pavement"})
+# Never in details when the scene has no road: they grew a road or tyre tracks on the meadow.
+ROAD_DETAIL_WORDS = ROAD_WORDS | {"tyre", "tyres", "tire", "tires", "track", "tracks", "blur"}
+# Never in details: the positions are in the subject and object phrases, word for word. Details that placed
+# things again re-framed the shot on GPU ("make it night" moved the tree into the distance, cut the car off).
+POSITION_WORDS = frozenset({"foreground", "background", "midground", "left", "right", "centre", "center",
+                            "middle", "distance", "distant", "beside", "behind", "front", "closeup", "shot"})
+SIZE_WORDS = frozenset({"large", "small", "big", "huge", "tiny", "giant", "massive", "medium", "tall", "little",
+                        "enormous"})
+PHRASE_POSITION_WORDS = POSITION_WORDS - {"shot", "closeup"} | {"near", "next", "beneath", "under", "above"}
+FINAL_MAX_PHRASE = 200  # characters; a positioned phrase is longer than the nano slow reader's 120
+
+# Ishaan's tested car prompt (verbatim). A scene with this base starts with it, and every later prompt of that
+# scene keeps its first two sentences (subject, motion and camera) word for word; the engine builds them in.
+CAR_BASE = "a red sports car driving along a country road"
+CAR_PROMPT = ("A red sports car speeds forward along a straight two-lane country road, driving away from the camera. "
+              "The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping "
+              "the car centred in the frame while the asphalt and the white dashed lane markings rush toward the "
+              "viewer beneath it. Green fields and rows of trees line both sides of the road under a clear blue summer "
+              "sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion "
+              "blur on the road.")
+
+
+@dataclasses.dataclass(frozen=True)
+class Anchor:
+    """A scene base with a hand-tested prompt. `lead` (its first `lead_sentences` sentences) starts every prompt
+    of that scene; `style` (its last sentence) ends it."""
+    base: str
+    prompt: str
+    sentences: tuple[str, ...] = ()  # spoken sentences that start this scene
+    lead_sentences: int = 2
+
+    @property
+    def lead(self) -> str:
+        return " ".join(_sentences(self.prompt)[:self.lead_sentences])
+
+    @property
+    def style(self) -> str:
+        return _sentences(self.prompt)[-1]
+
+
+def _sentences(text: str) -> list[str]:
+    return re.split(r"(?<=\.)\s+", text.strip())
+
+
+ANCHORS = {a.base: a for a in [Anchor(CAR_BASE, CAR_PROMPT, ("new scene of a red sports car driving along a country road",))]}
+
+
+def anchor_for_base(base) -> Anchor | None:
+    """The anchor whose base is `base`, ignoring case and punctuation."""
+    from commands.dictionary import normalize
+    if not isinstance(base, str):
+        return None
+    return next((a for a in ANCHORS.values() if normalize(a.base) == normalize(base)), None)
+
+
+def anchor_for_sentence(text: str) -> Anchor | None:
+    from commands.dictionary import normalize
+    return next((a for a in ANCHORS.values() if normalize(text) in {normalize(s) for s in a.sentences}), None)
+
 
 STANDIN_DETAILS = """The "details" field is the WORLD of the new scene, for the Wan2.1 text-to-video model.
 The engine builds the video prompt as SUBJECT + OBJECTS + WORLD + STYLE. SUBJECT is the scene's base sentence,
@@ -123,17 +188,12 @@ nothing about the camera, shots, lenses or editing.
 Write WORLD in about 50 words (never more than 60), plain present tense, no lists, no line breaks:
 - First the ground or road of that place, then two or three concrete things on both sides, then the light or sky.
 - The season, weather and time of day of the new scene must appear in WORLD. Objects, animals and people are
-  already in OBJECTS: do not describe them again.
+  already in OBJECTS: do not describe them again, and never say where they are.
 - A place REPLACES the world. It is never added to the old one: "make it a desert" turns the meadow into a
   desert, and nothing of the old landscape (grass, meadow, fields) is described. The objects and animals of the
   scene stay, now in the new place.
 - Do not add any object, creature, person or vehicle the scene does not name, and no motion or events beyond
-  what it says.
-- If a change adds a kind the scene already has, describe a second one with a clear position. A colour, type or
-  size the user names ALWAYS wins: "add a red car racing on a road" when the scene has a red car gives "a second
-  red car racing alongside it in the next lane", differing only by position. Only when the user names no
-  attribute ("add a car"), give the second one another colour or type, for example "a second blue car driving
-  alongside it in the next lane".
+  what it says. Mention a road only when the scene has one.
 - If changes conflict (sunlight and rain), blend them plausibly, such as sun breaking through rain clouds.
 Examples of WORLD:
 - start: "a two-lane country road through green fields and trees under a clear blue summer sky, bright sunshine."
@@ -160,29 +220,72 @@ def standin_validate(prompt: str, reply, objects=()) -> str | None:
     subject = ", ".join([with_forward_motion(base), *objects])
     subject = subject[:1].upper() + subject[1:]
     world = details if details.endswith(".") else details + "."
-    return f"{subject}, {world} {VEHICLE_STYLE if is_vehicle(base) else STYLE}"
+    return f"{subject}, {world} {VEHICLE_STYLE if is_vehicle(base) and has_road(prompt) else STYLE}"
+
+
+def _words(text: str) -> set[str]:
+    return set(re.findall(r"[a-z]+", text.lower()))
 
 
 def is_vehicle(subject: str) -> bool:
     """True when `subject` names a vehicle (VEHICLE_WORDS), as a whole word."""
-    return bool(set(re.findall(r"[a-z]+", subject.lower())) & set(VEHICLE_WORDS))
+    return bool(_words(subject) & set(VEHICLE_WORDS))
+
+
+def has_road(text: str) -> bool:
+    """True when `text` names a road (ROAD_WORDS), as a whole word."""
+    return bool(_words(text) & ROAD_WORDS)
 
 
 def with_forward_motion(subject: str) -> str:
     """`subject` plus FORWARD_MOTION when it names a vehicle and says nothing about its direction yet."""
-    words = set(re.findall(r"[a-z]+", subject.lower()))
-    if is_vehicle(subject) and not words & {"forward", "away", "behind", "reversing", "backwards"}:
+    if is_vehicle(subject) and not _words(subject) & {"forward", "away", "behind", "reversing", "backwards"}:
         return f"{subject}, {FORWARD_MOTION}"
     return subject
+
+
+class PrefixKind(enum.Enum):
+    COMPOSED = "composed"        # the composed prompt, objects right after the subject; details follow
+    ANCHOR_LEAD = "anchor lead"  # an anchor's lead, then the changes; details follow, then the anchor's style
+    ANCHOR_FULL = "anchor full"  # an anchored scene with no changes: the anchor's prompt itself, no details
+
+
+@dataclasses.dataclass(frozen=True)
+class Prefix:
+    kind: PrefixKind
+    text: str                   # what the details are appended to (and checked against)
+    tail: str = ""              # appended after the details
+
+
+def scene_prefix(scene: dict) -> Prefix:
+    """The fixed part of the prompt of `scene`, from the commands/ composer. The phrases of the scene's objects
+    come right after the subject, word for word, so a positioned lion stays where it is in every later prompt.
+    A vehicle subject gets FORWARD_MOTION. A scene whose base has an Anchor starts with the anchor's lead."""
+    from commands.composer import compose
+    parts = [p.strip() for p in compose(scene).split(";")]
+    subject, rest = parts[0], parts[1:]
+    phrases = [p.rstrip(".") for p in _scene_objects(scene)]
+    objects = [p for p in rest if any(p.endswith(ph) for ph in phrases)]
+    others = [p for p in rest if p not in objects]
+    anchor = ANCHORS.get(scene["base"])
+    if anchor is None:
+        return Prefix(PrefixKind.COMPOSED, "; ".join([with_forward_motion(subject), *objects, *others]))
+    if not objects and not others:
+        return Prefix(PrefixKind.ANCHOR_FULL, anchor.prompt)
+    changes = "; ".join([*objects, *others])
+    return Prefix(PrefixKind.ANCHOR_LEAD, f"{anchor.lead} {changes[:1].upper()}{changes[1:]}", anchor.style)
 
 
 @dataclasses.dataclass(frozen=True)
 class PromptSpec:
     """How the prompt part is asked for and checked. `validate(scene, reply)` gets the snapshot of the new scene
-    and {"details": str}, and gives the text the model sees, or None to reject the details."""
+    and {"details": str}, and gives the text the model sees, or None to reject the details. With commands.rewriter,
+    `prefix` and `check` (validate_rewrite itself) let the engine find out why details are rejected and repair them."""
     name: str
     details_instructions: str
     validate: Callable[[dict, dict], str | None]
+    prefix: Callable[[dict], Prefix] | None = None
+    check: Callable[[str, dict], str | None] | None = None
 
 
 def _scene_objects(scene: dict) -> list[str]:
@@ -199,13 +302,17 @@ STANDIN = PromptSpec("engine stand-in", STANDIN_DETAILS, _standin_spec_validate)
 
 
 def rewriter_validate(validate_rewrite: Callable[[str, dict], str | None]) -> Callable[[dict, dict], str | None]:
-    """commands.rewriter.validate_rewrite on the composed prompt of the scene, with FORWARD_MOTION in its subject
-    (the part before the first ";") when that subject is a vehicle that does not say how it moves yet, as the
-    stand-in does. The order of the composed prompt is the commands/ composer's."""
+    """commands.rewriter.validate_rewrite on scene_prefix(scene): the composed prompt of the scene with its objects
+    right after the subject and FORWARD_MOTION in a vehicle subject, or an anchor's lead. An anchored scene with
+    no changes is the anchor's prompt; after an anchor's lead the details are followed by the anchor's style."""
     def validate(scene: dict, reply: dict) -> str | None:
-        from commands.composer import compose
-        subject, sep, rest = compose(scene).partition(";")
-        return validate_rewrite(with_forward_motion(subject.strip()) + sep + rest, reply)
+        prefix = scene_prefix(scene)
+        if prefix.kind is PrefixKind.ANCHOR_FULL:
+            return prefix.text
+        out = validate_rewrite(prefix.text, reply)
+        if out is None or not prefix.tail:
+            return out
+        return f"{out.rstrip(' .;')}. {prefix.tail}"
     return validate
 
 
@@ -221,15 +328,134 @@ def prompt_spec(import_rules: Callable[[], object] = lambda: importlib.import_mo
     """
     try:
         rules = import_rules()
-        return PromptSpec("commands.rewriter", rules.SYSTEM_PROMPT, rewriter_validate(rules.validate_rewrite))
+        return PromptSpec("commands.rewriter", rules.SYSTEM_PROMPT, rewriter_validate(rules.validate_rewrite),
+                          scene_prefix, rules.validate_rewrite)
     except Exception as exc:  # not there yet, or not the agreed shape
         log.info("final reader: commands.rewriter not usable (%r); using the engine's stand-in prompt", exc)
         return STANDIN
 
 
+# --- why details are rejected, and the repair -----------------------------------------------------------
+
+_CLAUSE = re.compile(r"(?<=[,;.])\s+")
+# Words a model tends to use in details. Only those commands.rewriter.validate_rewrite really rejects are listed
+# in the system prompt (probed at start-up), so the list follows the validator if its rules change.
+_CANDIDATE_WORDS = """camera cameras pan pans panning zoom zooming dolly tracking aerial drone tilt crane handheld orbit
+    cut cuts frame frames framing drive drives driving move moves moving run runs running walk walks walking fly flies
+    flying reverse reversing backward backwards toward towards away approach approaching enter entering leave leaves
+    leaving arrive arriving appear appears emerge emerging speeding racing explode explosion crash suddenly transform
+    becomes previous previously earlier again still now before after anymore remain remains continue continues no not
+    never without none nothing""".split()
+
+
+def _validator_words(check: Callable[[str, dict], str | None]) -> list[str]:
+    return [w for w in _CANDIDATE_WORDS if check("a scene", {"details": w}) is None]
+
+
+def engine_banned(scene: dict) -> dict[str, str]:
+    """Words the engine keeps out of details for `scene`, each with its reason."""
+    from commands.composer import compose
+    banned = {w: "a position or framing word (positions stay in the subject and object phrases)" for w in POSITION_WORDS}
+    if not has_road(compose(scene)):
+        banned.update({w: "a road word in a scene with no road" for w in ROAD_DETAIL_WORDS})
+    for c in scene["changes"]:
+        if c["kind"] == "extra" and c["strength"] > 0:
+            for w in re.findall(r"[a-z]+", c["label"].lower())[-1:]:  # the noun: "red car" -> car
+                banned[w] = f"names the scene's object {c['label']!r} again"
+    return banned
+
+
+@dataclasses.dataclass(frozen=True)
+class Repair:
+    prompt: str | None                 # the prompt with the kept details, or None: nothing usable
+    dropped: tuple[tuple[str, str], ...] = ()  # (clause, why) for each clause cut
+
+
+def why_rejected(check: Callable[[str, dict], str | None], prefix: str, details: str, banned: dict[str, str]) -> str:
+    """The reason validate_rewrite (`check`) rejects `details` after `prefix`, found through its public behaviour:
+    the word limits, then the single words it refuses. validate_rewrite itself returns None with no reason."""
+    from commands import rewriter
+    from commands.dictionary import normalize
+    if not isinstance(details, str):
+        return "details is not text"
+    if "\n" in details or "\r" in details:
+        return "a line break in details"
+    max_detail = getattr(rewriter, "MAX_DETAIL_WORDS", 60)
+    max_total = getattr(rewriter, "MAX_TOTAL_WORDS", 100)
+    n, p = len(details.split()), len(prefix.split())
+    if n > max_detail:
+        return f"details has {n} words, the limit is {max_detail}"
+    if p + n > max_total:
+        return f"prompt {p} + details {n} words is over the limit of {max_total}"
+    words = sorted({w for w in normalize(details).split() if check(prefix, {"details": w}) is None})
+    engine = sorted({w for w in normalize(details).split() if w in banned})
+    parts = []
+    if words:
+        parts.append(f"validate_rewrite refuses the words {', '.join(map(repr, words))}"
+                     " (motion, camera, time order, negation, an object, or a season, weather or time the scene does not have)")
+    if engine:
+        parts.append("; ".join(f"{w!r} is {banned[w]}" for w in engine))
+    return "; ".join(parts) or "validate_rewrite refuses it (no single word or limit explains it)"
+
+
+def repair_details(spec: PromptSpec, scene: dict, details: str) -> Repair:
+    """The prompt for `details`, cutting the clauses that break a rule: first the clauses with a word the
+    validator or the engine refuses, then clauses from the end until it fits the word limits. Each cut is kept
+    with its reason. Without spec.check (the stand-in) the details are taken or rejected whole."""
+    if spec.check is None or spec.prefix is None:
+        prompt = spec.validate(scene, {"details": details})
+        return Repair(prompt, () if prompt is not None else ((details, "the engine stand-in refuses it"),))
+    from commands.dictionary import normalize
+    prefix = spec.prefix(scene)
+    banned = engine_banned(scene)
+    clauses = [c for c in _CLAUSE.split(details.strip()) if c.strip()]
+    if not clauses or prefix.kind is PrefixKind.ANCHOR_FULL:
+        return Repair(spec.validate(scene, {"details": ""}))
+    if spec.check(prefix.text, {"details": "soft light"}) is None:
+        return Repair(None, ((details, f"the prompt before the details already has {len(prefix.text.split())} words"),))
+    refused = {w for w in normalize(details).split() if w in banned or spec.check(prefix.text, {"details": w}) is None}
+    kept, dropped = [], []
+    for c in clauses:
+        bad = sorted(set(normalize(c).split()) & refused)
+        if bad:
+            dropped.append((c, why_rejected(spec.check, prefix.text, c, banned)))
+        else:
+            kept.append(c)
+    while kept:
+        text = " ".join(kept).rstrip(",;. ")
+        prompt = spec.validate(scene, {"details": text})
+        if prompt is not None:
+            return Repair(prompt, tuple(dropped))
+        dropped.append((kept[-1], why_rejected(spec.check, prefix.text, text, banned)))
+        kept.pop()
+    return Repair(None, tuple(dropped))
+
+
+def phrase_problems(op: dict) -> list[str]:
+    """Rule breaks in the phrase of a new object (an add of kind extra): world words (a place, season, weather or
+    time: they belong to the world, and "parked on the snowy ground" stays snowy in a desert), or no size or
+    position words (the video model then draws it small or leaves it out)."""
+    from commands.dictionary import normalize
+    phrase = normalize(op["phrase"])
+    words = set(phrase.split())
+    found = sorted({a for a in [*_vocabulary(), *_known_worlds()] if a not in ("bright", "dark")
+                    and re.search(rf"\b{re.escape(a)}\b", phrase)})
+    out = []
+    if found:
+        out.append(f"the phrase of {op['label']!r} has world words {', '.join(map(repr, found))}: describe only the object, its size and its position")
+    if not words & SIZE_WORDS:
+        out.append(f"the phrase of {op['label']!r} has no size word (large, small, ...)")
+    if not words & PHRASE_POSITION_WORDS:
+        out.append(f"the phrase of {op['label']!r} has no position words (in the foreground at the left of the frame, beside the oak tree, ...)")
+    return out
+
+
 _PLACE_RULE = """- A PLACE or setting ("take me to the desert", "make it a desert", "go to Mars", "switch to a
   neon city") is ONE add of kind world: label = the place in 1 to 3 words, phrase = a short description of that
-  place. It replaces the old world and KEEPS every other change: a red car added before stays in the desert.
+  place. It replaces the old world and KEEPS every object: a red car added before stays in the desert.
+  A new place brings its own season and weather: the engine removes the earlier season and weather changes, so
+  a desert after "make it winter" has no snow. Add a season or weather again only if the user says it in the same
+  sentence ("a snowy desert"). The time of day stays.
   Known places, use exactly these labels when one fits: {places}."""
 
 _OPERATIONS = """You read one spoken sentence that edits a video scene, and reply with one JSON object only:
@@ -247,10 +473,19 @@ Operations, applied in order (a sentence with several edits gives several operat
 {{"op": "new_scene", "base": "<one sentence describing the whole new scene>"}}
 
 Rules for operations:
-- Write phrases as concrete visual descriptions, under 20 words.
-- A new object, animal or person (kind extra) gets explicit size and position words in its phrase that a video
-  model obeys, for example "a large male lion standing in the foreground at the left of the frame, facing the
-  camera". The engine keeps that phrase word for word in every later prompt.
+- Write phrases as concrete visual descriptions. A season, weather or time phrase is under 12 words.
+- A new object, animal or person (kind extra) gets a phrase of at most 25 words (under 200 characters) with
+  explicit size and position words that a video model obeys: where it is in the frame and, when it helps, next
+  to what, for example "a large male lion standing in the foreground at the left of the frame,
+  facing the camera" or "a small red car parked beside the oak tree at the right of the frame". The engine keeps
+  that phrase word for word, right after the subject, in every later prompt, also after a change of place,
+  season or time, so it must not name a place, ground, season, weather or time of day ("in the snow", "on the
+  sand", "at night" are wrong): only the object, its size, its position and what it does.
+- If an add names a kind the scene already has, its phrase describes a second one with a clear position. A
+  colour, type or size the user names ALWAYS wins: "add a red car racing on a road" when the scene has a red car
+  gives "a second small red car racing in the next lane at the right of the frame", differing only by position.
+  Only when the user names no attribute ("add a car"), give the second one another colour or type.
+- A vehicle on a road ("add a red car racing on a road") gets this cue at the end of its phrase: "{lane_cue}".
 {place_rule}
 - Seasons, weather and times of day use the keyword table's labels and kinds, so a sentence gives the same
   change however it is read: label (kind): words that mean it.
@@ -259,7 +494,7 @@ Rules for operations:
 - A BASE EDIT turns something the base sentence names into something else and KEEPS every change ("turn the
   tree into a lighthouse"): use edit_base. The engine keeps the changes; never copy them yourself.
 - A NEW SCENE only when the user asks for one in so many words ("new scene of a beach", "start over with a
-  beach"): use new_scene, which clears every change.
+  beach"): use new_scene, which clears every change. Its base is the user's words for the scene, as said.
 - edit_base and new_scene come before any other operation of the sentence.
 - To remove or weaken something, use the id of the matching change. "a little" means strength 0.3, "a lot" or
   "very" means 1.3.
@@ -269,12 +504,28 @@ Set "blocked" to true, with no operations, if the sentence asks for sexual, viol
 hateful content. Otherwise "blocked" is false.
 
 The user message is JSON: {{"scene": <the scene before the sentence>, "prompt": <its current video prompt>,
-"sentence": <what the user said>}}.
+"sentence": <what the user said>, "details_max_words": <the most words "details" may have>}}. If it also has
+"rejected", your earlier reply to the same sentence was not usable for the reasons given: reply again, fixed.
 
 For the "details" field, follow the rules below. Where they speak of the scene or the description, that is the
 NEW scene, after your operations. Any reply format they name is only the shape of that one field: you always
 reply with the one JSON object above, {{"blocked", "operations", "details"}}.
 """
+
+_DETAILS_LIMITS = """
+Limits the engine checks on "details" (a clause that breaks one is cut; a reply with nothing left is rejected):
+- Write 3 to 5 short clauses separated by commas, the most important first, at most "details_max_words" words
+  in all. Only the ground, surfaces, textures, light, air and colours of the place.
+- Never name or describe an object, animal, person or vehicle of the scene again, and never say where anything
+  is: no position or framing words ({position}).
+- Never these words, they are objects: {extras}.
+- A season, weather or time word only for a label the NEW scene has after your operations. The words of each
+  label are in the keyword table above; note that haze, mist, wind, breeze, frost, icy, moon, moonlight, stars,
+  sunlight, sunshine, morning, evening and dusk are on it, so "heat haze" needs fog and "moonlight" needs night.
+- Never these words (motion, camera, time order, negation): {validator}.
+- Road words ({road}) only when the scene has a road.
+"""
+
 
 _KIND_HELP = {"world": "world (the place: desert, neon city, Mars, ...)", "season": "season (winter, autumn, ...)",
               "weather": "weather (rain, fog, sunny, ...)", "time": "time (night, day, sunset, ...)",
@@ -308,8 +559,32 @@ def operations_instructions() -> str:
     places = ", ".join(sorted({w["label"] for w in _known_worlds().values()})) or "none"
     singletons = [k for k in KINDS if k != "extra"]
     return _OPERATIONS.format(kinds_help=", ".join(_KIND_HELP.get(k, k) for k in KINDS), kinds="|".join(KINDS),
-                              singletons=", ".join(singletons[:-1]) + " or " + singletons[-1],
+                              singletons=", ".join(singletons[:-1]) + " or " + singletons[-1], lane_cue=LANE_CUE,
                               place_rule=_PLACE_RULE.format(places=places), vocabulary=_vocabulary_lines())
+
+
+def details_limits(spec: PromptSpec) -> str:
+    """The engine's limits on details, with the words commands.rewriter refuses; empty for the stand-in."""
+    if spec.check is None:
+        return ""
+    from commands.dictionary import KEYWORDS
+    extras = sorted({a for a, e in KEYWORDS.items() if e["kind"] == "extra"})
+    return _DETAILS_LIMITS.format(position=", ".join(sorted(POSITION_WORDS)), extras=", ".join(extras),
+                                  validator=", ".join(_validator_words(spec.check)), road=", ".join(sorted(ROAD_DETAIL_WORDS)))
+
+
+def details_budget(spec: PromptSpec, snapshot: dict) -> int:
+    """The words details may have: what the validator's total limit leaves after the prompt of the scene before,
+    less room for a new phrase and the anchor's style, between 12 and 45."""
+    if spec.prefix is None:
+        return 50
+    from commands import rewriter
+    prefix = spec.prefix(snapshot)
+    if prefix.kind is PrefixKind.ANCHOR_FULL:  # the next prompt is the anchor's lead, the changes and its style
+        anchor = ANCHORS[snapshot["base"]]
+        prefix = Prefix(prefix.kind, anchor.lead, anchor.style)
+    left = getattr(rewriter, "MAX_TOTAL_WORDS", 100) - len(prefix.text.split()) - 15 - len(prefix.tail.split())
+    return max(12, min(45, left))
 
 
 # --- the cache file -------------------------------------------------------------------------------------
@@ -440,7 +715,7 @@ class FinalReader:
         self.reason = reason
         self.spec = spec
         self.timeout_s = timeout_s
-        self.system_prompt = f"{operations_instructions()}\n{spec.details_instructions}"
+        self.system_prompt = f"{operations_instructions()}\n{spec.details_instructions}\n{details_limits(spec)}"
         self._chat = chat
         self._file = cache_file
         self._lock = threading.Lock()
@@ -455,6 +730,8 @@ class FinalReader:
         self.late_dropped = 0
         self.rejects = 0
         self.details_rejected = 0
+        self.details_repaired = 0
+        self.retries = 0
         self.errors = 0
         self.last_ms: float | None = None
         self._recent_ms: deque[float] = deque(maxlen=50)
@@ -529,7 +806,8 @@ class FinalReader:
                     "calls": self.calls, "cache_hits": self.cache_hits,
                     "pinned": len(self._pinned), "pinned_hits": self.pinned_hits, "blocked": self.blocked,
                     "timeouts": self.timeouts, "late_dropped": self.late_dropped, "rejects": self.rejects,
-                    "details_rejected": self.details_rejected, "errors": self.errors,
+                    "details_rejected": self.details_rejected, "details_repaired": self.details_repaired,
+                    "retries": self.retries, "errors": self.errors,
                     "p50_ms": round(statistics.median(self._recent_ms), 1) if self._recent_ms else None,
                     "last_ms": None if self.last_ms is None else round(self.last_ms, 1),
                     "cache_size": len(self._cache), "timeout_s": self.timeout_s,
@@ -552,12 +830,59 @@ class FinalReader:
         return None
 
     def _call(self, text: str, snapshot: dict) -> Entry | None:
-        """Worker thread: one Sonnet call, checked. None (a timeout or an error) or an Entry. Never raises."""
+        """Worker thread: one Sonnet call, checked, and one retry with the reasons when the first reply is not
+        fully usable and the first call took less than half the wait (so on the live 3 s wait at 1.8 s a call,
+        the retry happens only in offline runs such as the demo prompts regeneration). Never raises."""
+        t0 = time.perf_counter()
+        first = self._attempt(text, snapshot, None)
+        best = first
+        if first.verdict in RETRY_VERDICTS:
+            elapsed = time.perf_counter() - t0
+            if elapsed < self.timeout_s / 2:
+                with self._lock:
+                    self.retries += 1
+                log.warning("final reader: asking again for %r: %s", _short(text), "; ".join(first.reasons)[:400])
+                second = self._attempt(text, snapshot, first)
+                if VERDICT_RANK[second.verdict] >= VERDICT_RANK[first.verdict]:
+                    best = second
+            else:
+                log.warning("final reader: no time to ask again for %r (%.0f ms of %.1f s used)", _short(text),
+                            elapsed * 1e3, self.timeout_s)
+        with self._lock:
+            if best.verdict is Verdict.FAILED:
+                self.errors += 1
+            elif best.verdict in (Verdict.INVALID, Verdict.EMPTY):
+                self.rejects += 1
+            elif best.verdict is Verdict.PLAIN:
+                self.details_rejected += 1
+            elif best.verdict is Verdict.REPAIRED:
+                self.details_repaired += 1
+        entry = best.entry
+        if best.verdict in (Verdict.FAILED, Verdict.INVALID, Verdict.EMPTY):
+            log.warning("final reader: no usable reply for %r: %s", _short(text), "; ".join(best.reasons)[:400])
+        elif entry.outcome is Outcome.BLOCKED:
+            log.info("final reader: the model blocked %r", _short(text))
+        else:
+            if best.verdict is Verdict.PLAIN:
+                log.warning("final reader: %r keeps its operations with the composed prompt (no usable details)",
+                            _short(text))
+            log.info("final reader: %r -> %d operations (%s), prompt %r", _short(text), len(entry.operations),
+                     best.verdict.value, _short(entry.prompt))
+        return entry
+
+    def _attempt(self, text: str, snapshot: dict, previous: "Attempt | None") -> "Attempt":
+        """One call. `previous` is the earlier attempt for this sentence: its reply and reasons are sent back."""
         from commands.composer import compose
         t0 = time.perf_counter()
-        user = json.dumps({"scene": _scene_for_model(snapshot), "prompt": compose(snapshot), "sentence": text})
+        user = {"scene": _scene_for_model(snapshot), "prompt": compose(snapshot), "sentence": text,
+                "details_max_words": details_budget(self.spec, snapshot)}
+        messages = [{"role": "user", "content": json.dumps(user)}]
+        if previous is not None and previous.reply_text is not None:
+            messages += [{"role": "assistant", "content": previous.reply_text},
+                         {"role": "user", "content": json.dumps({**user, "rejected": list(previous.reasons)})}]
+        reply_text = None
         try:
-            reply_text = self._chat.complete(self.system_prompt, [{"role": "user", "content": user}])
+            reply_text = self._chat.complete(self.system_prompt, messages)
             reply = json.loads(FENCE.sub("", reply_text))
             error = None
         except Exception as exc:  # the HTTP call or the JSON
@@ -567,22 +892,14 @@ class FinalReader:
             self.last_ms = ms
             self._recent_ms.append(ms)
         if error is not None:
-            with self._lock:
-                self.errors += 1
-            log.warning("final reader: call failed for %r after %.0f ms: %s", _short(text), ms, repr(error)[:200])
-            return Entry(Outcome.FALLBACK)
-        entry, why = self._check(reply, snapshot)
-        if entry.outcome is Outcome.FALLBACK:
-            with self._lock:
-                self.rejects += 1
-            log.info("final reader: rejected the reply for %r (%s, %.0f ms): %s", _short(text), why, ms,
-                     _short(json.dumps(reply)))
-        elif entry.outcome is Outcome.BLOCKED:
-            log.info("final reader: the model blocked %r (%.0f ms)", _short(text), ms)
-        else:
-            log.info("final reader: %r -> %d operations, prompt %r (%.0f ms)", _short(text), len(entry.operations),
-                     _short(entry.prompt), ms)
-        return entry
+            if reply_text is None:  # the call itself failed: asking again would fail the same way
+                log.warning("final reader: call failed for %r after %.0f ms: %s", _short(text), ms, repr(error)[:200])
+                return Attempt(Verdict.FAILED, Entry(Outcome.FALLBACK), (f"the call failed: {error!r}"[:200],))
+            log.warning("final reader: the reply for %r is not JSON (%.0f ms): %s", _short(text), ms, _short(reply_text))
+            return Attempt(Verdict.INVALID, Entry(Outcome.FALLBACK), ("the reply was not one JSON object",), reply_text)
+        attempt = self._check(reply, snapshot, text)
+        log.info("final reader: %r reply %s in %.0f ms", _short(text), attempt.verdict.value, ms)
+        return dataclasses.replace(attempt, reply_text=reply_text)
 
     def _plain(self, after: dict, canonical: str) -> str:
         """The spec's prompt with no details (the composed prompt, plus forward motion with commands.rewriter)."""
@@ -592,39 +909,98 @@ class FinalReader:
             prompt = None
         return prompt if isinstance(prompt, str) and prompt.strip() else canonical
 
-    def _check(self, reply, snapshot: dict) -> tuple[Entry, str]:
+    def _check(self, reply, snapshot: dict, text: str = "") -> "Attempt":
         if not isinstance(reply, dict):
-            return Entry(Outcome.FALLBACK), "not an object"
+            return Attempt(Verdict.INVALID, Entry(Outcome.FALLBACK), ("the reply is not a JSON object",))
         if reply.get("blocked") is True:
-            return Entry(Outcome.BLOCKED), "blocked"
+            return Attempt(Verdict.BLOCKED, Entry(Outcome.BLOCKED))
         ops = reply.get("operations")
         if not isinstance(ops, list) or not 1 <= len(ops) <= MAX_OPERATIONS:
-            return Entry(Outcome.FALLBACK), "no operations"
+            return Attempt(Verdict.EMPTY, Entry(Outcome.FALLBACK), ("no operations",))
+        anchor = anchor_for_sentence(text)
+        if anchor is not None:  # "new scene of a red sports car ...": the anchored base, exactly
+            ops = [{**op, "base": anchor.base} if isinstance(op, dict) and op.get("op") == "new_scene" else op
+                   for op in ops]
         try:
             clean = expand_operations(ops, snapshot)
             after = scene_after(snapshot, clean) if clean is not None else None
         except (ValueError, TypeError, KeyError) as exc:
-            return Entry(Outcome.FALLBACK), f"operations do not apply: {exc!r}"
+            return Attempt(Verdict.INVALID, Entry(Outcome.FALLBACK), (f"the operations do not apply: {exc!r}",))
         if clean is None:
-            return Entry(Outcome.FALLBACK), "an invalid operation (undo and reset stay with the dictionary)"
+            return Attempt(Verdict.INVALID, Entry(Outcome.FALLBACK), (invalid_operation_reason(ops, snapshot),))
         from commands.composer import compose
         try:
             canonical = compose(after)  # with PR #88 a world the base cannot take raises ValueError
         except (ValueError, TypeError, KeyError) as exc:
-            return Entry(Outcome.FALLBACK), f"the new scene does not compose: {exc!r}"
+            return Attempt(Verdict.INVALID, Entry(Outcome.FALLBACK), (f"the new scene does not compose: {exc!r}",))
+        known = {(c["label"], c["phrase"]) for c in snapshot["changes"]}
+        problems = [p for op in clean if op["op"] == "add" and op["kind"] == "extra"
+                    and (op["label"], op["phrase"]) not in known for p in phrase_problems(op)]
+        for p in problems:
+            log.warning("final reader: %r: %s", _short(text), p)
         details = reply.get("details")
+        details = details if isinstance(details, str) else ""
         try:  # only {"details"}: commands.rewriter.validate_rewrite rejects any other key
-            prompt = self.spec.validate(after, {"details": details if isinstance(details, str) else ""})
-        except Exception as exc:
-            prompt = None
-            log.info("final reader: validate raised %r", exc)
-        if not isinstance(prompt, str) or not prompt.strip():
+            repair = repair_details(self.spec, after, details)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("final reader: checking the details raised %r", exc)
+            repair = Repair(None, ((details, f"the check raised {exc!r}"),))
+        for clause, why in repair.dropped:  # every rejection, with its reason and the words
+            log.warning("final reader: details for %r rejected (%s): %s", _short(text), why, _short(clause, 80))
+        if repair.prompt is None or not repair.prompt.strip():
             # The operations are still the model's reading of the sentence; only its wording is dropped.
-            with self._lock:
-                self.details_rejected += 1
-            log.info("final reader: details rejected, using the composed prompt: %s", _short(details))
-            prompt = self._plain(after, canonical)
-        return Entry(Outcome.SONNET, tuple(clean), prompt), "ok"
+            reasons = tuple(problems) + tuple(f"details {why}: {_short(c, 60)!r}" for c, why in repair.dropped)
+            return Attempt(Verdict.PLAIN, Entry(Outcome.SONNET, tuple(clean), self._plain(after, canonical)),
+                           reasons or ("no details",))
+        if problems:
+            return Attempt(Verdict.PHRASE, Entry(Outcome.SONNET, tuple(clean), repair.prompt), tuple(problems))
+        verdict = Verdict.REPAIRED if repair.dropped else Verdict.ACCEPTED
+        return Attempt(verdict, Entry(Outcome.SONNET, tuple(clean), repair.prompt),
+                       tuple(f"details {why}: {_short(c, 60)!r}" for c, why in repair.dropped))
+
+
+class Verdict(enum.Enum):
+    """What one reply gave. RETRY_VERDICTS are asked again once, with the reasons, when there is time."""
+    ACCEPTED = "accepted"    # operations and all of the details
+    REPAIRED = "repaired"    # operations and the details minus the clauses that broke a rule (logged)
+    PHRASE = "phrase"        # usable, but a new object's phrase breaks a rule (world words, no size or position)
+    PLAIN = "plain"          # operations, but no usable details: the composed prompt
+    EMPTY = "empty"          # no operations: the dictionary path (a vague sentence; not asked again)
+    BLOCKED = "blocked"      # the model refused the sentence
+    INVALID = "invalid"      # not usable: the dictionary path
+    FAILED = "failed"        # the call failed: the dictionary path
+
+
+RETRY_VERDICTS = frozenset({Verdict.PHRASE, Verdict.PLAIN, Verdict.INVALID})
+VERDICT_RANK = {Verdict.FAILED: 0, Verdict.INVALID: 1, Verdict.EMPTY: 1, Verdict.PLAIN: 2, Verdict.PHRASE: 3,
+                Verdict.REPAIRED: 4, Verdict.ACCEPTED: 5, Verdict.BLOCKED: 5}
+
+
+@dataclasses.dataclass(frozen=True)
+class Attempt:
+    verdict: Verdict
+    entry: Entry
+    reasons: tuple[str, ...] = ()
+    reply_text: str | None = None
+
+
+def invalid_operation_reason(ops: list, snapshot: dict) -> str:
+    """Which operation is invalid, and why, for the log and the retry."""
+    for n, op in enumerate(ops):
+        if not isinstance(op, dict):
+            return f"operation {n + 1} is not an object"
+        kind = op.get("op")
+        if kind in ("undo", "reset"):
+            return f"operation {n + 1} is {kind}: undo and reset stay with the dictionary"
+        if kind == "add":
+            phrase = op.get("phrase")
+            if isinstance(phrase, str) and len(" ".join(phrase.split())) > FINAL_MAX_PHRASE:
+                return (f"operation {n + 1} ({op.get('label')!r}): its phrase has {len(phrase)} characters, "
+                        f"the limit is {FINAL_MAX_PHRASE}")
+        if validate_operation(op if kind != "edit_base" else {"op": "new_scene", "base": op.get("base")}, snapshot,
+                              FINAL_MAX_PHRASE) is None:
+            return f"operation {n + 1} is not valid: {_short(json.dumps(op), 160)}"
+    return "an operation names a change id after a base edit or a new scene, or there are too many"
 
 
 BATCH_LIMIT = 16  # commands.state: a batch holds 1 to 16 operations
@@ -639,12 +1015,15 @@ def expand_operations(ops: list, snapshot: dict) -> list[dict] | None:
     change replaces the place, not an object of the base such as the tree), so this expansion stays.
     An operation naming a change id after a base edit or a new scene is invalid (those ids are gone), and undo
     and reset stay with the dictionary.
+    A world add (a new place) also removes the earlier season and weather changes that the sentence does not
+    replace itself: a desert after "make it winter" has no snow. The time of day stays.
+    A new_scene whose base is an anchor's base gets that base exactly. A vehicle added on a road gets LANE_CUE.
     """
     out: list[dict] = []
     rebuilt = False  # an edit_base or new_scene came first: the old ids no longer exist
     for op in ops:
         if isinstance(op, dict) and op.get("op") == "edit_base":
-            clean = validate_operation({"op": "new_scene", "base": op.get("base")}, snapshot)
+            clean = validate_operation({"op": "new_scene", "base": op.get("base")}, snapshot, FINAL_MAX_PHRASE)
             if clean is None:
                 return None
             current = scene_after(snapshot, out)["changes"]
@@ -653,12 +1032,30 @@ def expand_operations(ops: list, snapshot: dict) -> list[dict] | None:
                      "strength": c["strength"]} for c in current]
             rebuilt = True
             continue
-        clean = validate_operation(op, snapshot)
+        clean = validate_operation(op, snapshot, FINAL_MAX_PHRASE)
         if clean is None or clean["op"] in ("undo", "reset") or (rebuilt and "id" in clean):
             return None
+        if clean["op"] == "new_scene":
+            anchor = anchor_for_base(clean["base"])
+            clean = {**clean, "base": anchor.base} if anchor else clean
         rebuilt = rebuilt or clean["op"] == "new_scene"
-        out.append(canonical_change(canonical_world(clean)))
+        out.append(with_lane_cue(canonical_change(canonical_world(clean))))
+    if not rebuilt and any(o["op"] == "add" and o["kind"] == "world" for o in out):
+        replaced = {o["kind"] for o in out if o["op"] == "add"}
+        removed = {o["id"] for o in out if o["op"] == "remove"}
+        out += [{"op": "remove", "id": c["id"]} for c in snapshot["changes"]
+                if c["kind"] in ("season", "weather") and c["kind"] not in replaced and c["id"] not in removed]
     return out if len(out) <= BATCH_LIMIT else None
+
+
+def with_lane_cue(op: dict) -> dict:
+    """An add of a vehicle on a road (kind extra) with LANE_CUE at the end of its phrase, once."""
+    if op.get("op") != "add" or op.get("kind") != "extra":
+        return op
+    phrase = op["phrase"]
+    if is_vehicle(phrase) and has_road(phrase) and "lane markings" not in phrase.lower():
+        return {**op, "phrase": f"{phrase.rstrip(' .,')}, {LANE_CUE}"}
+    return op
 
 
 def canonical_change(op: dict) -> dict:
