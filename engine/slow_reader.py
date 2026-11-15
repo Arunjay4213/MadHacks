@@ -18,7 +18,7 @@ import time
 
 import httpx
 
-from commands.state import KINDS
+from commands.state import KINDS, MAX_BATCH
 
 from .foundry import DEFAULT_DEPLOYMENT, FoundryChat, settings_from_env
 
@@ -109,9 +109,6 @@ def validate(reply, snapshot: dict, max_phrase: int = MAX_PHRASE) -> dict | None
     return None  # "none" or anything unknown
 
 
-BATCH_LIMIT = 16  # commands.state: a batch holds 1 to 16 operations
-
-
 def edit_base(base: str, snapshot: dict) -> dict | None:
     """A base edit that keeps the changes, as one batch: new_scene `base`, then one add per existing change.
 
@@ -121,7 +118,7 @@ def edit_base(base: str, snapshot: dict) -> dict | None:
     the ones being copied. None if the batch would be longer than commands.state allows.
     """
     changes = snapshot.get("changes", [])
-    if len(changes) + 1 > BATCH_LIMIT:
+    if len(changes) + 1 > MAX_BATCH:
         return None
     ordered = [c for c in changes if c["kind"] == "world"] + [c for c in changes if c["kind"] != "world"]
     adds = [{"op": "add", "label": c["label"], "kind": c["kind"], "phrase": c["phrase"], "strength": c["strength"]}

@@ -34,12 +34,8 @@ import re
 
 from commands import world as commands_world
 from commands.composer import strength_phrase
-
-CAMERA = ("The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping "
-          "the car centred in the frame while the white dashed centre line rushes toward the viewer.")
-STYLE = "Cinematic, highly detailed, realistic, sharp focus, motion blur on the road."
-_REAR = ", seen from directly behind with its rear lights facing the camera, drives fast along "
-_FORWARD = ", moving forward away from the camera."
+from commands.dictionary import normalize
+from commands.world import CAMERA, FORWARD, REAR, STYLE  # the one copy of Ishaan's template sentences
 
 
 @dataclasses.dataclass(frozen=True)
@@ -135,17 +131,12 @@ class Plan:
     new_scene: bool = False     # the sentence starts a new scene
 
 
-def _normalize(text: str) -> str:
-    from commands.dictionary import normalize
-    return normalize(text)
-
-
 def split_vehicle(text) -> tuple[str, str] | None:
     """(subject, rest) when `text` is a vehicle subject, optionally followed by how it moves or where it is;
     else None. "a red sports car driving along a country road" -> ("a red sports car", "driving along ...")."""
     if not isinstance(text, str):
         return None
-    m = _SUBJECT.match(_normalize(text))
+    m = _SUBJECT.match(normalize(text))
     if m is None:
         return None
     rest = m.group("rest") or ""
@@ -163,7 +154,7 @@ def vehicle_subject(base) -> str | None:
 def is_bare(snapshot: dict) -> bool:
     """True when the base is the bare vehicle subject (no place in it), as the engine keeps it."""
     subject = vehicle_subject(snapshot.get("base"))
-    return subject is not None and _normalize(snapshot["base"]) == subject
+    return subject is not None and normalize(snapshot["base"]) == subject
 
 
 class Words(enum.Enum):
@@ -186,7 +177,7 @@ def has_objects(snapshot: dict) -> bool:
 
 def plan(text: str, snapshot: dict) -> Plan:
     """The route for one final sentence on `snapshot`."""
-    t = _normalize(text)
+    t = normalize(text)
     m = _NEW_SCENE.match(t)
     if m is not None:
         parts = split_vehicle(m.group("desc") or m.group("desc2"))
@@ -235,15 +226,11 @@ def _object_sentences(objects) -> str:
     return " ".join(f"{o[:1].upper()}{o[1:].rstrip(' .,;')}." for o in objects)
 
 
-def compose_prompt(subject: str, world: World, objects=()) -> str:
+def world_prompt(subject: str, world: World, objects=()) -> str:
     """The template, with the subject capitalised and one sentence per object phrase after the camera sentence."""
     middle = " ".join(p for p in (_object_sentences(objects), world.scene, world.light) if p)
-    return (f"{subject[:1].upper()}{subject[1:]}{_REAR}{world.road}{_FORWARD} {camera_sentence(subject)} "
+    return (f"{subject[:1].upper()}{subject[1:]}{REAR}{world.road}{FORWARD} {camera_sentence(subject)} "
             f"{middle} {STYLE}")
-
-
-def world_prompt(subject: str, world: World, objects=()) -> str:
-    return compose_prompt(subject, world, objects)
 
 
 def scene_objects(snapshot: dict) -> list[str]:
@@ -315,10 +302,10 @@ def check_prompt(prompt: str, subject: str, objects=()) -> bool:
     """True when `prompt` is the template for `subject`: the subject sentence (any road), the camera sentence
     word for word as the second sentence, the object sentences word for word, then exactly one scene and one
     light sentence and the style."""
-    head = f"{subject[:1].upper()}{subject[1:]}{_REAR}"
+    head = f"{subject[:1].upper()}{subject[1:]}{REAR}"
     if not prompt.startswith(head) or not prompt.endswith(" " + STYLE):
         return False
-    first, sep, rest = prompt[len(head):].partition(_FORWARD + " ")
+    first, sep, rest = prompt[len(head):].partition(FORWARD + " ")
     camera = camera_sentence(subject)
     if not sep or re.search(r"[.!?]", first) or not rest.startswith(camera + " "):
         return False
@@ -362,8 +349,8 @@ def parse_world(prompt, subject: str, objects=()) -> World | None:
     `prompt` is not one (check_prompt)."""
     if not isinstance(prompt, str) or not check_prompt(prompt, subject, objects):
         return None
-    head = f"{subject[:1].upper()}{subject[1:]}{_REAR}"
-    road, _, rest = prompt[len(head):].partition(_FORWARD + " ")
+    head = f"{subject[:1].upper()}{subject[1:]}{REAR}"
+    road, _, rest = prompt[len(head):].partition(FORWARD + " ")
     middle = rest[len(camera_sentence(subject)) + 1:-len(STYLE) - 1][len(_object_sentences(objects)):].strip()
     scene, light = re.split(r"(?<=[.!?])\s+", middle)
     return World("given", road, scene, light)
