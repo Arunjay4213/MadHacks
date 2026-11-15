@@ -5,6 +5,7 @@ Sentences are the demo's spoken sentences. A fake chat stands in for Sonnet wher
 
 import json
 
+from commands.composer import compose
 from commands.service import CommandService
 from commands.state import SceneState
 from engine import car_template as ct
@@ -194,18 +195,32 @@ def test_routes_for_real_sentences():
 
 def test_the_meadow_chain_is_unchanged():
     pinned = load_pinned(DEFAULT_DEMO_PROMPTS)
-    meadow = [k for k in pinned if k[0].startswith("a wide shot of a")]
+    meadow = list(pinned)[:7]  # the meadow chain, in the file's order
     assert [s for _, s in meadow] == ["make it winter", "add a red car", "make it night", "add a lion", "sunny",
                                       "make it a desert", "add a red car racing on a road"]
     reader = FinalReader(FinalReaderState.ON, chat=NoChat(), spec=prompt_spec(), pinned=pinned)
     svc = FinalReadingService(CommandService(semantic_reader=lambda *a: None), reader)
-    # The 7th ("add a red car racing on a road") has a phrase over 120 characters, which _from_cache refuses
-    # today (Greptile on PR #125); that is fixed separately.
-    for before, sentence in meadow[:6]:
+    for before, sentence in meadow:
         out = svc.handle(final(sentence))
         assert "seen from directly behind" not in out["steer"]["prompt"], sentence
         assert out["steer"]["prompt"] == pinned[(before, sentence)].prompt, sentence
-    assert reader.stats()["template_hits"] == 0 and reader.stats()["pinned_hits"] == 6
+    assert reader.stats()["template_hits"] == 0 and reader.stats()["pinned_hits"] == 7
+
+
+def test_the_pinned_car_chain_is_what_the_live_reader_composes():
+    entries = json.loads(open(DEFAULT_DEMO_PROMPTS).read())
+    pinned = load_pinned(DEFAULT_DEMO_PROMPTS)
+    assert len(pinned) == len(entries)
+    car = [k for k in pinned if k[1] in dict(CHAIN)][-len(CHAIN):]
+    assert [s for _, s in car] == [s for s, _ in CHAIN]
+    live = FinalReader(FinalReaderState.ON, chat=NoChat(), spec=prompt_spec())
+    svc = FinalReadingService(CommandService(semantic_reader=lambda *a: None), live)
+    for (before, sentence), (_, name) in zip(car, CHAIN):
+        assert before == compose(svc._svc.snapshot())
+        out = svc.handle(final(sentence))
+        assert out["steer"]["prompt"] == pinned[(before, sentence)].prompt == \
+            ct.world_prompt("a red sports car", ct.WORLDS[name]), sentence
+
 
 
 FOG = {"op": "add", "label": "fog", "kind": "weather", "phrase": "thick fog", "strength": 1.0}
