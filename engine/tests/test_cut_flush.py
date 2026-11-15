@@ -370,3 +370,85 @@ def test_flush_and_interrupt_cut_the_delay():
     assert not today.problems and not fast.problems, (today.problems, fast.problems)
     assert today.stalls == 0 and fast.stalls == 0
     assert np.median(fast.delays_ms) < np.median(today.delays_ms) - 150
+
+
+# --- interrupts the real backend drops (PR #187: interrupt() only works once generate_chunk is running) ------------
+
+def test_fake_drops_an_interrupt_made_before_the_chunk_starts():
+    b = fake()
+    b.generate_chunk(cond())
+    b.interrupt()  # between chunks, or after the engine marked the chunk but before the call began
+    assert b.generate_chunk(cond())["number"] == 1 and b.interrupted_chunks == 0
+    assert b.generate_chunk(cond())["number"] == 2 and b.interrupted_chunks == 0  # nothing stale is left over
+
+
+def _steer_cut_ready(r: Run, prompt: str) -> None:
+    r.e.encoder.encode(prompt)
+    assert wait(lambda: r.e.policy.chunks_since_anchor >= r.e.reanchor_config.min_gap_chunks)
+
+
+def _check_cut_follows(r: Run, rec, kept: int) -> None:
+    """The steer cut is the chunk right after `kept`, the command's stamps are in order, and nothing later stops."""
+    assert wait(lambda: rec.stage is CommandStage.SHOWN)
+    assert rec.applies_from_chunk == kept + 1 and r.reasons[kept + 1] == "steer"
+    st = rec.stamps_ms()
+    assert st["embedded"] <= st["generated"] <= st["shown"]
+    assert wait(lambda: max(c for c, _, _ in r.sent) >= kept + 6)
+    counts: dict[int, list[int]] = {}
+    for c, i, _ in r.sent:
+        counts.setdefault(c, []).append(i)
+    assert counts[kept] == [0, 1, 2, 3]  # the old chunk that was not stopped is shown whole
+    numbers = sorted(counts)
+    assert numbers == list(range(numbers[0], numbers[-1] + 1))
+    assert all(v == [0, 1, 2, 3] for c, v in counts.items() if numbers[0] < c < numbers[-1])
+    cut = r.e.stats()["cut"]
+    assert cut["interrupted_chunks"] == 0 and r.e.backend.interrupted_chunks == 0 and r.stopped == []
+    assert r.e._inflight in (InFlight.IDLE, InFlight.CONTINUATION, InFlight.ANCHOR)
+
+
+def test_an_interrupt_before_the_backend_starts_the_chunk_is_late_and_the_cut_is_next(runs):
+    r = runs(interrupt="on")
+    e, prompt = r.e, PROMPTS[1]
+    _steer_cut_ready(r, prompt)
+    generate = e.backend.generate_chunk
+    armed, kept, recs = [True], [], []
+
+    def steer_first(c):
+        # The engine has marked this chunk CONTINUATION (in take_cond) but the backend has not started it: the
+        # window where the real backend drops interrupt(). Steer now and start the call only once it is asked.
+        if armed[0] and r.taken is not None and r.taken[1] is None:
+            armed[0] = False
+            kept.append(r.taken[0])
+            recs.append(e.handle_target({**WINTER, "prompt": prompt}, time.monotonic_ns()))
+            assert wait(lambda: e._inflight is InFlight.STOPPING)
+        return generate(c)
+
+    e.backend.generate_chunk = steer_first
+    assert wait(lambda: recs and recs[0].stage is CommandStage.SHOWN)
+    assert e.stats()["cut"]["late_interrupts"] == 1
+    _check_cut_follows(r, recs[0], kept[0])
+
+
+def test_a_command_between_chunks_calls_no_interrupt_and_the_cut_is_next(runs):
+    r = runs(interrupt="on")
+    e, prompt = r.e, PROMPTS[2]
+    _steer_cut_ready(r, prompt)
+    calls = []
+    interrupt = e.backend.interrupt
+    e.backend.interrupt = lambda: (calls.append(e._inflight), interrupt())
+    take_cond = e.book.take_cond  # Run's wrapper, which notes each chunk's re-anchor reason
+    armed, nxt, recs = [True], [], []
+
+    def steer_first(get_cond, chunk):
+        if armed[0]:  # the generation thread is between chunks: the last one ended, the next has no cond yet
+            armed[0] = False
+            assert e._inflight is InFlight.IDLE
+            nxt.append(chunk)
+            recs.append(e.handle_target({**WINTER, "prompt": prompt}, time.monotonic_ns()))
+            assert wait(lambda: recs[0].stage is CommandStage.EMBEDDED)
+        return take_cond(get_cond, chunk)
+
+    e.book.take_cond = steer_first
+    assert wait(lambda: recs and recs[0].stage is CommandStage.SHOWN)
+    assert calls == [] and e.stats()["cut"]["late_interrupts"] == 0
+    _check_cut_follows(r, recs[0], nxt[0] - 1)
