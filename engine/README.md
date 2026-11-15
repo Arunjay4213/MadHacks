@@ -95,7 +95,9 @@ The live command line is `ExecStart` in `engine/deploy/madhacks-engine.service`:
 ```
 python -m engine.server --backend causal_forcing --reader commands --width 672 --height 384 \
     --backend-opt vae=taehv --backend-opt cut_fade_frames=8 \
+    --backend-opt steer_steps=1000,500 --backend-opt defer_context=1 \
     --reanchor on --reanchor-opt refresh_every_chunks=24 --final-reader sonnet \
+    --flush-on-cut on --interrupt-on-steer on \
     --host 127.0.0.1 --port 8000 --record-dir /home/ubuntu/recordings
 ```
 
@@ -110,13 +112,16 @@ The unit also sets `COMMAND_SEMANTIC=1` and loads `~/.madhacks-foundry.env`.
 | `--reanchor-opt refresh_every_chunks=24` | A refresh from the clean frame every 24 chunks (6 s) keeps the picture from drifting (PR #83). Since PR #128 a refresh draws its noise from a generator seeded by the clean anchor (`refresh_noise=fixed`, the default), so it returns to the same picture instead of re-arranging the scene; live since 01:50 UTC on 2026-11-15 (PR #184). Rollback: `--backend-opt refresh_noise=fresh` or `refresh_every_chunks=48`. |
 | Decoder restart (always on, `first_frame_pad=hold` default) | A re-anchor chunk is a first frame; decoding it as a continuation gave a washed-out, ghosted chunk (sharpness 498 against 2049 before; 1871 after, PR #83). |
 | `--backend-opt cut_fade_frames=8` | A re-anchor is a hard cut; dissolving from the last shown frame over 8 frames (0.5 s) brings the largest frame-to-frame change at a steer from 82 to 13 (PR #113). Refreshes fade too (`cut_fade_refresh` default 1); Ishaan saw no double car on the live recording, so it stays on (board post at 00:12 UTC). |
+| `--backend-opt steer_steps=1000,500 --backend-opt defer_context=1` | A steer cut starts on a 2-step schedule (PR #174), and each chunk's context pass runs at the start of the next chunk and is skipped before a cut (PR #187), so a cut's latent is ready after 2 passes instead of 5. |
+| `--flush-on-cut on` | When a steer cut's frames are decoded, the old-scene frames still queued for sending are dropped, so the cut is the next frame on screen; the 8-frame dissolve is shifted to start from the frame the viewer saw last, and the recorder saves exactly what was shown (PR #198). |
+| `--interrupt-on-steer on` | When the policy says the next chunk is a steer cut, the old-scene chunk being generated is stopped at its next pass boundary and the cut takes its chunk number; refreshes, cuts and the first chunk of a video are never stopped (PR #187, PR #198). On the fake backend at live timings these four flags take command to screen from 554 to 296 ms median (621 to 349 p90) with no added stalls. |
 | `--reader commands` | The `commands/` scene state, dictionary and composer read every sentence. |
 | `COMMAND_SEMANTIC=1` | Turns on the CPU vector matcher in `commands/` for finals the dictionary misses (PR #73, PR #78). |
 | `--final-reader sonnet` | Every final sentence goes to one Claude Sonnet 5.5 call that returns the operations and a rich prompt, with the dictionary as the instant result for partials and the backup on a timeout (PR #87, PR #120, live since PR #125). |
 | `--demo-prompts` (default `engine/demo_prompts.json`) | The demo sentences' Sonnet prompts are pinned, so every run draws the same words and a prompt checked on the GPU stays as checked (see "Final reader (Sonnet)"). |
 | `--record-dir /home/ubuntu/recordings` | Every video is saved as an mp4, for the backup video and for checks such as Ishaan's refresh review. |
 
-Rollback for the last deploy (01:50 UTC, PR #184): `--backend-opt refresh_noise=fresh`, or back to `refresh_every_chunks=48`.
+Rollback for the latency deploy: remove `--flush-on-cut on --interrupt-on-steer on` and the two `--backend-opt steer_steps=... defer_context=...` options. Rollback for the 01:50 UTC deploy (PR #184): `--backend-opt refresh_noise=fresh`, or back to `refresh_every_chunks=48`.
 
 ### Deploy and restart
 
