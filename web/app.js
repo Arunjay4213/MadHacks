@@ -57,9 +57,13 @@ function send(msg) {
   return true;
 }
 
+// Status pill: Live when connected; Reconnecting… while retrying (Connecting… before the first
+// connection); Offline once several retries in a row have failed. The notice over the video says more.
+const OFFLINE_AFTER = 5; // failed attempts in a row (about 8 s with the backoff)
 function setConnected(open) {
-  el.connection.dataset.state = open ? 'open' : control ? 'closed' : 'connecting';
-  el.connection.textContent = open ? 'Connected' : 'Reconnecting…'; // the notice over the video says the connection was lost
+  const offline = !open && attempt >= OFFLINE_AFTER;
+  el.connection.dataset.state = open ? 'open' : offline ? 'offline' : 'connecting';
+  el.connection.textContent = open ? 'Live' : offline ? 'Offline' : link.everConnected ? 'Reconnecting…' : 'Connecting…';
   el.changes.dataset.stale = String(!open);
   el.undo.disabled = !open;
   el.reset.disabled = !open;
@@ -89,9 +93,9 @@ function connectControl() {
     renderNotice();
     latency.reset(); // a stale command can no longer be correlated
     ordered.dropAll(); // held spoken commands are dropped, never replayed after a reconnect
-    el.latency.textContent = '—'; // no number without a measured frame
-    setConnected(false);
+    showDelay(null); // no number without a measured frame
     setTimeout(connectControl, backoffMs(attempt++));
+    setConnected(false);
   };
 }
 
@@ -117,26 +121,28 @@ function onServer(raw) {
   latency.onServer(m);
 }
 
-// The words line: a small label, the full sentence, and what the server understood.
-function wordsParts(sentenceNodes, labels) {
-  const label = document.createElement('span');
-  label.className = 'words-label';
-  label.textContent = labels.label;
-  const text = document.createElement('span');
-  text.className = 'words-text';
+// The caption: line 1 is the sentence (keyword highlighted), line 2 says what happened to it. It fades
+// out a few seconds after the last update so it never sits over the picture for long.
+const CAPTION_MS = 4000;
+let captionTimer = 0;
+function showCaption(sentenceNodes, labels, { unmatched = false } = {}) {
+  const text = document.createElement('p');
+  text.className = 'caption-text';
   text.append(...sentenceNodes);
-  const parts = [label, text];
-  if (labels.understood) {
-    const understood = document.createElement('span');
-    understood.className = 'words-understood';
-    understood.textContent = labels.understood;
-    parts.push(understood);
-  }
-  return parts;
+  const status = document.createElement('p');
+  status.className = 'caption-status';
+  // Same meaning as wordsLabels (lib.js), worded for the caption.
+  if (labels.label !== 'heard') [status.dataset.state, status.textContent] = ['partial', 'Listening…'];
+  else if (unmatched) [status.dataset.state, status.textContent] = ['unmatched', 'Not understood'];
+  else if (labels.understood) [status.dataset.state, status.textContent] = ['understood', 'Understood · applying now'];
+  el.words.replaceChildren(text, ...(status.textContent ? [status] : []));
+  el.words.classList.add('visible');
+  clearTimeout(captionTimer);
+  captionTimer = setTimeout(() => el.words.classList.remove('visible'), CAPTION_MS);
 }
 
 function renderLocalWords(text, kind) {
-  el.words.replaceChildren(...wordsParts([document.createTextNode(text)], wordsLabels({ local: true })));
+  showCaption([document.createTextNode(text)], wordsLabels({ local: true }));
   el.words.dataset.unmatched = 'false';
   el.words.dataset.kind = kind;
 }
@@ -148,7 +154,7 @@ function renderWords({ heard, keyword, unmatched, kind, confirmed }) {
     mark.textContent = p.text;
     return mark;
   });
-  el.words.replaceChildren(...wordsParts(sentence, wordsLabels({ keyword, unmatched, confirmed })));
+  showCaption(sentence, wordsLabels({ keyword, unmatched, confirmed }), { unmatched });
   el.words.dataset.unmatched = String(Boolean(unmatched));
   el.words.dataset.kind = kind || 'server';
 }
@@ -251,12 +257,16 @@ function connectFrames() {
   };
 }
 
-// The big number is command -> first new frame on screen; the line under it is the server's own
-// stamps, shortened. The full definition is in the number's tooltip.
+// Delay pill: command -> first new frame on screen, in seconds; amber over 1.5 s, red over 3 s. The
+// server's own stage stamps show on hover; the exact definition is in the tooltip.
+function showDelay(ms) {
+  el.latency.textContent = ms === null ? '— delay' : `${(ms / 1000).toFixed(1)} s delay`;
+  el.latency.dataset.level = ms === null ? '' : ms > 3000 ? 'bad' : ms > 1500 ? 'slow' : 'ok';
+}
 function renderLatency({ ms, stamps }) {
-  el.latency.textContent = `${ms} ms`;
+  showDelay(ms);
   const s = formatStamps(stamps);
-  el.timing.textContent = s ? `voice → video · server: ${s}` : 'voice → video';
+  el.timing.textContent = `${ms} ms · voice → video` + (s ? ` · server: ${s}` : '');
 }
 
 // ---------- text box (Wispr Flow pastes here) ----------
@@ -307,7 +317,10 @@ el.fullscreen.addEventListener('click', () => {
   p?.catch(() => showError('Full screen was blocked: use View → Enter Full Screen in Chrome'));
 });
 document.addEventListener('fullscreenchange', () => {
-  el.fullscreen.textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
+  document.documentElement.classList.toggle('fs', Boolean(document.fullscreenElement)); // full-screen layout (style.css)
+  const label = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
+  el.fullscreen.setAttribute('aria-label', label); // icon-only button: keep the icon, change the label
+  el.fullscreen.title = document.fullscreenElement ? 'Exit full screen (Esc)' : 'Full screen for the demo (Esc leaves)';
   refocus();
 });
 // Back to the starting scene (the scene reset is undoable; the picture restarts cleanly).
@@ -426,9 +439,7 @@ if (micUnavailable) {
 }
 
 setConnected(false);
-el.connection.dataset.state = 'connecting';
-el.connection.textContent = 'Connecting…';
-el.latency.textContent = '—';
+showDelay(null);
 el.timing.textContent = 'voice → video: measured after your first command';
 connectControl();
 connectFrames();

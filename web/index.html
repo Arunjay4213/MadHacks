@@ -3,50 +3,65 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Live voice-steered video</title>
+  <title>Halo: live video, steered by voice</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Ccircle cx='14' cy='14' r='11' fill='none' stroke='%23F5F5F7' stroke-width='1.6'/%3E%3Ccircle cx='14' cy='14' r='5' fill='%23F5B544'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="topbar-left">
-      <span id="connection" class="status" data-state="connecting" role="status">Connecting…</span>
-      <span id="mode-banner" class="banner" hidden>MOCK server · test pattern, not the real engine</span>
+  <header class="header">
+    <div class="brand">
+      <svg class="logo" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
+        <circle cx="14" cy="14" r="11" fill="none" stroke="#F5F5F7" stroke-width="1.6"/>
+        <circle cx="14" cy="14" r="5" fill="#F5B544"/>
+      </svg>
+      <span class="wordmark">Halo</span>
+      <span id="mode-banner" class="banner" hidden>Mock server · test pattern</span>
     </div>
-    <div class="delay">
-      <span id="latency" class="latency" role="status" aria-describedby="timing">—</span>
-      <span id="timing" class="timing" role="tooltip"></span>
+    <div class="pills">
+      <span id="connection" class="pill status glass" data-state="connecting" role="status">Connecting…</span>
+      <div class="pill delay glass">
+        <span id="latency" class="latency" role="status" aria-describedby="timing">— delay</span>
+        <span id="timing" class="timing glass" role="tooltip"></span>
+      </div>
     </div>
   </header>
 
-  <main class="stage">
+  <main class="column">
+    <!-- The video box: the picture keeps 672:384 and is never cropped or stretched. -->
     <div id="frame" class="frame">
       <canvas id="video" width="672" height="384" aria-label="Live generated video"></canvas>
-      <p id="video-notice" class="notice" role="status">Connecting to the video server…</p>
+      <ul id="changes" class="chips" aria-label="Active changes"></ul>
+      <button id="fullscreen" type="button" class="icon-btn glass fs-btn" aria-label="Full screen" title="Full screen for the demo (Esc leaves)">
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <p id="video-notice" class="notice glass" role="status">Connecting to the video server…</p>
     </div>
+
+    <section id="words" class="caption" aria-live="polite" data-kind="" data-unmatched="false"></section>
   </main>
 
-  <section class="caption">
-    <p id="words" class="words" aria-live="polite" data-kind="" data-unmatched="false"></p>
-    <ul id="changes" class="chips" aria-label="Active changes"></ul>
-  </section>
-
-  <form id="command-form" class="dock" autocomplete="off">
-    <input id="command" type="text" aria-label="Command" placeholder="Type or speak a command">
-    <div class="dock-buttons">
-      <button id="mic" type="button" class="btn" aria-pressed="false"
-              title="Live mic on or off. Wispr Flow: hold Ctrl and speak; the sentence lands in the box">
-        Mic <kbd>Ctrl = Wispr</kbd></button>
-      <button id="ptt" type="button" class="btn" aria-pressed="false" title="Hold to talk (or hold the ` key)">
-        Hold to talk <kbd>`</kbd></button>
-      <button id="undo" type="button" class="btn" title="Undo the last change">Undo</button>
-      <button id="reset" type="button" class="btn" title="Back to the starting scene (Option+R / Alt+R)">
-        Reset <kbd>⌥R</kbd></button>
-      <button id="fullscreen" type="button" class="btn btn-ghost" title="Full screen for the demo (Esc leaves)">
-        Full screen</button>
-    </div>
+  <div class="scrim" aria-hidden="true"></div>
+  <form id="command-form" class="bar glass" autocomplete="off">
+    <label for="command" class="visually-hidden">Command</label>
+    <input id="command" type="text" placeholder="Type or speak a command">
+    <button id="ptt" type="button" class="ptt" aria-pressed="false" aria-label="Hold to talk" title="Hold to talk (or hold the ` key)">
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+    <span class="divider" aria-hidden="true"></span>
+    <button id="mic" type="button" class="icon-btn" aria-pressed="false" aria-label="Live mic on or off"
+            title="Live mic on or off. Wispr Flow: hold Ctrl and speak; the sentence lands in the box">
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M19.5 3.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" fill="currentColor"/></svg>
+    </button>
+    <button id="undo" type="button" class="icon-btn" aria-label="Undo the last change" title="Undo the last change">
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7H4.5V2.5M4.8 7A8 8 0 1 1 4 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button id="reset" type="button" class="icon-btn" aria-label="Reset to the starting scene" title="Back to the starting scene (Option+R / Alt+R)">
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4.5h-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
   </form>
+  <p class="hints"><kbd>`</kbd> hold to talk · <kbd>Ctrl</kbd> Wispr · <kbd>⌥R</kbd> reset</p>
 
-  <p id="error" class="error" role="alert" hidden></p>
+  <p id="error" class="error glass" role="alert" hidden></p>
 
   <script type="module" src="app.js"></script>
 </body>
