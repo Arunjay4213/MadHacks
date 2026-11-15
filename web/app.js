@@ -71,7 +71,8 @@ function renderStatus() {
     : connState === 'offline' ? 'Offline' : link.everConnected ? 'Reconnecting…' : 'Connecting…';
   el.latency.textContent = text;
   el.latency.setAttribute('aria-label', connState === 'open' && delayMs !== null ? `Live, ${text} from command to video` : text);
-  el.latency.dataset.level = delayMs === null ? '' : delayMs > 3000 ? 'bad' : delayMs > 1500 ? 'slow' : 'ok';
+  // While connected the capsule warns about a slow delay: amber over 1.5 s, red over 3 s.
+  el.connection.dataset.level = delayMs === null ? '' : delayMs > 3000 ? 'bad' : delayMs > 1500 ? 'slow' : 'ok';
 }
 function setConnected(open) {
   connState = open ? 'open' : attempt >= OFFLINE_AFTER ? 'offline' : 'connecting';
