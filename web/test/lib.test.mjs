@@ -4,6 +4,7 @@ import {
   parseFrame, parseServerMessage, splitKeyword, backoffMs, isWholeInsert,
   makeFrameGate, makeLatencyTracker, makeTranscriber, changesKey, commandKey, makeInputClassifier,
   PUSH_TO_TALK_CODE, isPushToTalk, micErrorText, looksUnfinished, finalizeDelay, wordsLabels, makeHeardTracker, PENDING_MS, makeOrderedFinals,
+  makeSpeechEndpointer, EndpointState, SPEECH_STABLE_MS,
 } from '../lib.js';
 import { loadTestPattern } from '../fake-server.mjs';
 import { wsBaseUrl, fitSize, videoNotice, formatStamps, STALL_MS, isResetShortcut } from '../lib.js';
@@ -339,4 +340,177 @@ test('transcriber: a new session restarts result indices', () => {
   t.start();
   t.handle([R('undo', true)]); // index 0 again in the new session: a new command
   assert.deepEqual(out, ['undo', 'undo']);
+});
+
+// A fake clock for the endpointer: advance(ms) fires due timers in order.
+function fakeClock() {
+  let t = 0;
+  let id = 0;
+  const timers = new Map();
+  return {
+    now: () => t,
+    setTimer: (fn, ms) => (timers.set(++id, { fn, at: t + ms }), id),
+    clearTimer: (i) => timers.delete(i),
+    advance(ms) {
+      const end = t + ms;
+      for (;;) {
+        const due = [...timers].filter(([, v]) => v.at <= end).sort((a, b) => a[1].at - b[1].at)[0];
+        if (!due) break;
+        timers.delete(due[0]);
+        t = due[1].at;
+        due[1].fn();
+      }
+      t = end;
+    },
+  };
+}
+
+// Chrome's mic as the page wires it: recognizer results -> transcriber -> endpointer -> ordered slot.
+function micPipeline({ hold = false, open = () => true, ordered, clock = fakeClock(), out = [] } = {}) {
+  const o = ordered ?? makeOrderedFinals((m) => out.push(m), open);
+  const slot = o.open();
+  const ep = makeSpeechEndpointer(slot.send, { isOpen: open, ...clock });
+  const t = makeTranscriber(ep.send);
+  t.start({ hold });
+  return { t, ep, slot, clock, out, finals: () => out.filter((m) => m.type === 'final').map((m) => m.text),
+    end() { t.flush(); ep.close(); slot.close(); } };
+}
+
+test('endpointer: words unchanged for 200 ms are sent as one final, before Chrome marks them final', () => {
+  assert.equal(SPEECH_STABLE_MS, 200);
+  const p = micPipeline();
+  p.t.handle([R('make it winter')]);
+  p.clock.advance(199);
+  assert.deepEqual(p.finals(), []); // not yet
+  p.clock.advance(1);
+  assert.deepEqual(p.finals(), ['make it winter']);
+  const sent = p.out.find((m) => m.type === 'final');
+  assert.equal(sent.t_client, 200); // stamped when it was sent, like any final
+  assert.equal(p.ep.state, EndpointState.STABLE_SENT);
+  p.clock.advance(5000); // still silent: sent exactly once
+  assert.deepEqual(p.finals(), ['make it winter']);
+});
+
+test('endpointer: words still changing keep resetting the 200 ms wait', () => {
+  const p = micPipeline();
+  p.t.handle([R('make it')]); // connector ending: no timer at all
+  p.clock.advance(150);
+  p.t.handle([R('make it snow')]);
+  p.clock.advance(150);
+  p.t.handle([R('make it snowy')]); // changed again 150 ms later: the wait starts over
+  p.clock.advance(150);
+  assert.deepEqual(p.finals(), []);
+  p.clock.advance(50);
+  assert.deepEqual(p.finals(), ['make it snowy']);
+});
+
+test('endpointer: a sentence ending in a connector ("and", "make it", "add a") is never cut early', () => {
+  for (const text of ['make it night and', 'make it', 'add a', 'a car racing on', 'make it winter,']) {
+    const p = micPipeline();
+    p.t.handle([R(text)]);
+    p.clock.advance(3000);
+    assert.deepEqual(p.finals(), [], text);
+    assert.equal(p.ep.state, EndpointState.LISTENING, text);
+  }
+});
+
+test('endpointer: Chrome\'s own final for the words already sent is dropped (case and punctuation aside)', () => {
+  const p = micPipeline();
+  p.t.handle([R('make it winter')]);
+  p.clock.advance(200);
+  p.t.handle([R('Make it winter.', true)]); // Chrome's final a second later
+  assert.deepEqual(p.finals(), ['make it winter']);
+  assert.equal(p.ep.state, EndpointState.LISTENING); // the next sentence is a new command
+  p.t.handle([R('Make it winter.', true), R('undo', true)]);
+  assert.deepEqual(p.finals(), ['make it winter', 'undo']);
+  p.end();
+  assert.deepEqual(p.finals(), ['make it winter', 'undo']); // nothing left over to flush
+});
+
+test('endpointer: Chrome\'s final that adds words sends only the new words', () => {
+  const p = micPipeline();
+  p.t.handle([R('make it winter')]);
+  p.clock.advance(200);
+  p.t.handle([R('make it winter at night', true)]);
+  assert.deepEqual(p.finals(), ['make it winter', 'at night']);
+  // Added words heard as interim are also sent once they settle, then Chrome's final is dropped.
+  const q = micPipeline();
+  q.t.handle([R('add a river')]);
+  q.clock.advance(200);
+  q.t.handle([R('add a river with')]); // connector: waits
+  q.clock.advance(500);
+  q.t.handle([R('add a river with boats')]);
+  q.clock.advance(200);
+  q.t.handle([R('Add a river with boats.', true)]);
+  assert.deepEqual(q.finals(), ['add a river', 'with boats']);
+});
+
+test('endpointer: a different sentence from Chrome is sent as its own command; a rewrite waits for it', () => {
+  const p = micPipeline();
+  p.t.handle([R('make it winner')]);
+  p.clock.advance(200);
+  p.t.handle([R('make it winter')]); // Chrome rewrote a word: no second early final
+  p.clock.advance(1000);
+  assert.deepEqual(p.finals(), ['make it winner']);
+  p.t.handle([R('make it winter', true)]);
+  assert.deepEqual(p.finals(), ['make it winner', 'make it winter']);
+});
+
+test('endpointer: push-to-talk sends early while the key is held, and the release sends nothing again', () => {
+  const p = micPipeline({ hold: true });
+  p.t.handle([R('make it night')]);
+  p.clock.advance(200);
+  assert.deepEqual(p.finals(), ['make it night']);
+  p.t.handle([R('make it night', true)]); // Chrome's segment final is held, the words line is unchanged
+  p.clock.advance(1000);
+  p.end(); // key released: the flush equals what was sent
+  assert.deepEqual(p.finals(), ['make it night']);
+  // A release before the words settled still sends the whole press once.
+  const q = micPipeline({ hold: true });
+  q.t.handle([R('undo')]);
+  q.clock.advance(100);
+  q.end();
+  q.clock.advance(1000);
+  assert.deepEqual(q.finals(), ['undo']);
+});
+
+test('endpointer: push-to-talk presses still reach the server in press order', () => {
+  const out = [];
+  const ordered = makeOrderedFinals((m) => out.push(m));
+  const clock = fakeClock();
+  const a = micPipeline({ hold: true, ordered, clock, out }); // press 1, released, still ending
+  const b = micPipeline({ hold: true, ordered, clock, out }); // press 2
+  a.t.handle([R('make it winter and')]); // connector: press 1 waits for its flush
+  b.t.handle([R('undo')]);
+  clock.advance(200); // press 2's words settle first: held behind press 1
+  assert.deepEqual(out.filter((m) => m.type === 'final'), []);
+  a.t.handle([R('make it winter and add snow')]);
+  a.end();
+  b.end(); // release of press 2: same words as its early final, nothing more
+  assert.deepEqual(out.filter((m) => m.type === 'final').map((m) => m.text), ['make it winter and add snow', 'undo']);
+});
+
+test('endpointer: nothing is sent early while disconnected, and nothing is replayed after', () => {
+  let open = false;
+  const server = [];
+  // The page's send(): drops a message while disconnected, never replays it.
+  const ordered = makeOrderedFinals((m) => open && server.push(m.text), () => open);
+  const p = micPipeline({ open: () => open, ordered });
+  p.t.handle([R('make it winter')]);
+  p.clock.advance(200);
+  assert.equal(p.ep.state, EndpointState.LISTENING); // not marked as sent
+  p.t.handle([R('make it winter', true)]); // dropped by send() like any final while down
+  open = true;
+  p.clock.advance(1000);
+  p.end();
+  assert.deepEqual(server, []);
+});
+
+test('endpointer: a closed recognizer never fires a late early final', () => {
+  const p = micPipeline({ hold: true });
+  p.t.handle([R('add a dog')]);
+  p.ep.close(); // e.g. the recognizer ended without a flush of these words
+  p.clock.advance(1000);
+  assert.deepEqual(p.finals(), []);
+  assert.equal(p.ep.state, EndpointState.CLOSED);
 });

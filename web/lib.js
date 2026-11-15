@@ -374,3 +374,94 @@ export function makeTranscriber(send) {
     },
   };
 }
+
+// Spoken commands only: Chrome waits about 0.5 to 1 s of silence before it marks a result final, and the
+// engine acts only on finals. The page treats a command as finished once the interim words have not
+// changed for this long.
+export const SPEECH_STABLE_MS = 200;
+
+// The words of a sentence, each with its spelling as heard (`raw`) and a key for comparing: lower case,
+// punctuation dropped, so "Make it winter." and "make it winter" are the same words.
+const sentenceWords = (text) => text.trim().split(/\s+/)
+  .map((raw) => ({ raw, key: raw.toLowerCase().replace(/[^\p{L}\p{N}']/gu, '') }))
+  .filter((w) => w.key);
+
+// How `text` relates to the words already sent: the same words, the same words plus more (`rest` is
+// the new part), or a different sentence.
+function compareToSent(sentKeys, text) {
+  const words = sentenceWords(text);
+  if (words.length < sentKeys.length || !sentKeys.every((k, i) => words[i].key === k)) return { kind: 'different' };
+  if (words.length === sentKeys.length) return { kind: 'same' };
+  return { kind: 'extends', rest: words.slice(sentKeys.length).map((w) => w.raw).join(' ') };
+}
+
+// The endpointer's states, for one recognizer (one press, or one mic-toggle session):
+// LISTENING: nothing of the current utterance has been sent as a final yet.
+// STABLE_SENT: the utterance's words so far were sent early, after SPEECH_STABLE_MS unchanged.
+// CLOSED: the recognizer has ended; no early final can fire any more.
+export const EndpointState = Object.freeze({ LISTENING: 'LISTENING', STABLE_SENT: 'STABLE_SENT', CLOSED: 'CLOSED' });
+
+// Sits between the transcriber and the ordered-finals slot. It passes every message on, and:
+// - a partial unchanged for `stableMs` is sent as a final at once (LISTENING -> STABLE_SENT), unless it
+//   looks unfinished ("make it", "... and"), or the connection is down (then the browser's own final
+//   goes the normal way, and is dropped like any final sent while disconnected);
+// - in STABLE_SENT, a partial that only adds words gets the same treatment for the added words; a
+//   partial that rewrites what was sent waits for the browser's final;
+// - the browser's final (or the flush on release) ends the utterance (-> LISTENING): dropped if it is
+//   what was sent, only its new words sent if it extends it, sent whole if it is a different sentence.
+// So the same words are never sent twice.
+export function makeSpeechEndpointer(send, {
+  isOpen = () => true, stableMs = SPEECH_STABLE_MS, setTimer = setTimeout, clearTimer = clearTimeout, now = Date.now,
+} = {}) {
+  let state = EndpointState.LISTENING;
+  let sentKeys = []; // in STABLE_SENT: the keys of the words of this utterance already sent
+  let timer = null;
+  const cancelTimer = () => {
+    if (timer !== null) clearTimer(timer);
+    timer = null;
+  };
+  const sendStable = (fullText, newText) => {
+    timer = null;
+    if (state === EndpointState.CLOSED || !isOpen()) return;
+    send(finalMsg(newText, now()));
+    sentKeys = sentenceWords(fullText).map((w) => w.key);
+    state = EndpointState.STABLE_SENT;
+  };
+  const onPartial = (text) => {
+    if (looksUnfinished(text)) return; // a connector ending: the sentence is still coming
+    let newText = text;
+    if (state === EndpointState.STABLE_SENT) {
+      const c = compareToSent(sentKeys, text);
+      if (c.kind !== 'extends') return; // nothing new, or a rewrite: the browser's final settles it
+      newText = c.rest;
+    }
+    timer = setTimer(() => sendStable(text, newText), stableMs);
+  };
+  const onFinal = (msg) => {
+    if (state !== EndpointState.STABLE_SENT) return send(msg);
+    const c = compareToSent(sentKeys, msg.text);
+    state = EndpointState.LISTENING; // the utterance is over either way
+    sentKeys = [];
+    if (c.kind === 'same') return true; // already sent: dropped
+    if (c.kind === 'extends') return send(finalMsg(c.rest, msg.t_client));
+    return send(msg); // a different sentence: a new command
+  };
+  return {
+    get state() {
+      return state;
+    },
+    send(msg) {
+      if (state === EndpointState.CLOSED || (msg.type !== 'partial' && msg.type !== 'final')) return send(msg);
+      cancelTimer();
+      if (msg.type === 'final') return onFinal(msg);
+      const ok = send(msg);
+      if (msg.text.trim()) onPartial(msg.text);
+      return ok;
+    },
+    // The recognizer has ended (after its flush): a pending early final is cancelled.
+    close() {
+      cancelTimer();
+      state = EndpointState.CLOSED;
+    },
+  };
+}
