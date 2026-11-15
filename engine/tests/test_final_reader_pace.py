@@ -38,7 +38,7 @@ def play(replies, sentences, pinned=None):
     for s in sentences:
         res = reader(s, svc.snapshot())
         assert res is not None and not res.get("blocked"), (s, res)
-        steer = svc.apply_final(s, res["operations"], None)["steer"]
+        steer = svc.apply_final(s, res["operations"])["steer"]
         out.append(({c["label"]: c["strength"] for c in svc.snapshot()["changes"]}, steer["ramp_chunks"]))
     return out
 

@@ -56,13 +56,9 @@ class ZeroStrengthTest(unittest.TestCase):
 class ApplyFinalPaceTest(unittest.TestCase):
     DOG = {"op": "add", "label": "dog", "kind": "extra", "phrase": "a dog standing nearby", "strength": 1.0}
 
-    def test_pace_from_text_without_prompt(self):
+    def test_pace_from_text(self):
         self.assertEqual(svc().apply_final("slowly add a dog", [self.DOG])["steer"]["ramp_chunks"], RAMP["slow"])
         self.assertEqual(svc().apply_final("add a dog", [self.DOG])["steer"]["ramp_chunks"], RAMP["default"])
-
-    def test_pace_from_text_with_prompt_override(self):
-        r = svc().apply_final("slowly add a dog", [self.DOG], prompt="A dog arrives in the meadow.")
-        self.assertEqual((r["steer"]["prompt"], r["steer"]["ramp_chunks"]), ("A dog arrives in the meadow.", RAMP["slow"]))
 
 
 class RemoveWorldKeepsObjectsTest(unittest.TestCase):

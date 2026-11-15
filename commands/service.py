@@ -1,18 +1,33 @@
 """CommandService: contract 1 in, contract 2 out, plus the contract-4 state fields. See PLAN.md section 6."""
 
 import copy
+import dataclasses
+import enum
 import threading
 import time
 import unicodedata
 
 from .composer import compose
-from .reader import KEYWORDS, MAX_CLAUSES, RAMP, is_blocked, read, split_commands, spot, style_fallback
+from .reader import KEYWORDS, MAX_CLAUSES, RAMP, is_blocked, ramp_for, read, split_commands, spot, style_fallback
 from .state import SceneState
 from .world import WORLDS
 
 PROVISIONAL_CAP = 0.4
-MAX_FINAL_PROMPT_CHARS = 4000
 SEMANTIC_WAIT_S = 0.05  # the local vector match is ~10 ms; never let it eat the slow LLM's budget
+
+
+class Applied(enum.Enum):
+    """What applying one operation (or one batch) to the scene did."""
+    CHANGED = "changed"      # the scene changed: steer to the new composed prompt
+    UNCHANGED = "unchanged"  # valid, but the scene is the same (a repeated add, undo with no history)
+    REJECTED = "rejected"    # invalid or not understood: nothing applied, the words show as unmatched
+
+
+@dataclasses.dataclass(frozen=True)
+class Guess:
+    """A provisional move in flight, from a partial: the keyword's label and the prompt steered to (capped)."""
+    label: str
+    prompt: str
 
 
 def _has_non_latin_letters(text: str) -> bool:
@@ -53,8 +68,7 @@ class CommandService:
         self._semantic_thread: threading.Thread | None = None
         self._lock = threading.Lock()
         self._committed = compose(self._state.snapshot())
-        self._guess: str | None = None  # keyword of the provisional move in flight
-        self._guess_prompt: str | None = None
+        self._guess: Guess | None = None  # the provisional move in flight, if any
         self._heard = None
         self._keyword = None
         self._unmatched = False
@@ -84,22 +98,19 @@ class CommandService:
         with self._lock:
             return self._state.snapshot()
 
-    def apply_final(self, text: str, operations, prompt=None) -> dict:
-        """Apply the engine's LLM decision for one final sentence: 0..16 operations, applied atomically.
+    def apply_final(self, text: str, operations) -> dict:
+        """Apply the engine's LLM decision for one final sentence: 0..16 operations, applied atomically, with the
+        same steer and state shape as handle(). The steer is the composed prompt of the new scene; the engine maps
+        it to its rich prompt.
 
         [] means blocked or not understood: nothing applied, unmatched, a provisional guess is rolled back.
-        Invalid operations or an invalid prompt (non-string, empty, > MAX_FINAL_PROMPT_CHARS) reject the whole
-        final the same way. A valid prompt replaces the composed prompt as the committed prompt and the steer,
-        so later rollbacks return to it; undo returns to the canonical composed prompt of the earlier state.
+        Invalid operations reject the whole final the same way.
         """
         with self._lock:
             self._heard = text
             self._keyword = None
-            if prompt is not None:
-                prompt = prompt.strip() if isinstance(prompt, str) else ""
             valid = (isinstance(operations, list) and len(operations) <= MAX_CLAUSES
-                     and all(isinstance(o, dict) for o in operations)
-                     and (prompt is None or 0 < len(prompt) <= MAX_FINAL_PROMPT_CHARS))
+                     and all(isinstance(o, dict) for o in operations))
             op = None
             if valid and operations:
                 op = operations[0] if len(operations) == 1 else {"op": "batch", "operations": operations}
@@ -111,21 +122,11 @@ class CommandService:
                     op = None
             if op is None:
                 self._unmatched = True
-                return {"steer": self._commit(None, RAMP["default"]), "state": self._fields()}
-            changed = self._apply(op)
+                return {"steer": self._commit(Applied.REJECTED, RAMP["default"]), "state": self._fields()}
+            applied = self._apply(op)
             self._unmatched = False
-            pace = read(text, self._state.snapshot())["pace"] if isinstance(text, str) else None  # "slowly ..." = 12
-            ramp = RAMP.get(pace or "default", RAMP["default"])
-            if prompt is None:
-                return {"steer": self._commit(changed, ramp), "state": self._fields()}
-            guess_prompt = self._guess_prompt
-            self._guess = self._guess_prompt = None
-            if prompt == self._committed and guess_prompt is None:
-                steer = None  # same scene, same words: nothing to send
-            else:
-                self._committed = prompt
-                steer = self._steer(prompt, RAMP["confirm"] if prompt == guess_prompt and ramp == RAMP["default"] else ramp)
-            return {"steer": steer, "state": self._fields()}
+            ramp = ramp_for(text) if isinstance(text, str) else RAMP["default"]  # "slowly ..." = 12
+            return {"steer": self._commit(applied, ramp), "state": self._fields()}
 
     def handle(self, msg: dict) -> dict:
         _validate(msg)
@@ -172,14 +173,14 @@ class CommandService:
         word = spot(text)
         self._keyword = word
         label = KEYWORDS[word]["label"] if word else None
-        if label == self._guess:
+        if self._guess is not None and label == self._guess.label:
             return None
         prompt = self._hypothesis(KEYWORDS[word]) if word else self._committed
         if prompt == self._committed:  # word dropped by a revision, or already in the scene: move back if guessing
-            had_guess = self._guess_prompt is not None
-            self._guess = self._guess_prompt = None
+            had_guess = self._guess is not None
+            self._guess = None
             return self._steer(self._committed, RAMP["default"]) if had_guess else None
-        self._guess, self._guess_prompt = label, prompt
+        self._guess = Guess(label, prompt)
         return self._steer(prompt, RAMP["provisional"], provisional=True)
 
     def _final(self, text: str):
@@ -190,7 +191,7 @@ class CommandService:
         if not 1 <= len(clauses) <= MAX_CLAUSES:
             self._keyword = None
             self._unmatched = True
-            return self._commit(None, RAMP["default"])
+            return self._commit(Applied.REJECTED, RAMP["default"])
         trial = copy.deepcopy(self._state)
         operations = []
         pace = None
@@ -220,26 +221,27 @@ class CommandService:
                 break
             # A world-with-time phrase is itself a batch: flatten it so the sentence stays one non-nested batch.
             operations.extend(op["operations"] if op.get("op") == "batch" else [op])
-        changed = self._apply(operations[0] if len(operations) == 1 else {"op": "batch", "operations": operations}) if operations else None
-        self._unmatched = changed is None
-        return self._commit(changed, RAMP.get(pace or "default", RAMP["default"]))
+        applied = (self._apply(operations[0] if len(operations) == 1 else {"op": "batch", "operations": operations})
+                   if operations else Applied.REJECTED)
+        self._unmatched = applied is Applied.REJECTED
+        return self._commit(applied, RAMP.get(pace or "default", RAMP["default"]))
 
     def _final_original(self, text: str):
         """Text the reader cannot see (non-Latin letters): the slow reader gets the ORIGINAL text, one operation.
         No answer means unmatched; the dictionary never makes a partial edit from the Latin leftovers."""
         self._keyword = None
         op = self._ask_slow(text, self._state.snapshot()) if self._slow_reader is not None else None
-        changed = None
+        applied = Applied.REJECTED
         if op is not None:
             trial = copy.deepcopy(self._state)
             try:
                 trial.apply(op)
                 compose(trial.snapshot())
-                changed = self._apply(op)
+                applied = self._apply(op)
             except (ValueError, TypeError, KeyError):
-                changed = None
-        self._unmatched = changed is None
-        return self._commit(changed, RAMP.get(read(text, self._state.snapshot())["pace"] or "default", RAMP["default"]))
+                applied = Applied.REJECTED
+        self._unmatched = applied is Applied.REJECTED
+        return self._commit(applied, ramp_for(text))
 
     def _ask_semantic(self, text: str, snapshot: dict, timeout: float):
         """One bounded call to the local vector matcher (returns an op, never mutates). At most one in flight;
@@ -260,23 +262,20 @@ class CommandService:
         op = box.get("op")
         return op if isinstance(op, dict) else None
 
-    def _apply(self, op):
-        """True/False from state.apply, or None if the op was rejected as invalid."""
+    def _apply(self, op) -> Applied:
         try:
-            return self._state.apply(op)
+            return Applied.CHANGED if self._state.apply(op) else Applied.UNCHANGED
         except (ValueError, TypeError, KeyError):
-            return None
+            return Applied.REJECTED
 
-    def _commit(self, changed, ramp: int):
+    def _commit(self, applied: Applied, ramp: int):
         """After a final or a tap: steer to the new state, or roll back a guess in flight."""
-        guess_prompt = self._guess_prompt
-        self._guess = self._guess_prompt = None
-        if changed:
+        had_guess = self._guess is not None
+        self._guess = None
+        if applied is Applied.CHANGED:
             self._committed = compose(self._state.snapshot())
-            if guess_prompt == self._committed and ramp == RAMP["default"]:
-                ramp = RAMP["confirm"]  # the guess already moved part way
             return self._steer(self._committed, ramp)
-        return self._steer(self._committed, RAMP["default"]) if guess_prompt is not None else None
+        return self._steer(self._committed, RAMP["default"]) if had_guess else None
 
     def _ask_slow(self, text: str, snapshot: dict, timeout=None):
         """One bounded call to the injected slow reader. At most one in flight; a hung one blocks further calls."""
