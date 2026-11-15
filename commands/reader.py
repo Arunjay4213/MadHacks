@@ -318,6 +318,11 @@ def read(text: str, snapshot: dict) -> dict:
         return out({"op": "add", **entry, "phrase": f"{subject} {action}",
                     "strength": existing["strength"]}, keyword)
     rest = t[: kw.start()] + " " + t[kw.end():]  # strength words outside the noun itself ("light house" is not "light")
+    location = _PREP_RX.search(t[kw.end():])
+    if entry["kind"] != "extra" and location:
+        # Weather, season and time cover the whole scene, so a place after the noun is neither a strength nor a
+        # description: "make it rain near a little river" is full rain. Words before the noun stay ("red rain").
+        rest = t[: kw.start()] + " " + t[kw.end():][: location.start()]
     add_verb = _ADD_RX.search(t)
     bare = (entry["kind"] == "extra" and not _ACTION_RX.match(t)
             and not re.match(r"^(?:what|why|how|when|where|who|can|could|would|should|is|are|do|does)\b", t))
@@ -343,12 +348,6 @@ def read(text: str, snapshot: dict) -> dict:
                     phrase = _additional(phrase, entry, keyword, snapshot)
                 return out({"op": "add", **entry, "phrase": phrase, "strength": strength}, keyword)
     if existing:
-        if entry["kind"] != "extra":
-            # Weather, season and time cover the whole scene, so a place after the noun ("snow near the river") adds
-            # nothing to read. Words before the noun stay for the check: "turn it to red rain" is a colour change.
-            location = _PREP_RX.search(t[kw.end():])
-            if location:
-                rest = t[: kw.start()] + " " + t[kw.end():][: location.start()]
         if _unread_words(rest):
             # "make the dog black": a change to an object the table cannot write. Keeping the strength would change
             # nothing and still look understood; unmatched shows the user the words were not used.

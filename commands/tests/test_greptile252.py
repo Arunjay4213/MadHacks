@@ -33,6 +33,11 @@ class PaceOnAnExistingChangeTest(unittest.TestCase):
         self.assertEqual(say("add a river", "make it winter", "make it a little snowy near the river"),
                          ([("river", 1.0), ("winter", 0.3)], RAMP["default"]))
 
+    def test_words_describing_the_place_do_not_change_the_weather(self):
+        # "a little" describes the river, not the rain: the rain stays full.
+        self.assertEqual(say("add rain", "a lot of rain", "make it rain near a little river")[0], [("rain", 1.0)])
+        self.assertEqual(say("make it rain near a little river")[0], [("rain", 1.0)])
+
     def test_every_request_form_adjusts_an_existing_change(self):
         for lines, chips in [
             (["make it winter", "give me a little snow"], [("winter", 0.3)]),
