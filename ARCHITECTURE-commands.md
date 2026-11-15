@@ -164,16 +164,23 @@ This runs when the final reader gives None, for CONTROL and MIXED sentences, and
 
 Each is checked by the behaviour lock `engine/tests/test_prompt_lock.py` (sentence chains over the meadow and the car scene, on the dictionary path and on the live Sonnet path with a fake model) and the full suite, before and after.
 
-| Rank | Change | Risk | Lines saved (about) |
-|---|---|---|---|
-| 1 | One copy of the car template constants and other copied numbers: `car_template` imports `CAMERA`, `STYLE`, `REAR`, `FORWARD` from `commands.world`; `final_reader` imports `VEHICLE_WORDS` and uses `world.STYLE`; one `MAX_BATCH`; the label limit by name; no stale `getattr` defaults; one `scene_record`; one helper for new-object phrase problems. | None: same text and numbers. | 25 |
-| 2 | Delete the dead stand-in prompt spec in `final_reader.py` and its tests; `prompt_spec()` returns the rewriter spec with no fallback. | Low: never runs live; the lock checks the system prompt (cache fingerprint). | 70 code, 40 tests |
-| 3 | Delete `rewriter.build_messages` and `_EXAMPLES` and their tests. | None: no caller. | 30 code, 30 tests |
-| 4 | `CommandService`: delete the dead `prompt` argument of `apply_final` and the no-op confirm ramp swaps; read the pace with one function instead of a full `read()`. | Low: the engine never passes a prompt. | 20 |
-| 5 | `CommandService`: name the implicit states (one `Guess` value instead of two fields; an `Applied` enum instead of True, False or None). | Low. | 0 (clarity) |
-| 6 | Delete the nano slow reader: keep `validate` (the final reader's operation check) and `StateCachingReader`, delete the rest and the service's slow reader path. | Medium: no live change, but `--final-reader off` with Foundry keys would no longer ask nano. | 200 code and tests |
-| 7 | One car template and one vehicle scene rule for both paths. | High: changes composed prompts, which are the keys of `demo_prompts.json` and the disk cache. | 60 |
-| 8 | One negation and transform word list. | Medium: the three lists differ at the edges ("never mind", "replaced"). | 5 |
-| 9 | One answer for winter and night on car scenes on both paths. | High: changes prompts. | 20 |
+| Rank | Change | Risk | Lines saved (about) | Status |
+|---|---|---|---|---|
+| 1 | One copy of the car template constants and other copied numbers: `car_template` imports `CAMERA`, `STYLE`, `REAR`, `FORWARD` from `commands.world`; `final_reader` imports `VEHICLE_WORDS` and uses `world.STYLE`; one `MAX_BATCH`; the label limit by name; no stale `getattr` defaults; one `scene_record`; one helper for new-object phrase problems. | None: same text and numbers. | 25 | Done, #223 |
+| 2 | Delete the dead stand-in prompt spec in `final_reader.py` and its tests; `prompt_spec()` returns the rewriter spec with no fallback. | Low: never runs live; the lock checks the system prompt (cache fingerprint). | 70 code, 40 tests | Done, #233 |
+| 3 | Delete `rewriter.build_messages` and `_EXAMPLES` and their tests. | None: no caller. | 30 code, 30 tests | Done, #234 |
+| 4 | `CommandService`: delete the dead `prompt` argument of `apply_final` and the no-op confirm ramp swaps; read the pace with one function instead of a full `read()`. | Low: the engine never passes a prompt. | 20 | Done, #235 |
+| 5 | `CommandService`: name the implicit states (one `_guess_label` field instead of two fields that moved together; an `Applied` enum instead of True, False or None). | Low. | 0 (clarity) | Done, #235 |
+| 6 | Delete the nano slow reader: keep `validate` (the final reader's operation check) and `StateCachingReader`, delete the rest and the service's slow reader path. | Medium: no live change, but `--final-reader off` with Foundry keys would no longer ask nano. | 200 code and tests | Skipped: needs the lead (see below) |
+| 7 | One car template and one vehicle scene rule for both paths. | High: changes composed prompts, which are the keys of `demo_prompts.json` and the disk cache. | 60 | Skipped: changes prompts |
+| 8 | One negation and transform word list. | Medium: the three lists differ at the edges ("never mind", "replaced"). | 5 | Skipped: changes edge readings |
+| 9 | One answer for winter and night on car scenes on both paths. | High: changes prompts. | 20 | Skipped: changes prompts |
 
 Ranks 7 to 9 change behaviour, so they are left for a decision by the owners.
+
+Rank 6 is left for the lead.
+The live engine never calls the nano slow reader, but restarting with `--final-reader off` (Foundry keys still set) is the quickest fallback if the Sonnet deployment fails during the demo, because nano answers in about 0.5 s.
+Deleting it removes that fallback, and #210 extended it on 2026-11-15, so it is still treated as in use.
+If the lead decides it can go: keep `slow_reader.validate` (the final reader's operation check) and `StateCachingReader`, delete `FoundrySlowReader`, `SYSTEM_PROMPT`, `from_env`, `edit_base` and `engine/foundry.py`'s `FoundryChat`, and in `commands/service.py` the `slow_reader` path (`_ask_slow`, the slow call in `_final_original`, `slow_timeout_s`).
+
+Smaller items seen but not done: `reader._norm` and `people._normalize` are thin wrappers of `dictionary.normalize`; `world.world_phrase` is used only by tests; `final_reader.pace_keeps_strength` imports the private `reader._pace`.
