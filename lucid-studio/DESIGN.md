@@ -1,4 +1,4 @@
-# Lucid Studio design
+# Studio page (Mirage) design
 
 The user's supplied Zero-Chrome Lucid Canvas specification is the design baseline.
 This is a separate local React/TypeScript/Vite app; Ani's `web/` is unchanged.

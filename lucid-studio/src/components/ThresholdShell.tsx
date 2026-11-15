@@ -42,8 +42,8 @@ export default function ThresholdShell({ children, reducedMotion, onEnter, onVis
   const enter = () => { if (editor.current) lenisRef.current?.scrollTo(editor.current, { duration: reducedMotion ? 0 : 1.15 }); };
 
   return <div className={`experience ${visible ? 'editor-visible' : ''}`}>
-    <section className="hero-section" aria-label="Lucid introduction">
-      <header className="threshold-header"><span className="wordmark">lucid<span className="wordmark-period">.</span></span>
+    <section className="hero-section" aria-label="Mirage introduction">
+      <header className="threshold-header"><span className="wordmark">mirage<span className="wordmark-period">.</span></span>
         <span className="edition">A STUDY IN LIVING WORLDS <span>№ 001</span></span></header>
       <div className="threshold-title">
         <motion.p initial={{ opacity: 0, filter: 'blur(6px)' }} animate={{ opacity: 1, filter: 'blur(0px)' }} transition={{ duration: 1.2 }} className="eyebrow">THOUGHT BECOMES LANDSCAPE</motion.p>
@@ -54,7 +54,7 @@ export default function ThresholdShell({ children, reducedMotion, onEnter, onVis
           Speak a thought. Watch it become.
         </motion.p>
       </div>
-      <button className="hero-preview" onClick={enter} aria-label="Open the Lucid editor" style={preview ? { backgroundImage: `url(${preview})` } : {}}>
+      <button className="hero-preview" onClick={enter} aria-label="Open the Mirage editor" style={preview ? { backgroundImage: `url(${preview})` } : {}}>
         <span className="preview-atmosphere" />
         <span className="portal-caption"><span>THE WORLD IS LISTENING</span><span>{live ? 'ENGINE / PREVIEW' : 'ALPINE STUDY / PREVIEW'}</span></span>
       </button>
@@ -63,7 +63,7 @@ export default function ThresholdShell({ children, reducedMotion, onEnter, onVis
         <span className="entry-footnote">YOUR VOICE. AN INFINITE CANVAS.</span></footer>
     </section>
     <section className="editor-section" ref={editor} id="studio" aria-label="Generative video editor">
-      <header className="editor-heading"><div><span className="eyebrow">LUCID STUDIO</span><h2>A landscape in progress.</h2></div>
+      <header className="editor-heading"><div><span className="eyebrow">MIRAGE STUDIO</span><h2>A landscape in progress.</h2></div>
         <span className="editor-source">{sourceLabel} <i /></span></header>
       <div className="editor-grid"><div className="generation-column">
         <div className="generation-heading"><span>CURRENT GENERATION</span><span>CONTINUOUS / 001</span></div>

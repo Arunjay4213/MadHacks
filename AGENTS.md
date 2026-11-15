@@ -89,7 +89,7 @@ Two agents should never edit the same folder.
 | The page and the inputs: the demo page, the words line, chips, undo button, the text box for Wispr Flow, and the live mic (voice). | `@anirudhaugile` (Ani) | `web/` |
 | Understanding commands: scene state, operations, undo history, the prompt composer, the keyword table. Also the write-up and the pitch. | `@prateekraouw` (Prateek) | `commands/`, `docs/` |
 | The four message shapes between the parts. | `@Arunjay4213` (lead) | `contracts/` |
-| Lucid Studio: a second, immersive frontend in a separate app (issue #40). It uses the shared contracts without changing them. | `@prateekraouw` (Prateek) | `lucid-studio/` |
+| Studio page: a second, immersive frontend in a separate app (issue #40), also branded Mirage. It uses the shared contracts without changing them. | `@prateekraouw` (Prateek) | `lucid-studio/` |
 
 Assigned by the lead on 2026-11-14, following Ishaan's blueprint (board post #6883918631).
 In the blueprint's words: Ishaan is steering, Arunjay is teammate 1, Ani is teammate 2, Prateek is teammate 3.
@@ -115,6 +115,7 @@ We enter the main track, and we may also enter one sponsor track: Databricks or 
 Entering no sponsor track is also allowed.
 
 Decided by the lead on 2026-11-14: the project is live voice-steered video.
+The product name is Mirage (decided by the lead on 2026-11-15); both pages, the pitch and Devpost use it, with "live voice-steered video" as the subtitle.
 A video is generated continuously by a diffusion model and changes while it plays when someone speaks an instruction, for example "make it winter".
 Ishaan (`@Tactacion`) wrote the blueprint, board post #6883918631, and the work is divided in section 4.
 It builds on a published project (Training-Free Interactive World Models), which must be credited first in the pitch, on the Devpost page and on a slide.

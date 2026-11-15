@@ -140,7 +140,7 @@ Rollback for the latency deploy: remove `--flush-on-cut on --interrupt-on-steer 
 First time on a new machine: `bash engine/setup_gpu.sh`, then `uv pip install -r engine/requirements.txt -r steering/requirements.txt` into `~/engine-venv`, and for the vector matcher `pip install -r commands/requirements-semantic.txt` and `python -m commands.semantic --prepare` as the `ubuntu` user.
 
 The repo on the machine is a copy made with `rsync -a --delete --exclude .git ./ madhacks-engine:madhacks/` from a laptop clone of `main`, because the machine has no GitHub credentials.
-Build Lucid Studio in that clone first (`cd lucid-studio && npm ci && npm run build`), so `lucid-studio/dist` goes with the copy.
+Build the studio page in that clone first (`cd lucid-studio && npm ci && npm run build`), so `lucid-studio/dist` goes with the copy.
 
 1. Post on the board before a restart: the video is gone for about 80 s, and the tunnel address stays the same.
 2. Copy the repo as above.
@@ -329,14 +329,14 @@ Every other path under `/app/` returns 404, including the rest of `web/` (`node_
 The files are read from disk on each request with `Cache-Control: no-cache`, so an rsync of `web/` takes effect without a restart.
 If `web/` is missing, `/app/` returns a 404 that says so, and the rest of the server works as usual.
 
-## Lucid Studio at /studio/
+## The studio page at /studio/
 
-The server serves the Lucid Studio build (a Vite app) read-only at `/studio/`, from `--studio-dir` (default `<repo>/lucid-studio/dist`).
+The server serves the studio page build (`lucid-studio/`, branded Mirage) (a Vite app) read-only at `/studio/`, from `--studio-dir` (default `<repo>/lucid-studio/dist`).
 Its asset names are hashed, so any regular file inside that folder is served, not an allow-list.
 Dotfiles, missing files, directories, path traversal and symlinks that point outside the folder all return 404.
 `/studio` redirects to `/studio/`, which serves `index.html`.
 `index.html` and other files are sent with `Cache-Control: no-cache`; hashed files under `assets/` may be cached for a year.
-If the folder is missing, `/studio/` returns "Lucid Studio build not found at <path>" with a 404, and the server still starts.
+If the folder is missing, `/studio/` returns "Studio build not found at <path>" with a 404, and the server still starts.
 The Vite build must use `base: './'` or `base: '/studio/'` in its config, or its asset links point at `/assets/` and fail under `/studio/`.
 
 ## Backend interface

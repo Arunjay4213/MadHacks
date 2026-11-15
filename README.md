@@ -1,4 +1,6 @@
-# MadHacks: live voice-steered video
+# Mirage: live voice-steered video
+
+Mirage is our MadHacks project.
 
 A video is generated without stopping by a diffusion model, and it changes while it plays when someone speaks or types an instruction, for example "make it winter", "add a red car" or "make it a desert".
 Changes stack as named chips, and each one can be undone or removed by name.
@@ -33,7 +35,7 @@ The engine runs on one GPU machine and is reached through a Cloudflare quick tun
 The tunnel address changes whenever the tunnel restarts, so the current address is posted on the [Message Board](https://github.com/Arunjay4213/MadHacks/issues/1).
 
 - Demo page: `https://<tunnel address>/app/` in Chrome (the live mic needs Chrome and https).
-- Lucid Studio: `https://<tunnel address>/studio/`.
+- Studio page (`lucid-studio/`, also branded Mirage): `https://<tunnel address>/studio/`.
 - Engine numbers: `https://<tunnel address>/stats`.
 
 There is one shared video and no login: every viewer sees every command and reset, so keep the address inside the team.
