@@ -43,7 +43,9 @@ _HIGH_RX = _rx(["a lot", "lots of", "much more", "way more", "tons of", "heavy",
 _MORE_RX = _rx(["more"])
 _LESS_RX = _rx(["less", "fewer", "weaker", "softer"])
 # Pass-through: "add a lion" -> an extra change named by the spoken noun phrase.
-_ADD_RX = re.compile(r"\b(?:add|put|place|bring|include|build|draw|give me|i want|i'd like)\s+(?:(a|an|some|the|another)\s+)?(.+)")
+_ADD_VERBS = ["add", "put", "place", "bring", "include", "build", "draw", "give me", "i want", "i'd like"]
+_ADD_VERB_RX = _rx(_ADD_VERBS)
+_ADD_RX = re.compile(r"\b(?:" + "|".join(_ADD_VERBS) + r")\s+(?:(a|an|some|the|another)\s+)?(.+)")
 _PREP_RX = re.compile(r"\s+\b(?:in|on|at|near|by|over|under|to|with|beside|behind|across|next to|around|above|below)\b\s+")
 _FILLER_TAIL_RX = re.compile(r"(?:\s+\b(?:please|too|as well|now|here|there|for me|in the scene|to the scene)\b)+$")
 _NOT_AN_OBJECT = {"a", "an", "the", "another", "it", "that", "this", "them", "these", "those", "something", "anything", "one", "please", "more", "some"}
@@ -342,9 +344,11 @@ def read(text: str, snapshot: dict) -> dict:
                 return out({"op": "add", **entry, "phrase": phrase, "strength": strength}, keyword)
     if existing:
         if entry["kind"] != "extra":
-            # Weather, season and time cover the whole scene, so a place ("snow near the river") adds nothing to read.
-            location = _PREP_RX.search(rest)
-            rest = rest[:location.start()] if location else rest
+            # Weather, season and time cover the whole scene, so a place after the noun ("snow near the river") adds
+            # nothing to read. Words before the noun stay for the check: "turn it to red rain" is a colour change.
+            location = _PREP_RX.search(t[kw.end():])
+            if location:
+                rest = t[: kw.start()] + " " + t[kw.end():][: location.start()]
         if _unread_words(rest):
             # "make the dog black": a change to an object the table cannot write. Keeping the strength would change
             # nothing and still look understood; unmatched shows the user the words were not used.
@@ -358,13 +362,13 @@ _LEAD = r"^(?:(?:also|then|please|now|and)\s+)*(?:(?:slowly|gradually|gently|sud
 _COLOURS = {"black", "white", "red", "orange", "yellow", "green", "blue", "purple", "pink", "grey", "gray", "brown",
             "golden", "gold", "silver"}
 _EDIT_VERBS = {"make", "turn", "set", "keep", "change", "let", "have", "get", "go", "now", "please", "it", "its", "it's",
-               "just", "only", "even", "again", "back", "still", "ok", "okay", "so", "add", "put", "bring", "include"}
+               "just", "only", "even", "again", "back", "still", "ok", "okay", "so"}
 
 
 def _unread_words(rest: str) -> bool:
     """True when `rest` (the sentence without the object's own words) holds a word that is not filler, an edit
     verb, a pace word, or a strength, more or less word: a description the keyword table does not apply."""
-    for rx in (_LOW_RX, _HIGH_RX, _MORE_RX, _LESS_RX, _SLOW_RX, _SUDDEN_RX):
+    for rx in (_LOW_RX, _HIGH_RX, _MORE_RX, _LESS_RX, _SLOW_RX, _SUDDEN_RX, _ADD_VERB_RX):
         rest = rx.sub(" ", rest)
     filler = (_STOP - _COLOURS) | _EDIT_VERBS
     return any(w not in filler for w in re.findall(r"[a-z']+", rest))

@@ -33,11 +33,25 @@ class PaceOnAnExistingChangeTest(unittest.TestCase):
         self.assertEqual(say("add a river", "make it winter", "make it a little snowy near the river"),
                          ([("river", 1.0), ("winter", 0.3)], RAMP["default"]))
 
-    def test_an_unsupported_description_is_still_unmatched(self):
-        # "black" is a change the table cannot write: nothing changes, slowly or not.
-        for lines in (["add a dog", "make the dog black"], ["add a dog", "slowly make the dog black"]):
+    def test_every_request_form_adjusts_an_existing_change(self):
+        for lines, chips in [
+            (["make it winter", "give me a little snow"], [("winter", 0.3)]),
+            (["make it winter", "i want more snow"], [("winter", 1.3)]),
+            (["make it winter", "i’d like less snow"], [("winter", 0.7)]),
+            (["make it winter", "add a little snow near the river"], [("winter", 0.3)]),
+        ]:
             with self.subTest(lines=lines):
-                self.assertEqual(say(*lines), ([("dog", 1.0)], None))
+                self.assertEqual(say(*lines), (chips, RAMP["default"]))
+
+    def test_an_unsupported_description_is_still_unmatched(self):
+        # "black" and "red" are changes the table cannot write: nothing changes, slowly or not, strength kept.
+        for lines, chips in [
+            (["add a dog", "make the dog black"], [("dog", 1.0)]),
+            (["add a dog", "slowly make the dog black"], [("dog", 1.0)]),
+            (["add rain", "a little rain", "turn it to red rain"], [("rain", 0.3)]),
+        ]:
+            with self.subTest(lines=lines):
+                self.assertEqual(say(*lines), (chips, None))
 
 
 if __name__ == "__main__":

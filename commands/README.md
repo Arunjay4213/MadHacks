@@ -98,7 +98,7 @@ Explicit actions can be joined by and, then or a semicolon, and unambiguous noun
 Descriptions such as "black and white" stay one phrase.
 "add snow near the river" adds only snow, and "add a dog and stop the rain" adds the dog and removes the rain.
 "make the dog black" on an existing dog is unmatched: the keyword table cannot recolour, and keeping the dog as it was would look understood while nothing changed.
-Pace words, add verbs and (for weather, season and time) a place are not such descriptions: with winter present, "slowly add a little snow" lowers winter to 0.3 over the slow ramp, like "add a little snow" does at once (PR #252 review).
+Pace words, request words ("add", "give me", "i want") and, for weather, season and time, a place after the noun are not such descriptions ("turn it to red rain" still is): with winter present, "slowly add a little snow" lowers winter to 0.3 over the slow ramp, like "add a little snow" does at once (PR #252 review).
 Words after a preposition are a location for every verb, so "make it snow near the river" adds snow even when a river is present, and "turn it to night near the river" sets night.
 After an add verb, "without" starts a removal: "add a dog without the rain" adds the dog and removes the rain.
 A rejected clause rolls back the whole sentence, including any provisional guess.
