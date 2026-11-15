@@ -271,6 +271,16 @@ test('ordered finals: a quick second press that ends first is still sent after t
   a.send({ type: 'final', text: 'make it winter' });
   a.close();
   assert.deepEqual(out.slice(2), ['final:make it winter', 'final:undo']); // press order kept
+  // Greptile: a still-open slot (mic toggle) that becomes first must send what it buffered before
+  // its newer sentences.
+  const p1 = o.open(); // a push-to-talk press, still ending
+  const tog = o.open(); // a mic-toggle session, stays open
+  tog.send({ type: 'final', text: 'make it night' }); // buffered behind p1
+  p1.send({ type: 'final', text: 'add a river' });
+  p1.close();
+  tog.send({ type: 'final', text: 'add a lion' });
+  assert.deepEqual(out.slice(4), ['final:add a river', 'final:make it night', 'final:add a lion']);
+  tog.close();
   const c = o.open(); // nothing earlier waiting: sent at once
   c.send({ type: 'final', text: 'add a river' });
   assert.equal(out.at(-1), 'final:add a river');

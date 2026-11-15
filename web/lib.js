@@ -293,9 +293,14 @@ export function makeLatencyTracker(maxSent = 50) {
 // second press ("undo") that ends first can never reach the server before the command it undoes.
 export function makeOrderedFinals(send) {
   const slots = [];
+  // Send what the first slot holds, even if it is still open (a mic-toggle session keeps producing
+  // sentences); drop it once closed and repeat, so a buffered sentence is never overtaken.
   const drain = () => {
-    while (slots.length && slots[0].closed) {
-      for (const m of slots.shift().finals) send(m);
+    while (slots.length) {
+      const head = slots[0];
+      for (const m of head.finals.splice(0)) send(m);
+      if (!head.closed) return;
+      slots.shift();
     }
   };
   return {
