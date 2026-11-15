@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseFrame, parseServerMessage, splitKeyword, backoffMs, isWholeInsert,
   makeFrameGate, makeLatencyTracker, makeTranscriber, changesKey, commandKey, makeInputClassifier,
-  PUSH_TO_TALK_CODE, isPushToTalk, micErrorText, looksUnfinished, finalizeDelay, wordsLabels, makeHeardTracker, PENDING_MS,
+  PUSH_TO_TALK_CODE, isPushToTalk, micErrorText, looksUnfinished, finalizeDelay, wordsLabels, makeHeardTracker, PENDING_MS, makeOrderedFinals,
 } from '../lib.js';
 import { loadTestPattern } from '../fake-server.mjs';
 import { wsBaseUrl, fitSize, videoNotice, formatStamps, STALL_MS, isResetShortcut } from '../lib.js';
@@ -256,6 +256,24 @@ test('heard tracker: own partials are pending, own finals confirmed, anything el
   g.sentPartial('add a lion', 9000);
   g.clearPartials();
   assert.equal(g.classify('add a lion', 5, 9100), 'other');
+});
+
+test('ordered finals: a quick second press that ends first is still sent after the first press', () => {
+  const out = [];
+  const o = makeOrderedFinals((m) => out.push(`${m.type}:${m.text}`));
+  const a = o.open(); // press 1: "make it winter", still ending
+  const b = o.open(); // press 2: "undo", ends first
+  a.send({ type: 'partial', text: 'make it win' });
+  b.send({ type: 'partial', text: 'undo' });
+  b.send({ type: 'final', text: 'undo' });
+  b.close();
+  assert.deepEqual(out, ['partial:make it win', 'partial:undo']); // partials live, the undo waits
+  a.send({ type: 'final', text: 'make it winter' });
+  a.close();
+  assert.deepEqual(out.slice(2), ['final:make it winter', 'final:undo']); // press order kept
+  const c = o.open(); // nothing earlier waiting: sent at once
+  c.send({ type: 'final', text: 'add a river' });
+  assert.equal(out.at(-1), 'final:add a river');
 });
 
 const R = (transcript, isFinal = false) => ({ transcript, isFinal });

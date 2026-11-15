@@ -288,6 +288,36 @@ export function makeLatencyTracker(maxSent = 50) {
 
 // Speech recognition results -> contract-1 messages, with no duplicate finals.
 // `results` is [{transcript, isFinal}] for the current recognition session.
+// Keeps spoken commands in the order the presses happened. Each press opens a slot; partials go out at
+// once (the live words line), but a press's finals wait until every earlier press has closed, so a quick
+// second press ("undo") that ends first can never reach the server before the command it undoes.
+export function makeOrderedFinals(send) {
+  const slots = [];
+  const drain = () => {
+    while (slots.length && slots[0].closed) {
+      for (const m of slots.shift().finals) send(m);
+    }
+  };
+  return {
+    open() {
+      const slot = { finals: [], closed: false };
+      slots.push(slot);
+      return {
+        send(msg) {
+          if (msg.type !== 'final') return send(msg);
+          if (slots[0] === slot) return send(msg); // nothing earlier is waiting
+          slot.finals.push(msg);
+          return true;
+        },
+        close() {
+          slot.closed = true;
+          drain();
+        },
+      };
+    },
+  };
+}
+
 // With { hold: true } (push-to-talk) Chrome's final segments are kept, not sent: Chrome splits speech
 // at pauses, and one press of the key is one command, so flush() sends the whole utterance once.
 // Partials then show the utterance so far.

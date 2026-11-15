@@ -3,7 +3,7 @@ import {
   PROTOCOL, finalizeDelay, partialMsg, finalMsg, tapMsg, parseFrame, parseServerMessage,
   splitKeyword, backoffMs, makeFrameGate, makeLatencyTracker, makeTranscriber,
   changesKey, commandKey, makeInputClassifier, wordsLabels, makeHeardTracker, PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
-  wsBaseUrl, fitSize, videoNotice, formatStamps, isResetShortcut,
+  wsBaseUrl, fitSize, videoNotice, formatStamps, isResetShortcut, makeOrderedFinals,
 } from './lib.js';
 
 const $ = (id) => document.getElementById(id);
@@ -319,6 +319,7 @@ document.addEventListener('keydown', (e) => {
 });
 // ---------- live mic ----------
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const ordered = makeOrderedFinals(send); // spoken commands reach the server in press order
 let rec = null; // the current recognizer; an older one may still be ending
 let listening = null; // what the user asked for: 'toggle' | 'ptt' | null
 let startedAt = 0;
@@ -335,7 +336,8 @@ function startListening(mode) {
 // the previous recognizer still sends its own sentence when it ends; the two never mix.
 function begin() {
   const r = new Recognition();
-  const t = makeTranscriber(send);
+  const slot = ordered.open();
+  const t = makeTranscriber(slot.send);
   const previous = rec;
   rec = r;
   r.continuous = true;
@@ -353,6 +355,7 @@ function begin() {
   };
   r.onend = () => {
     t.flush(); // this recognizer's leftover words become one final, once
+    slot.close(); // ...sent only after every earlier press has sent its own
     if (rec !== r) return; // an older recognizer: the page's state belongs to the newer one
     rec = null;
     if (startWhenEnded) {
@@ -370,6 +373,7 @@ function begin() {
   } catch {
     // The browser refuses a second recognizer while the previous one is still ending: start this
     // press as soon as that one has flushed.
+    slot.close(); // this attempt recorded nothing
     rec = previous;
     startWhenEnded = true;
   }
