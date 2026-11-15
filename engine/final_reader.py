@@ -144,6 +144,32 @@ def blocked_word(text: str) -> str | None:
     return next((w for w in _WORD.findall(text.lower()) if w in BLOCKED_WORDS), None)
 
 
+# --- movers on the car scene (dictionary results) ---------------------------------------------------------
+
+# Things that move by themselves. On a vehicle scene the camera follows the car forward, so one with no direction of its
+# own is drawn moving backwards (live, 2026-11-15: "an airplane in the sky" from the dictionary flew backwards, #272).
+# Sonnet's prompts state the direction themselves (the system prompt); this is for the dictionary's objects.
+MOVER_WORDS = frozenset({"airplane", "aeroplane", "plane", "jet", "helicopter", "bird", "birds", "eagle", "drone",
+                         "balloon", "car", "truck", "van", "bus", "motorcycle", "motorbike", "bike", "bicycle", "horse",
+                         "horses", "dog", "deer", "boat"})
+HEADING = "seen from behind, moving forward away from the camera in the same direction as the car"
+# Words that already say how a thing moves, or that it stays where it is.
+MOTION_SAID_WORDS = frozenset({"forward", "away", "behind", "reversing", "reverse", "backwards", "backward", "toward",
+                               "towards", "approaching", "approaches", "oncoming", "parked", "parking", "stopped",
+                               "stationary", "standing", "idle", "idling", "still", "waiting", "abandoned", "crashed",
+                               "wrecked", "sitting"})
+STAYING_WORDS = frozenset({"anchored", "moored", "docked", "sleeping", "asleep", "perched", "resting", "lying", "lies",
+                           "grazing", "sits", "landed", "hovering", "floating", "stands", "still"})
+
+
+def with_heading(phrase: str) -> str:
+    """An object phrase on a vehicle scene with HEADING when it names a mover and says nothing about its direction."""
+    words = set(re.findall(r"[a-z]+", phrase.lower()))
+    if words & MOVER_WORDS and not words & (MOTION_SAID_WORDS | STAYING_WORDS):
+        return f"{phrase.rstrip(' .,')}, {HEADING}"
+    return phrase
+
+
 # --- the system prompt ----------------------------------------------------------------------------------
 
 SYSTEM_PROMPT = """You are a skilled prompt writer for a live text-to-video model (Wan 2.1, text encoder umT5). The
@@ -705,7 +731,8 @@ class FinalReader:
             return None
         said = (*earlier, *(strength_phrase(c["phrase"], c["strength"]) for c in added
                             if c["kind"] in ("season", "weather", "time") and c["strength"] > 0))
-        prompt = car_template.world_prompt(subject, world, [*car_template.scene_objects(after), *said])
+        objects = [with_heading(o) for o in car_template.scene_objects(after)]
+        prompt = car_template.world_prompt(subject, world, [*objects, *said])
         with self._lock:
             self._given_vehicle[compose(after)] = prompt
             self._fallback_vehicle[compose(after)] = (prompt, world, said)
