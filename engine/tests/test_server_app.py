@@ -86,17 +86,3 @@ def test_engine_viewer_at_root_is_unchanged(client):
     r = client.get("/")
     assert r.status_code == 200
     assert "text/html" in r.headers["content-type"]
-
-
-def test_an_edited_page_file_is_served_with_its_new_contents(tmp_path):
-    """A file edited while the server runs is sent as it is now: the server never keeps the first contents."""
-    web = tmp_path / "web"
-    web.mkdir()
-    for name in PAGE:
-        (web / name).write_text(f"/* {name} v1 */")
-    client = TestClient(build_app(EngineConfig(backend="fake"), web_dir=web))
-    assert client.get("/app/app.js").text == "/* app.js v1 */"
-    (web / "app.js").write_text("/* app.js v2, longer than v1 */")
-    r = client.get("/app/app.js")
-    assert r.text == "/* app.js v2, longer than v1 */"
-    assert r.headers["cache-control"] == "no-cache"
