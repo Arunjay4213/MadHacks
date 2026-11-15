@@ -571,7 +571,7 @@ if (micUnavailable) {
     b.title = micUnavailable;
   }
 } else {
-  el.ptt.title = `Hold to talk (${keyLabel})`;
+  el.ptt.title = `Hold to talk (${keyLabel}) · Wispr: Ctrl`;
   el.ptt.setAttribute('aria-label', el.ptt.title);
   el.mic.addEventListener('click', () => (listening === 'toggle' ? stopListening('toggle') : startListening('toggle')));
   el.ptt.addEventListener('pointerdown', (e) => {
