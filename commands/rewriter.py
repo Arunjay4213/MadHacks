@@ -17,7 +17,7 @@ import re
 from .dictionary import KEYWORD_RX, KEYWORDS, normalize
 
 MAX_DETAIL_WORDS = 60
-MAX_TOTAL_WORDS = 100
+MAX_TOTAL_WORDS = 180
 
 SYSTEM_PROMPT = """You enrich a scene description for a text-to-video model.
 Reply with JSON only: {"details": "..."} with about 40 to 50 words on one line.
