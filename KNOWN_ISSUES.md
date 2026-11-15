@@ -32,6 +32,8 @@ Options: pick one page for the demo and keep the other as a fallback, and pick o
 - **Every command recomposes the shot.**
   A command re-anchors from noise at full strength, so the camera angle and layout can jump.
   Ishaan's opt-in options (`steer_anchor_t=800`, `steer_noise=fixed`, PR #174) keep the layout (tree moves 7 to 16 px instead of up to 194 px), but winter then only partly arrives on the meadow.
+  These numbers are from his newer 2-seed run (https://github.com/Arunjay4213/MadHacks/issues/1#issuecomment-6887678106): on the car chain winter, neon and desert arrive fully (car moves 5 px), on the meadow winter reaches a white share of 0.10 to 0.12 at +3 s against about 0.30 with defaults.
+  The earlier one-seed table in `engine/MODEL_NOTES.md` (12 / 12 / 21 px, full snow, night and desert) did not include the meadow winter case.
   They are off on the live engine.
 - **Added objects are small or at the edge.**
   Size and position words in the prompt help ("a large ... in the foreground at the left of the frame").
@@ -47,4 +49,5 @@ Options: pick one page for the demo and keep the other as a fallback, and pick o
 - **A new sentence takes about 2.5 s.**
   Known and pinned sentences take about 0.6 s; a new one waits about 2 s for the Sonnet rewrite.
   In progress: Ishaan's latency plan (median 566 to 300 ms), faster end of speech on the page, and compiled model steps.
-  Not done: skipping Sonnet when the dictionary fully understood the sentence on a scene that uses the measured template.
+  Done: a sentence that names one of the measured car worlds on a car scene skips Sonnet (`FinalReader._measured` in `engine/final_reader.py`, counted in `template_hits`).
+  Not done: skipping Sonnet for any other sentence the dictionary fully understood (objects, weather and time on any scene, and worlds on a scene without the car).
