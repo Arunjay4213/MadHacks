@@ -39,15 +39,15 @@ The tunnel address changes whenever the tunnel restarts, so the current address 
 There is one shared video and no login: every viewer sees every command and reset, so keep the address inside the team.
 Automated checks belong on a local fake engine (`engine/README.md`, "Run it with the fake backend").
 
-## Current state (2026-11-15, about 00:15 UTC)
+## Current state (2026-11-15, about 00:40 UTC)
 
 - Live model: Causal Forcing++ framewise, 2 steps, 672x384, TAEHV decoder, on one NVIDIA L40S; `/stats` read at about 00:15 UTC showed 191.5 ms generation and 21.9 ms decode per chunk on average, at 16.0 fps.
 - Gate 1 (real time) and Gate 2 (a typed command changes the real scene) passed; see the "Status" section at the end of `PLAN.md`.
-- Every command re-anchors the picture: a clean cut to the new scene, dissolved over 8 frames (0.5 s), and the picture is refreshed from a clean saved frame every 24 chunks (6 s), which stopped the long-run drift (PRs #83 and #113).
+- Every command re-anchors the picture: a clean cut to the new scene, dissolved over 8 frames (0.5 s), and the picture is refreshed from a clean saved frame, which stopped the long-run drift (PRs #83 and #113); the live engine refreshes every 48 chunks (12 s) since PR #125.
 - Command to screen on the live engine: 429 to 496 ms on the page (Ani's live check after PR #104) and 637 to 640 ms in the draft-script harness (board post after PR #113).
 - Place changes work: "make it a desert" or "turn it into a beach" replace the world and keep the objects (PRs #88 and #115).
-- The Sonnet final reader (one Claude Sonnet 5.5 call per sentence for richer prompts) is built but off on the live engine; a new sentence costs about 1.8 s extra when it is on (board post by Arunjay's Claude at 23:31 UTC).
-- Known faults: every steer and every refresh re-composes the shot (camera and layout move), and an added lion often does not show (Ishaan's posts at 23:42 and 00:12 UTC).
+- The Sonnet final reader (one Claude Sonnet 5.5 call per final sentence for the operations and a rich prompt) is live since PR #125, with the demo sentences' prompts pinned in `engine/demo_prompts.json`; a new sentence costs about 1.8 s extra, a pinned one nothing (board post by Arunjay's Claude at 23:31 UTC).
+- Known faults: every steer and every refresh re-composes the shot (camera and layout move), and before PR #125 an added lion often did not show (Ishaan's posts at 23:42 and 00:12 UTC).
 
 ## Team board setup (do this once, about 2 minutes)
 
