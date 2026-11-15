@@ -239,7 +239,7 @@ class CommandService:
             except (ValueError, TypeError, KeyError):
                 changed = None
         self._unmatched = changed is None
-        return self._commit(changed, RAMP["default"])
+        return self._commit(changed, RAMP.get(read(text, self._state.snapshot())["pace"] or "default", RAMP["default"]))
 
     def _ask_semantic(self, text: str, snapshot: dict, timeout: float):
         """One bounded call to the local vector matcher (returns an op, never mutates). At most one in flight;

@@ -79,6 +79,9 @@ At 832x480 one chunk takes about 443 ms on this GPU, so that size is not real ti
 | Command to screen on the page | 496 ms ("make it winter"), 429 ms (push-to-talk "make it night") | Ani's live check after PR #104 (board post at 23:59 UTC) |
 | Sonnet final reader, new sentence | 1.87 s per call (p50), 2.3 to 3.1 s command to screen on a test engine; about 2 s extra live | test engine with the fake backend, 5 calls (board post at 23:31 UTC); live (00:38 UTC) |
 | Sonnet final reader, pinned or cached sentence | no extra wait | the same post |
+| Latency stages, pinned sentence (median ms) | reader 9, text encoder 1 (prefetched), wait for the chunk boundary 91, generation of the command's chunk 345 (a normal chunk is about 210; the re-anchor runs on it), decode and JPEG 19, playout queue 50, network about 40; server heard to shown 555 (494 to 637), client total 596 (536 to 674) | 15 commands in 3 live harness runs (board post at 00:55 UTC) |
+| Latency, new sentence (Sonnet call) | reader 1679 ms median (1326 to 2772), Sonnet about 1380 ms per call, 2 of 8 needed a retry; client total 2290 ms (1920 to 3418) | 8 commands in live harness runs (the same post) |
+| Foundry limits | prompt caching works but saves no time (1582 against 1577 ms); Azure returns 429 after about 20 calls in 40 s | 10-sentence bench from the laptop (the same post) |
 
 The steps from a command to its first frame are in "Command stages and delay stamps" below.
 

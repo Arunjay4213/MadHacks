@@ -250,8 +250,9 @@ def test_reanchor_applies_on_the_next_chunk_only(no_cuda):
         n0 = len(b.generator.calls)
         b.generate_chunk(a)  # applied once: the next chunk is a normal one
         assert [c["t"] for c in b.generator.calls[n0:]] == [[int(t)] for t in b.denoising_steps] + [[0]]
+    b.reanchor(0.5)  # a pending re-anchor
     rebases = b.rebases
-    b.reanchor(0.0)  # zero strength cancels: no cut
+    b.reanchor(0.0)  # zero strength cancels it: no cut
     b.generate_chunk(a)
     assert b.rebases == rebases
 
@@ -646,8 +647,28 @@ def test_fixed_refresh_noise_changes_with_the_clean_anchor(no_cuda):
     assert b.last_rebase.from_clean and not torch.equal(before[0]["x"], after[0]["x"])
 
 
+def test_a_seeded_replay_gives_the_same_video_through_a_refresh(no_cuda):
+    b = make_backend(refresh_noise="fixed")
+    a = torch.full((1, 3, 8), 1.0)
+
+    def video(seed):
+        b.reset(seed=seed)
+        outs = [b.generate_chunk(a) for _ in range(6)]
+        out, calls, _ = reanchored_chunk(b, a, 0.5, "clean")
+        assert b.last_rebase.from_clean
+        return [o.latents for o in outs] + [calls[0]["x"], out.latents]
+
+    first, again = video(0), video(0)
+    assert all(torch.equal(x, y) for x, y in zip(first, again))  # the same seed: the same video, refresh included
+    b.reset()  # an unseeded new video gets new refresh noise
+    for _ in range(6):
+        b.generate_chunk(a)
+    _, calls, _ = reanchored_chunk(b, a, 0.5, "clean")
+    assert not torch.equal(calls[0]["x"], first[-2])
+
+
 def test_fixed_refresh_noise_leaves_steers_and_normal_chunks_alone(no_cuda):
-    fixed, fresh = make_backend(refresh_noise="fixed"), make_backend()
+    fixed, fresh = make_backend(refresh_noise="fixed"), make_backend(refresh_noise="fresh")
     a, c = torch.full((1, 3, 8), 1.0), torch.full((1, 3, 8), 2.0)
     outs = {}
     for name, b in (("fixed", fixed), ("fresh", fresh)):
@@ -700,7 +721,7 @@ def test_refresh_noise_is_fixed_by_default_and_seeded_by_the_anchor(no_cuda):
     b.reset(seed=0)
     outs = [b.generate_chunk(a) for _ in range(6)]
     _, calls, _ = reanchored_chunk(b, a, 0.5, "clean")
-    g = torch.Generator().manual_seed(1_000_003 * b.video_id + 3)
+    g = torch.Generator().manual_seed(1_000_003 * 0 + 3)  # the video's seed (0) and the anchor chunk (3)
     noise = torch.randn(outs[3].latents.shape, generator=g)
     t = b.first_chunk_steps[2] * torch.ones([1], dtype=torch.long)
     want = b.scheduler.add_noise(outs[3].latents.flatten(0, 1), noise.flatten(0, 1), t).unflatten(0, outs[3].latents.shape[:2])

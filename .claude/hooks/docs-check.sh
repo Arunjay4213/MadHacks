@@ -10,7 +10,7 @@ session="$(printf '%s' "$input" | jq -r '.session_id // "none"' 2>/dev/null)"
 # Files changed: uncommitted (staged, unstaged, untracked) plus commits on this branch that main does not have.
 base="$(git merge-base HEAD origin/main 2>/dev/null)"
 changed="$( {
-  git status --porcelain 2>/dev/null | sed 's/^...//; s/.* -> //'
+  git status --porcelain --untracked-files=all 2>/dev/null | sed 's/^...//; s/.* -> //'
   [ -n "$base" ] && git diff --name-only "$base" HEAD 2>/dev/null
 } | sort -u)"
 [ -z "$changed" ] && exit 0
@@ -19,7 +19,9 @@ folders=""
 for f in engine commands steering web lucid-studio contracts; do
   code="$(printf '%s\n' "$changed" | rg "^$f/" | rg -v '/tests?/|\.test\.|/samples/|/screenshots/|\.md$|\.(png|jpe?g|gif|mp4|webm)$')"
   [ -z "$code" ] && continue
-  docs="$(printf '%s\n' "$changed" | rg "^$f/.*\.md$|^docs/")"
+  # docs/ belongs to the commands/ owner, so it counts as docs only for commands/.
+  pat="^$f/.*\.md$"; [ "$f" = commands ] && pat="$pat|^docs/"
+  docs="$(printf '%s\n' "$changed" | rg "$pat")"
   [ -z "$docs" ] && folders="$folders $f/"
 done
 [ -z "$folders" ] && exit 0
