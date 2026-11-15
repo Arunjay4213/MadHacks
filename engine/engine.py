@@ -982,7 +982,18 @@ class Engine:
     def _read(self, msg: dict, rec: CommandRecord, reply: Callable[[dict], None],
               ticket: ResetTicket | None = None) -> threading.Event | None:
         """Reader worker thread: reader.handle, then steer, or reset for a reset tap (`ticket` is its HEARD
-        ticket)."""
+        ticket). A reset tap that ends without requesting its reset (the reader rejected it, or encoding its
+        prompt raised) cancels the ticket and drops its command here, on every path, so later commands that wait
+        for the ticket (_wait_for_reset) never wait forever."""
+        try:
+            return self._read_command(msg, rec, reply, ticket)
+        finally:
+            if ticket is not None and ticket.stage is ResetStage.HEARD:
+                self._cancel_reset(ticket)
+                self.book.drop(rec, "the reset was not requested")
+
+    def _read_command(self, msg: dict, rec: CommandRecord, reply: Callable[[dict], None],
+                      ticket: ResetTicket | None) -> threading.Event | None:
         is_reset = ticket is not None
         try:
             result = self.reader.handle(msg)
@@ -990,15 +1001,11 @@ class Engine:
             if steer is not None:
                 check_target(steer)
         except (ValueError, BadMessage) as exc:  # BadMessage is a ValueError too
-            if is_reset:
-                self._cancel_reset(ticket)
             self.book.drop(rec, f"reader rejected it: {exc}")
             reply({"error": f"command reader: {exc}"})
             return None
         except Exception as exc:
             log.exception("reader.handle failed")
-            if is_reset:
-                self._cancel_reset(ticket)
             self.book.drop(rec, f"reader error: {exc!r}")
             reply({"error": f"command reader failed: {exc!r}"})
             return None

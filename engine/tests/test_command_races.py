@@ -120,3 +120,23 @@ def test_a_chunk_between_hearing_and_holding_does_not_release_the_hold(path):
     finally:
         gate.set()
         e.stop()
+
+
+def test_a_reset_whose_prompt_fails_to_encode_does_not_hold_later_commands(engine):
+    """Greptile on PR #130: encoding the reset's prompt raised after its HEARD ticket existed, and the ticket was
+    never cancelled, so every later command waited for it forever."""
+    real_encode = engine.encoder.encode
+
+    def encode(prompt):
+        if prompt == FRESH["prompt"]:
+            raise RuntimeError("CUDA out of memory")
+        return real_encode(prompt)
+
+    engine.encoder.encode = encode
+    reset = engine.handle_control({"type": "tap", "action": "reset", "t_client": 100}, time.monotonic_ns())
+    with pytest.raises(RuntimeError):
+        reset.result(5)
+    target = engine.handle_target(dict(WINTER), time.monotonic_ns())
+    assert wait(lambda: target.stage is CommandStage.SHOWN, timeout=3), f"target stuck at {target.stage}"
+    reset_rec = next(r for r in engine.book._records if r.t_client == 100)
+    assert reset_rec.stage is CommandStage.DROPPED  # not left in flight, which would hold prefetch forever
