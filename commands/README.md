@@ -71,7 +71,7 @@ Repeating the current world still clears a later season.
 
 The known places are in `world.py`: country road, desert, snowy mountain road, neon city, ocean coast (also "beach" and "sea"), Mars, forest and meadow.
 The first six are Ishaan's tested sentences, word for word; forest was added at the lead's request, and meadow lets "take me back to the meadow" return to the oak scene.
-A later season, weather or time change removes the matching built-in part of the world sentence (for example the desert's sunset sky after "make it night").
+A later season, weather or time change removes the matching built-in part of the world sentence (for example the desert's afternoon sun after "make it night").
 An arbitrary custom base that mixes an unknown world with subjects is rejected rather than edited by unsafe text surgery.
 
 ## Multiple commands per sentence
@@ -88,6 +88,12 @@ A sentence is limited to 16 operations, and nested batches are rejected.
 - "undo", "go back", "revert", "take that back" and "never mind" restore the whole state before the last command, so one compound sentence or one world change is one undo step.
 - "undo the winter" removes the winter, not the last change.
 - "remove the river", or the × on a chip (a `remove` tap), removes one change and keeps the rest.
+- "remove the forest" removes the world, and objects added inside it stay (a tree added earlier is kept).
+- "remove the car near the forest" removes the car and keeps the forest.
+  A world named after a preposition ("near", "in", "by") is only the location of the object named before it, never the removal target.
+  This holds for every world, for example "remove the car near the meadow" keeps the meadow.
+  If the object is not in the scene, nothing is removed: "remove the dragon near the meadow" with no dragon keeps the meadow.
+  A world whose own name holds a preposition is still named in full: "remove the city on mars" removes the "city on mars" world.
 - "reset", "start over" and "clear everything" go back to the base scene, and the engine starts a new video.
 - "a little more snow" and "a little less snow" move the strength up or down from where it is.
 

@@ -132,7 +132,8 @@ def resolve(query: str, snapshot: dict):
     A dictionary noun in the query decides alone: if that change is not in the scene the answer is None,
     never a guess from adjectives or phrase words ("the red car" must not remove the red autumn leaves).
     Without one: exact id, free-text label, phrase word (stopwords and colours excluded), then a close
-    match on present labels for words of 4+ letters.
+    match on present labels for words of 4+ letters. Every step reads only the words before the first
+    preposition.
     """
     changes = snapshot.get("changes", [])
     if not changes:
@@ -141,13 +142,22 @@ def resolve(query: str, snapshot: dict):
     for c in reversed(changes):
         if c["id"] == raw:
             return c["id"]
-    q = _norm(query)
+    # Only the words before the first preposition name the target. The rest is a location
+    # ("remove the car near the meadow"), so an absent car removes nothing rather than the meadow.
+    full = _norm(query)
+    q = _PREP_RX.split(full, maxsplit=1)[0]
     # Present labels as whole phrases, longest first: "dark knight" before the "dark" alias of night.
     aliases = list(KEYWORD_RX.finditer(q))
     named = []
     for change in changes:
-        for match in re.finditer(r"\b" + re.escape(_norm(change["label"])) + r"\b", q):
-            if not any(a.start() <= match.start() and match.end() <= a.end()
+        label = _norm(change["label"])
+        # A label with its own preposition ("city on mars") is matched in the whole query, but it must
+        # start before the cut: in "remove the car near the city on mars" it is still only the location.
+        for match in re.finditer(r"\b" + re.escape(label) + r"\b", full if _PREP_RX.search(label) else q):
+            if match.start() >= len(q):
+                continue
+            # A named world is the target even where its name is also an alias ("forest" -> trees).
+            if change["kind"] == "world" or not any(a.start() <= match.start() and match.end() <= a.end()
                        and KEYWORDS[a.group()]["label"] != change["label"] for a in aliases):
                 named.append(change)
                 break

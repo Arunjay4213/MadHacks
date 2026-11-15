@@ -18,6 +18,9 @@ The output folder gets:
                   /stats at start and end; the sheet marks
     summary.txt   the same in a short table
 
+The run exits 1, after saving what it recorded, when /frames or /control closes before the end or the video stops
+for more than 2 s (timings.json then has "complete": false and the reasons in "failures").
+
 `--compare` puts several runs on one sheet, one row per run at the same time marks, to judge quality changes.
 
 Against a URL that is not localhost the run changes the shared live video for every viewer, so it prints a warning
@@ -27,7 +30,6 @@ and waits a few seconds before it starts (`--yes` skips the wait).
 import argparse
 import asyncio
 import enum
-import io
 import json
 import shutil
 import subprocess
@@ -258,14 +260,25 @@ def stats_subset(s: dict | None) -> dict | None:
     return None if s is None else {k: s.get(k) for k in STATS_KEYS}
 
 
+@dataclass(frozen=True)
+class Closed:
+    """A recording socket that ended on its own (the harness cancelling its reader at the end is not a close)."""
+    t: float      # monotonic time
+    reason: str
+
+
 @dataclass
 class Recording:
     t0: float | None = None                      # monotonic time of script second 0
     frames: list[tuple[float, int, int, bytes]] = field(default_factory=list)  # (monotonic, chunk, index, jpeg)
     states: list[tuple[float, dict]] = field(default_factory=list)
     errors: list[dict] = field(default_factory=list)
-    frames_closed: str | None = None
-    control_closed: str | None = None
+    frames_closed: Closed | None = None
+    control_closed: Closed | None = None
+
+
+def closed_now(exc: BaseException | None) -> Closed:
+    return Closed(time.monotonic(), "closed by the server" if exc is None else f"{type(exc).__name__}: {exc}")
 
 
 async def read_frames(url: str, rec: Recording) -> None:
@@ -275,9 +288,9 @@ async def read_frames(url: str, rec: Recording) -> None:
                 chunk, index, jpeg = unpack_frame(msg)
                 rec.frames.append((time.monotonic(), chunk, index, jpeg))
     except Exception as exc:  # noqa: BLE001 - reported in the summary
-        rec.frames_closed = f"{type(exc).__name__}: {exc}"
+        rec.frames_closed = closed_now(exc)
     else:
-        rec.frames_closed = "closed by the server"
+        rec.frames_closed = closed_now(None)
 
 
 async def read_control(ws, rec: Recording) -> None:
@@ -289,7 +302,31 @@ async def read_control(ws, rec: Recording) -> None:
             else:
                 rec.states.append((time.monotonic(), data))
     except Exception as exc:  # noqa: BLE001
-        rec.control_closed = f"{type(exc).__name__}: {exc}"
+        rec.control_closed = closed_now(exc)
+    else:
+        rec.control_closed = closed_now(None)
+
+
+FRAMES_STOPPED_S = 2.0  # a run fails if the last frame arrived more than this before the end
+
+
+def run_failures(rec: Recording, frames: list[Frame], t_stop: float) -> list[str]:
+    """Why a recorded run does not count as a full run (empty when it does).
+
+    `frames` are the frames of the script window in script seconds; `t_stop` is the monotonic time the run stopped.
+    A socket that closed on its own before the stop fails the run, and so does a video that stopped for more than
+    FRAMES_STOPPED_S before it.
+    """
+    stop_s = t_stop - rec.t0
+    out = []
+    for name, closed in (("/control", rec.control_closed), ("/frames", rec.frames_closed)):
+        if closed is not None and closed.t <= t_stop:
+            out.append(f"the {name} connection closed at {closed.t - rec.t0:.2f} s ({closed.reason})")
+    if not frames:
+        out.append("no frames were received during the script")
+    elif stop_s - frames[-1].t > FRAMES_STOPPED_S:
+        out.append(f"no frame in the last {stop_s - frames[-1].t:.1f} s of the run")
+    return out
 
 
 async def wait_for(predicate, timeout: float, every: float = 0.05):
@@ -331,8 +368,14 @@ async def run(args, script: Script) -> int:
     async with websockets.connect(wsb + "/control", open_timeout=20) as control:
         control_task = asyncio.create_task(read_control(control, rec))
         if not await wait_for(lambda: rec.frames or rec.frames_closed, 20.0) or not rec.frames:
-            print(f"error: no frames on /frames ({rec.frames_closed})", file=sys.stderr)
+            print(f"error: no frames on /frames ({rec.frames_closed and rec.frames_closed.reason})", file=sys.stderr)
             return 1
+        readers = {control_task, frames_task}  # either one ending means a connection closed
+
+        def lost() -> tuple[str, Closed] | None:
+            """The first connection that closed, or None: either one ends the run early."""
+            closed = [(n, c) for n, c in (("/control", rec.control_closed), ("/frames", rec.frames_closed)) if c]
+            return min(closed, key=lambda nc: nc[1].t) if closed else None
 
         enter(Phase.RUNNING)
         sent: list[Sent] = []
@@ -341,21 +384,34 @@ async def run(args, script: Script) -> int:
         for step in script.steps:
             delay = t0 + step.at - time.monotonic()
             if delay > 0:
-                await asyncio.sleep(delay)
+                # Wakes at the step time, or at once when /control or /frames closes (its reader task ends).
+                await asyncio.wait(readers, timeout=delay, return_when=asyncio.FIRST_COMPLETED)
+            if lost():
+                break
             # Strictly increasing, so two steps at the same second never share a t_client (replies are matched by it).
             t_client = last_t_client = max(int(time.time() * 1000), last_t_client + 1)
             if step.kind is StepKind.RESET:
                 message = {"type": "tap", "action": "reset", "t_client": t_client}
             else:
                 message = {"type": "final", "text": step.text, "t_client": t_client}
-            await control.send(json.dumps(message))
+            try:
+                await control.send(json.dumps(message))
+            except websockets.ConnectionClosed as exc:
+                rec.control_closed = rec.control_closed or closed_now(exc)
+                break
             now = time.monotonic() - t0
             sent.append(Sent(step.at, step.kind, step.text, t_client, now))
             print(f"  {now:6.2f} s  {step.kind.value}" + (f" {step.text!r}" if step.text else ""))
+        # A closed connection ends the run early: without /control no step can be sent, and without /frames nothing
+        # can be measured, so no more commands go to the shared video. What was recorded is still saved.
         rest = t0 + script.end - time.monotonic()
-        if rest > 0:
-            await asyncio.sleep(rest)
+        if rest > 0 and not lost():
+            await asyncio.wait(readers, timeout=rest, return_when=asyncio.FIRST_COMPLETED)
         t_stop = time.monotonic()
+        if first := lost():
+            name, closed = first
+            print(f"  {name} closed ({closed.reason}), stopping the run early")
+            t_stop = min(t_stop, closed.t)  # the run ended when the connection closed, not when it was noticed
         stats1 = get_stats(base)
         control_task.cancel()
         await asyncio.gather(control_task, return_exceptions=True)
@@ -369,27 +425,20 @@ async def run(args, script: Script) -> int:
     window = [f for f in rec.frames if t0 <= f[0] <= t_stop]
     frames = [Frame(t - t0, c, i) for t, c, i, _ in window]
     results = [command_delay(cmd, frames) for cmd in sent]
-    report = save(out, args.label or out.name, script, fps, window, frames, results, rec, stats0, stats1)
+    failures = run_failures(rec, frames, t_stop)
+    save(out, args.label or out.name, script, fps, window, frames, results, rec, stats0, stats1, failures,
+         t_stop - t0)
     print((out / "summary.txt").read_text())
     enter(Phase.DONE)
-    print(f"  wrote {out}")
-    if not report["frames_received"]:
-        return 1
-    last_frame = window[-1][0] if window else t0
-    if t_stop - last_frame > FRAMES_STOPPED_S:
-        print(f"  FAILED: no frame in the last {t_stop - last_frame:.1f} s of the run (the /frames connection dropped?)")
-        return 1
-    return 0
-
-
-FRAMES_STOPPED_S = 2.0  # a run fails if the last frame arrived more than this before the end
+    print(f"  wrote {out}" + (" (an incomplete run, see FAILED above)" if failures else ""))
+    return 1 if failures else 0
 
 
 # --- saving ------------------------------------------------------------------------------------------------------
 
 
 def save(out: Path, label: str, script: Script, fps: float, window, frames: list[Frame], results: list[dict],
-         rec: Recording, stats0: dict, stats1: dict | None) -> dict:
+         rec: Recording, stats0: dict, stats1: dict | None, failures: list[str], stop_s: float) -> dict:
     out.mkdir(parents=True, exist_ok=True)
     frames_dir = out / "frames"
     if frames_dir.exists():
@@ -400,7 +449,7 @@ def save(out: Path, label: str, script: Script, fps: float, window, frames: list
     encode_mp4([jpeg for *_, jpeg in window], fps, video)
 
     marks = []
-    for m in sheet_marks(script.end):
+    for m in sheet_marks(min(script.end, stop_s)):  # a run that stopped early has no frames after the stop
         i = frame_at(frames, m)
         if i is None:
             continue
@@ -416,14 +465,19 @@ def save(out: Path, label: str, script: Script, fps: float, window, frames: list
     report = {
         "label": label, "script": script.name, "end_s": script.end, "fps": fps,
         "frames_received": len(frames), "max_frame_gap_ms": round(max(gaps) * 1000) if gaps else None,
+        "complete": not failures, "failures": failures,
         "commands": results, "error_replies": rec.errors,
-        "frames_socket": rec.frames_closed, "control_socket": rec.control_closed,
+        "frames_socket": socket_note(rec.frames_closed, rec.t0), "control_socket": socket_note(rec.control_closed, rec.t0),
         "stats_start": stats_subset(stats0), "stats_end": stats_subset(stats1),
         "sheet": marks,
     }
     (out / "timings.json").write_text(json.dumps(report, indent=2) + "\n")
     (out / "summary.txt").write_text(summary_text(report))
     return report
+
+
+def socket_note(closed: Closed | None, t0: float) -> str | None:
+    return None if closed is None else f"{closed.reason} (at {closed.t - t0:.2f} s)"
 
 
 def encode_mp4(jpegs: list[bytes], fps: float, path: Path) -> None:
@@ -459,6 +513,8 @@ def summary_text(r: dict) -> str:
     for k in ("frames_socket", "control_socket"):
         if r[k]:
             lines.append(f"{k}: {r[k]}")
+    for reason in r["failures"]:
+        lines.append(f"FAILED: {reason}")
     return "\n".join(lines) + "\n"
 
 

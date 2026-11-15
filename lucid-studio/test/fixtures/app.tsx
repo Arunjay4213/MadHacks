@@ -11,9 +11,10 @@ context.fillStyle = '#ff0000'; context.fillRect(0, 0, 800, 400);
 const mutations: string[] = [];
 Object.assign(window, { mutations });
 const pending: { prompt: string; release: () => void }[] = [];
-Object.assign(window, { pendingMutations: pending });
+const payloads: unknown[] = [];
+Object.assign(window, { pendingMutations: pending, mutationPayloads: payloads });
 const adapter = { sendMutation: async (payload: { prompt: string }) => {
-  mutations.push(payload.prompt);
+  mutations.push(payload.prompt); payloads.push(payload);
   if (mode === 'delayed') await new Promise<void>(release => pending.push({ prompt: payload.prompt, release }));
 } };
 createRoot(document.getElementById('root')!).render(mode === 'external'

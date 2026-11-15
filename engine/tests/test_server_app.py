@@ -56,6 +56,14 @@ def test_the_page_files_are_served_fresh_with_their_types(client):
         assert r.content == (WEB / name).read_bytes(), path
 
 
+def test_an_edited_page_file_is_served_with_its_new_contents(tmp_path):
+    client = TestClient(build_app(EngineConfig(backend="fake"), web_dir=tmp_path))
+    (tmp_path / "app.js").write_text("one")
+    assert client.get("/app/app.js").text == "one"
+    (tmp_path / "app.js").write_text("two")
+    assert client.get("/app/app.js").text == "two"
+
+
 def test_other_files_and_traversal_are_not_served(client):
     for path in ["/app/package.json", "/app/README.md", "/app/node_modules/", "/app/INDEX.HTML",
                  "/app/%2e%2e/engine/server.py", "/app/..%5cengine%5cserver.py"]:

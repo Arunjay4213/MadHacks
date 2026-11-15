@@ -96,6 +96,7 @@ def _warm_policy(config: ReanchorConfig = ReanchorConfig()) -> ReanchorPolicy:
         {"refresh_every_chunks": 0},
         {"refresh_source": "golden"},
         {"min_gap_chunks": "8"},             # a string is not an int
+        {"slow_anchors": True},              # a bool is not an int
     ],
 )
 def test_bad_config_raises(kwargs: dict) -> None:

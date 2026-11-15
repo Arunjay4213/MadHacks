@@ -58,6 +58,7 @@ The output folder gets:
 `--compare DIR1 DIR2 ... --out OUT` writes `OUT/compare.jpg`: one row per run at the same time marks (every 4 s; `--every 2` for every sheet frame), labelled with each run's `--label` and its delay range.
 
 It works on localhost and through the tunnel (`--url https://<address>`, which uses wss).
+If the engine connection drops during a run, the harness stops waiting at once, saves what it received so far, and exits with code 1 (PR #153, PR #161).
 A run against a URL that is not localhost changes the shared live video for every viewer, so the harness prints a warning and waits 5 s before it starts (`--yes` skips the wait).
 
 ## The live engine on the GPU machine
@@ -332,6 +333,7 @@ It is a cut to a new picture, so a cross-fade from the old video would blend two
 The decode thread knows it by the video number in `ChunkMeta`: the last decoded frame belongs to another video, or there is none.
 The decision is the enum `ChunkShape`: `full`, `video_start` or `short`.
 The padding frames count as frames of the chunk, so the lead gate's estimate of `frames_per_chunk` frames stays right.
+The padding time counts in the chunk's `decode_ms` (and so in `/stats` and the lead limit), because it runs on the decode thread between decode and JPEG encoding.
 Each short chunk logs one line (`chunk 40: short chunk, 1 of 4 frames, mode crossfade: padded to 4 frames in 1.9 ms`).
 `/stats` has `short_chunks`: `mode`, `count`, `last_chunk`, and `last` (`chunk`, decoded `frames`, `pad_ms`).
 The real backend's default `first_frame_pad=hold` already repeats a re-anchor chunk's 1 frame to 4, so on the live engine no chunk is short (`/stats` showed `short_chunks.count` 0); this padding matters only with `--backend-opt first_frame_pad=none` or the fake backend's `short_on_chunks`.
@@ -386,8 +388,9 @@ contract 1 on `/control` -> reader worker thread: `reader.handle` -> `steer` (co
   That jumps the steerer to the new target with no ramp, honours a strength pair, and keeps the controller's prompt cache.
 - Commands are ordered against a reset by when they were heard.
   A command heard before the reset tap is dropped by it.
-  A command heard after it (for example "make it winter" a few ms after Reset) waits on the steer worker until the reset is done (`ResetTicket`, stage `requested` then `done`), then applies to the new video, so it gets its own `applies_from_chunk` and all five stamps.
-  Its `embedded` stamp includes that wait, which is at most about one chunk.
+  A command heard after it (for example "make it winter" a few ms after Reset) waits on the steer worker until the reset is done (`ResetTicket`, stage `heard`, then `requested`, then `done`; or `cancelled` if the reader rejects the tap), then applies to the new video, so it gets its own `applies_from_chunk` and all five stamps.
+  The ticket exists from the moment the tap is heard, so a `POST /target`, which bypasses the reader, also waits while the tap is still being read.
+  Its `embedded` stamp includes that wait, which is at most the reader's time for the tap plus about one chunk.
 - The encoder service runs on its own thread with a priority queue, caches embeddings and token ids by exact prompt text (LRU, 512 entries), shares one encoding between identical requests, and logs cache hits, misses and encode ms.
 - The reader's `likely_prompts()` are encoded at startup, and after every command they are queued again at background priority, behind any command's encoding.
   Each new set replaces the background prompts still queued from the last one, because those belong to an older scene.
@@ -440,7 +443,8 @@ So a new sentence costs about 1.8 s extra, and a pinned or cached sentence costs
   `{"op": "edit_base", "base": ...}` is a base edit ("turn the tree into a lighthouse"): the engine expands it into `new_scene` plus one `add` per existing change, applied as one batch, so the changes stay and one undo reverts it.
   `commands/state.py` has no operation that rewrites only the base, so this expansion stays.
   `new_scene` is only for an explicit new scene ("new scene of a beach", "start over with a beach") and clears the changes.
-  Undo and reset are left to the keyword table.
+  A sentence made only of undo and reset clauses ("undo", "reset", "undo that and start over") skips the final reader and goes to the keyword table.
+  Any other sentence, including a compound such as "reset and add a dog", goes through the content check and the final reader first (PR #147), so a blocked word in any clause blocks the whole sentence.
 - The prompt is SUBJECT + OBJECTS + WORLD + STYLE: SUBJECT is the base sentence (with forward-driving words for a vehicle), OBJECTS are the phrases of the extra changes word for word, so a lion stays the same lion in every later prompt, WORLD is the model's `details` (about 50 words: the ground of the place, two or three things on both sides, then the light; a place replaces the world), STYLE is a fixed sentence, which says "motion blur on the road" only when the subject is a vehicle.
   A colour, type or size the user names always wins over making a second car look different.
   This is the engine's stand-in (`PromptSpec` "engine stand-in"); when `commands.rewriter` imports, its `SYSTEM_PROMPT` and `validate_rewrite` are used instead with no code change.
@@ -456,12 +460,14 @@ So a new sentence costs about 1.8 s extra, and a pinned or cached sentence costs
 - One retry: a reply that is invalid, has no usable details, or adds an object whose phrase breaks a rule (world words such as "in the snow", or no size or position words) is asked again once, with the reasons and the earlier reply, when the first call took under half the wait (`retries`).
   On the live 3 s wait at about 1.8 s a call this does not happen; it does in offline runs such as the demo prompts regeneration.
   The reply states are named in `Verdict` (accepted, repaired, phrase, plain, empty, blocked, invalid, failed).
-- An object phrase may have up to 200 characters (the nano slow reader keeps 120), so a positioned phrase is valid.
+- An object phrase may have up to 200 characters (the nano slow reader keeps 120), so a positioned phrase is valid; any other phrase (a world sentence from `commands/world.py`, about 250 characters) up to 400 (`FINAL_MAX_PHRASE`).
+  A cached or pinned operation is checked with the same limits plus room for the lane cue (`CACHED_MAX_PHRASE`), so a saved edit replays instead of falling back.
   A vehicle added on a road gets "white dashed lane markings rush toward the viewer" at the end of its phrase; `FORWARD_MOTION` ends with the same cue.
 - A new place (an add of kind world) clears the earlier season and weather in `commands/state.py` (#115), so a desert after "make it winter" has no snow; the time of day stays.
   The engine moves a sentence's world add before its season and weather adds, so "take me to a snowy desert" keeps the snow it asked for.
-- Anchors: "new scene of a red sports car driving along a country road" gives the base `a red sports car driving along a country road` and Ishaan's tested prompt, verbatim.
-  Every later prompt of that scene starts with its first two sentences word for word (subject, motion and camera), then the changes and the details, and ends with its style sentence (`ANCHORS` in `engine/final_reader.py`).
+- Vehicle scenes (`engine/car_template.py`): a scene whose base is a vehicle on a road gets Ishaan's measured car template, and the base is kept as the bare vehicle ("a red sports car") with its world as one change of kind world.
+  A sentence that names one measured world (country, winter, desert, neon city, ocean coast, sunset, autumn, rain; "make it night" is the neon city) is composed by the engine with no call (`template_hits`): it swaps road, scene and light together, and the subject and camera sentences stay word for word.
+  Any other sentence on a vehicle scene asks Sonnet for `road`, `scene` and `light`; the engine checks them (one sentence each, no camera words) and builds the template itself.
 - "motion blur on the road" (the stand-in's vehicle style) and road words in details are used only when the scene has a road: on GPU the oak meadow grew a road or tyre tracks from them.
   `commands.rewriter.build_messages` is not used: it is made for a separate details-only call whose command is "context only", and the engine needs one call that applies the command too (two calls in a row would not fit the 3 s wait).
 - Content block: a short word list (`BLOCKED_WORDS`) is checked first with no call, and the model sets `blocked: true` for sexual, violent or hateful requests.

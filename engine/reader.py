@@ -17,7 +17,9 @@ With --final-reader sonnet, FinalReadingService wraps CommandService: every FINA
 and undo work as for any other edit, and the steer's prompt becomes the final reader's rich prompt.
 """
 
+import enum
 import logging
+import re
 
 log = logging.getLogger("engine.reader")
 
@@ -63,12 +65,17 @@ class FinalReadingService:
         if isinstance(msg, dict) and msg.get("type") == "final" and isinstance(msg.get("text"), str) \
                 and isinstance(msg.get("t_client"), int) and not isinstance(msg.get("t_client"), bool):
             snapshot = self._svc.snapshot()
-            if _is_undo_or_reset(msg["text"], snapshot):  # the dictionary knows these; no call
+            kind = sentence_kind(msg["text"], snapshot)
+            if kind is SentenceKind.CONTROL:  # the dictionary knows these and they add nothing; no call
                 return self._mapped(self._svc.handle(msg))
-            result = self._final_reader(msg["text"], snapshot)
+            result = self._final_reader(msg["text"], snapshot)  # the content check, for every other sentence
             if result is not None and result.get("blocked"):
                 log.info("final reader: %r blocked, no steer", msg["text"][:100])
                 return self._mapped(self._svc.apply_final(msg["text"], [], None))
+            if kind is SentenceKind.MIXED:
+                # Not blocked. The final reader leaves undo and reset to the dictionary, so its operations would
+                # drop them: the dictionary reads the whole sentence, as it would without this wrapper.
+                return self._mapped(self._svc.handle(msg))
             if result is not None:
                 # prompt None: the service steers to the composed prompt and _mapped gives the rich one. Passing
                 # the rich prompt would make an undo back to this state steer to the composed prompt (another
@@ -97,7 +104,61 @@ class FinalReadingService:
         return out
 
 
-def _is_undo_or_reset(text: str, snapshot: dict) -> bool:
-    from commands.reader import read
-    op = read(text, snapshot)["op"]
-    return op is not None and op["op"] in ("undo", "reset")
+class SentenceKind(enum.Enum):
+    """What a final sentence asks for, which decides whether it may skip the final reader's content check."""
+    CONTROL = "control"  # every clause is a bare undo or reset: the dictionary alone, no call (nothing new enters)
+    MIXED = "mixed"      # bare undo or reset plus edit clauses: content check first, then the dictionary
+    EDIT = "edit"        # no bare undo or reset, or a reset that names a scene: the final reader decides
+
+
+class ClauseKind(enum.Enum):
+    """What one clause of a final sentence is."""
+    BARE_CONTROL = "bare_control"  # undo, or a reset that names nothing ("start over please")
+    SCENE_RESET = "scene_reset"    # a reset that names a scene ("start over with a beach"): a new scene
+    EDIT = "edit"                  # anything else
+
+
+# Words that may follow a reset ("start over please", "reset everything", "reset immediately") without naming a
+# scene: filler, and the pace words of commands/reader.py. Any other word ("start over with a beach") names content.
+RESET_FILLER = frozenset("""
+    please now everything it all the scene video whole thing again from scratch completely entirely this that
+    slowly gradually gently little by over time suddenly instantly immediately right quickly at once
+""".split())
+_WORDS = re.compile(r"[a-z']+")
+
+
+def sentence_kind(text: str, snapshot: dict) -> SentenceKind:
+    """Classify each clause the way CommandService splits the sentence, so a clause like "add ..." after
+    "reset and" is seen and cannot ride past the content check on the reset.
+
+    A scene reset with no undo or reset after it makes the whole sentence EDIT: the keyword table would read it
+    as a plain reset and drop the scene, and the final reader's new_scene already clears the changes, so a bare
+    reset before it adds nothing. An undo or reset after it ("start over with a beach and reset") must still run
+    last, which only the keyword table does, so that sentence is MIXED."""
+    from commands.reader import read, split_commands
+    kinds = [clause_kind(clause, read(clause, snapshot)) for clause in split_commands(text) or [text]]
+    if ClauseKind.SCENE_RESET in kinds:
+        last_scene = len(kinds) - 1 - kinds[::-1].index(ClauseKind.SCENE_RESET)
+        if ClauseKind.BARE_CONTROL not in kinds[last_scene + 1:]:
+            return SentenceKind.EDIT
+        return SentenceKind.MIXED
+    if all(k is ClauseKind.BARE_CONTROL for k in kinds):
+        return SentenceKind.CONTROL
+    return SentenceKind.MIXED if ClauseKind.BARE_CONTROL in kinds else SentenceKind.EDIT
+
+
+def clause_kind(clause: str, reading: dict) -> ClauseKind:
+    """`reading` is commands.reader.read(clause, ...). The keyword table reads "start over with a beach" as a
+    plain reset; the words left after the reset words tell a scene reset from a bare one."""
+    op = reading["op"]
+    if op is None or op["op"] not in ("undo", "reset"):
+        return ClauseKind.EDIT
+    if op["op"] == "undo":
+        return ClauseKind.BARE_CONTROL
+    words = _WORDS.findall(clause.lower())
+    keyword = _WORDS.findall((reading["keyword"] or "").lower())
+    for i in range(len(words) - len(keyword) + 1):  # drop the first match of the reset words themselves
+        if keyword and words[i:i + len(keyword)] == keyword:
+            words = words[:i] + words[i + len(keyword):]
+            break
+    return ClauseKind.BARE_CONTROL if all(w in RESET_FILLER for w in words) else ClauseKind.SCENE_RESET

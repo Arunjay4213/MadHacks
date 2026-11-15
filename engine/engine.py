@@ -284,10 +284,11 @@ class PrefetchPacer:
         """Generation thread, after each chunk. Returns True when the state became READY.
 
         `in_flight` (CommandBook.in_flight) is called under this pacer's lock, not read by the caller beforehand.
-        A command thread calls hold() before it records its command, so a hold either lands before this call
-        (and in_flight() then sees the command) or waits for the lock and lands after it (and wins). Reading
-        in_flight outside the lock let a hold land between the read and this call, and the stale False then
-        moved HELD back to SAVING or READY, so a background encode could start while the command was in flight.
+        A command thread records its command (CommandBook.heard) and only then calls hold(). So this call either
+        runs after the record (in_flight() sees the command: HELD) or before it, and then the hold comes later and
+        wins. Holding first let a chunk_done run between the hold and the record: in_flight() was still False,
+        and HELD moved back to SAVING or READY while the command was in flight. Reading in_flight outside the
+        lock had the same effect with a hold landing between the read and this call.
         """
         with self._lock:
             if in_flight():
@@ -316,27 +317,48 @@ class PrefetchPacer:
 
 
 class ResetStage(enum.Enum):
-    """Where one requested reset is. See ResetTicket."""
+    """Where one reset is. See ResetTicket."""
+    HEARD = "heard"          # the reset tap is heard and the reader is still reading it; its target is not known yet
     REQUESTED = "requested"  # waiting for the generation thread's next chunk boundary, or running there now
     DONE = "done"            # the new video's steerer is in place (or the reset failed and the engine recovers)
+    CANCELLED = "cancelled"  # the reader rejected the tap, or the engine could not reset: no reset happens
+
+
+OPEN_RESET_STAGES = (ResetStage.HEARD, ResetStage.REQUESTED)  # later commands wait while a ticket is in one of these
 
 
 @dataclass
 class ResetTicket:
-    """One reset request, in the order commands were heard.
+    """One reset, in the order commands were heard. HEARD -> REQUESTED -> DONE, or HEARD -> CANCELLED.
 
-    Commands heard after the reset's own command (seq above `heard_up_to`) wait on the steer worker until the
-    ticket is DONE, then apply to the new video's steerer. Without that wait a final sent a few ms after a reset
-    tap was applied to the old video, and the reset then dropped it and restarted the steerer without it.
+    Commands heard after the reset's own command (seq above `heard_up_to`) wait on the steer worker while the
+    ticket is HEARD or REQUESTED, then apply to the new video's steerer. Without that wait a final sent a few ms
+    after a reset tap was applied to the old video, and the reset then dropped it and restarted the steerer
+    without it. A reset tap's ticket exists from the moment the tap is heard (HEARD), not only once the reader
+    has read it: a POST /target bypasses the reader, so it could otherwise be applied to the old video while the
+    tap was still in the reader, and then be marked generated and shown although the new video never used it.
     """
     heard_up_to: int                         # seq of the reset's command: the newest command the reset replaces
-    command: CommandRecord | None            # the reset's command when it carries a steer (the seed), else None
-    steer: dict | None                       # the new video starts on this target; None: the starting prompt
-    done: threading.Event = field(default_factory=threading.Event)
-    stage: ResetStage = ResetStage.REQUESTED
+    stage: ResetStage = ResetStage.HEARD
+    command: CommandRecord | None = None     # set by request(): the reset's command when it carries a steer
+    steer: dict | None = None                # set by request(): the new video's target; None: the starting prompt
+    done: threading.Event = field(default_factory=threading.Event)  # set on DONE and on CANCELLED
+
+    def request(self, command: CommandRecord | None, steer: dict | None) -> None:
+        """HEARD -> REQUESTED: the reader gave the target; the generation thread may take it."""
+        assert self.stage is ResetStage.HEARD, self.stage
+        self.command, self.steer = command, steer
+        self.stage = ResetStage.REQUESTED
 
     def finish(self) -> None:
+        """REQUESTED -> DONE."""
         self.stage = ResetStage.DONE
+        self.done.set()
+
+    def cancel(self) -> None:
+        """HEARD -> CANCELLED: no reset will happen, so nothing waits for it."""
+        assert self.stage is ResetStage.HEARD, self.stage
+        self.stage = ResetStage.CANCELLED
         self.done.set()
 
 
@@ -401,7 +423,7 @@ class Engine:
         self.prefetch = PrefetchPacer()
         self._reset_lock = threading.Lock()
         self._pending_resets: list[ResetTicket] = []  # REQUESTED tickets the generation thread has not taken yet
-        self._latest_reset: ResetTicket | None = None  # the newest ticket, taken or not; None before the first reset
+        self._open_resets: list[ResetTicket] = []  # every ticket still HEARD or REQUESTED, in the order heard
         self._threads: list[threading.Thread] = []
         # A crash in the generation or decode thread: set once, handled by the generation thread in _recover.
         self._crash_lock = threading.Lock()
@@ -716,7 +738,8 @@ class Engine:
 
     # --- reset -----------------------------------------------------------------------------
 
-    def request_reset(self, command: CommandRecord | None = None, steer: dict | None = None) -> threading.Event:
+    def request_reset(self, command: CommandRecord | None = None, steer: dict | None = None,
+                      ticket: ResetTicket | None = None) -> threading.Event:
         """Ask for a reset at the next chunk boundary. The returned event is set when it is done.
 
         `command` is the reset's own command record; commands heard after it wait for this reset and then apply
@@ -724,16 +747,34 @@ class Engine:
         `steer` is the reset's target: the new video starts directly on it (its prompt, and its strength pair if
         it has one), with no ramp, and `command` counts its first chunk. Without it the new video starts on the
         starting prompt. The steer's prompts must already be in the encoder cache, so the reset does not wait.
+        `ticket` is the HEARD ticket made when the reset tap was heard (_hear_reset); without one a new ticket is
+        made here. On BadMessage the ticket is CANCELLED.
         """
-        state = self.lifecycle.state
-        if state not in (Lifecycle.GENERATING, Lifecycle.RESETTING):
-            raise BadMessage(f"cannot reset while {state.value}")
-        heard_up_to = command.seq if command is not None else self.book.newest_seq()
-        ticket = ResetTicket(heard_up_to, command if steer is not None else None, steer)
         with self._reset_lock:
+            if ticket is None:
+                ticket = ResetTicket(command.seq if command is not None else self.book.newest_seq())
+                self._open_resets.append(ticket)
+            state = self.lifecycle.state
+            if state not in (Lifecycle.GENERATING, Lifecycle.RESETTING):
+                self._cancel_reset_locked(ticket)
+                raise BadMessage(f"cannot reset while {state.value}")
+            ticket.request(command if steer is not None else None, steer)
             self._pending_resets.append(ticket)
-            self._latest_reset = ticket
         return ticket.done
+
+    def _hear_reset(self, rec: CommandRecord) -> ResetTicket:
+        """Under _reset_lock, right after the reset tap's record is made: its HEARD ticket."""
+        ticket = ResetTicket(rec.seq)
+        self._open_resets.append(ticket)
+        return ticket
+
+    def _cancel_reset(self, ticket: ResetTicket) -> None:
+        with self._reset_lock:
+            self._cancel_reset_locked(ticket)
+
+    def _cancel_reset_locked(self, ticket: ResetTicket) -> None:
+        ticket.cancel()
+        self._open_resets.remove(ticket)
 
     def _do_reset(self) -> None:
         """Generation thread, at a chunk boundary: run every requested reset as one. The newest one decides the
@@ -746,19 +787,21 @@ class Engine:
         try:
             self._reset_now(steer, newest.command, newest.heard_up_to)
         finally:  # also after an error (the engine then recovers), so POST /reset and held commands do not hang
-            for t in tickets:
-                t.finish()
+            with self._reset_lock:
+                for t in tickets:
+                    t.finish()
+                    self._open_resets.remove(t)
 
     def _wait_for_reset(self, rec: CommandRecord) -> None:
-        """Steer worker thread: a command heard after a reset that is still REQUESTED waits until it is DONE, so
-        it is applied to the new video's steerer rather than to the old one (which the reset would throw away)."""
+        """Steer worker thread: a command heard after a reset that is still HEARD or REQUESTED waits until it is
+        DONE (or CANCELLED), so it is applied to the new video's steerer rather than to the old one (which the
+        reset would throw away)."""
         with self._reset_lock:
-            ticket = self._latest_reset
-        if ticket is None or ticket.stage is ResetStage.DONE or rec.seq <= ticket.heard_up_to:
-            return
-        log.info("command %d: waits for the reset of command %d before it applies", rec.seq, ticket.heard_up_to)
-        while ticket.stage is ResetStage.REQUESTED and not self._stop.is_set():
-            ticket.done.wait(0.1)
+            tickets = [t for t in self._open_resets if t.heard_up_to < rec.seq]
+        for ticket in tickets:
+            log.info("command %d: waits for the reset of command %d before it applies", rec.seq, ticket.heard_up_to)
+            while ticket.stage in OPEN_RESET_STAGES and not self._stop.is_set():
+                ticket.done.wait(0.1)
 
     def _reset_now(self, steer: dict, rec: CommandRecord | None, heard_up_to: int) -> None:
         t0 = time.perf_counter()
@@ -809,7 +852,8 @@ class Engine:
                     t2 = time.perf_counter()
                     jpegs = [encode_jpeg(f, quality) for f in frames]
                     t3 = time.perf_counter()
-                    meta.decode_ms, meta.jpeg_ms, meta.frames = (t1 - t0) * 1e3, (t3 - t2) * 1e3, len(jpegs)
+                    # decode_ms includes short-chunk padding (t1..t2): _lead_limit budgets from it
+                    meta.decode_ms, meta.jpeg_ms, meta.frames = (t2 - t0) * 1e3, (t3 - t2) * 1e3, len(jpegs)
                     anchor = f", re-anchor {meta.anchor.reason} {meta.anchor.strength:.2f}" if meta.anchor else ""
                     log.info("chunk %d: gen %.0f ms, decode %.0f ms, jpeg %.0f ms, %d frames, decode queue %d%s",
                              meta.chunk, meta.gen_ms, meta.decode_ms, meta.jpeg_ms, meta.frames,
@@ -927,13 +971,31 @@ class Engine:
         """
         msg = check(1, message)
         self._require_running()
-        self.prefetch.hold()
-        rec = self.book.heard("control", msg.get("text"), msg.get("t_client"), heard_ns)
-        return self._reader_pool.submit(self._read, msg, rec, reply)
-
-    def _read(self, msg: dict, rec: CommandRecord, reply: Callable[[dict], None]) -> threading.Event | None:
-        """Reader worker thread: reader.handle, then steer, or reset for a reset tap."""
         is_reset = msg["type"] == "tap" and msg.get("action") == "reset"
+        # The record and a reset's HEARD ticket are made under _reset_lock, so a command heard after this one
+        # always finds the ticket when it checks (_wait_for_reset), even if it bypasses the reader (POST /target).
+        with self._reset_lock:
+            rec = self.book.heard("control", msg.get("text"), msg.get("t_client"), heard_ns)
+            ticket = self._hear_reset(rec) if is_reset else None
+        self.prefetch.hold()  # after the record: see PrefetchPacer.chunk_done
+        return self._reader_pool.submit(self._read, msg, rec, reply, ticket)
+
+    def _read(self, msg: dict, rec: CommandRecord, reply: Callable[[dict], None],
+              ticket: ResetTicket | None = None) -> threading.Event | None:
+        """Reader worker thread: reader.handle, then steer, or reset for a reset tap (`ticket` is its HEARD
+        ticket). A reset tap that ends without requesting its reset (the reader rejected it, or encoding its
+        prompt raised) cancels the ticket and drops its command here, on every path, so later commands that wait
+        for the ticket (_wait_for_reset) never wait forever."""
+        try:
+            return self._read_command(msg, rec, reply, ticket)
+        finally:
+            if ticket is not None and ticket.stage is ResetStage.HEARD:
+                self._cancel_reset(ticket)
+                self.book.drop(rec, "the reset was not requested")
+
+    def _read_command(self, msg: dict, rec: CommandRecord, reply: Callable[[dict], None],
+                      ticket: ResetTicket | None) -> threading.Event | None:
+        is_reset = ticket is not None
         try:
             result = self.reader.handle(msg)
             steer = result.get("steer")
@@ -958,8 +1020,8 @@ class Engine:
             else:
                 self.book.no_operation(rec, "reset to the starting prompt")
             try:
-                return self.request_reset(rec, steer)
-            except BadMessage as exc:
+                return self.request_reset(rec, steer, ticket)
+            except BadMessage as exc:  # request_reset cancelled the ticket
                 self.book.drop(rec, str(exc))
                 reply({"error": str(exc)})
                 return None
@@ -981,8 +1043,8 @@ class Engine:
         """A contract 2 message from POST /target, bypassing the reader. Passed to the Controller unchanged."""
         target = check_target(message)
         self._require_running()
-        self.prefetch.hold()
         rec = self.book.heard("target", None, None, heard_ns)
+        self.prefetch.hold()  # after the record: see PrefetchPacer.chunk_done
         self.book.decided(rec, target)
         self._embed(rec, target)
         return rec

@@ -496,6 +496,7 @@ class Backend:
         self._gen_lock = threading.Lock()
         self._gen_stream = torch.cuda.Stream(device=self.device)
         self._rng = torch.Generator(device=self.device).manual_seed(seed)
+        self._video_seed = int(seed)  # this video's seed: a fixed-noise refresh is seeded by it and the anchor chunk
         self._init_caches()
         self.state = GenState.EMPTY
         self.video_id = 0
@@ -562,6 +563,8 @@ class Backend:
         with self._gen_lock:
             if seed is not None:
                 self._rng.manual_seed(int(seed))
+            # A reseeded video replays exactly; an unseeded one gets the next seed, so its refreshes differ.
+            self._video_seed = int(seed) if seed is not None else self._video_seed + 1
             with torch.cuda.device(self.device), torch.cuda.stream(self._gen_stream):
                 self._clear_frame_cache()
             self._reset_crossattn_cache()
@@ -743,8 +746,9 @@ class Backend:
                     x_last = self._clean_anchor  # a refresh: the clean anchor stays as it is
                     if self.refresh_noise == "fixed":
                         # Seeded by the anchor, not drawn from the main stream: the same picture every refresh.
+                        # Reduced to 64 bits, the range manual_seed accepts, so any reset seed works.
                         rng = torch.Generator(device=self.device).manual_seed(
-                            1_000_003 * self.video_id + int(self.clean_anchor_chunk))
+                            (1_000_003 * self._video_seed + int(self.clean_anchor_chunk)) % (1 << 64))
                         noisy = torch.randn(noisy.shape, device=self.device, dtype=self.dtype, generator=rng)
                 elif not plan.from_clean or self._clean_anchor is not None:
                     # A steer (or any other rebase): the old clean anchor shows the old scene.
