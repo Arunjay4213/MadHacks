@@ -19,6 +19,7 @@ and undo work as for any other edit, and the steer's prompt becomes the final re
 
 import enum
 import logging
+import re
 
 log = logging.getLogger("engine.reader")
 
@@ -105,9 +106,17 @@ class FinalReadingService:
 
 class SentenceKind(enum.Enum):
     """What a final sentence asks for, which decides whether it may skip the final reader's content check."""
-    CONTROL = "control"  # every clause is undo or reset: the dictionary alone, no call (nothing new enters)
+    CONTROL = "control"  # every clause is a bare undo or reset: the dictionary alone, no call (nothing new enters)
     MIXED = "mixed"      # undo or reset plus other clauses: content check first, then the dictionary
-    EDIT = "edit"        # no undo or reset: the final reader decides the operations
+    EDIT = "edit"        # no bare undo or reset: the final reader decides the operations
+
+
+# Words that may follow a reset ("start over please", "reset everything", "clear it all from scratch") without
+# naming a scene. Any other word ("start over with a beach") names content, so the final reader reads it.
+RESET_FILLER = frozenset("""
+    please now everything it all the scene video whole thing again from scratch completely entirely this that
+""".split())
+_WORDS = re.compile(r"[a-z']+")
 
 
 def sentence_kind(text: str, snapshot: dict) -> SentenceKind:
@@ -115,11 +124,24 @@ def sentence_kind(text: str, snapshot: dict) -> SentenceKind:
     "reset and" is seen and cannot ride past the content check on the reset."""
     from commands.reader import read, split_commands
     clauses = split_commands(text) or [text]
-    control = [_is_undo_or_reset(read(clause, snapshot)["op"]) for clause in clauses]
+    control = [_is_bare_control(clause, read(clause, snapshot)) for clause in clauses]
     if all(control):
         return SentenceKind.CONTROL
     return SentenceKind.MIXED if any(control) else SentenceKind.EDIT
 
 
-def _is_undo_or_reset(op) -> bool:
-    return op is not None and op["op"] in ("undo", "reset")
+def _is_bare_control(clause: str, reading: dict) -> bool:
+    """An undo, or a reset that names nothing else. The keyword table reads "start over with a beach" as a
+    plain reset and would drop the beach; the final reader turns it into a new scene."""
+    op = reading["op"]
+    if op is None or op["op"] not in ("undo", "reset"):
+        return False
+    if op["op"] == "undo":
+        return True
+    words = _WORDS.findall(clause.lower())
+    keyword = _WORDS.findall((reading["keyword"] or "").lower())
+    for i in range(len(words) - len(keyword) + 1):  # drop the first match of the reset words themselves
+        if keyword and words[i:i + len(keyword)] == keyword:
+            words = words[:i] + words[i + len(keyword):]
+            break
+    return all(w in RESET_FILLER for w in words)
