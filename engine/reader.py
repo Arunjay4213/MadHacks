@@ -7,7 +7,8 @@ A reader is an object with this API (agreed with the commands/ owner):
         Raises ValueError on an invalid contract 1 message. May block up to about 1.5 s (the slow reader's LLM call),
         or up to --final-timeout-s with --final-reader sonnet.
     svc.state_fields() -> the same state dict; used for every contract 4 message, from the streamer thread.
-    svc.likely_prompts() -> list[str]; prompts worth encoding ahead of time.
+    svc.likely_prompts() -> list[str]; prompts worth encoding ahead of time. Asked after every final and tap,
+        not after a partial: a partial must not change it (it never changes the committed scene).
     svc.committed_prompt -> str or None; the current scene's prompt.
 
 The engine calls `handle` on one worker thread, in arrival order, never on the generation thread or event loop.
