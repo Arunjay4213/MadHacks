@@ -14,14 +14,20 @@ export const BURST_IDLE_MS = 600;
 
 // Typed text that ends like this is a sentence still being written ("a car," / "make it night and"),
 // so it is never sent on a pause, only on Enter: sending it would split one command into two.
+// Words that can END a real command ("start over", "undo it", "make it night slowly", "more snow" / "snow
+// more") are deliberately not here, or that command would never send on a pause (Greptile on #82).
 const CONNECTORS = new Set(['a', 'an', 'the', 'and', 'or', 'but', 'then', 'also', 'plus', 'with', 'on', 'in', 'into',
-  'onto', 'to', 'of', 'at', 'by', 'for', 'from', 'through', 'over', 'under', 'near', 'along', 'across', 'make', 'add',
-  'turn', 'remove', 'it', 'is', 'some', 'more', 'less', 'very', 'really', 'slowly', 'suddenly']);
+  'onto', 'to', 'of', 'at', 'by', 'for', 'from', 'through', 'under', 'near', 'along', 'across', 'make', 'add',
+  'turn', 'remove', 'is', 'some', 'very', 'really']);
 export function looksUnfinished(text) {
   const t = text.trim().toLowerCase();
   if (!t) return false;
   if (/[,;:\-–—]$/.test(t)) return true;
-  return CONNECTORS.has(t.split(/\s+/).pop().replace(/[^a-z']/g, ''));
+  const words = t.split(/\s+/).map((w) => w.replace(/[^a-z']/g, ''));
+  const last = words.at(-1);
+  // "it" ends "undo it" / "remove it", but "make it" / "turn it" are still waiting for what it becomes.
+  if (last === 'it') return ['make', 'turn', 'put', 'set'].includes(words.at(-2));
+  return CONNECTORS.has(last);
 }
 
 // How long typed text waits before it is sent as a command; null means wait for Enter.

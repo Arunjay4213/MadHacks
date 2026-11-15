@@ -208,7 +208,8 @@ test('looksUnfinished / finalizeDelay: a sentence still being typed is never sen
     assert.equal(finalizeDelay('typing', t), null, t);
     assert.equal(finalizeDelay('burst', t), null, t);
   }
-  for (const t of ['a car, car racing on a road', 'make it winter', 'go back', 'add a river.', 'undo']) {
+  for (const t of ['a car, car racing on a road', 'make it winter', 'go back', 'add a river.', 'undo',
+    'start over', 'make it night slowly', 'suddenly make it rain', 'make it snow more', 'less snow', 'snow less', 'undo it', 'remove it']) {
     assert.equal(looksUnfinished(t), false, t);
   }
   assert.equal(finalizeDelay('typing', 'make it winter'), 2500);

@@ -323,43 +323,55 @@ const transcriber = makeTranscriber(send);
 let rec = null;
 let listening = null; // what the user asked for: 'toggle' | 'ptt' | null
 let startedAt = 0;
+let startWhenEnded = false; // pressed again while the previous recognizer was still ending
 
 function startListening(mode) {
   if (!Recognition || listening) return;
   listening = mode;
-  begin();
   renderMic();
+  // The previous recognizer is still ending (its last words not sent yet): start the new one only
+  // after it has flushed, so a quick re-press never loses the held sentence or orphans a recognizer.
+  if (rec) startWhenEnded = true;
+  else begin();
 }
 
 function begin() {
-  rec = new Recognition();
-  rec.continuous = true;
-  rec.interimResults = true;
-  rec.lang = 'en-US';
+  const r = new Recognition();
+  rec = r;
+  r.continuous = true;
+  r.interimResults = true;
+  r.lang = 'en-US';
   transcriber.start({ hold: listening === 'ptt' }); // push-to-talk: one command per press
   startedAt = performance.now();
-  rec.onresult = (e) => transcriber.handle(Array.from(e.results, (r) => ({ transcript: r[0].transcript, isFinal: r.isFinal })));
-  rec.onerror = (e) => {
+  r.onresult = (e) => rec === r && transcriber.handle(Array.from(e.results, (x) => ({ transcript: x[0].transcript, isFinal: x.isFinal })));
+  r.onerror = (e) => {
     const text = micErrorText(e.error);
     if (!text) return;
     showError(text);
     listening = null; // a real failure: do not restart into it
+    startWhenEnded = false;
   };
-  rec.onend = () => {
+  r.onend = () => {
+    if (rec !== r) return; // an older recognizer: it no longer owns the page's state
     transcriber.flush(); // leftover interim text becomes one final, once
     rec = null;
+    if (startWhenEnded) {
+      startWhenEnded = false;
+      if (listening) return begin(); // the queued re-press
+    }
     // Chrome ends recognition by itself after a pause; keep listening while the mic toggle is on,
     // unless it ended at once (then restarting would just spin).
     if (listening === 'toggle' && performance.now() - startedAt > 500) return begin();
     listening = null;
     renderMic();
   };
-  rec.start();
+  r.start();
 }
 
 function stopListening(mode) {
   if (listening !== mode) return;
   listening = null; // so onend does not restart
+  startWhenEnded = false; // released before the queued start began: nothing to start
   renderMic();
   rec?.stop(); // onend flushes the last words
 }
