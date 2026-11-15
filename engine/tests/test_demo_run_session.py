@@ -81,12 +81,12 @@ def test_same_time_steps_get_their_own_t_client_and_reply(tmp_path, monkeypatch)
 
 def test_control_closing_mid_run_saves_the_partial_run_and_fails(tmp_path, monkeypatch, capsys):
     engine = TinyEngine(close_control_after=1)
-    script = {"end": 5.0, "steps": [{"at": 0.1, "say": "make it winter"}, {"at": 0.4, "say": "make it night"},
-                                    {"at": 0.8, "say": "add a lion"}]}
+    script = {"end": 8.0, "steps": [{"at": 0.1, "say": "make it winter"}, {"at": 5.0, "say": "make it night"},
+                                    {"at": 6.0, "say": "add a lion"}]}
     t = time.monotonic()
     code, report = play(tmp_path, monkeypatch, engine, script)
     assert code == 1
-    assert time.monotonic() - t < 3.0  # stopped early instead of waiting for the end
+    assert time.monotonic() - t < 2.0  # stopped at the close, not at the next step (5 s) or the end (8 s)
     assert report["complete"] is False
     assert any("/control connection closed" in r for r in report["failures"])
     assert [c["say"] for c in report["commands"]] == ["make it winter"]  # nothing sent after the close
