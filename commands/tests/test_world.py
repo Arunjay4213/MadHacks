@@ -149,6 +149,19 @@ class OverridesTest(unittest.TestCase):
                          "a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one "
                          "side, palm trees and green hills on the other side.")
 
+    def test_sunlit_time_drops_builtin_weather_that_is_not_sunlit(self):
+        snowy = change("snowy mountain road", "world", ISHAAN["snowy mountain road"])
+        trees = ("a snowy mountain road. Pine forests covered in thick white snow line both sides, high snowbanks "
+                 "along the edges of the road")
+        for label in ("day", "noon"):
+            self.assertEqual(world_with_overrides(snowy, [snowy, change(label, "time")]), trees + ".")
+        # An explicit weather change says the weather itself: day + snow keeps the falling snow, not the overcast light.
+        self.assertEqual(world_with_overrides(snowy, [snowy, change("day", "time"), change("snow", "weather")]),
+                         trees + ", snowflakes falling.")
+        city = change("neon city", "world", ISHAAN["neon city"])
+        self.assertNotIn("light rain falling", world_with_overrides(city, [city, change("day", "time")]))
+        self.assertIn("light rain falling", world_with_overrides(city, [city, change("day", "time"), change("rain", "weather")]))
+
     def test_unknown_world_phrase_is_left_literal(self):
         custom = change("old harbour", "world", "the old harbour.")
         self.assertEqual(world_with_overrides(custom, [custom, change("night", "time")]), "the old harbour.")

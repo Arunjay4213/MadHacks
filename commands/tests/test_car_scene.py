@@ -95,6 +95,23 @@ class CarSceneTest(unittest.TestCase):
         self.assertNotIn("Cold blue overcast winter light", prompt)
         self.assertTrue(prompt.endswith(STYLE))
 
+    def test_sunny_on_the_snowy_road_replaces_the_light_and_one_undo_restores(self):
+        sunny_winter = (HEAD + "a snowy mountain road" + CAMERA + "Pine forests covered in thick white snow line both "
+                        "sides, high snowbanks along the edges of the road. Bright winter sunshine in a clear blue sky, "
+                        "sparkling snow, crisp shadows." + STYLE)
+        for sentence in ["sunny", "make it day", "make it sunny"]:
+            with self.subTest(sentence=sentence):
+                service = car_service()
+                final(service, "make it winter")
+                self.assertEqual(service.committed_prompt, WINTER)
+                result = final(service, sentence)
+                self.assertFalse(result["state"]["unmatched"])
+                self.assertEqual([c["label"] for c in result["state"]["changes"]], ["winter", "day"])
+                self.assertEqual(service.committed_prompt, sunny_winter)
+                final(service, "undo")
+                self.assertEqual(service.committed_prompt, WINTER)
+                self.assertEqual([c["label"] for c in service.state_fields()["changes"]], ["winter"])
+
     def test_meadow_winter_is_unchanged(self):
         service = CommandService(semantic_reader=lambda *a: None)
         final(service, "make it winter")
