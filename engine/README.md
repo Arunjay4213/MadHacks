@@ -550,7 +550,9 @@ So a new sentence costs about 1.8 s extra, and a pinned or cached sentence costs
 - Road words in details are used only when the scene has a road: on GPU the oak meadow grew a road or tyre tracks from them.
 - Content block: a short word list (`BLOCKED_WORDS`) is checked first with no call, and the model sets `blocked: true` for sexual, violent or hateful requests.
   A blocked final gives no steer: the words show as unmatched, and one log line says why.
-- A timeout (`--final-timeout-s`, 3.0 s), a failed call or a reply that does not validate keeps the keyword table's result and the short prompt.
+- A timeout (`--final-timeout-s`, 3.0 s), a failed call or a reply that does not validate keeps the keyword table's result.
+  On a scene without a vehicle the prompt is then the short composed prompt.
+  On a vehicle scene the fallback still gets the car template (PR #238): the road, scene and light on screen are kept unless the sentence changed the world, season, weather or time, new objects become object sentences, and an undo back to that state gives the same words.
 - The cache is keyed by (composed prompt before the sentence, sentence).
   A Sonnet result or a block is chosen once and saved to `--final-cache` (JSON, written atomically, tied to a fingerprint of the system prompt and the model), so a restart gives the same result and nothing is regenerated.
   A fallback is final for that key for the life of the process, and an answer that arrives after the wait is dropped (`late_dropped`); fallbacks are not saved, so a passing outage does not disable a sentence for good.
