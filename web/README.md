@@ -30,13 +30,13 @@ The layout is the "Cue" design (placeholder name): one white window on a pale bl
 - Banners under the header: the video notice (connecting, connection lost, paused) and the error message.
 - The voice line under the video, the words in orange quotes:
   - nothing yet: "Say something";
-  - speech coming in: five blue voice bars, the settled words, the not-yet-final words in grey and a blue caret. The bars follow the real mic level while push-to-talk is held (a Web Audio analyser on its own short-lived mic stream, read once per animation frame and released on release); for Wispr Flow dictation or the Live mic they play a gentle wave;
+  - speech coming in: five blue voice bars, the settled words, the not-yet-final words in grey and a blue caret. The bars follow the real mic level while push-to-talk is held (a Web Audio analyser on its own short-lived mic stream, read once per animation frame and released on release); for Wispr Flow dictation they play a gentle wave;
   - typing: just the words, no bars;
   - a final the server understood: a green tick; one it did not: an amber "!" and "· Didn't catch that". Partial words never get the tick.
   With reduced motion on, the bars are static and the level meter does not run.
-- The controls row: Undo and Reset on the left, the big Hold to talk mic in the centre (its outer ring grows with your voice while held), Live mic (browser) and Full screen on the right. Every button has a tooltip with its shortcut; the mic's says "Hold to talk (`) · Wispr: Ctrl".
-- The type field under it, with a send button.
-- Full screen: the video fills the screen; the voice line and the controls float at the bottom on a white card; the header is hidden, and the type field is hidden visually but keeps focus, so Wispr Flow (Ctrl) still types into it and its words show on the card.
+- The controls row: Undo and Reset on the left, the big Hold to talk mic in the centre (its outer ring grows with your voice while held), Keyboard and Full screen on the right. Every button has a tooltip with its shortcut; the mic's says "Hold to talk (`) · Wispr: Ctrl".
+- The type box, hidden until you click Keyboard (or start typing): then it fades in under the controls with a send button, and stays open after a send. Keyboard again, or Esc while it is empty, hides it. Hidden, it is still focused (never `display: none`), so Wispr Flow (Ctrl) always types into it; dictation shows on the voice line and does not open the box.
+- Full screen: the video fills the screen; the voice line and the controls float at the bottom on a white card; the header is hidden; the type box stays focused there too, so Wispr Flow (Ctrl) still types into it and its words show on the card, and Keyboard opens the box on the card.
 - Phone width: everything stacks, the video goes full width, the chips scroll sideways and the page may scroll.
 
 ## Controls and keys
@@ -47,7 +47,7 @@ The layout is the "Cue" design (placeholder name): one white window on a pale bl
 | Typing pause of 2.5 s | Sends the sentence, unless it looks unfinished (ends in a comma, "and", "a", "on", "make it" and similar); then it waits for Enter. Endings like "start over", "undo it", "slowly" and "more" send normally (PR #114). |
 | Wispr Flow: hold Ctrl, speak, release | The sentence lands in the text box and is sent at once. Dictation that arrives in quick bursts shows the voice wave until it is sent. |
 | Hold to talk, or hold the backtick key (`` ` ``, under Esc) | Push-to-talk: words show while you speak, and one press is one command. It is sent once the words have not changed for 200 ms (see below), or on release, whichever comes first. A quick second press records at once, and commands reach the server in the order you pressed (PR #114). |
-| Live mic (browser), right group | Chrome's live mic: keeps listening hands-free until clicked again (the old Mic button). A web page cannot start Wispr Flow; Wispr is always Ctrl. |
+| Keyboard, right group | Shows or hides the type box (`aria-expanded`). Typing printable characters also opens it. The separate hands-free browser-mic toggle was removed on purpose (owner's decision): Wispr Flow is Ctrl, hold-to-talk is the big mic or backtick. |
 | Undo | Steps back one change. |
 | × on a chip | Removes that change only. |
 | Reset, or Option+R / Alt+R | Goes back to the starting scene and starts a new video. |
@@ -58,7 +58,7 @@ Speech while disconnected is dropped, never replayed.
 ### Spoken commands finish after 200 ms of unchanged words (issue #188)
 
 Chrome waits about 0.5 to 1 s of silence before it marks speech final, and the engine acts only on finals.
-So the mic (Live mic and push-to-talk, not the text box or Wispr Flow) sends the words as the command once they have not changed for 200 ms (`SPEECH_STABLE_MS` in `lib.js`).
+So push-to-talk (not the text box or Wispr Flow) sends the words as the command once they have not changed for 200 ms (`SPEECH_STABLE_MS` in `lib.js`).
 Words that end like an unfinished sentence ("make it", "... and", "add a", a comma) wait, the same rule as typing (`looksUnfinished`).
 When Chrome's own final arrives later it is dropped if it has the same words (case and punctuation aside).
 If it adds words ("make it winter" then "make it winter at night"), only the new words are sent ("at night").
@@ -101,7 +101,7 @@ On 2026-11-14 the lead named Lucid Studio the judges' page "for now" with `web/`
 
 1. Open `https://<tunnel address>/app/` in Chrome and allow the microphone the first time Chrome asks.
 2. Press Full screen.
-3. Speak with Wispr Flow (Ctrl), push-to-talk, or the Live mic, or type.
+3. Speak with Wispr Flow (Ctrl) or push-to-talk, or type (Keyboard).
 4. Fix mistakes with Undo, the × on a chip, or Reset.
 5. Read the screen: the chips are the changes the server holds, the voice line says what was heard and understood (tick or "Didn't catch that"), and the status capsule is the delay.
 
