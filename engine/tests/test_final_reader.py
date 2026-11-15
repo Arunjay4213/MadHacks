@@ -176,8 +176,9 @@ def test_cached_operations_must_still_fit_the_scene():
     chat = FakeChat({"remove it": reply([{"op": "remove", "id": lion_id}], "")})
     r = reader(chat)
     assert r("remove it", s)["operations"] == [{"op": "remove", "id": lion_id}]
-    other = dict(s, changes=[dict(s["changes"][0], id="c9")])  # same prompt, other id
-    assert r("remove it", other) is None
+    other = dict(s, changes=[dict(s["changes"][0], id="c9")])  # the same scene, the lion has another id
+    assert r("remove it", other)["operations"] == [{"op": "remove", "id": "c9"}]
+    assert len(chat.calls) == 1
 
 
 def test_prompt_spec_prefers_commands_rewriter(monkeypatch):

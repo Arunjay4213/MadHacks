@@ -98,6 +98,10 @@ class Entry:
     outcome: Outcome
     operations: tuple = ()
     prompt: str | None = None
+    # The scene the operations were made for ({"base", "changes"} with ids). The key holds only its composed
+    # prompt, which leaves out zero-strength chips and sorts changes by kind; a hit is used only on this same scene,
+    # with its change ids mapped to the live ones (scene_ids). None: an entry with no operations to map.
+    scene_before: dict | None = None
 
     def result(self) -> dict | None:
         if self.outcome in (Outcome.SONNET, Outcome.PINNED, Outcome.TEMPLATE):
@@ -105,6 +109,21 @@ class Entry:
         if self.outcome is Outcome.BLOCKED:
             return {"blocked": True}
         return None
+
+
+def scene_record(snapshot: dict) -> dict:
+    """The part of a snapshot a cached entry is tied to: the base and the changes in order, with their ids."""
+    return {"base": snapshot["base"], "changes": [{k: c[k] for k in ("id", "label", "kind", "phrase", "strength")}
+                                                  for c in snapshot["changes"]]}
+
+
+def scene_ids(before: dict, snapshot: dict) -> dict[str, str] | None:
+    """{id in `before`: id in `snapshot`} when both are the same scene (base, and every change's label, kind,
+    phrase and strength in the same order); None when they differ."""
+    shape = lambda s: (s["base"], [(c["label"], c["kind"], c["phrase"], c["strength"]) for c in s["changes"]])
+    if shape(before) != shape(snapshot):
+        return None
+    return {b["id"]: c["id"] for b, c in zip(before["changes"], snapshot["changes"])}
 
 
 def blocked_word(text: str) -> str | None:
@@ -569,15 +588,18 @@ class CacheFile:
                 outcome = Outcome(e["outcome"])
                 if outcome not in (Outcome.SONNET, Outcome.BLOCKED):
                     continue
+                scene = e.get("scene_before")
+                if outcome is Outcome.SONNET and not isinstance(scene, dict):
+                    continue  # written before entries kept their scene: its ids cannot be mapped
                 out[(e["prompt_before"], e["sentence"])] = Entry(
-                    outcome, tuple(e.get("operations") or ()), e.get("prompt"))
+                    outcome, tuple(e.get("operations") or ()), e.get("prompt"), scene)
             except (KeyError, TypeError, ValueError):
                 continue
         return out
 
     def save(self, cache: dict[tuple[str, str], Entry]) -> None:
         entries = [{"prompt_before": k[0], "sentence": k[1], "outcome": v.outcome.value,
-                    "operations": list(v.operations), "prompt": v.prompt}
+                    "operations": list(v.operations), "prompt": v.prompt, "scene_before": v.scene_before}
                    for k, v in cache.items() if v.outcome in (Outcome.SONNET, Outcome.BLOCKED)]
         with self._lock:
             try:
@@ -649,8 +671,8 @@ def load_pinned(path: str | Path | None) -> dict[tuple[str, str], Entry]:
         except Exception as exc:  # noqa: BLE001 - skip the entry, keep the others
             log.warning("final reader: demo prompt %d (%r) skipped: %r", n, _short(e.get("sentence") if isinstance(e, dict) else e), exc)
             continue
+        pinned[(before, sentence)] = Entry(Outcome.PINNED, tuple(ops), prompt, scene_record(scene.snapshot()))
         scene = trial
-        pinned[(before, sentence)] = Entry(Outcome.PINNED, tuple(ops), prompt)
     log.info("final reader: %d of %d demo prompts pinned from %s", len(pinned), len(entries), path)
     return pinned
 
@@ -726,18 +748,13 @@ class FinalReader:
         from commands.composer import compose  # the commands/ owner's composer; imported only when ON
         key = (compose(snapshot), text)
         with self._lock:
-            entry = self._pinned.get(key)
-            if entry is not None:
-                self.pinned_hits += 1
-            else:
-                entry = self._cache.get(key)
-                if entry is not None:
-                    self.cache_hits += 1
-        if entry is not None:
-            result = self._from_cache(key, entry, snapshot)
-            if result is not None:
-                self._given(entry, snapshot)
-            return result
+            pinned, cached = self._pinned.get(key), self._cache.get(key)
+        for found, counter in ((pinned, "pinned_hits"), (cached, "cache_hits")):
+            hit = self._from_cache(key, found, snapshot) if found is not None else None
+            if hit is not None:
+                with self._lock:
+                    setattr(self, counter, getattr(self, counter) + 1)
+                return self._given(hit, snapshot)
         measured = self._measured(text, snapshot)
         if measured is not None:
             with self._lock:
@@ -755,6 +772,8 @@ class FinalReader:
             if late:
                 self.timeouts += 1
                 entry = Entry(Outcome.FALLBACK)
+            if entry.outcome is Outcome.SONNET:
+                entry = dataclasses.replace(entry, scene_before=scene_record(snapshot))
             self._cache[key] = entry
             if entry.outcome is Outcome.BLOCKED:
                 self.blocked += 1
@@ -831,13 +850,21 @@ class FinalReader:
         log.info("final reader: %r -> measured car world %r, no call", _short(text), plan.world.name)
         return Entry(Outcome.TEMPLATE, tuple(ops), prompt)
 
-    def _from_cache(self, key, entry: Entry, snapshot: dict) -> dict | None:
-        """A cached SONNET or PINNED result's operations name change ids; check they still fit this snapshot."""
+    def _from_cache(self, key, entry: Entry, snapshot: dict) -> Entry | None:
+        """The cached or pinned `entry` for `snapshot`, or None when it does not apply (a miss: the sentence is read
+        again). A SONNET or PINNED entry applies only to the scene it was made for (scene_ids), with its change
+        ids mapped to the live ones, and only when every operation still validates. BLOCKED and FALLBACK apply."""
         if entry.outcome not in (Outcome.SONNET, Outcome.PINNED):
-            return entry.result()
-        if all(validate_operation(dict(op), snapshot, CACHED_MAX_PHRASE) == dict(op) for op in entry.operations):
-            return entry.result()
-        log.info("final reader: the cached operations for %r no longer fit the scene; dictionary path", _short(key[1]))
+            return entry
+        ids = scene_ids(entry.scene_before, snapshot) if entry.scene_before is not None else None
+        if ids is None:
+            log.info("final reader: the saved result for %r was made for another scene with the same prompt; "
+                     "reading it again", _short(key[1]))
+            return None
+        ops = tuple({**op, "id": ids[op["id"]]} if "id" in op else dict(op) for op in entry.operations)
+        if all(validate_operation(dict(op), snapshot, CACHED_MAX_PHRASE) == dict(op) for op in ops):
+            return dataclasses.replace(entry, operations=ops, scene_before=scene_record(snapshot))
+        log.info("final reader: the cached operations for %r no longer fit the scene; reading it again", _short(key[1]))
         return None
 
     def _call(self, text: str, snapshot: dict) -> Entry | None:
