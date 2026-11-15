@@ -13,7 +13,7 @@ import sys
 
 from commands.composer import compose
 from commands.state import DEFAULT_BASE, SceneState
-from engine import final_reader as fr
+from engine import car_template, final_reader as fr
 
 PATH = "engine/demo_prompts.json"
 
@@ -53,6 +53,10 @@ def main(argv: list[str]) -> int:
                           "canonical": compose(trial.snapshot()), "source": "claude-sonnet-5-5",
                           "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")})
                 print(f"   NEW: {res['prompt']}")
+        elif regen and car_template.vehicle_subject(trial.snapshot()["base"]) is not None:
+            # As live: the reader is told the road, scene and light last given for a vehicle scene, so an entry
+            # asked again after an unchanged one keeps that entry's fog or light.
+            reader._given_vehicle[after] = e["prompt"]
         scene = trial
     print(f"{drifted} of {len(entries)} entries drifted")
     if regen:
