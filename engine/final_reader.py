@@ -361,9 +361,11 @@ def load_pinned(path: str | Path | None) -> dict[tuple[str, str], Entry]:
     {"sentence", "prompt_before", "operations": [op, ...], "prompt"} (other keys, such as "canonical", "model" or
     "fingerprint", are notes and ignored). The entries are replayed in order on a commands.state.SceneState that
     starts at `base` (commands.state.DEFAULT_BASE for the list form). An entry whose
-    prompt_before is the composed prompt of the base starts again from the base (a reset came before it).
-    An entry is skipped, with a log line, when its prompt_before is not the composed prompt of the replayed
-    scene, its operations do not apply (checked_operations, then one batch), or its prompt is not text.
+    prompt_before is the composed prompt of the base starts again from the base (a reset came before it). An entry
+    whose prompt_before is an earlier scene of the file (not the one the entry before it leads to) is read on that
+    scene: a spoken variant of a step ("make it snow" beside "make it winter") follows the step it varies.
+    An entry is skipped, with a log line, when its prompt_before is no scene the entries before it reached, its
+    operations do not apply (checked_operations, then one batch), or its prompt is not text.
     """
     if path is None:
         return {}
@@ -391,6 +393,7 @@ def load_pinned(path: str | Path | None) -> dict[tuple[str, str], Entry]:
         return {}
     pinned: dict[tuple[str, str], Entry] = {}
     scene = SceneState(base)
+    scenes: dict[str, SceneState] = {}  # composed prompt -> the first replayed scene with it, for variants
     for n, e in enumerate(entries):
         try:
             sentence, before, prompt = e["sentence"], e["prompt_before"], e["prompt"]
@@ -398,8 +401,11 @@ def load_pinned(path: str | Path | None) -> dict[tuple[str, str], Entry]:
                 raise ValueError("sentence, prompt_before and prompt must be nonempty text")
             if before == start:
                 scene = SceneState(base)
-            if compose(scene.snapshot()) != before:
-                raise ValueError("prompt_before is not the scene the entries before it lead to")
+            elif compose(scene.snapshot()) != before:
+                if before not in scenes:
+                    raise ValueError("prompt_before is no scene the entries before it reached")
+                scene = scenes[before]
+            scenes.setdefault(before, scene)
             ops = checked_operations(e["operations"], scene.snapshot()) if isinstance(e["operations"], list) else None
             if not ops:
                 raise ValueError("the operations are not valid for that scene")
@@ -411,6 +417,7 @@ def load_pinned(path: str | Path | None) -> dict[tuple[str, str], Entry]:
             continue
         pinned[(before, sentence_key(sentence))] = Entry(Outcome.PINNED, tuple(ops), prompt, scene_record(scene.snapshot()))
         scene = trial
+        scenes.setdefault(compose(trial.snapshot()), trial)
     log.info("final reader: %d of %d demo prompts pinned from %s", len(pinned), len(entries), path)
     return pinned
 
