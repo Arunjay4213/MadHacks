@@ -70,9 +70,19 @@ Repeating the current world still clears a later season.
 "turn the tree into a lighthouse" names one object, not the whole scene, so it is not a world change: it is left to the engine's final reader.
 
 The known places are in `world.py`: country road, desert, snowy mountain road, neon city, ocean coast (also "beach" and "sea"), Mars, forest and meadow.
-The first six are Ishaan's tested sentences, word for word; forest was added at the lead's request, and meadow lets "take me back to the meadow" return to the oak scene.
+The first six are Ishaan's tested sentences, word for word (country road is the world of his tested car prompt); forest was added at the lead's request, and meadow lets "take me back to the meadow" return to the oak scene.
 A later season, weather or time change removes the matching built-in part of the world sentence (for example the desert's afternoon sun after "make it night").
 An arbitrary custom base that mixes an unknown world with subjects is rejected rather than edited by unsafe text surgery.
+
+## The car scene (road scenes)
+
+`world.CAR_BASE` is the car scene: Ishaan's measured car template (board #6886548029) on the country road.
+A base that is that template for any known world is a road scene (`world.is_road_scene`).
+On a road scene the composer always writes the template: the subject sentence with the road, the camera sentence, one sentence per object, the scene and light of the world, one sentence per season, weather or time phrase, then the style sentence "Cinematic, highly detailed, realistic, sharp focus, motion blur on the road."
+The style sentence is used only on road scenes, because on the meadow it grew a road.
+Ishaan measured that appending a season to the car prompt does not change the picture, so on a road scene a winter season ("make it winter", "make it snowy") is shown as the snowy mountain road world.
+The state still holds a season change labelled winter, so one undo or removing the chip goes back to the earlier world, and "make it a desert" after it clears it as usual.
+On the meadow, winter is still the season phrase.
 
 ## Multiple commands per sentence
 
