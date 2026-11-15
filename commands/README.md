@@ -74,6 +74,7 @@ The first six are Ishaan's tested sentences, word for word (country road is the 
 A later season, weather or time change removes the matching built-in part of the world sentence (for example the desert's afternoon sun after "make it night").
 A sunlit time ("sunny", "make it day", "noon") also removes built-in weather that is not sunlit, such as overcast light, rain or falling snow, unless a weather change names the weather itself.
 A world can word such a change in its own light sentence: on the snowy mountain road "sunny" becomes "Bright winter sunshine in a clear blue sky, sparkling snow, crisp shadows." in place of the overcast winter light, and the snowy road and forest stay.
+That sentence belongs to winter, so after an explicit change to another season ("make it summer") a later "make it day" uses the plain daylight phrase and never brings winter back.
 The state only gains a `day` change, so one undo brings the overcast light back.
 An arbitrary custom base that mixes an unknown world with subjects is rejected rather than edited by unsafe text surgery.
 

@@ -39,7 +39,7 @@ def _phrases(changes, world_change=None):
     for change in sorted(changes, key=lambda c: KINDS.index(c['kind'])):
         if change['kind'] == 'world' or change['strength'] == 0:
             continue
-        phrase = strength_phrase(change_wording(world_change, change), change['strength'])
+        phrase = strength_phrase(change_wording(world_change, change, changes), change['strength'])
         (extras if change['kind'] == 'extra' else modifiers).append(phrase)
     return extras, modifiers
 
