@@ -25,18 +25,18 @@ Its wire format follows `contracts/README.md`.
 
 The layout is the "Cue" design (placeholder name): one white window on a pale blue page, everything in one centred column.
 
-- Header: "Cue · Say it. See it." on the left (plus a "Mock server" badge when the server is the fake one); on the right the status capsule. Connected, it is green and shows the delay ("0.9 s": the time from your command to the first frame of the chunk it applies to, "Live" until a command has been measured; an unmatched command is never measured), with the server's stage stamps on hover. Otherwise it is amber "Reconnecting…" (or "Connecting…" before the first connection) or grey "Offline" after about 8 s of failed retries.
+- Header: "Cue · Say it. See it." on the left (plus a "Mock server" badge when the server is the fake one); on the right the status capsule. Connected, it shows the delay ("0.9 s": the time from your command to the first frame of the chunk it applies to, "Live" until a command has been measured; an unmatched command is never measured), green, amber over 1.5 s, red over 3 s, with the server's stage stamps on hover. Otherwise it is amber "Reconnecting…" (or "Connecting…" before the first connection) or grey "Offline" after about 8 s of failed retries.
 - The video on a pale blue mat, at the engine's 672x384 shape, never cropped or stretched. The chips sit on it at the top left, one per change the server holds, each with a × to remove it, in blue, red and amber in the order the changes first appeared.
 - Banners under the header: the video notice (connecting, connection lost, paused) and the error message.
 - The voice line under the video, the words in orange quotes:
   - nothing yet: "Say something";
-  - speech coming in: five blue voice bars, the settled words, the not-yet-final words in grey and a blue caret. The bars follow the real mic level while push-to-talk is held (a Web Audio analyser on its own short-lived mic stream, read once per animation frame and released on release); for Wispr Flow dictation or the toggle mic they play a gentle wave;
+  - speech coming in: five blue voice bars, the settled words, the not-yet-final words in grey and a blue caret. The bars follow the real mic level while push-to-talk is held (a Web Audio analyser on its own short-lived mic stream, read once per animation frame and released on release); for Wispr Flow dictation or the Live mic they play a gentle wave;
   - typing: just the words, no bars;
   - a final the server understood: a green tick; one it did not: an amber "!" and "· Didn't catch that". Partial words never get the tick.
   With reduced motion on, the bars are static and the level meter does not run.
-- The controls row: Undo and Reset on the left, the big Hold to talk mic in the centre (its outer ring grows with your voice while held), Wispr dictation and Full screen on the right. Every button has a tooltip with its shortcut.
+- The controls row: Undo and Reset on the left, the big Hold to talk mic in the centre (its outer ring grows with your voice while held), Live mic (browser) and Full screen on the right. Every button has a tooltip with its shortcut; the mic's says "Hold to talk (`) · Wispr: Ctrl".
 - The type field under it, with a send button.
-- Full screen: the video fills the screen; the voice line and the controls float at the bottom on a white card; the header and type field are hidden.
+- Full screen: the video fills the screen; the voice line and the controls float at the bottom on a white card; the header is hidden, and the type field is hidden visually but keeps focus, so Wispr Flow (Ctrl) still types into it and its words show on the card.
 - Phone width: everything stacks, the video goes full width, the chips scroll sideways and the page may scroll.
 
 ## Controls and keys
@@ -47,7 +47,7 @@ The layout is the "Cue" design (placeholder name): one white window on a pale bl
 | Typing pause of 2.5 s | Sends the sentence, unless it looks unfinished (ends in a comma, "and", "a", "on", "make it" and similar); then it waits for Enter. Endings like "start over", "undo it", "slowly" and "more" send normally (PR #114). |
 | Wispr Flow: hold Ctrl, speak, release | The sentence lands in the text box and is sent at once. Dictation that arrives in quick bursts shows the voice wave until it is sent. |
 | Hold to talk, or hold the backtick key (`` ` ``, under Esc) | Push-to-talk: words show while you speak, and one press is one command. It is sent once the words have not changed for 200 ms (see below), or on release, whichever comes first. A quick second press records at once, and commands reach the server in the order you pressed (PR #114). |
-| Wispr dictation button (right group) | Chrome's live mic: keeps listening hands-free until clicked again (the old Mic button). |
+| Live mic (browser), right group | Chrome's live mic: keeps listening hands-free until clicked again (the old Mic button). A web page cannot start Wispr Flow; Wispr is always Ctrl. |
 | Undo | Steps back one change. |
 | × on a chip | Removes that change only. |
 | Reset, or Option+R / Alt+R | Goes back to the starting scene and starts a new video. |
@@ -58,7 +58,7 @@ Speech while disconnected is dropped, never replayed.
 ### Spoken commands finish after 200 ms of unchanged words (issue #188)
 
 Chrome waits about 0.5 to 1 s of silence before it marks speech final, and the engine acts only on finals.
-So the mic (the Wispr dictation button and push-to-talk, not the text box or Wispr Flow itself) sends the words as the command once they have not changed for 200 ms (`SPEECH_STABLE_MS` in `lib.js`).
+So the mic (Live mic and push-to-talk, not the text box or Wispr Flow) sends the words as the command once they have not changed for 200 ms (`SPEECH_STABLE_MS` in `lib.js`).
 Words that end like an unfinished sentence ("make it", "... and", "add a", a comma) wait, the same rule as typing (`looksUnfinished`).
 When Chrome's own final arrives later it is dropped if it has the same words (case and punctuation aside).
 If it adds words ("make it winter" then "make it winter at night"), only the new words are sent ("at night").
@@ -101,7 +101,7 @@ On 2026-11-14 the lead named Lucid Studio the judges' page "for now" with `web/`
 
 1. Open `https://<tunnel address>/app/` in Chrome and allow the microphone the first time Chrome asks.
 2. Press Full screen.
-3. Speak with Wispr Flow, push-to-talk or the Wispr dictation button, or type.
+3. Speak with Wispr Flow (Ctrl), push-to-talk, or the Live mic, or type.
 4. Fix mistakes with Undo, the × on a chip, or Reset.
 5. Read the screen: the chips are the changes the server holds, the voice line says what was heard and understood (tick or "Didn't catch that"), and the status capsule is the delay.
 
