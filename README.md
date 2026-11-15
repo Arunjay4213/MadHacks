@@ -91,6 +91,7 @@ Add an object to `cases`:
 - `slow`: true when a pace word must make the change gradual.
 - `strength`: `{"winter": "up"}` or `"down"` against the step before, or `"low"`, `"full"`, `"high"` against 1.
 - `visible`: yes/no questions about the frame, for Layer B; a plain string expects yes.
+- `known_failure` on a step: a reason the team decided not to fix it (for example "slow changes are not used in the demo"); Layer B then reports a failing frame as a known failure, apart from the count.
 - `live: true` puts the case in the Layer B run; `modes` limits Layer A to `sonnet` or `dictionary`.
 - Write what the user asked for, never what the code prints today.
   When the code is wrong, add `"xfail": {"sonnet": "bug: ..."}` (or `dictionary`) to that case only.
