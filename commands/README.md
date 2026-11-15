@@ -94,7 +94,7 @@ On the meadow, winter is still the season phrase.
 Explicit actions can be joined by and, then or a semicolon, and unambiguous noun lists can repeat an action ("add a dog and a cat").
 Descriptions such as "black and white" stay one phrase.
 "add snow near the river" adds only snow, and "add a dog and stop the rain" adds the dog and removes the rain.
-Words after the first preposition are a location for every verb, so "make it snow near the river" adds snow even when a river is present.
+Words after a preposition are a location for every verb, so "make it snow near the river" adds snow even when a river is present, and "turn it to night near the river" sets night.
 After an add verb, "without" starts a removal: "add a dog without the rain" adds the dog and removes the rain.
 A rejected clause rolls back the whole sentence, including any provisional guess.
 A sentence is limited to 16 operations, and nested batches are rejected.

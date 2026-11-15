@@ -116,16 +116,20 @@ def _pick(t: str):
     Adjective-like aliases ("bright", "dark", "snowy") name a time or weather change on their own,
     but in "add a bright red car" or "add dark clouds" the object is what the speaker means.
     Words after the first preposition are a location: in "make it snow near the river" the change is snow,
-    not the river. Without an add verb the location is searched only when nothing comes before it ("turn it to night").
+    not the river. Without an add verb the phrases between prepositions are searched in order and the first one
+    that names a change wins: "turn it to night near the river" is night ("turn it" names nothing, "night" does).
     """
     add = _ADD_RX.search(t)
     if add:
-        start, end = add.start(2), add.start(2) + len(_PREP_RX.split(add.group(2), maxsplit=1)[0])
+        end = add.start(2) + len(_PREP_RX.split(add.group(2), maxsplit=1)[0])
+        matches = list(KEYWORD_RX.finditer(t, add.start(2), end))
     else:
-        start, end = 0, len(_PREP_RX.split(t, maxsplit=1)[0])
-    matches = list(KEYWORD_RX.finditer(t, start, end))
-    if not matches and not add:
-        matches = list(KEYWORD_RX.finditer(t))
+        cuts = [0] + [i for p in _PREP_RX.finditer(t) for i in p.span()] + [len(t)]
+        matches = []
+        for start, end in zip(cuts[::2], cuts[1::2]):
+            matches = list(KEYWORD_RX.finditer(t, start, end))
+            if matches:
+                break
     for m in matches:
         if KEYWORDS[m.group(0)]["kind"] == "extra":
             return m

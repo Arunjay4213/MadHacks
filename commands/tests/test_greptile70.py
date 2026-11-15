@@ -24,6 +24,11 @@ class LocationDoesNotReplaceTheEditTest(unittest.TestCase):
     def test_change_named_only_after_a_preposition_still_works(self):
         self.assertEqual(say("turn it to night"), ["night"])
 
+    def test_change_after_a_preposition_beats_a_later_location(self):
+        self.assertEqual(say("turn it to night near the river"), ["night"])
+        self.assertEqual(say("add a river", "turn it to night near the river"), ["river", "night"])
+        self.assertEqual(say("add a dog", "set it to night with the dog"), ["dog", "night"])
+
 
 class WithoutIsARemovalTest(unittest.TestCase):
     def test_add_a_dog_without_the_rain_does_both(self):
