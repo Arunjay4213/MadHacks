@@ -112,7 +112,7 @@ After `keep=0` that latent is a first-frame latent, which the Wan VAE normally d
 Expect a short (about 0.25 s) blend or near-freeze, and possibly a one-chunk brightness or colour pop; this has not been looked at on the GPU yet.
 
 Automatic mode, for the live server with no engine change (`--backend-opt k=v`): `steer_rebase=1` fires on the first chunk whose cond differs from the previous one (`steer_fire_on_change=1`, default) and again when the cond stops changing (the end of a ramp), never on the first chunk of a video and never within `steer_min_gap` chunks (8) of the last rebase or reset; it uses `steer_keep` (3), `steer_memory_noise` (0) and `steer_anchor_step` (-1 = none). `refresh_every=N` (0 = off) rebases with `refresh_keep` (6) and `refresh_memory_noise` (0) every N chunks to keep positions small. An explicit `rebase=` always wins for that chunk.
-Counters for logs and tests: `rebases`, `recached_frames`, `auto_rebases`, `last_rebase`; `first_frame_steps` and `anchor_step_for_strength(s)` map a 0..1 strength to an anchor step.
+Counters for logs and tests: `rebases`, `recached_frames`, `auto_rebases`, `last_rebase` (with `last_rebase.steer` set when a steer option shaped the chunk, see "Steer start"); `first_frame_steps` and `anchor_step_for_strength(s)` map a 0..1 strength to an anchor step.
 With everything off, the calls, the RNG draws and their order are exactly as before (checked by `engine/tests/test_causal_forcing.py` against a recording of the old code).
 The experiment driver is `python -m steering.eval.follow_probe` (see `steering/eval/README.md`).
 
@@ -200,7 +200,7 @@ Still open: each refresh snaps the composition back to the clean anchor (on the 
 Live (`cut_fade_frames=8`, static parked-car scene) every 6 s refresh gave a different composition: the car moved, the snow layout changed.
 The cause is the refresh noise. Step 2 of the first-frame schedule is warped t = 833 (sigma about 0.83), and each refresh drew fresh noise, so each refresh was a new sample near the clean anchor.
 The anchor itself does not walk: in every run below each refresh used the clean anchor saved at chunk 3.
-Fix: backend option `refresh_noise` (default now `fixed`; `fresh` is the old behaviour). A refresh from the clean anchor draws its start noise and its in-step noise from a generator seeded by the anchor (video id and the anchor's chunk), so every refresh from one anchor gives the same picture; a steer makes a new anchor and so new noise. Steers and normal chunks still use the main noise stream.
+Fix: backend option `refresh_noise` (default now `fixed`; `fresh` is the old behaviour). A refresh from the clean anchor draws its start noise and its in-step noise from a generator seeded by the video's seed and the anchor's chunk (`(1000003 * video_seed + anchor_chunk) mod 2^64`), so every refresh from one anchor gives the same picture; a steer makes a new anchor and so new noise. Steers and normal chunks still use the main noise stream.
 A second option, `refresh_anchor_t` (None by default; 1-1000, the config's unwarped scale, 500 = step 2, 250 = step 3), noises the anchor to a chosen level instead of the strength's step.
 
 Measured (360 chunks, refresh every 24, `cut_fade_frames=8`, no commands; "re-roll" = mean absolute difference between the frame 1 s after a refresh and the frame 1 s after the previous refresh, against the change over 1 s elsewhere; car shift = movement of the red car's centroid between those frames, 672x384 px):
@@ -216,6 +216,46 @@ Measured (360 chunks, refresh every 24, `cut_fade_frames=8`, no commands; "re-ro
 
 With fixed noise the refresh-to-refresh change on the static scene is the same as normal motion, and the composition holds for the whole 90 s (`engine/samples/refresh_noise_fixed_parked.jpg` against `refresh_noise_fresh_parked.jpg`; the car scene: `refresh_noise_fixed_car.jpg`). A lower level alone does not fix it, and t = 250 drifts on a moving scene (`refresh_t250_car_drift.jpg`). A longer interval keeps the re-roll, only rarer.
 What remains with fixed noise is the snap back to one picture at each refresh (dissolved over 0.5 s by `cut_fade_frames`).
+
+The video's seed is the seed given to `reset(seed=N)`, or the load `seed` for the first video; an unseeded `reset()` takes the previous video's seed plus one.
+So `reset(seed=N)` twice replays the same video through its refreshes, an unseeded reset gets new refresh noise, and any int seed works (the derived seed is reduced to 64 bits, the range `manual_seed` accepts; PRs #144 and #152).
+Note that a fixed-noise refresh still draws one start-noise sample from the main stream and discards it; the steer options below do not.
+
+### Steer start: keeping the layout across a world change (experimental, off by default)
+
+A command is a steer re-anchor at strength 1.0: a keep-0 rebase whose first frame starts from pure fresh noise on the 4-step first-frame schedule (1000/750/500/250, warped).
+That changes the world fully but re-composes the shot every time (the tree trunk moves 56 to 96 px, the camera changes).
+Four backend options (`--backend-opt k=v`) change how that chunk starts. All are off by default, and then the calls, the RNG draws and their order are exactly those of main before them (`test_steer_options_off_are_bit_for_bit_unchanged`, against a recording of origin/main e7b1f25 with steers, a refresh and a seeded reset).
+
+They apply only to a **steer chunk**: the chunk a `reanchor(strength, source="last")` asks for, with a strength that maps to anchor step 0 (`anchor_step_for_strength`; strength above 0.75 on the 4-step first-frame schedule).
+That is what commands send (`sudden_strength` 1.0, `steer_strength` 0.85).
+They do not touch a refresh (source `clean`, including one that falls back to the last latent), a lower-strength steer (step 1 or more, so a slow steer's 0.5 anchors), an explicit `generate_chunk(rebase=...)` or the automatic `steer_rebase`/`refresh_every` rebases.
+
+| Option | Default | What it does |
+|---|---|---|
+| `steer_anchor_t` | unset | 1..1000, the config's unwarped scale. The steer starts from the last clean latent noised to this level (warped by the same mapping as `refresh_anchor_t`) instead of pure noise. With no clean latent yet it falls back to pure noise and the first-frame schedule. 0 is rejected: it would repaint nothing. |
+| `steer_noise` | `fresh` | `fixed`: all noise of the steer chunk (the start noise and the re-noise between steps) comes from a generator seeded by `(1000003 * video_seed + STEER_NOISE_SEED_OFFSET) mod 2^64`, made again identically for every steer of the video. The main noise stream is not advanced by that chunk: it resumes where it was before the steer, so the chunks after it draw different noise than after a `fresh` steer (which advances it by its start noise and each re-noise). Replay under `reset(seed=N)`, unseeded resets and any int seed behave as for the fixed-noise refresh. |
+| `steer_steps` | unset | The steer chunk's denoising schedule, a comma list such as `800,500` or `1000,500` (0..1000, unwarped, strictly descending). It must start at `steer_anchor_t` when that is set, else at 1000 (the start is pure noise). Unset: `steer_anchor_t` followed by the first-frame steps below it (800 gives 800/750/500/250), or the first-frame schedule when `steer_anchor_t` is unset too. |
+| `steer_noise_first_frame` | 0 | 1: the first chunk of every video also draws all its noise from the fixed steer generator, so the base video and every steer share the noise. Independent of `steer_noise`. |
+
+Bad values (an unknown noise mode, a level outside 1..1000, an unsorted or out-of-range schedule, a schedule that does not start where the steer starts) raise ValueError when the backend is built, before any weights load, never mid-video.
+`last_rebase.steer` is a `SteerStart(t, noise, timesteps)` on a steer chunk the options shaped (`t` None when it started from pure noise, `timesteps` the warped steps actually run), else None.
+Everything else is as for any steer: the clean anchor is dropped and saved again `clean_anchor_after` chunks later, the chunk is `ChunkStart.FIRST_FRAME` so the decoder restarts, and `cut_fade_frames` dissolves into it.
+
+Measured on the GPU box (one seed so far, more runs in progress; trunk shift = movement of the tree trunk between the frame before the steer and after it, 672x384 px):
+
+| Variant | Trunk shift | World change | Sharpness |
+|---|---|---|---|
+| today: pure fresh noise, 1000/750/500/250 | 56 to 96 px, the camera changes | full | - |
+| t = 800, fresh noise | - | only partly arrives | - |
+| **t = 800, fixed noise, 800/750/500/250** | **12 / 12 / 21 px** | full (snow, night, desert) | unchanged |
+| t = 700, fixed noise | less than at 800 | does not arrive | - |
+| t = 900, fixed noise | a little more reframing than 800 | full | - |
+
+So fixed noise is essential at t = 800.
+Latency: the steer chunk is slow only because it runs 5 model passes (4 denoising + the context pass) against 3 for a normal chunk; a 2-step schedule for the cut chunk dropped it from 410 to 247 ms with unchanged sharpness (pure noise start, `steer_steps=1000,500`).
+Whether a short schedule also works with t = 800 (`steer_steps=800,500`) is being measured now.
+Candidate live setting, not deployed: `--backend-opt steer_anchor_t=800 --backend-opt steer_noise=fixed`.
 
 ## Using the backend from a plain Python script
 

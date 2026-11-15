@@ -726,3 +726,288 @@ def test_refresh_noise_is_fixed_by_default_and_seeded_by_the_anchor(no_cuda):
     t = b.first_chunk_steps[2] * torch.ones([1], dtype=torch.long)
     want = b.scheduler.add_noise(outs[3].latents.flatten(0, 1), noise.flatten(0, 1), t).unflatten(0, outs[3].latents.shape[:2])
     assert torch.allclose(calls[0]["x"], want)
+
+
+# ---------------------------------------------------------------- steer start: steer_anchor_t, steer_noise, steer_steps
+
+
+def _steer_run(b):
+    """Steers at 1.0 and 0.85, a clean refresh at 0.5, a seeded reset; everything the defaults must not change."""
+    a, c, d = conds()
+    tags = {id(a): "A", id(c): "B", id(d): "C"}
+    outs, rebases = [], []
+    b.reset(seed=0)
+    outs += [b.generate_chunk(a) for _ in range(6)]
+    b.reanchor(1.0)
+    outs.append(b.generate_chunk(c))
+    rebases.append(b.last_rebase)
+    outs += [b.generate_chunk(c) for _ in range(4)]
+    b.reanchor(0.5, source="clean")
+    outs.append(b.generate_chunk(c))
+    rebases.append(b.last_rebase)
+    outs += [b.generate_chunk(c) for _ in range(2)]
+    b.reanchor(0.85)
+    outs.append(b.generate_chunk(d))
+    rebases.append(b.last_rebase)
+    outs += [b.generate_chunk(d) for _ in range(2)]
+    b.reset(seed=5)
+    outs += [b.generate_chunk(a) for _ in range(2)]
+    tail = round(float(torch.randn(4, generator=b._rng).sum()), 4)  # where the main noise stream ended
+    return (summarize(b, outs, tags), [o.start.value for o in outs], [o.fade for o in outs], rebases,
+            b.clean_anchor_chunk, tail)
+
+
+# Recorded on origin/main e7b1f25 (before the steer options existed), same stub, cut_fade_frames=8.
+GOLDEN_STEER_TRACE = ([(0, [1000], 'A', 6.5901, False, 0), (0, [937], 'A', 25.77, True, 4), (0, [833], 'A', 19.8163, True, 4), (0, [625], 'A', 3.3423, True, 4), (0, [0], 'A', 20.2312, True, 4), (1, [1000], 'A', 8.6193, True, 4), (1, [833], 'A', 25.1555, True, 8), (1, [0], 'A', 36.7271, True, 8), (2, [1000], 'A', -13.7387, True, 8), (2, [833], 'A', -16.6387, True, 12), (2, [0], 'A', 16.086, True, 12), (3, [1000], 'A', -6.3662, True, 12), (3, [833], 'A', 6.4494, True, 16), (3, [0], 'A', 27.886, True, 16), (4, [1000], 'A', -18.1832, True, 16), (4, [833], 'A', -5.4696, True, 20), (4, [0], 'A', 22.1825, True, 20), (5, [1000], 'A', -11.6108, True, 20), (5, [833], 'A', 5.3024, True, 24), (5, [0], 'A', 27.8246, True, 24), (0, [1000], 'B', 9.4622, False, 0), (0, [937], 'B', -29.2152, True, 4), (0, [833], 'B', -11.3279, True, 4), (0, [625], 'B', 0.9065, True, 4), (0, [0], 'B', 21.5732, True, 4), (1, [1000], 'B', 19.7299, True, 4), (1, [833], 'B', 13.9523, True, 8), (1, [0], 'B', 33.6855, True, 8), (2, [1000], 'B', -46.4131, True, 8), (2, [833], 'B', 7.6241, True, 12), (2, [0], 'B', 30.7774, True, 12), (3, [1000], 'B', -7.4913, True, 12), (3, [833], 'B', -4.4583, True, 16), (3, [0], 'B', 24.9922, True, 16), (4, [1000], 'B', 6.603, True, 16), (4, [833], 'B', 22.2101, True, 20), (4, [0], 'B', 38.5824, True, 20), (0, [833], 'B', -11.4299, False, 0), (0, [625], 'B', 2.2338, True, 4), (0, [0], 'B', 22.2369, True, 4), (1, [1000], 'B', -19.2189, True, 4), (1, [833], 'B', 3.2577, True, 8), (1, [0], 'B', 28.3382, True, 8), (2, [1000], 'B', 17.575, True, 8), (2, [833], 'B', 4.4003, True, 12), (2, [0], 'B', 29.1655, True, 12), (0, [1000], 'C', -15.9753, False, 0), (0, [937], 'C', -0.7897, True, 4), (0, [833], 'C', -23.8904, True, 4), (0, [625], 'C', 20.0217, True, 4), (0, [0], 'C', 33.6908, True, 4), (1, [1000], 'C', -5.7533, True, 4), (1, [833], 'C', -8.8494, True, 8), (1, [0], 'C', 24.8446, True, 8), (2, [1000], 'C', 5.8038, True, 8), (2, [833], 'C', -2.3236, True, 12), (2, [0], 'C', 28.3635, True, 12), (0, [1000], 'A', 12.1691, False, 0), (0, [937], 'A', 6.3556, True, 4), (0, [833], 'A', 10.179, True, 4), (0, [625], 'A', 13.6711, True, 4), (0, [0], 'A', 25.3955, True, 4), (1, [1000], 'A', 3.5189, True, 4), (1, [833], 'A', -1.1288, True, 8), (1, [0], 'A', 23.5849, True, 8)], [20.2312, 36.7271, 16.086, 27.886, 22.1825, 27.8246, 21.5732, 33.6855, 30.7774, 24.9922, 38.5824, 22.2369, 28.3382, 29.1655, 33.6908, 24.8446, 28.3635, 25.3955, 23.5849])
+GOLDEN_STEER_STARTS = ['first_frame'] + ['continue'] * 5 + ['first_frame'] + ['continue'] * 4 + ['first_frame', 'continue', 'continue',
+                       'first_frame', 'continue', 'continue', 'first_frame', 'continue']
+GOLDEN_STEER_FADES = [False] * 6 + [True] + [False] * 4 + [True, False, False, True] + [False] * 4
+GOLDEN_STEER_REBASES = [cf.Rebase(0, 0, 0, False), cf.Rebase(0, 0, 2, True), cf.Rebase(0, 0, 0, False)]
+GOLDEN_STEER_TAIL = -0.8254
+
+
+DEFAULT_STEER_OPTIONS = {"steer_anchor_t": None, "steer_noise": "fresh", "steer_steps": None, "steer_noise_first_frame": False}
+
+
+@pytest.mark.parametrize("options", [{}, DEFAULT_STEER_OPTIONS])
+def test_steer_options_off_are_bit_for_bit_unchanged(no_cuda, options):
+    (calls, sums), outs = _legacy_run(make_backend(**options))
+    assert _same_trace((calls, sums), GOLDEN)
+    trace, starts, fades, rebases, clean_chunk, tail = _steer_run(make_backend(cut_fade_frames=8, **options))
+    assert _same_trace(trace, GOLDEN_STEER_TRACE)
+    assert starts == GOLDEN_STEER_STARTS and fades == GOLDEN_STEER_FADES
+    assert rebases == GOLDEN_STEER_REBASES and all(r.steer is None for r in rebases)
+    assert clean_chunk is None and abs(tail - GOLDEN_STEER_TAIL) <= 2e-3
+
+
+def _steer_backend(**options):
+    b = make_backend(**options)
+    b.reset(seed=0)
+    outs = [b.generate_chunk(torch.full((1, 3, 8), 1.0)) for _ in range(6)]
+    return b, outs
+
+
+def _steer(b, strength=1.0, cond=None, source="last"):
+    cond = cond if cond is not None else torch.full((1, 3, 8), 2.0)
+    return reanchored_chunk(b, cond, strength, source)
+
+
+def steer_seed(seed):
+    return (1_000_003 * int(seed) + cf.STEER_NOISE_SEED_OFFSET) % (1 << 64)
+
+
+def warped(b, ts):
+    return [int(b._timestep(t)) for t in ts]
+
+
+def test_steer_anchor_t_starts_from_the_last_latent_noised_to_t(no_cuda):
+    b, outs = _steer_backend(steer_anchor_t=800)
+    out, calls, rng = _steer(b)
+    t0 = b._timestep(800)
+    sched = [t0] + [s for s in b.first_chunk_steps if s < t0]
+    assert [c["t"] for c in calls] == [[int(s)] for s in sched] + [[0]]
+    assert len(sched) == 4  # 800 and the first-frame steps below it: 750, 500, 250 (warped)
+    x_last = outs[-1].latents
+    noise = torch.randn(x_last.shape, generator=torch.Generator().set_state(rng))  # fresh: from the main stream
+    want = b.scheduler.add_noise(x_last.flatten(0, 1), noise.flatten(0, 1), t0 * torch.ones([1], dtype=torch.long))
+    assert torch.allclose(calls[0]["x"], want.unflatten(0, x_last.shape[:2]))
+    assert all(c["frame"] == 0 for c in calls) and b.frame_index == 1
+    assert out.start is cf.ChunkStart.FIRST_FRAME
+    assert b.last_rebase == cf.Rebase(0, 0, 0, False, steer=cf.SteerStart(800, "fresh", tuple(int(s) for s in sched)))
+
+
+@pytest.mark.parametrize("strength, source", [(0.5, "last"), (0.5, "clean"), (1.0, "clean")])
+def test_steer_options_only_shape_full_strength_steers(no_cuda, strength, source):
+    on, _ = _steer_backend(steer_anchor_t=800, steer_noise="fixed", steer_steps="800,500")
+    off, _ = _steer_backend()
+    cond = torch.full((1, 3, 8), 1.0)  # the same cond, so a clean refresh really uses the clean anchor
+    o1, c1, _ = _steer(on, strength, cond, source)
+    o2, c2, _ = _steer(off, strength, cond, source)
+    assert [c["t"] for c in c1] == [c["t"] for c in c2]
+    assert all(torch.equal(x["x"], y["x"]) for x, y in zip(c1, c2)) and torch.equal(o1.latents, o2.latents)
+    assert on.last_rebase == off.last_rebase and on.last_rebase.steer is None
+
+
+def test_steer_options_ignore_an_explicit_rebase(no_cuda):
+    on, _ = _steer_backend(steer_anchor_t=800, steer_noise="fixed")
+    off, _ = _steer_backend()
+    c = torch.full((1, 3, 8), 2.0)
+    a, b = on.generate_chunk(c, rebase=cf.Rebase(keep=0, anchor_step=0)), off.generate_chunk(c, rebase=cf.Rebase(keep=0, anchor_step=0))
+    assert torch.equal(a.latents, b.latents) and on.last_rebase.steer is None
+
+
+def test_steer_anchor_t_falls_back_without_a_last_latent(no_cuda):
+    b, _ = _steer_backend(steer_anchor_t=800)
+    b._history.clear()  # no clean latent to start from
+    _, calls, rng = _steer(b)
+    assert [c["t"] for c in calls] == [[int(t)] for t in b.first_chunk_steps] + [[0]]
+    assert torch.equal(calls[0]["x"], torch.randn(calls[0]["x"].shape, generator=torch.Generator().set_state(rng)))
+    assert b.last_rebase.steer == cf.SteerStart(None, "fresh", tuple(int(t) for t in b.first_chunk_steps))
+
+
+def test_fixed_steer_noise_is_seeded_by_the_video_and_leaves_the_main_stream_alone(no_cuda):
+    b, outs = _steer_backend(steer_anchor_t=800, steer_noise="fixed")
+    before = b._rng.get_state()
+    out, calls, _ = _steer(b)
+    assert torch.equal(b._rng.get_state(), before)  # no draw from the main stream on the steer chunk
+    g = torch.Generator().manual_seed(steer_seed(0))
+    x_last = outs[-1].latents
+    noise = torch.randn(x_last.shape, generator=g)
+    t0 = b._timestep(800)
+    want = b.scheduler.add_noise(x_last.flatten(0, 1), noise.flatten(0, 1), t0 * torch.ones([1], dtype=torch.long))
+    assert torch.allclose(calls[0]["x"], want.unflatten(0, x_last.shape[:2]))
+    # The re-noise between steps comes from the same generator: see the next test (equal outputs).
+    assert b.last_rebase.steer.noise == "fixed"
+
+
+def test_fixed_steer_noise_is_the_same_for_every_steer_of_a_video(no_cuda):
+    for noise, same in (("fixed", True), ("fresh", False)):
+        b, _ = _steer_backend(steer_noise=noise)  # pure-noise start: the input is the noise itself
+        c = torch.full((1, 3, 8), 2.0)
+        o1, c1, _ = _steer(b, cond=c)
+        for _ in range(9):
+            b.generate_chunk(c)
+        o2, c2, _ = _steer(b, cond=c)
+        assert torch.equal(c1[0]["x"], c2[0]["x"]) is same
+        assert torch.equal(o1.latents, o2.latents) is same  # all noise of the chunk, not only the start
+
+
+def test_fixed_steer_noise_replays_under_a_seeded_reset_and_changes_per_video(no_cuda):
+    b = make_backend(steer_anchor_t=800, steer_noise="fixed")
+    a, c = torch.full((1, 3, 8), 1.0), torch.full((1, 3, 8), 2.0)
+
+    def video(seed):
+        b.reset(seed=seed)
+        outs = [b.generate_chunk(a) for _ in range(6)]
+        out, calls, _ = reanchored_chunk(b, c, 1.0, "last")
+        outs += [out] + [b.generate_chunk(c) for _ in range(4)]
+        return [o.latents for o in outs] + [calls[0]["x"]]
+
+    first, again = video(7), video(7)
+    assert all(torch.equal(x, y) for x, y in zip(first, again))
+    b.reset()  # unseeded: the next video seed (8), so new steer noise
+    for _ in range(6):
+        b.generate_chunk(a)
+    x_last = b._history[-1]
+    _, calls, _ = reanchored_chunk(b, c, 1.0, "last")
+    noise = torch.randn(x_last.shape, generator=torch.Generator().manual_seed(steer_seed(8)))
+    t0 = b._timestep(800)
+    want = b.scheduler.add_noise(x_last.flatten(0, 1), noise.flatten(0, 1), t0 * torch.ones([1], dtype=torch.long))
+    assert torch.allclose(calls[0]["x"], want.unflatten(0, x_last.shape[:2]))
+    assert not torch.equal(calls[0]["x"], first[-1])
+
+
+@pytest.mark.parametrize("seed", [2**63 - 1, 2**64 - 1, -(2**63)])
+def test_fixed_steer_noise_takes_any_reset_seed(no_cuda, seed):
+    b = make_backend(steer_noise="fixed", steer_noise_first_frame=True)
+    a = torch.full((1, 3, 8), 1.0)
+    xs = []
+    for _ in range(2):
+        b.reset(seed=seed)
+        for _ in range(6):
+            b.generate_chunk(a)
+        xs.append(reanchored_chunk(b, a, 1.0, "last")[1][0]["x"])
+    assert torch.equal(xs[0], xs[1])
+    assert torch.equal(xs[0], torch.randn(xs[0].shape, generator=torch.Generator().manual_seed(steer_seed(seed))))
+
+
+def test_fixed_steer_noise_keeps_the_refresh_seeding(no_cuda):
+    on = make_backend(steer_noise="fixed", steer_anchor_t=800)
+    off = make_backend()
+    a = torch.full((1, 3, 8), 1.0)
+    got = {}
+    for name, b in (("on", on), ("off", off)):
+        b.reset(seed=0)
+        for _ in range(6):
+            b.generate_chunk(a)
+        _, calls, _ = reanchored_chunk(b, a, 0.5, "clean")  # a refresh: seeded by the clean anchor in both
+        assert b.last_rebase.from_clean and b.last_rebase.steer is None
+        got[name] = calls[0]["x"]
+    assert torch.equal(got["on"], got["off"])
+
+
+@pytest.mark.parametrize("anchor_t, steps, want", [(None, "1000,500", [1000, 500]), (800, "800,500", [800, 500]),
+                                                   (800, None, [800, 750, 500, 250]), (900, None, [900, 750, 500, 250]),
+                                                   (None, [1000, 750, 250], [1000, 750, 250])])
+def test_steer_steps_sets_the_steer_schedule(no_cuda, anchor_t, steps, want):
+    b, outs = _steer_backend(steer_anchor_t=anchor_t, steer_steps=steps)
+    _, calls, rng = _steer(b)
+    assert [c["t"] for c in calls] == [[t] for t in warped(b, want)] + [[0]]
+    noise = torch.randn(outs[-1].latents.shape, generator=torch.Generator().set_state(rng))
+    if anchor_t is None:
+        assert torch.equal(calls[0]["x"], noise)  # pure noise, as today
+    assert b.last_rebase.steer == cf.SteerStart(anchor_t, "fresh", tuple(warped(b, want)))
+    n0 = len(b.generator.calls)
+    b.generate_chunk(torch.full((1, 3, 8), 2.0))  # the next chunk is a normal one again
+    assert [c["t"] for c in b.generator.calls[n0:]] == [[int(t)] for t in b.denoising_steps] + [[0]]
+
+
+def test_steer_options_keep_the_clean_anchor_resave_fade_and_first_frame(no_cuda):
+    b, _ = _steer_backend(steer_anchor_t=800, steer_noise="fixed", steer_steps="800,500", cut_fade_frames=8)
+    c = torch.full((1, 3, 8), 2.0)
+    assert b.clean_anchor_chunk == 3
+    out, _, _ = _steer(b, cond=c)  # chunk 6
+    assert out.start is cf.ChunkStart.FIRST_FRAME and out.fade and out.chunk_index == 6
+    assert b._clean_anchor is None
+    outs = [b.generate_chunk(c) for _ in range(4)]
+    assert b.clean_anchor_chunk == 9 and b._clean_anchor is outs[2].latents  # 3 chunks after the steer
+    assert not any(o.fade or o.start is cf.ChunkStart.FIRST_FRAME for o in outs)
+
+
+def test_steer_noise_first_frame_uses_the_steer_generator(no_cuda):
+    a = torch.full((1, 3, 8), 1.0)
+    b = make_backend(steer_noise="fixed", steer_noise_first_frame=True)
+    b.reset(seed=3)
+    before = b._rng.get_state()
+    n0 = len(b.generator.calls)
+    b.generate_chunk(a)
+    first = b.generator.calls[n0:]
+    assert torch.equal(b._rng.get_state(), before)  # the main stream is untouched by the first frame
+    assert torch.equal(first[0]["x"], torch.randn(first[0]["x"].shape, generator=torch.Generator().manual_seed(steer_seed(3))))
+    for _ in range(5):
+        b.generate_chunk(a)
+    _, calls, _ = reanchored_chunk(b, a, 1.0, "last")
+    assert torch.equal(calls[0]["x"], first[0]["x"])  # the base video and the steer share the noise
+    off = make_backend(steer_noise="fixed")
+    off.reset(seed=3)
+    off.generate_chunk(a)
+    assert not torch.equal(off.generator.calls[0]["x"], first[0]["x"])  # default 0: the main stream
+
+
+@pytest.mark.parametrize("options", [
+    {"steer_noise": "same"},
+    {"steer_anchor_t": 0}, {"steer_anchor_t": 1001}, {"steer_anchor_t": -5},
+    {"steer_steps": "500,800"}, {"steer_steps": "800,800"}, {"steer_steps": "1001,500"}, {"steer_steps": "800,-1"},
+    {"steer_steps": ""}, {"steer_steps": "800,abc"}, {"steer_steps": []},
+    {"steer_steps": "800,500"},  # without steer_anchor_t the steer starts from pure noise: the schedule must start at 1000
+    {"steer_anchor_t": 800, "steer_steps": "1000,500"},  # must start at steer_anchor_t
+    {"steer_anchor_t": 800, "steer_steps": 500},
+])
+def test_steer_options_are_checked(options):
+    with pytest.raises(ValueError):
+        make_backend(**options)
+    with pytest.raises(ValueError):  # at start-up, before any weights load
+        cf.Backend(64, 64, None, "cpu", "cpu", **options)
+
+
+def test_steer_steps_accepts_a_single_int_and_a_list(no_cuda):
+    assert make_backend(steer_steps=1000).steer_steps == (1000,)
+    assert make_backend(steer_anchor_t=800, steer_steps=800).steer_steps == (800,)
+    assert make_backend(steer_steps=(1000, 500)).steer_steps == (1000, 500)
+    assert make_backend(steer_steps=" 1000 , 500 ").steer_steps == (1000, 500)
+    assert make_backend(steer_steps="none").steer_steps is None
+
+
+def test_load_converts_the_steer_options(monkeypatch):
+    seen = {}
+
+    class Capture:
+        def __init__(self, *args, **kwargs):
+            seen.update(kwargs)
+
+    monkeypatch.setattr(cf, "Backend", Capture)
+    cf.load(64, 64, steer_anchor_t="800", steer_noise="fixed", steer_steps="800,500", steer_noise_first_frame="1")
+    assert seen == {"steer_anchor_t": 800, "steer_noise": "fixed", "steer_steps": "800,500", "steer_noise_first_frame": True}
+    seen.clear()
+    cf.load(64, 64, steer_anchor_t="none", steer_steps=1000, steer_noise_first_frame=0)  # as the server converts them
+    assert seen == {"steer_anchor_t": None, "steer_steps": 1000, "steer_noise_first_frame": False}

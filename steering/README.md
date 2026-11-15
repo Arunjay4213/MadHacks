@@ -242,7 +242,22 @@ Sheets: `engine/samples/cut_fade_steer.jpg` and `cut_fade_refresh.jpg`.
 - Every steer re-composes the whole scene (a new camera angle and tree position), because strength 1.0 restarts from pure noise and continuity comes only from the prompt text (board post at 23:42 UTC).
 - Every refresh also re-composes the scene: on the live recording the car moved between right of the tree, nearer, far left and small and distant at each 6 s refresh, so a refresh is a new sample, not a return to one saved frame (board post at 00:12 UTC).
   Ishaan is measuring fixed refresh noise, a lower refresh timestep, whether the anchor is re-saved, and interval 48.
-- No variant kept the exact camera and layout across a world change.
+- No variant kept the exact camera and layout across a world change, before the steer start options below.
+
+### Steer start: keeping the layout (backend options, off by default)
+
+Four backend options change how a steer chunk starts; they need no change to `steering/reanchor.py`.
+A steer chunk is the one `backend.reanchor(strength, source="last")` asks for at a strength that maps to anchor step 0 (above 0.75), which is every command (`sudden_strength` 1.0, `steer_strength` 0.85); refreshes and slow steers at 0.5 are not touched.
+
+- `steer_anchor_t=800`: start from the last clean latent noised to t = 800 instead of pure noise.
+- `steer_noise=fixed`: all noise of that chunk comes from a generator seeded by the video's seed, the same for every steer of the video.
+- `steer_steps=800,500`: the chunk's schedule (default: `steer_anchor_t` then the first-frame steps below it).
+- `steer_noise_first_frame=1`: the first frame of each video uses the same fixed noise.
+
+Measured on the GPU box, one seed so far, more runs in progress: with t = 800 and fixed noise the tree trunk moved 12, 12 and 21 px across steers to snow, night and desert (56 to 96 px today), the world still changed fully and sharpness was unchanged.
+With fresh noise at t = 800 the world only partly arrives; t = 700 keeps more layout but the world does not arrive; t = 900 is like 800 with a little more reframing.
+A 2-step schedule for the cut chunk (`steer_steps=1000,500`) took it from 410 to 247 ms with unchanged sharpness; with t = 800 that is being measured.
+Details and validation rules: `engine/MODEL_NOTES.md`, "Steer start".
 
 ## Tried and rejected
 
