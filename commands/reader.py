@@ -9,12 +9,13 @@ import re
 import unicodedata
 
 from .dictionary import KEYWORD_RX, KEYWORDS, normalize
+from .state import MAX_BATCH
 from .world import WORLDS, world_op
 
 __all__ = ["KEYWORDS", "MAX_CLAUSES", "RAMP", "is_blocked", "read", "remove_target", "resolve", "split_commands", "spot",
            "style_fallback"]
 
-MAX_CLAUSES = 16  # callers reject a sentence that splits into more
+MAX_CLAUSES = MAX_BATCH  # callers reject a sentence that splits into more
 
 RAMP = {"default": 1, "slow": 12, "sudden": 1, "confirm": 1, "provisional": 4}  # anchor fires at full target
 

@@ -6,6 +6,7 @@ from copy import deepcopy
 DEFAULT_BASE = "a wide shot of a meadow with a single oak tree"
 KINDS = ("world", "season", "weather", "time", "extra")
 WORLD_CLEARS = {"world", "season", "weather"}
+MAX_BATCH = 16  # operations in one batch (one undo step); also the most clauses in one sentence
 
 
 def _text(value, field):
@@ -37,9 +38,9 @@ class SceneState:
         op = operation.get("op")
         if op == "batch":
             operations = operation.get("operations")
-            if (not isinstance(operations, list) or not 1 <= len(operations) <= 16
+            if (not isinstance(operations, list) or not 1 <= len(operations) <= MAX_BATCH
                     or any(not isinstance(item, dict) or item.get("op") == "batch" for item in operations)):
-                raise ValueError("batch needs 1 to 16 non-nested operations")
+                raise ValueError(f"batch needs 1 to {MAX_BATCH} non-nested operations")
             trial = deepcopy(self)
             for item in operations:
                 trial.apply(item)

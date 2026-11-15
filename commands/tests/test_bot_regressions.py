@@ -1,7 +1,7 @@
 import unittest
 from importlib.util import find_spec
 from commands.service import CommandService
-from commands.reader import resolve, split_commands, style_fallback
+from commands.reader import resolve, style_fallback
 from commands.semantic import SemanticReader
 
 

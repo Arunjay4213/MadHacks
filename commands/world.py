@@ -20,8 +20,8 @@ CAR_SUBJECT = "A red sports car"
 CAMERA = ("The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car "
           "centred in the frame while the white dashed centre line rushes toward the viewer.")
 STYLE = "Cinematic, highly detailed, realistic, sharp focus, motion blur on the road."  # road scenes only
-_REAR = ", seen from directly behind with its rear lights facing the camera, drives fast along "
-_FORWARD = ", moving forward away from the camera."
+REAR = ", seen from directly behind with its rear lights facing the camera, drives fast along "
+FORWARD = ", moving forward away from the camera."
 
 # Each world is a list of segments (text, tags). Joined, the segments are Ishaan's tested sentence verbatim.
 # Tagged segments are the built-in sky/time/weather; world_with_overrides drops one only when an explicit
@@ -218,7 +218,7 @@ def car_prompt(world: str, objects=(), modifiers=(), subject: str = CAR_SUBJECT)
     """Ishaan's car template for a world phrase: subject with its road, camera, objects, scene and light, modifiers,
     style. Object and modifier phrases (already strength-worded) are one sentence each, word for word."""
     road, _, rest = world.strip().rstrip(".").partition(". ")
-    parts = [f"{subject}{_REAR}{road}{_FORWARD}", CAMERA, *map(_sentence, objects),
+    parts = [f"{subject}{REAR}{road}{FORWARD}", CAMERA, *map(_sentence, objects),
              *([rest + "."] if rest else []), *map(_sentence, modifiers), STYLE]
     return " ".join(parts)
 

@@ -55,8 +55,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 from . import car_template, people
+from commands.state import MAX_BATCH
+
 from .foundry import FoundryMessages, settings_from_env
-from .slow_reader import validate as validate_operation
+from .slow_reader import MAX_LABEL, validate as validate_operation
 
 log = logging.getLogger("engine.final_reader")
 
@@ -136,12 +138,11 @@ def blocked_word(text: str) -> str | None:
 STYLE = "Cinematic, highly detailed, realistic, sharp focus."
 # "motion blur on the road" only fits a vehicle on a road. Measured on GPU (2026-11-14): with that tail every
 # winter and night frame of the oak meadow grew a road or a tyre track, so it is used only when the scene has a road.
-VEHICLE_STYLE = "Cinematic, highly detailed, realistic, sharp focus, motion blur on the road."
+VEHICLE_STYLE = car_template.STYLE
 
 # Measured by the steering owner with optical flow (board, 2026-11-14): a vehicle subject drives backwards in 1 of
 # 3 seeds with a short prompt, and forward in 3 of 3 with this wording. Added to SUBJECT when the subject is a
 # vehicle and does not already say how it moves. LANE_CUE is also added to the phrase of a vehicle added on a road.
-VEHICLE_WORDS = ("car", "truck", "van", "bus", "motorcycle", "motorbike", "jeep", "taxi", "vehicle")
 LANE_CUE = "white dashed lane markings rush toward the viewer"
 FORWARD_MOTION = f"speeding forward, driving away from the camera, the camera follows directly behind, {LANE_CUE}"
 ROAD_WORDS = frozenset({"road", "roads", "roadside", "highway", "highways", "street", "streets", "lane", "lanes",
@@ -212,8 +213,8 @@ def _words(text: str) -> set[str]:
 
 
 def is_vehicle(subject: str) -> bool:
-    """True when `subject` names a vehicle (VEHICLE_WORDS), as a whole word."""
-    return bool(_words(subject) & set(VEHICLE_WORDS))
+    """True when `subject` names a vehicle (car_template.VEHICLE_WORDS), as a whole word."""
+    return bool(_words(subject) & set(car_template.VEHICLE_WORDS))
 
 
 def has_road(text: str) -> bool:
@@ -354,8 +355,7 @@ def why_rejected(check: Callable[[str, dict], str | None], prefix: str, details:
         return "details is not text"
     if "\n" in details or "\r" in details:
         return "a line break in details"
-    max_detail = getattr(rewriter, "MAX_DETAIL_WORDS", 60)
-    max_total = getattr(rewriter, "MAX_TOTAL_WORDS", 100)
+    max_detail, max_total = rewriter.MAX_DETAIL_WORDS, rewriter.MAX_TOTAL_WORDS
     n, p = len(details.split()), len(prefix.split())
     if n > max_detail:
         return f"details has {n} words, the limit is {max_detail}"
@@ -430,6 +430,15 @@ def phrase_problems(op: dict, main: bool = False) -> list[str]:
     if not words & PHRASE_POSITION_WORDS:
         out.append(f"the phrase of {op['label']!r} has no position words (in the foreground at the left of the frame, beside the oak tree, ...)")
     return out
+
+
+def new_object_problems(before: dict, after: dict) -> list[str]:
+    """phrase_problems of every object `after` has that `before` did not (same label and phrase); the first object
+    of `after` is the main one."""
+    known = {(c["label"], c["phrase"]) for c in before["changes"]}
+    added = [c for c in after["changes"] if c["kind"] == "extra" and (c["label"], c["phrase"]) not in known]
+    main = next((c for c in after["changes"] if c["kind"] == "extra"), None)
+    return [p for c in added for p in phrase_problems(c, main=c is main)]
 
 
 _PLACE_RULE = """- A PLACE or setting ("take me to the desert", "make it a desert", "go to Mars", "switch to a
@@ -591,7 +600,7 @@ def details_budget(spec: PromptSpec, snapshot: dict) -> int:
     if spec.prefix is None:
         return 50
     from commands import rewriter
-    left = getattr(rewriter, "MAX_TOTAL_WORDS", 100) - len(spec.prefix(snapshot).split()) - 15
+    left = rewriter.MAX_TOTAL_WORDS - len(spec.prefix(snapshot).split()) - 15
     return max(12, min(45, left))
 
 
@@ -977,7 +986,7 @@ class FinalReader:
         """One call. `previous` is the earlier attempt for this sentence: its reply and reasons are sent back."""
         from commands.composer import compose
         t0 = time.perf_counter()
-        user = {"scene": _scene_for_model(snapshot), "prompt": compose(snapshot), "sentence": people.for_model(text),
+        user = {"scene": scene_record(snapshot), "prompt": compose(snapshot), "sentence": people.for_model(text),
                 "details_max_words": details_budget(self.spec, snapshot)}
         plan = car_template.plan(text, snapshot)
         if plan.route is not car_template.Route.PLAIN:
@@ -1041,10 +1050,7 @@ class FinalReader:
             canonical = compose(after)  # with PR #88 a world the base cannot take raises ValueError
         except (ValueError, TypeError, KeyError) as exc:
             return Attempt(Verdict.INVALID, Entry(Outcome.FALLBACK), (f"the new scene does not compose: {exc!r}",))
-        known = {(c["label"], c["phrase"]) for c in snapshot["changes"]}
-        added = [c for c in after["changes"] if c["kind"] == "extra" and (c["label"], c["phrase"]) not in known]
-        main = next((c for c in after["changes"] if c["kind"] == "extra"), None)  # the first object of the scene
-        problems = [p for c in added for p in phrase_problems(c, main=c is main)]
+        problems = new_object_problems(snapshot, after)
         for p in problems:
             log.warning("final reader: %r: %s", _short(text), p)
         details = reply.get("details")
@@ -1089,10 +1095,7 @@ class FinalReader:
         if prompt is None or not car_template.check_prompt(prompt, subject, objects):
             return Attempt(Verdict.INVALID, Entry(Outcome.FALLBACK),
                            tuple(problems) or ("road, scene and light do not make the template",))
-        known = {(c["label"], c["phrase"]) for c in snapshot["changes"]}
-        added = [c for c in after["changes"] if c["kind"] == "extra" and (c["label"], c["phrase"]) not in known]
-        main = next((c for c in after["changes"] if c["kind"] == "extra"), None)
-        phrase = [p for c in added for p in phrase_problems(c, main=c is main)]
+        phrase = new_object_problems(snapshot, after)
         if phrase:  # usable, but a new object's phrase breaks a rule: asked again once when there is time
             return Attempt(Verdict.PHRASE, Entry(Outcome.SONNET, tuple(ops), prompt), tuple(phrase))
         return Attempt(Verdict.ACCEPTED, Entry(Outcome.SONNET, tuple(ops), prompt))
@@ -1143,9 +1146,6 @@ def invalid_operation_reason(ops: list, snapshot: dict) -> str:
     return "an operation names a change id after a base edit or a new scene, or there are too many"
 
 
-BATCH_LIMIT = 16  # commands.state: a batch holds 1 to 16 operations
-
-
 def expand_operations(ops: list, snapshot: dict) -> list[dict] | None:
     """The model's operations as operations of commands/state.py, or None if one is invalid.
 
@@ -1184,7 +1184,7 @@ def expand_operations(ops: list, snapshot: dict) -> list[dict] | None:
         rebuilt = rebuilt or clean["op"] == "new_scene"
         out.append(with_lane_cue(distinct_label(canonical_change(canonical_world(clean)), snapshot, out)))
     out = world_first(out, copied)
-    return out if len(out) <= BATCH_LIMIT else None
+    return out if len(out) <= MAX_BATCH else None
 
 
 def bare_vehicle_operations(ops: list[dict], snapshot: dict, subject: str) -> list[dict] | None:
@@ -1235,7 +1235,7 @@ def distinct_label(op: dict, snapshot: dict, earlier: list[dict]) -> dict:
     noun = op["label"].split()[-1]
     for ordinal in _ORDINALS:
         for label in (f"{ordinal} {op['label']}", f"{ordinal} {noun}"):
-            if label not in taken and len(label) <= 24:  # slow_reader.MAX_LABEL
+            if label not in taken and len(label) <= MAX_LABEL:
                 return {**op, "label": label}
     return op
 
@@ -1288,12 +1288,6 @@ def scene_after(snapshot: dict, operations: list[dict]) -> dict:
             op["id"] = to_trial[op["id"]]
         trial.apply(op)
     return trial.snapshot()
-
-
-def _scene_for_model(snapshot: dict) -> dict:
-    return {"base": snapshot.get("base"),
-            "changes": [{k: c[k] for k in ("id", "label", "kind", "phrase", "strength")}
-                        for c in snapshot.get("changes", [])]}
 
 
 # Changed whenever the engine builds prompts differently from the same reply (the car template, forward motion,
