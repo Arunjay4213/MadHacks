@@ -127,3 +127,53 @@ def test_pace_words_set_the_ramp_of_a_final_reader_result():
         assert chat.sentences == [sentence]
         assert labels(out) == ["night"]
         assert out["steer"]["ramp_chunks"] == ramp, sentence
+
+
+BEACH = {"op": "new_scene", "base": "a sandy beach with gentle waves"}
+DESERT = {"op": "new_scene", "base": "a wide sand desert with dunes"}
+
+
+def test_start_over_with_a_scene_reaches_the_final_reader():
+    """Greptile on PR #105, engine/final_reader.py:262: the keyword table reads "start over with a beach" as a
+    plain reset, which would drop the beach; the final reader makes it a new scene."""
+    for sentence, op, word in (("start over with a beach", BEACH, "beach"), ("new scene of a desert", DESERT, "desert"),
+                               ("reset to a beach", BEACH, "beach"),
+                               ("reset and start over with a beach", BEACH, "beach"),
+                               ("undo and start over with a beach", BEACH, "beach")):
+        svc, chat = wrapper({"make it winter": reply([WINTER]), sentence: reply([op])})
+        final(svc, "make it winter")
+        out = final(svc, sentence, 2)
+        assert chat.sentences[-1] == sentence
+        assert out["state"]["unmatched"] is False and labels(out) == []
+        assert word in out["steer"]["prompt"] and "snow" not in out["steer"]["prompt"]
+
+
+def test_start_over_with_unsafe_content_is_blocked():
+    svc, _ = wrapper({"make it winter": reply([WINTER])})
+    final(svc, "make it winter")
+    out = final(svc, "start over with a naked man", 2)
+    assert_blocked(svc, out)
+    assert labels(out) == ["winter"]
+
+
+def test_a_bare_start_over_keeps_the_fast_path():
+    for sentence in ("start over", "reset", "start over please", "reset everything", "start over from scratch",
+                     "reset immediately", "slowly start over", "reset right now", "reset and start over"):
+        svc, chat = wrapper({"make it winter": reply([WINTER])})
+        final(svc, "make it winter")
+        out = final(svc, sentence, 2)
+        assert chat.sentences == ["make it winter"], sentence  # no call
+        assert labels(out) == [], sentence
+
+
+def test_a_control_after_a_scene_reset_still_runs_last():
+    """Greptile on PR #164: "start over with a beach and reset" ends on the initial scene, as said."""
+    for sentence in ("start over with a beach and reset", "start over with a beach and start over"):
+        svc, chat = wrapper({"make it winter": reply([WINTER]), sentence: reply([BEACH])})
+        final(svc, "make it winter")
+        out = final(svc, sentence, 2)
+        assert chat.sentences[-1] == sentence  # still the content check
+        assert labels(out) == [] and "beach" not in out["steer"]["prompt"], sentence
+    svc, _ = wrapper({"make it winter": reply([WINTER])})
+    final(svc, "make it winter")
+    assert_blocked(svc, final(svc, "start over with a naked man and reset", 2))

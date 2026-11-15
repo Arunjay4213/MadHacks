@@ -19,6 +19,7 @@ and undo work as for any other edit, and the steer's prompt becomes the final re
 
 import enum
 import logging
+import re
 
 log = logging.getLogger("engine.reader")
 
@@ -105,21 +106,59 @@ class FinalReadingService:
 
 class SentenceKind(enum.Enum):
     """What a final sentence asks for, which decides whether it may skip the final reader's content check."""
-    CONTROL = "control"  # every clause is undo or reset: the dictionary alone, no call (nothing new enters)
-    MIXED = "mixed"      # undo or reset plus other clauses: content check first, then the dictionary
-    EDIT = "edit"        # no undo or reset: the final reader decides the operations
+    CONTROL = "control"  # every clause is a bare undo or reset: the dictionary alone, no call (nothing new enters)
+    MIXED = "mixed"      # bare undo or reset plus edit clauses: content check first, then the dictionary
+    EDIT = "edit"        # no bare undo or reset, or a reset that names a scene: the final reader decides
+
+
+class ClauseKind(enum.Enum):
+    """What one clause of a final sentence is."""
+    BARE_CONTROL = "bare_control"  # undo, or a reset that names nothing ("start over please")
+    SCENE_RESET = "scene_reset"    # a reset that names a scene ("start over with a beach"): a new scene
+    EDIT = "edit"                  # anything else
+
+
+# Words that may follow a reset ("start over please", "reset everything", "reset immediately") without naming a
+# scene: filler, and the pace words of commands/reader.py. Any other word ("start over with a beach") names content.
+RESET_FILLER = frozenset("""
+    please now everything it all the scene video whole thing again from scratch completely entirely this that
+    slowly gradually gently little by over time suddenly instantly immediately right quickly at once
+""".split())
+_WORDS = re.compile(r"[a-z']+")
 
 
 def sentence_kind(text: str, snapshot: dict) -> SentenceKind:
     """Classify each clause the way CommandService splits the sentence, so a clause like "add ..." after
-    "reset and" is seen and cannot ride past the content check on the reset."""
+    "reset and" is seen and cannot ride past the content check on the reset.
+
+    A scene reset with no undo or reset after it makes the whole sentence EDIT: the keyword table would read it
+    as a plain reset and drop the scene, and the final reader's new_scene already clears the changes, so a bare
+    reset before it adds nothing. An undo or reset after it ("start over with a beach and reset") must still run
+    last, which only the keyword table does, so that sentence is MIXED."""
     from commands.reader import read, split_commands
-    clauses = split_commands(text) or [text]
-    control = [_is_undo_or_reset(read(clause, snapshot)["op"]) for clause in clauses]
-    if all(control):
+    kinds = [clause_kind(clause, read(clause, snapshot)) for clause in split_commands(text) or [text]]
+    if ClauseKind.SCENE_RESET in kinds:
+        last_scene = len(kinds) - 1 - kinds[::-1].index(ClauseKind.SCENE_RESET)
+        if ClauseKind.BARE_CONTROL not in kinds[last_scene + 1:]:
+            return SentenceKind.EDIT
+        return SentenceKind.MIXED
+    if all(k is ClauseKind.BARE_CONTROL for k in kinds):
         return SentenceKind.CONTROL
-    return SentenceKind.MIXED if any(control) else SentenceKind.EDIT
+    return SentenceKind.MIXED if ClauseKind.BARE_CONTROL in kinds else SentenceKind.EDIT
 
 
-def _is_undo_or_reset(op) -> bool:
-    return op is not None and op["op"] in ("undo", "reset")
+def clause_kind(clause: str, reading: dict) -> ClauseKind:
+    """`reading` is commands.reader.read(clause, ...). The keyword table reads "start over with a beach" as a
+    plain reset; the words left after the reset words tell a scene reset from a bare one."""
+    op = reading["op"]
+    if op is None or op["op"] not in ("undo", "reset"):
+        return ClauseKind.EDIT
+    if op["op"] == "undo":
+        return ClauseKind.BARE_CONTROL
+    words = _WORDS.findall(clause.lower())
+    keyword = _WORDS.findall((reading["keyword"] or "").lower())
+    for i in range(len(words) - len(keyword) + 1):  # drop the first match of the reset words themselves
+        if keyword and words[i:i + len(keyword)] == keyword:
+            words = words[:i] + words[i + len(keyword):]
+            break
+    return ClauseKind.BARE_CONTROL if all(w in RESET_FILLER for w in words) else ClauseKind.SCENE_RESET
