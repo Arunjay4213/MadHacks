@@ -443,6 +443,8 @@ class Backend:
         clean_anchor_after: int = 3,
         cut_fade_frames: int = 0,
         cut_fade_refresh: bool = True,
+        refresh_noise: str = "fixed",
+        refresh_anchor_t: Optional[int] = None,
     ) -> None:
         """Generation state: lock, stream, RNG, caches, counters, automatic rebase settings.
         Split out of __init__ so tests can build a Backend around a stub generator."""
@@ -461,6 +463,16 @@ class Backend:
         # The clean anchor: the latent of the chunk `clean_anchor_after` chunks after the start of
         # the video or after the last rebase that did not start from the clean anchor (a steer).
         # A refresh (reanchor(..., source="clean")) starts from it instead of the drifted last latent.
+        if refresh_noise not in ("fresh", "fixed"):
+            raise ValueError(f"refresh_noise must be 'fresh' or 'fixed', got {refresh_noise!r}")
+        if refresh_anchor_t is not None and not 0 < int(refresh_anchor_t) <= 1000:
+            raise ValueError(f"refresh_anchor_t must be in 1..1000 or None, got {refresh_anchor_t}")
+        # A refresh from the clean anchor: "fixed" draws its noise from a generator seeded by the clean
+        # anchor, so every refresh from one anchor gives the same picture (fresh: a new sample each time).
+        self.refresh_noise = refresh_noise
+        # The 0-1000 level (unwarped, like the config's steps) the clean anchor is noised to on a
+        # refresh, instead of the strength's anchor step; None: the anchor step.
+        self.refresh_anchor_t = None if refresh_anchor_t is None else int(refresh_anchor_t)
         if int(cut_fade_frames) < 0:
             raise ValueError(f"cut_fade_frames must be >= 0, got {cut_fade_frames}")
         # Dissolve from the last shown frame over this many frames after a re-anchor cut (0 = off);
@@ -718,6 +730,7 @@ class Backend:
             schedule = self.first_chunk_steps if self.state is GenState.EMPTY else self.denoising_steps
             start = ChunkStart.FIRST_FRAME if self.state is GenState.EMPTY else ChunkStart.CONTINUE
             fade = False
+            rng = self._rng  # a fixed-noise refresh uses its own generator for this chunk
             if plan is not None:
                 x_last = self._history[-1] if self._history else None
                 from_clean = plan.from_clean and self._clean_anchor is not None
@@ -725,8 +738,14 @@ class Backend:
                     # The scene changed without a steer re-anchor (a provisional or a steer too weak
                     # to repaint): the clean anchor shows the old scene, so this refresh is a steer.
                     from_clean = False
+                rng = self._rng
                 if from_clean:
                     x_last = self._clean_anchor  # a refresh: the clean anchor stays as it is
+                    if self.refresh_noise == "fixed":
+                        # Seeded by the anchor, not drawn from the main stream: the same picture every refresh.
+                        rng = torch.Generator(device=self.device).manual_seed(
+                            1_000_003 * self.video_id + int(self.clean_anchor_chunk))
+                        noisy = torch.randn(noisy.shape, device=self.device, dtype=self.dtype, generator=rng)
                 elif not plan.from_clean or self._clean_anchor is not None:
                     # A steer (or any other rebase): the old clean anchor shows the old scene.
                     self._clean_anchor = None
@@ -744,7 +763,15 @@ class Backend:
                         n = min(max(0, n), len(schedule) - 1)  # automatic mode: clamp, never fail mid-stream
                     elif not 0 <= n < len(schedule):
                         raise ValueError(f"anchor_step {n} outside the schedule of {len(schedule)} steps")
-                if n is not None and n > 0 and x_last is not None:
+                if from_clean and keep == 0 and self.refresh_anchor_t is not None:
+                    # A refresh at a chosen level: noise the clean anchor to refresh_anchor_t and
+                    # denoise with that level and the first-frame steps below it.
+                    t0 = self._timestep(self.refresh_anchor_t)
+                    noisy = self.scheduler.add_noise(
+                        x_last.flatten(0, 1), noisy.flatten(0, 1), t0 * torch.ones([f], device=self.device, dtype=torch.long),
+                    ).unflatten(0, noisy.shape[:2])
+                    schedule = torch.stack([t0] + [s for s in self.first_chunk_steps if s < t0])
+                elif n is not None and n > 0 and x_last is not None:
                     # Start from the last clean frame noised to step n (reuses the noise drawn above).
                     noisy = self.scheduler.add_noise(
                         x_last.flatten(0, 1),
@@ -774,7 +801,7 @@ class Backend:
                     nxt = schedule[i + 1]
                     noisy = self.scheduler.add_noise(
                         denoised.flatten(0, 1),
-                        torch.randn(denoised.flatten(0, 1).shape, device=self.device, dtype=denoised.dtype, generator=self._rng),
+                        torch.randn(denoised.flatten(0, 1).shape, device=self.device, dtype=denoised.dtype, generator=rng),
                         nxt * torch.ones([f], device=self.device, dtype=torch.long),
                     ).unflatten(0, denoised.shape[:2])
 
@@ -830,6 +857,9 @@ def load(width: int, height: int, steps: Optional[int] = None, device: str = "cu
     cut_fade_frames (0 = off): after a re-anchor cut, dissolve from the last shown frame into the new
     picture over this many output frames, across chunk boundaries; never on a new video.
     cut_fade_refresh (1): refreshes (reanchor source "clean") fade too; 0 fades only steers.
+    refresh_noise ("fresh" or "fixed"): "fixed" seeds a refresh's noise by its clean anchor, so every
+    refresh from one anchor gives the same picture. refresh_anchor_t (None, or 1..1000): the level a
+    refresh noises the clean anchor to, instead of the strength's anchor step (500 = step 2, 250 = step 3).
     """
     # Options may arrive as strings from the server's --backend-opt KEY=VALUE.
     flag = lambda v: v if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes", "on")  # noqa: E731
@@ -837,7 +867,8 @@ def load(width: int, height: int, steps: Optional[int] = None, device: str = "cu
              "steer_rebase": flag, "steer_keep": int, "steer_memory_noise": int, "steer_anchor_step": int,
              "steer_min_gap": int, "steer_fire_on_change": flag, "refresh_every": int, "refresh_keep": int,
              "refresh_memory_noise": int, "clean_anchor_after": int, "cut_fade_frames": int,
-             "cut_fade_refresh": flag}
+             "cut_fade_refresh": flag, "refresh_noise": str,
+             "refresh_anchor_t": lambda v: None if str(v).lower() == "none" else int(v)}
     options = {k: types[k](v) if k in types else v for k, v in options.items()}
     steps = int(steps) if steps is not None and int(steps) > 0 else None  # 0 or None: distilled schedule
     t0 = time.time()

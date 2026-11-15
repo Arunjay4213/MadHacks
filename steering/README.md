@@ -194,6 +194,10 @@ Refresh interval on the car, with the decoder restart (mean saturation per 60 ch
 The default stays at 24.
 The live engine runs 48 (`--reanchor-opt refresh_every_chunks=48`) since engine PR #125, because each refresh re-composes the shot and 48 halves the number of jumps.
 
+Why each refresh re-composed the shot: the refresh noises the clean anchor to step 2 (warped t = 833, sigma about 0.83) with fresh noise, so each refresh was a new sample near the anchor, and on a static scene the car and the snow layout changed every refresh.
+The backend now draws a refresh's noise from a generator seeded by the clean anchor (`refresh_noise=fixed`, the default), so every refresh from one anchor returns to the same picture.
+On the parked-car scene the change between the frames 1 s after two refreshes went from 30.4 to 10.9 (normal motion over 1 s: 12), with no drift over 360 chunks on the parked or the driving car (engine/MODEL_NOTES.md, `engine/samples/refresh_noise_fixed_parked.jpg`).
+
 On the live engine, the 90 s after a Reset with no commands stayed clean and the same scene after PR #83, where before it was over-saturated by 25 to 30 s and broken by 40 to 60 s (`engine/samples/drift_after_83_90s.jpg`).
 
 ### Decoder restart (PR #83)
