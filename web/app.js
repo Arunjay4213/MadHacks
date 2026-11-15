@@ -532,6 +532,8 @@ function startLevel() {
   }).catch(() => {}); // no level (refused, no device): the bars keep their wave
 }
 
+reducedMotion.addEventListener('change', () => reducedMotion.matches && stopLevel()); // turned on mid-press
+
 function drawLevel() {
   level.analyser.getByteFrequencyData(level.data);
   let total = 0;
