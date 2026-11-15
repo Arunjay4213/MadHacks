@@ -28,7 +28,16 @@ bf16 (padding tokens zeroed), passed as conditional_dict["prompt_embeds"]. The W
 caches the cross-attention K/V of the text in a second cache (crossattn_cache, flag
 "is_init"). generate_chunk() resets that cache whenever `cond` is a different object from
 the one used for the previous call, so a new prompt takes effect on the very next chunk.
-The frame KV cache is never touched by a conditioning change.
+A plain conditioning change never touches the frame KV cache.
+
+Re-anchor and recache (both off by default, chosen per call; see ChunkMode):
+- generate_chunk(cond, anchor_step=n) drops the frame history and makes the frame as the
+  first frame of a new video, started from the previous clean latent noised to S[n] of the
+  first-frame schedule S (n == 0: pure noise, a hard cut). The decoder is not restarted.
+- generate_chunk(cond, recache_frames=N) rebuilds the frame KV cache from the last N clean
+  latents under the new cond (clean context pass only, at their own positions), then makes
+  the frame normally.
+- anchor_step_for_strength(strength) maps the steering policy's 0..1 strength to a step.
 
 Threads and devices: generation, prompt encoding and decoding each run on their own CUDA
 stream. The decoder object owns all decode state and receives only the ChunkLatents passed
@@ -37,6 +46,7 @@ in, so it can move to `decode_device` or to another process later.
 
 from __future__ import annotations
 
+import collections
 import contextlib
 import dataclasses
 import enum
@@ -90,6 +100,31 @@ class VaeType(str, enum.Enum):
 class GenState(enum.Enum):
     EMPTY = "empty"  # no frame generated since load() or reset(); next call starts a new video
     STREAMING = "streaming"  # frame cache holds past frames; next call continues the video
+
+
+class ChunkMode(enum.Enum):
+    """What one generate_chunk call does. Chosen by Backend._chunk_mode from GenState and the
+    call's arguments; each value is one named path through generate_chunk."""
+
+    FIRST_FRAME = "first_frame"  # GenState.EMPTY: first frame of a new video, from noise, first-frame schedule
+    CONTINUE = "continue"  # GenState.STREAMING, no option: next frame on the frame cache, normal schedule
+    ANCHOR = "anchor"  # anchor_step=n: clear the frame history, restart from the last clean latent noised to S[n]
+    RECACHE = "recache"  # recache_frames=N: rebuild the frame cache from the last N clean latents under the new cond
+
+
+def anchor_step_for_strength(strength: float) -> int:
+    """Map a re-anchor strength in 0..1 (1 = strongest repaint) to an anchor_step in 1..3.
+
+    Step 1 keeps only the rough layout and lets the text repaint the scene, step 3 keeps almost
+    everything. Step 0 (a hard cut to a new video) is never returned. Values outside 0..1 are
+    clamped. Thresholds: strength >= 2/3 -> 1, >= 1/3 -> 2, else 3.
+    """
+    s = min(1.0, max(0.0, float(strength)))
+    if s >= 2.0 / 3.0:
+        return 1
+    if s >= 1.0 / 3.0:
+        return 2
+    return 3
 
 
 class DecoderState(enum.Enum):
@@ -329,6 +364,10 @@ class Backend:
         self.frame_index = 0  # latent frames generated in this video (absolute RoPE position)
         self._last_cond: Optional[torch.Tensor] = None
         self.crossattn_resets = 0  # how many times the text K/V cache was recomputed (for tests)
+        # Clean latents of the last calls, one [1, 1, 16, H/8, W/8] entry per latent frame, newest
+        # last, at most one window. Empty exactly when state is GenState.EMPTY. history[-1] is
+        # x_last for a re-anchor; the tail is what a recache replays.
+        self._history: collections.deque[torch.Tensor] = collections.deque(maxlen=attn_window_frames)
 
     # ---- caches -------------------------------------------------------------------------------
 
@@ -352,6 +391,16 @@ class Backend:
                 }
                 for _ in range(NUM_BLOCKS)
             ]
+
+    def _clear_frame_cache(self, start_frame: int):
+        """Empty the frame KV cache so the next frame written is the one at `start_frame`.
+
+        The official cache writes a frame at local slot local_end + (current_end - global_end),
+        so after this the frame at `start_frame` lands in slot 0. start_frame=0 is what reset()
+        does; a recache uses the position of the first frame it replays."""
+        for c in self.kv_cache:
+            c["global_end_index"].fill_(start_frame * self.frame_seq_length)
+            c["local_end_index"].zero_()
 
     def _reset_crossattn_cache(self):
         for c in self.crossattn_cache:
@@ -389,32 +438,106 @@ class Backend:
             if seed is not None:
                 self._rng.manual_seed(int(seed))
             with torch.cuda.device(self.device), torch.cuda.stream(self._gen_stream):
-                for c in self.kv_cache:
-                    c["global_end_index"].zero_()
-                    c["local_end_index"].zero_()
+                self._clear_frame_cache(0)
             self._reset_crossattn_cache()
             self._last_cond = None
+            self._history.clear()
             self.frame_index = 0
             self.chunk_index = 0
             self.video_id += 1
             self.state = GenState.EMPTY
 
+    def _chunk_mode(self, anchor_step: Optional[int], recache_frames: Optional[int]) -> ChunkMode:
+        """Validate the per-call options and name what this call does."""
+        if anchor_step is not None and recache_frames is not None:
+            raise ValueError("pass anchor_step or recache_frames, not both")
+        if anchor_step is not None and not 0 <= int(anchor_step) < len(self.first_chunk_steps):
+            raise ValueError(f"anchor_step must be in 0..{len(self.first_chunk_steps) - 1}")
+        if recache_frames is not None:
+            n = int(recache_frames)
+            if not 1 <= n <= self.attn_window_frames or n % self.num_frame_per_block:
+                raise ValueError(f"recache_frames must be in 1..{self.attn_window_frames} and a multiple of {self.num_frame_per_block}")
+        if self.state is GenState.EMPTY:
+            return ChunkMode.FIRST_FRAME  # nothing to anchor on or replay yet: a new video starts anyway
+        if anchor_step is not None:
+            return ChunkMode.ANCHOR
+        if recache_frames is not None:
+            return ChunkMode.RECACHE
+        return ChunkMode.CONTINUE
+
+    def _clean_pass(self, clean: torch.Tensor, cond_dict: dict, frame: int):
+        """Write clean latents into the frame KV cache at `frame` (official step 3.3)."""
+        self.generator(
+            noisy_image_or_video=clean,
+            conditional_dict=cond_dict,
+            timestep=torch.ones([1, clean.shape[1]], device=self.device, dtype=torch.int64) * self.context_noise,
+            kv_cache=self.kv_cache,
+            crossattn_cache=self.crossattn_cache,
+            current_start=frame * self.frame_seq_length,
+        )
+
+    def _recache(self, n: int, cond_dict: dict):
+        """Rebuild the frame KV cache from the last `n` clean latents under `cond_dict`.
+
+        Each block is replayed with the clean context pass at its own absolute frame position, in
+        order, so every frame attends to the replayed frames before it, as when it was made."""
+        frames = list(self._history)[-n:]
+        first = self.frame_index - len(frames)
+        self._clear_frame_cache(first)
+        f = self.num_frame_per_block
+        for j in range(0, len(frames), f):
+            self._clean_pass(torch.cat(frames[j:j + f], dim=1), cond_dict, first + j)
+
     @torch.no_grad()
-    def generate_chunk(self, cond: torch.Tensor) -> ChunkLatents:
+    def generate_chunk(self, cond: torch.Tensor, anchor_step: Optional[int] = None,
+                       recache_frames: Optional[int] = None) -> ChunkLatents:
+        """Make the next block of latent frames under `cond`.
+
+        anchor_step=n (0..len(first-frame schedule)-1): re-anchor, see ChunkMode.ANCHOR. The frame
+        cache and frame index restart as in reset(), the text K/V is recomputed, but the decoder
+        and the noise stream continue, so the viewer sees one continuous video. The frame starts
+        from the previous clean latent noised to S[n] (n == 0: pure noise) and is denoised with
+        S[n:]. Small n repaints more.
+        recache_frames=N: rebuild the frame cache from the last N clean latents under `cond`,
+        then make the frame normally (ChunkMode.RECACHE).
+        Both are ignored on the first call of a video (ChunkMode.FIRST_FRAME). With neither, the
+        output is bit-identical to the backend without these options.
+        """
+        mode = self._chunk_mode(anchor_step, recache_frames)
         with self._gen_lock, torch.cuda.device(self.device), torch.cuda.stream(self._gen_stream):
             if self.frame_index + self.num_frame_per_block > self.max_latent_frames:
                 raise RuntimeError("reached max_latent_frames; call reset() or load with a larger max_latent_frames")
             # `cond` may have been written on another thread's stream (the steerer's blend).
             self._gen_stream.wait_stream(torch.cuda.default_stream(self.device))
-            if cond is not self._last_cond:
+            if cond is not self._last_cond or mode is ChunkMode.ANCHOR:
                 self._reset_crossattn_cache()
                 self._last_cond = cond
             cond_dict = {"prompt_embeds": cond}
 
             f = self.num_frame_per_block
             lh, lw = self.latent_hw
-            noisy = torch.randn([1, f, LATENT_CHANNELS, lh, lw], device=self.device, dtype=self.dtype, generator=self._rng)
-            schedule = self.first_chunk_steps if self.state is GenState.EMPTY else self.denoising_steps
+            noise = torch.randn([1, f, LATENT_CHANNELS, lh, lw], device=self.device, dtype=self.dtype, generator=self._rng)
+            if mode is ChunkMode.FIRST_FRAME:
+                noisy, schedule = noise, self.first_chunk_steps
+            elif mode is ChunkMode.CONTINUE:
+                noisy, schedule = noise, self.denoising_steps
+            elif mode is ChunkMode.ANCHOR:
+                x_last = torch.cat(list(self._history)[-f:], dim=1)
+                self._clear_frame_cache(0)
+                self.frame_index = 0
+                n = int(anchor_step)
+                schedule = self.first_chunk_steps[n:]
+                if n == 0:
+                    noisy = noise
+                else:
+                    noisy = self.scheduler.add_noise(
+                        x_last.flatten(0, 1), noise.flatten(0, 1), schedule[0] * torch.ones([f], device=self.device, dtype=torch.long)
+                    ).unflatten(0, x_last.shape[:2])
+            elif mode is ChunkMode.RECACHE:
+                self._recache(int(recache_frames), cond_dict)
+                noisy, schedule = noise, self.denoising_steps
+            else:
+                raise AssertionError(mode)
             current_start = self.frame_index * self.frame_seq_length
 
             for i, t in enumerate(schedule):
@@ -436,18 +559,12 @@ class Backend:
                     ).unflatten(0, denoised.shape[:2])
 
             # Write the clean frame into the frame KV cache (official step 3.3).
-            self.generator(
-                noisy_image_or_video=denoised,
-                conditional_dict=cond_dict,
-                timestep=torch.ones([1, f], device=self.device, dtype=torch.int64) * self.context_noise,
-                kv_cache=self.kv_cache,
-                crossattn_cache=self.crossattn_cache,
-                current_start=current_start,
-            )
+            self._clean_pass(denoised, cond_dict, self.frame_index)
 
             ready = torch.cuda.Event()
             ready.record(self._gen_stream)
             out = ChunkLatents(latents=denoised, video_id=self.video_id, chunk_index=self.chunk_index, ready=ready)
+            self._history.extend(denoised[:, j:j + 1] for j in range(f))
             self.frame_index += f
             self.chunk_index += 1
             self.state = GenState.STREAMING
