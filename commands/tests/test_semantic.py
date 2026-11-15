@@ -92,5 +92,47 @@ class SemanticReaderTests(unittest.TestCase):
         self.assertEqual(undone["state"]["changes"], [])
 
 
+def nocturnal_encode(texts):
+    """'nocturnal' sits next to the dictionary's night entry; every other text is far from it and from each other."""
+    from commands.dictionary import KEYWORDS
+    night = {alias for alias, entry in KEYWORDS.items() if entry["label"] == "night"} | {KEYWORDS["night"]["phrase"]}
+    return [[1, 0, 0] if text in night or "nocturnal" in text else [0, 1 + len(text) % 7, 1 + len(text) % 5] for text in texts]
+
+
+@unittest.skipUnless(find_spec("numpy"), "optional vector tests need numpy")
+class StrengthWordsTests(unittest.TestCase):
+    """Strength words on the vector and style paths follow reader.strength_for, as on the dictionary path."""
+
+    def run_sentences(self, *sentences):
+        service = CommandService(slow_reader=lambda *a: None, semantic_reader=SemanticReader(nocturnal_encode))
+        for i, text in enumerate(sentences):
+            result = service.handle(dict(type="final", text=text, t_client=i + 1))
+            self.assertFalse(result["state"]["unmatched"], text)
+        return [(c["label"], c["strength"]) for c in result["state"]["changes"]]
+
+    def test_vector_path_reads_strength_words(self):
+        self.assertEqual(self.run_sentences("make it a little nocturnal"), [("night", 0.3)])
+        self.assertEqual(self.run_sentences("make it a little night"), [("night", 0.3)])  # the dictionary path agrees
+        self.assertEqual(self.run_sentences("make it a lot nocturnal"), [("night", 1.3)])
+        self.assertEqual(self.run_sentences("make it nocturnal", "make it much more nocturnal"), [("night", 1.3)])
+        self.assertEqual(self.run_sentences("make it nocturnal", "make it less nocturnal"), [("night", 0.7)])
+
+    def test_style_path_strips_strength_words_and_sets_strength(self):
+        self.assertEqual(self.run_sentences("make it a little spooky"), [("spooky", 0.3)])
+        self.assertEqual(self.run_sentences("make it a lot spooky"), [("spooky", 1.3)])
+        self.assertEqual(self.run_sentences("make it less spooky"), [("spooky", 1.0)])  # no chip named "less spooky"
+        self.assertEqual(self.run_sentences("make it spooky", "make it much more spooky"), [("spooky", 1.3)])
+        self.assertEqual(self.run_sentences("make it spooky", "make it more spooky"), [("spooky", 1.3)])
+        self.assertEqual(self.run_sentences("make it spooky", "make it less spooky"), [("spooky", 0.7)])
+        self.assertEqual(self.run_sentences("make it spooky", "make it a little less spooky"), [("spooky", 0.7)])
+
+    def test_style_strength_change_is_one_undo(self):
+        service = CommandService(slow_reader=lambda *a: None, semantic_reader=SemanticReader(nocturnal_encode))
+        service.handle(dict(type="final", text="make it spooky", t_client=1))
+        service.handle(dict(type="final", text="make it less spooky", t_client=2))
+        undone = service.handle(dict(type="tap", action="undo"))
+        self.assertEqual([(c["label"], c["strength"]) for c in undone["state"]["changes"]], [("spooky", 1.0)])
+
+
 if __name__ == "__main__":
     unittest.main()

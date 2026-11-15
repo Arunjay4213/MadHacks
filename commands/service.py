@@ -208,7 +208,7 @@ class CommandService:
                 if op is None and self._slow_reader is not None:
                     op = self._ask_slow(clause, snapshot, max(0, deadline - time.monotonic()))
                 if op is None:
-                    op = style_fallback(clause)  # last resort: "make it spooky" -> a "spooky" look
+                    op = style_fallback(clause, snapshot)  # last resort: "make it spooky" -> a "spooky" look
             if op is None:
                 operations = []
                 break
