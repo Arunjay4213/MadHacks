@@ -149,6 +149,16 @@ The mean absolute change from the last frame of the previous chunk is 23-28 (0-2
 `ChunkLatents.start` is now `ChunkStart.FIRST_FRAME` on the first chunk of a video and on every keep-0 rebase (every re-anchor), else `CONTINUE`.
 On `FIRST_FRAME` mid-video the decoder restarts its stream state exactly as for a new video (same "drop the first 3 frames" rule, so 1 frame) but keeps `video_id` and the chunk count, so the engine's ordering does not change. Rebases with keep >= 1 make continuation latents and do not restart the decoder.
 Backend option `first_frame_pad` (`--backend-opt first_frame_pad=...`): `hold` (default) repeats that 1 clean frame to the usual 4 frames, so every chunk still has 4 frames; `none` emits the true 1 frame, as the first chunk of a video already does. Switch to `none` once the streamer handles short chunks.
+
+Dissolve after a cut (`--backend-opt cut_fade_frames=N`, default 0 = off; `cut_fade_refresh=1` default, 0 fades only steers): on a re-anchor chunk (not the first chunk of a video) the decoder blends output frame k after the cut as (1 - a) * last shown frame + a * new frame, a = (k + 1) / (N + 1), over the next N emitted frames, across chunk boundaries, after the uint8 conversion and the `first_frame_pad` hold, for both decoders. With `first_frame_pad=none` it counts the frames actually emitted (the cut's 1 frame, then the next chunks), so the dissolve has the same length.
+Measured (car, 360 chunks, refresh every 24, steers to snow, neon and desert; largest change between consecutive frames from the chunk before an anchor to 3 chunks after it, mean over events; normal motion median 4, p99 17):
+
+| | N = 0 | N = 8 |
+|---|---|---|
+| steer (3) | 82 (max 97) | 13 (max 15) |
+| refresh (12) | 38 (max 56) | 8 (max 13) |
+
+With N = 8 the new scene is fully in 0.5 s after the cut. The frames in between are a double exposure (lowest sharpness during the fade 226 against 369 without, on refreshes). On a refresh this turns the layout snap-back into a 0.5 s dissolve with no brightness pulse, but when the car's position differs between the drifted picture and the clean anchor, two overlapping cars show for about 4 frames. Sheets: `engine/samples/cut_fade_steer.jpg`, `engine/samples/cut_fade_refresh.jpg` (every output frame from 2 before the cut to 11 after, N = 0 and N = 8).
 Measured on the meadow, 360 chunks, refresh every 24 at step 2, mean over the refreshes (sharpness = variance of the Laplacian; change = mean absolute difference, 0-255, between a chunk's first frame and the previous chunk's last frame):
 
 | Chunk | sharpness before | sharpness after | change before | change after |
