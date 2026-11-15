@@ -285,7 +285,7 @@ The full list with defaults is in the `load()` docstring of `engine/backends/cau
 
 The four steer options are off by default, and then nothing changes; a bad value stops the backend at load, before any weights are read.
 They keep the shot's layout across a world change (tree trunk shift 12 to 21 px against 56 to 96 px, one seed so far, more runs in progress); see `engine/MODEL_NOTES.md`, "Steer start".
-They are not on the live engine yet.
+On the live engine only `steer_steps=1000,500` is set (the latency deploy, see "Live flags and why each is set"); `steer_anchor_t`, `steer_noise` and `steer_noise_first_frame` are off.
 
 - `defer_context` (0): 1 runs each chunk's context pass (its frame KV cache write) at the start of the next chunk instead of at the end of its own, and skips it when that chunk rebases (every re-anchor), so a latent reaches the decoder one pass (about 90 ms) sooner and a cut does not pay for the old scene's pass. Latents and RNG draws are unchanged.
 - `Backend.interrupt()` is not an option but a method: any thread may call it to stop a non-rebase chunk at its next pass boundary (`ChunkInterrupted`), leaving the backend as if the call had not been made, so a steer cut can take that chunk's number. The engine calls it with `--interrupt-on-steer on` (see "Cut latency").
