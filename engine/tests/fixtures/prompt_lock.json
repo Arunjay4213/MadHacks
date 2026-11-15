@@ -11,7 +11,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "8438448d29aa85ca"
+    "likely_prompts_sha": "7035ab0620b82b34"
    },
    {
     "say": "make it winter",
@@ -34,7 +34,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-    "likely_prompts_sha": "bb5cfaa4799ccb75"
+    "likely_prompts_sha": "79414cc07fdb13f4"
    },
    {
     "say": "add a red car",
@@ -234,7 +234,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "8438448d29aa85ca"
+    "likely_prompts_sha": "7035ab0620b82b34"
    },
    {
     "say": "make it winter",
@@ -257,7 +257,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-    "likely_prompts_sha": "bb5cfaa4799ccb75"
+    "likely_prompts_sha": "79414cc07fdb13f4"
    },
    {
     "say": "add a red car",
@@ -496,7 +496,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains; night time under a full moon",
-    "likely_prompts_sha": "d0dc0c68d361408f"
+    "likely_prompts_sha": "a4d0e86dbac1d59a"
    },
    {
     "say": "remove the forest",
@@ -519,7 +519,7 @@
      "unmatched": true
     },
     "committed": "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains; night time under a full moon",
-    "likely_prompts_sha": "d0dc0c68d361408f"
+    "likely_prompts_sha": "a4d0e86dbac1d59a"
    },
    {
     "say": "make it foggy",
@@ -552,11 +552,11 @@
      "unmatched": false
     },
     "committed": "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-    "likely_prompts_sha": "2060ad3f6200aa81"
+    "likely_prompts_sha": "7775593ddfcdcf97"
    }
   ],
   "likely_prompts": [
-   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; night time under a full moon",
+   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, puddles on the ground reflect the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; night time under a full moon",
    "a wide shot of a single oak tree; a calm lake reflecting the sky; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
    "a wide shot of a single oak tree; a car driving forward along a road; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
    "a wide shot of a single oak tree; a cat sitting nearby; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
@@ -615,7 +615,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "8438448d29aa85ca"
+    "likely_prompts_sha": "7035ab0620b82b34"
    },
    {
     "say": "make it winter",
@@ -638,7 +638,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-    "likely_prompts_sha": "bb5cfaa4799ccb75"
+    "likely_prompts_sha": "79414cc07fdb13f4"
    },
    {
     "say": "a little more snow",
@@ -661,7 +661,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; intense winter scenery with snow on the ground",
-    "likely_prompts_sha": "1efc1a781474afb7"
+    "likely_prompts_sha": "9873a555750b39a1"
    },
    {
     "say": "a little less snow",
@@ -684,7 +684,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-    "likely_prompts_sha": "bb5cfaa4799ccb75"
+    "likely_prompts_sha": "79414cc07fdb13f4"
    },
    {
     "say": "make it slowly rain",
@@ -712,7 +712,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; steady rain falling",
-    "likely_prompts_sha": "49f7eaa8074f4008"
+    "likely_prompts_sha": "7bacd12e933395c8"
    },
    {
     "say": "add a dog and remove the rain",
@@ -740,7 +740,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby",
-    "likely_prompts_sha": "06348f02185a64a2"
+    "likely_prompts_sha": "31ac9de1c6e4f3de"
    },
    {
     "say": "add a dog and a cat",
@@ -773,7 +773,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby; a cat sitting nearby",
-    "likely_prompts_sha": "047cc25cdb2bd3f0"
+    "likely_prompts_sha": "98e530710dbfc610"
    },
    {
     "say": "remove the dog",
@@ -801,7 +801,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a cat sitting nearby",
-    "likely_prompts_sha": "67c3d01740b43756"
+    "likely_prompts_sha": "2a617ecba0ceaca8"
    },
    {
     "say": "undo",
@@ -834,7 +834,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby; a cat sitting nearby",
-    "likely_prompts_sha": "047cc25cdb2bd3f0"
+    "likely_prompts_sha": "98e530710dbfc610"
    },
    {
     "say": "undo the winter",
@@ -862,7 +862,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; a dog standing nearby; a cat sitting nearby",
-    "likely_prompts_sha": "a9ae54f77609c951"
+    "likely_prompts_sha": "898b545615689f11"
    },
    {
     "say": "add a glowing unicorn",
@@ -895,7 +895,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; a dog standing nearby; a cat sitting nearby; a glowing unicorn",
-    "likely_prompts_sha": "1af9a187149e3726"
+    "likely_prompts_sha": "867d548a035e569c"
    },
    {
     "say": "add a bright red car",
@@ -1390,7 +1390,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "8438448d29aa85ca"
+    "likely_prompts_sha": "7035ab0620b82b34"
    }
   ],
   "likely_prompts": [
@@ -1434,7 +1434,7 @@
    "a wide shot of a meadow with a single oak tree; strong wind blowing through everything",
    "a wide shot of a meadow with a single oak tree; tall trees with branches moving in the breeze",
    "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, puddles on the ground reflect the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
    "a wide shot of a single oak tree; a dense green pine forest, tall trees all around, soft sunlight through the branches",
    "a wide shot of a single oak tree; a green meadow with soft grass, under a clear blue sky",
    "a wide shot of a single oak tree; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
@@ -1456,7 +1456,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "8438448d29aa85ca"
+    "likely_prompts_sha": "7035ab0620b82b34"
    },
    {
     "say": "new scene of a lighthouse on a cliff",
@@ -1473,7 +1473,7 @@
      "unmatched": false
     },
     "committed": "a lighthouse on a cliff",
-    "likely_prompts_sha": "bde05519238165d5"
+    "likely_prompts_sha": "16d4fb9aff565ff2"
    },
    {
     "say": "make it winter",
@@ -1496,7 +1496,7 @@
      "unmatched": false
     },
     "committed": "a lighthouse on a cliff; winter scenery with snow on the ground",
-    "likely_prompts_sha": "1afcd97ec2d45c0b"
+    "likely_prompts_sha": "da0bbfc9cb53b4a2"
    },
    {
     "say": "make it a desert",
@@ -1519,7 +1519,7 @@
      "unmatched": false
     },
     "committed": "a lighthouse on a cliff; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
-    "likely_prompts_sha": "2013fe56e07d5ac5"
+    "likely_prompts_sha": "250176638ecbea93"
    },
    {
     "say": "show me a castle",
@@ -1547,7 +1547,7 @@
      "unmatched": false
     },
     "committed": "a lighthouse on a cliff; a stone castle with tall towers in the distance; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
-    "likely_prompts_sha": "c2e42c8e36afd71a"
+    "likely_prompts_sha": "4019637e73b93d1d"
    },
    {
     "say": "reset and add a dog",
@@ -1570,7 +1570,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; a dog standing nearby",
-    "likely_prompts_sha": "2283fce1bef2fd27"
+    "likely_prompts_sha": "5ce21e91179c8778"
    },
    {
     "say": "start over with a beach",
@@ -1587,7 +1587,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "8438448d29aa85ca"
+    "likely_prompts_sha": "7035ab0620b82b34"
    }
   ],
   "likely_prompts": [
@@ -1631,7 +1631,7 @@
    "a wide shot of a meadow with a single oak tree; strong wind blowing through everything",
    "a wide shot of a meadow with a single oak tree; tall trees with branches moving in the breeze",
    "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, puddles on the ground reflect the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
    "a wide shot of a single oak tree; a dense green pine forest, tall trees all around, soft sunlight through the branches",
    "a wide shot of a single oak tree; a green meadow with soft grass, under a clear blue sky",
    "a wide shot of a single oak tree; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
@@ -1653,7 +1653,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "8438448d29aa85ca"
+    "likely_prompts_sha": "7035ab0620b82b34"
    },
    {
     "say": "new scene of a red sports car driving along a country road",
@@ -1939,7 +1939,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "8438448d29aa85ca"
+    "likely_prompts_sha": "7035ab0620b82b34"
    }
   ],
   "likely_prompts": [
@@ -1983,7 +1983,7 @@
    "a wide shot of a meadow with a single oak tree; strong wind blowing through everything",
    "a wide shot of a meadow with a single oak tree; tall trees with branches moving in the breeze",
    "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, puddles on the ground reflect the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
    "a wide shot of a single oak tree; a dense green pine forest, tall trees all around, soft sunlight through the branches",
    "a wide shot of a single oak tree; a green meadow with soft grass, under a clear blue sky",
    "a wide shot of a single oak tree; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
@@ -2005,7 +2005,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "8438448d29aa85ca"
+    "likely_prompts_sha": "7035ab0620b82b34"
    },
    {
     "say": "partial:make it win",
@@ -2017,7 +2017,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "8438448d29aa85ca"
+    "likely_prompts_sha": "7035ab0620b82b34"
    },
    {
     "say": "partial:make it winter",
@@ -2034,7 +2034,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "8438448d29aa85ca"
+    "likely_prompts_sha": "7035ab0620b82b34"
    },
    {
     "say": "final:make it winter",
@@ -2057,7 +2057,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-    "likely_prompts_sha": "bb5cfaa4799ccb75"
+    "likely_prompts_sha": "79414cc07fdb13f4"
    },
    {
     "say": "partial:add a li",
@@ -2075,7 +2075,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-    "likely_prompts_sha": "bb5cfaa4799ccb75"
+    "likely_prompts_sha": "79414cc07fdb13f4"
    },
    {
     "say": "partial:add a lion",
@@ -2093,7 +2093,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-    "likely_prompts_sha": "bb5cfaa4799ccb75"
+    "likely_prompts_sha": "79414cc07fdb13f4"
    },
    {
     "say": "partial:add a",
@@ -2111,7 +2111,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-    "likely_prompts_sha": "bb5cfaa4799ccb75"
+    "likely_prompts_sha": "79414cc07fdb13f4"
    },
    {
     "say": "final:add a lion",
@@ -2139,7 +2139,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a lion",
-    "likely_prompts_sha": "4ac6399d06f5aa4b"
+    "likely_prompts_sha": "1a046f3d203259ba"
    },
    {
     "say": "partial:undo",
@@ -2162,7 +2162,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a lion",
-    "likely_prompts_sha": "4ac6399d06f5aa4b"
+    "likely_prompts_sha": "1a046f3d203259ba"
    },
    {
     "say": "partial:make it a desert",
@@ -2185,7 +2185,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a lion",
-    "likely_prompts_sha": "4ac6399d06f5aa4b"
+    "likely_prompts_sha": "1a046f3d203259ba"
    },
    {
     "say": "partial:add a dog",
@@ -2213,7 +2213,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a lion",
-    "likely_prompts_sha": "4ac6399d06f5aa4b"
+    "likely_prompts_sha": "1a046f3d203259ba"
    },
    {
     "say": "final:never mind",
@@ -2236,7 +2236,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-    "likely_prompts_sha": "bb5cfaa4799ccb75"
+    "likely_prompts_sha": "79414cc07fdb13f4"
    }
   ],
   "likely_prompts": [
@@ -2279,7 +2279,7 @@
    "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; steady rain falling",
    "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; strong wind blowing through everything",
    "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; tall trees with branches moving in the breeze",
-   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, puddles on the ground reflect the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
    "a wide shot of a single oak tree; a dense green pine forest, tall trees all around, soft sunlight through the branches",
    "a wide shot of a single oak tree; a green meadow with soft grass, under a clear blue sky",
    "a wide shot of a single oak tree; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
@@ -2306,7 +2306,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "8438448d29aa85ca",
+    "likely_prompts_sha": "7035ab0620b82b34",
     "model_calls": []
    },
    {
@@ -2330,7 +2330,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; thick white snow blanketing the whole meadow, deep soft snowdrifts, pale cold light, muted silver and blue tones",
-    "likely_prompts_sha": "dd6b7eec04802b24",
+    "likely_prompts_sha": "c7a100fdae5a1417",
     "model_calls": []
    },
    {
@@ -2349,7 +2349,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; thick white snow blanketing the whole meadow, deep soft snowdrifts, pale cold light, muted silver and blue tones",
-    "likely_prompts_sha": "dd6b7eec04802b24",
+    "likely_prompts_sha": "c7a100fdae5a1417",
     "model_calls": []
    },
    {
@@ -2996,7 +2996,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "8438448d29aa85ca",
+    "likely_prompts_sha": "7035ab0620b82b34",
     "model_calls": []
    }
   ],
@@ -3041,7 +3041,7 @@
    "a wide shot of a meadow with a single oak tree; strong wind blowing through everything",
    "a wide shot of a meadow with a single oak tree; tall trees with branches moving in the breeze",
    "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, puddles on the ground reflect the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
    "a wide shot of a single oak tree; a dense green pine forest, tall trees all around, soft sunlight through the branches",
    "a wide shot of a single oak tree; a green meadow with soft grass, under a clear blue sky",
    "a wide shot of a single oak tree; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
@@ -3089,7 +3089,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "8438448d29aa85ca",
+    "likely_prompts_sha": "7035ab0620b82b34",
     "model_calls": []
    },
    {
@@ -3500,7 +3500,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "8438448d29aa85ca",
+    "likely_prompts_sha": "7035ab0620b82b34",
     "model_calls": []
    }
   ],
@@ -3545,7 +3545,7 @@
    "a wide shot of a meadow with a single oak tree; strong wind blowing through everything",
    "a wide shot of a meadow with a single oak tree; tall trees with branches moving in the breeze",
    "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, puddles on the ground reflect the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
    "a wide shot of a single oak tree; a dense green pine forest, tall trees all around, soft sunlight through the branches",
    "a wide shot of a single oak tree; a green meadow with soft grass, under a clear blue sky",
    "a wide shot of a single oak tree; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
@@ -3593,7 +3593,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "8438448d29aa85ca",
+    "likely_prompts_sha": "7035ab0620b82b34",
     "model_calls": []
    },
    {
@@ -3617,7 +3617,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; thick white snow blanketing the whole meadow, deep soft snowdrifts, pale cold light, muted silver and blue tones",
-    "likely_prompts_sha": "dd6b7eec04802b24",
+    "likely_prompts_sha": "c7a100fdae5a1417",
     "model_calls": []
    },
    {
@@ -3635,7 +3635,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "8438448d29aa85ca",
+    "likely_prompts_sha": "7035ab0620b82b34",
     "model_calls": []
    },
    {
@@ -3648,7 +3648,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "8438448d29aa85ca",
+    "likely_prompts_sha": "7035ab0620b82b34",
     "model_calls": []
    },
    {
@@ -3661,7 +3661,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "8438448d29aa85ca",
+    "likely_prompts_sha": "7035ab0620b82b34",
     "model_calls": [
      {
       "scene": {
@@ -3695,7 +3695,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; a dog standing nearby",
-    "likely_prompts_sha": "2283fce1bef2fd27",
+    "likely_prompts_sha": "5ce21e91179c8778",
     "model_calls": [
      {
       "scene": {

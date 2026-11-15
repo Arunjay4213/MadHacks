@@ -325,10 +325,10 @@
         "strength": 1.0
       }
     ],
-    "prompt": "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; glossy wet pavement, glowing pink and blue signage, reflective glass facades",
-    "canonical": "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+    "prompt": "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, puddles on the ground reflect the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; glowing neon reflections in puddles, glass and steel surfaces, vivid pink and cyan colour glow",
+    "canonical": "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, puddles on the ground reflect the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
     "source": "claude-sonnet-5-5",
-    "generated_at": "2026-11-15T04:51:37+00:00"
+    "generated_at": "2026-11-15T06:42:59+00:00"
   },
   {
     "sentence": "make it rain",
@@ -803,10 +803,10 @@
         "strength": 1.0
       }
     ],
-    "prompt": "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; dark night under a deep starry sky with soft moonlight; wet reflective pavement, glowing signage casting colourful light on glass facades, dark deep sky overhead, saturated pink and blue glow, polished surfaces mirroring the lights",
-    "canonical": "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; dark night under a deep starry sky with soft moonlight",
+    "prompt": "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, puddles on the ground reflect the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; dark night under a deep starry sky with soft moonlight; wet glass and steel surfaces, vivid magenta and cyan glow, thin humid air catching coloured light",
+    "canonical": "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, puddles on the ground reflect the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; dark night under a deep starry sky with soft moonlight",
     "source": "claude-sonnet-5-5",
-    "generated_at": "2026-11-15T04:51:38+00:00"
+    "generated_at": "2026-11-15T06:43:01+00:00"
   },
   {
     "sentence": "slowly make it night",
@@ -1203,10 +1203,10 @@
         "strength": 1.0
       }
     ],
-    "prompt": "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; wet asphalt reflecting vivid pink and blue light, glass and steel surfaces glowing with neon color, humid air with a faint glow, smooth slick textures",
-    "canonical": "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+    "prompt": "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, puddles on the ground reflect the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; glass facades humming with pink and blue glow, deep indigo air",
+    "canonical": "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, puddles on the ground reflect the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
     "source": "claude-sonnet-5-5",
-    "generated_at": "2026-11-15T04:51:40+00:00"
+    "generated_at": "2026-11-15T06:43:03+00:00"
   },
   {
     "sentence": "make it wintery",
