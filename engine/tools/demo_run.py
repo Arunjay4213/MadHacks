@@ -370,6 +370,12 @@ async def run(args, script: Script) -> int:
         if not await wait_for(lambda: rec.frames or rec.frames_closed, 20.0) or not rec.frames:
             print(f"error: no frames on /frames ({rec.frames_closed and rec.frames_closed.reason})", file=sys.stderr)
             return 1
+        readers = {control_task, frames_task}  # either one ending means a connection closed
+
+        def lost() -> tuple[str, Closed] | None:
+            """The first connection that closed, or None: either one ends the run early."""
+            closed = [(n, c) for n, c in (("/control", rec.control_closed), ("/frames", rec.frames_closed)) if c]
+            return min(closed, key=lambda nc: nc[1].t) if closed else None
 
         enter(Phase.RUNNING)
         sent: list[Sent] = []
@@ -378,9 +384,9 @@ async def run(args, script: Script) -> int:
         for step in script.steps:
             delay = t0 + step.at - time.monotonic()
             if delay > 0:
-                # Wakes at the step time, or at once when /control closes (its reader task ends).
-                await asyncio.wait({control_task}, timeout=delay)
-            if rec.control_closed:
+                # Wakes at the step time, or at once when /control or /frames closes (its reader task ends).
+                await asyncio.wait(readers, timeout=delay, return_when=asyncio.FIRST_COMPLETED)
+            if lost():
                 break
             # Strictly increasing, so two steps at the same second never share a t_client (replies are matched by it).
             t_client = last_t_client = max(int(time.time() * 1000), last_t_client + 1)
@@ -396,14 +402,16 @@ async def run(args, script: Script) -> int:
             now = time.monotonic() - t0
             sent.append(Sent(step.at, step.kind, step.text, t_client, now))
             print(f"  {now:6.2f} s  {step.kind.value}" + (f" {step.text!r}" if step.text else ""))
-        # A closed /control ends the run early: no more steps can be sent, and what was recorded is still saved.
+        # A closed connection ends the run early: without /control no step can be sent, and without /frames nothing
+        # can be measured, so no more commands go to the shared video. What was recorded is still saved.
         rest = t0 + script.end - time.monotonic()
-        if rest > 0 and not rec.control_closed:
-            await asyncio.wait({control_task}, timeout=rest)
+        if rest > 0 and not lost():
+            await asyncio.wait(readers, timeout=rest, return_when=asyncio.FIRST_COMPLETED)
         t_stop = time.monotonic()
-        if rec.control_closed:
-            print(f"  /control closed ({rec.control_closed.reason}), stopping the run early")
-            t_stop = min(t_stop, rec.control_closed.t)  # the run ended when /control closed, not when it was noticed
+        if first := lost():
+            name, closed = first
+            print(f"  {name} closed ({closed.reason}), stopping the run early")
+            t_stop = min(t_stop, closed.t)  # the run ended when the connection closed, not when it was noticed
         stats1 = get_stats(base)
         control_task.cancel()
         await asyncio.gather(control_task, return_exceptions=True)
