@@ -332,6 +332,7 @@ It is a cut to a new picture, so a cross-fade from the old video would blend two
 The decode thread knows it by the video number in `ChunkMeta`: the last decoded frame belongs to another video, or there is none.
 The decision is the enum `ChunkShape`: `full`, `video_start` or `short`.
 The padding frames count as frames of the chunk, so the lead gate's estimate of `frames_per_chunk` frames stays right.
+The padding time counts in the chunk's `decode_ms` (and so in `/stats` and the lead limit), because it runs on the decode thread between decode and JPEG encoding.
 Each short chunk logs one line (`chunk 40: short chunk, 1 of 4 frames, mode crossfade: padded to 4 frames in 1.9 ms`).
 `/stats` has `short_chunks`: `mode`, `count`, `last_chunk`, and `last` (`chunk`, decoded `frames`, `pad_ms`).
 The real backend's default `first_frame_pad=hold` already repeats a re-anchor chunk's 1 frame to 4, so on the live engine no chunk is short (`/stats` showed `short_chunks.count` 0); this padding matters only with `--backend-opt first_frame_pad=none` or the fake backend's `short_on_chunks`.
