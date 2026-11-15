@@ -127,3 +127,8 @@ A local real CPU engine can be used without touching the shared GPU service:
 `python -m engine.server --backend fake --reader commands --port 8100` from the repo
 root, then open `?server=127.0.0.1:8100`. It renders test frames, not model video.
 The optional integration test uses `LUCID_ENGINE_URL=http://127.0.0.1:8100`.
+
+Unsubmitted drafts remain unconfirmed until finalized or cleared, including long
+thinking pauses. An edit cancels any older automatic retry of a pending paste.
+Custom send-only adapters serialize successful scene edits and capture spatial
+pins when submitted, so a slow response cannot erase changes or lose placement.
