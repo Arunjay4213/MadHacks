@@ -158,7 +158,7 @@ For every final sentence the engine:
 
 1. takes the full scene with `CommandService.snapshot()`,
 2. asks Sonnet for the operations and the details in one call,
-3. applies the operations with `CommandService.apply_final(text, operations, None)`, which validates them and applies them as one edit with the same `steer` and `state` shape as `handle()`,
+3. applies the operations with `CommandService.apply_final(text, operations)`, which validates them and applies them as one edit with the same `steer` and `state` shape as `handle()`,
 4. checks the details with `validate_rewrite` and uses the rich prompt for that scene state from then on.
 
 Partials, taps, undo and reset still go through `handle()`, and so does any final where Sonnet times out or fails.
