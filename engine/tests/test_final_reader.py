@@ -125,8 +125,11 @@ def test_a_car_scene_keeps_the_template_unless_the_view_or_the_scene_changes():
     assert check_reply(json.loads(reply(on_sand, new_scene=True)), car).verdict is Verdict.ACCEPTED
     side = ("A red sports car, seen in side profile, drives from left to right along a coastal road. A smooth "
             "tracking shot from the side, the camera moving alongside the car, the ocean behind it.")
-    assert check_reply(json.loads(reply(side)), {**car, "view_change": True}).verdict is Verdict.ACCEPTED
-    assert check_reply(json.loads(reply(on_sand)), {**car, "view_change": True}).verdict is Verdict.REPAIRED
+    side_view = {**car, "view_change": True, "sentence": "show me a side view of the car"}
+    assert check_reply(json.loads(reply(side)), side_view).verdict is Verdict.ACCEPTED
+    assert check_reply(json.loads(reply(on_sand)), side_view).verdict is Verdict.REPAIRED
+    # Without the words "side view" a driving car keeps the template's forward shot (live: the side view reversed).
+    assert check_reply(json.loads(reply(side)), {**car, "view_change": True}).verdict is Verdict.NOT_FORWARD
 
 
 def test_view_change_words():
@@ -342,11 +345,32 @@ def test_object_adds_partial_strengths_and_vehicle_scenes_go_to_sonnet():
     meadow = snap()
     for text in ("add an eagle", "add a human", "add a dog and a cat", "add a little fog"):
         ops = dictionary_reading(text, meadow)
-        assert ops is None or not fast_path_ok(ops, meadow), text
+        assert ops is None or not fast_path_ok(ops, meadow, text), text
     for text in ("make it winter", "make it night", "take me to the beach", "make it foggy"):
-        assert fast_path_ok(dictionary_reading(text, meadow), meadow), text
+        assert fast_path_ok(dictionary_reading(text, meadow), meadow, text), text
     car = snap(base="a red sports car driving along a country road")
-    assert not fast_path_ok(dictionary_reading("make it foggy", car), car)
+    assert not fast_path_ok(dictionary_reading("make it foggy", car), car, "make it foggy")
+
+
+def test_the_fast_path_adds_only_on_the_plain_scene_with_no_amount_word():
+    # Regression sweep on 243a1e7 (#285): "make it snow" on the neon city appended the table's winter phrase and kept
+    # "light rain falling"; "gradually add some fog" wrote "a thick fog".
+    from engine.reader import fast_path_ok
+    from commands.service import dictionary_reading
+    meadow = snap()
+    for text in ("gradually add some fog", "add some rain", "make it light rain", "add more fog", "a lot of snow"):
+        ops = dictionary_reading(text, meadow)
+        assert ops is None or not fast_path_ok(ops, meadow, text), text
+    city = snap({"op": "add", "label": "neon city", "kind": "world", "phrase": "a big city at night, light rain falling",
+                 "strength": 1.0})
+    for text in ("make it snow", "make it night", "make it foggy", "take me to the beach"):
+        ops = dictionary_reading(text, city)
+        assert ops is None or not fast_path_ok(ops, city, text), text
+    winter = snap({"op": "add", "label": "winter", "kind": "season", "phrase": "winter scenery with snow on the ground",
+                   "strength": 1.0})
+    for text in ("remove the winter", "undo", "a little more snow"):  # no add: still the table
+        ops = dictionary_reading(text, winter)
+        assert ops is not None and fast_path_ok(ops, winter, text), text
 
 
 def test_the_leads_stuck_sequence_changes_the_prompt_every_step():
@@ -443,3 +467,61 @@ def test_outcomes_are_counted_by_verdict():
         r(s, snap())
     assert r.stats()["verdicts"] == {"accepted": 1, "invalid": 1, "not_understood": 1}
     assert r.stats()["not_understood"] == 1 and Outcome.NOT_UNDERSTOOD.saved
+
+
+def test_a_chip_whose_words_left_the_prompt_is_dropped():
+    # Regression sweep on 243a1e7 (#285): "make it rain" on a snowy night took every snow word out of the prompt and
+    # the "winter" chip stayed with nothing behind it.
+    from engine.final_reader import check_reply
+    before = ("a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; "
+              "a large male lion; a wide river; night, dark sky lit by a bright full moon")
+    after = "A wide shot of a dark meadow at night under heavy rain, a large male lion, a wide river, melting slush."
+    user = {"prompt": before, "chips": ["winter", "lion", "night", "river"], "sentence": "make it rain"}
+    attempt = check_reply(json.loads(reply(after, ["winter", "lion", "night", "river", "rain"])), user)
+    assert attempt.entry.operations[0]["chips"] == ["lion", "night", "river", "rain"]
+    # Snow said in other words keeps the chip; a chip never in either prompt, and the named person's chip, stay.
+    kept = after.replace("melting slush", "frosty snowdrifts")
+    attempt = check_reply(json.loads(reply(kept, ["winter", "rain", "zoom out", "jensen huang"])),
+                          {**user, "person_chip": "jensen huang"})
+    assert attempt.entry.operations[0]["chips"] == ["winter", "rain", "zoom out", "jensen huang"]
+    # Greptile on #286: a longer label keeps the aliases of the thing inside it ("light fog" shown as "a thin mist").
+    attempt = check_reply(json.loads(reply("A meadow under a thin mist at night.", ["light fog", "night"])),
+                          {"prompt": "a meadow; a light fog drifts low; night", "chips": ["light fog", "night"],
+                           "sentence": "make it night"})
+    assert attempt.entry.operations[0]["chips"] == ["light fog", "night"]
+    # Greptile on #288: the longest keyword wins ("lightning bugs" are fireflies, not the storm's lightning), and a label
+    # made only of a filler word ("light") keeps that word as its evidence.
+    attempt = check_reply(json.loads(reply("A meadow under a dark thunderstorm with lightning.", ["lightning bugs"])),
+                          {"prompt": "a meadow with glowing fireflies", "chips": ["lightning bugs"], "sentence": "storm"})
+    assert attempt.entry.operations[0]["chips"] == []
+    attempt = check_reply(json.loads(reply("A dark meadow.", ["light"])),
+                          {"prompt": "a meadow with a warm light", "chips": ["light"], "sentence": "make it dark"})
+    assert attempt.entry.operations[0]["chips"] == []
+
+
+def test_the_final_reader_waits_3_5_s_by_default():
+    # #285: "make it slow" on a long chain timed out 2 of 3 at 3.0 s (median call 1.98 s).
+    from engine.engine import EngineConfig
+    from engine.final_reader import DEFAULT_TIMEOUT_S
+    assert DEFAULT_TIMEOUT_S == 3.5 and EngineConfig.final_timeout_s == 3.5
+    assert load("sonnet", chat=FakeChat({}), cache_path=None, demo_prompts=None).timeout_s == 3.5
+
+
+def test_a_retry_starts_only_when_it_fits_in_the_wait():
+    # #285: with half of the 3.5 s wait as the limit, a 1.6 s first call was retried and the retry ran past the wait.
+    from engine.final_reader import retry_fits
+    assert retry_fits(1.4, 3.5) and retry_fits(1.5, 3.5)
+    assert not retry_fits(1.6, 3.5) and not retry_fits(1.6, 3.0)
+
+
+def test_a_driving_vehicle_must_use_the_car_template_shot():
+    # Live 2026-11-15: every driving wording but the template's reversed the car, left the road or turned it around.
+    from engine.final_reader import drives_without_template
+    assert drives_without_template("A red car drives along a city street at night, the camera static.")
+    assert not drives_without_template(car_prompt())
+    assert not drives_without_template("A red car parked at the curb on the right side of the street.")
+    assert not drives_without_template("A red car drives past, seen from the side.", "show me a side view")
+    chat = FakeChat({"add a car driving": reply("A meadow with a red car driving across it from left to right.")})
+    r = reader(chat)
+    assert r("add a car driving", snap()) is None  # not used: the dictionary reads it
+    assert r.stats()["verdicts"] == {"not_forward": 1}

@@ -39,7 +39,7 @@ APP_FILES = {
     "lib.js": "text/javascript",
 }
 
-# The Lucid Studio build (a Vite app) served under /studio/. Its asset names are hashed, so any regular file
+# The studio page build (lucid-studio, a Vite app) served under /studio/. Its asset names are hashed, so any regular file
 # inside the folder is served, but never a dotfile or anything that resolves outside the folder.
 STUDIO = Path(__file__).resolve().parent.parent / "lucid-studio" / "dist"
 STUDIO_TYPES = {
@@ -190,7 +190,7 @@ def build_app(config: EngineConfig, web_dir: Path = WEB, studio_dir: Path = STUD
     def studio_file(request: Request):  # sync for the same reason as app_file
         root = studio_dir.resolve()
         if not root.is_dir():
-            return PlainTextResponse(f"Lucid Studio build not found at {studio_dir}", status_code=404)
+            return PlainTextResponse(f"Studio build not found at {studio_dir}", status_code=404)
         name = request.path_params["name"] or "index.html"
         parts = name.split("/")
         if "\\" in name or any(not part or part.startswith(".") for part in parts):
@@ -324,7 +324,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--demo-prompts", default=EngineConfig.demo_prompts, metavar="PATH",
                    help="JSON file of pinned final reader results for the demo sentences (never regenerated); "
                         "none turns it off")
-    p.add_argument("--studio-dir", default=str(STUDIO), help="Lucid Studio build folder served at /studio/")
+    p.add_argument("--studio-dir", default=str(STUDIO), help="Studio page build folder (lucid-studio/dist) served at /studio/")
     p.add_argument("--record-dir", default="~/recordings",
                    help="folder for the mp4 of every video (one file per reset); none turns the recorder off")
     p.add_argument("--record-max-gb", type=float, default=20.0,

@@ -25,10 +25,14 @@ def main(argv: list[str]) -> int:
     start = compose(SceneState(DEFAULT_BASE).snapshot())
     scene = SceneState(DEFAULT_BASE)
     drifted = 0
+    scenes = {}  # composed prompt -> the first replayed scene with it: a variant is read on the scene of its step
     for n, e in enumerate(entries):
         if e["prompt_before"] == start:
             scene = SceneState(DEFAULT_BASE)
+        elif e["prompt_before"] and e["prompt_before"] != compose(scene.snapshot()) and e["prompt_before"] in scenes:
+            scene = scenes[e["prompt_before"]]
         before = compose(scene.snapshot())
+        scenes.setdefault(before, scene)
         ops = fr.checked_operations(e["operations"], scene.snapshot()) if e["operations"] else None
         trial = copy.deepcopy(scene)
         if ops:
@@ -58,6 +62,7 @@ def main(argv: list[str]) -> int:
             # asked again after an unchanged one keeps that entry's fog or light.
             reader._given_vehicle[after] = e["prompt"]
         scene = trial
+        scenes.setdefault(compose(trial.snapshot()), trial)
     print(f"{drifted} of {len(entries)} entries drifted")
     if regen:
         open(PATH, "w").write(json.dumps(entries, indent=2, ensure_ascii=False))

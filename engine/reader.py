@@ -16,10 +16,10 @@ The engine calls `handle` on one worker thread, in arrival order, never on the g
 With --final-reader sonnet, FinalReadingService wraps CommandService and decides who reads each FINAL, in this order:
 undo and reset sentences (the dictionary), the content block, a pinned or cached answer, a measured car world, the
 dictionary when it reads the whole sentence (commands.service.dictionary_reading) and the result is one the keyword
-table writes well (fast_path_ok: no object adds, no partial strengths, nothing added on a vehicle scene), and otherwise
-one Sonnet call that
-writes the whole new prompt (a free scene, final_reader.py). The answer is applied to the service's own scene, so
-chips, heard and undo work as for any other edit.
+table writes well (fast_path_ok: no object adds, no partial strengths or amount words, a place, season, weather
+or time added only on the plain base scene), and otherwise one Sonnet call that writes the whole new prompt (a free
+scene, final_reader.py). The answer is applied to the service's own scene, so chips, heard and undo work as for any
+other edit.
 """
 
 import enum
@@ -32,22 +32,39 @@ from commands.state import is_free
 log = logging.getLogger("engine.reader")
 
 # Kinds of change the keyword table writes as well as Sonnet: a tested place, season, weather or time of day at full
-# strength. Its object phrases change the count or the thing ("add an eagle" -> "a flock of birds", "add a human" ->
-# "a small group of people") and carry no size or position, so the model draws them small or not at all; a partial
-# strength reads "a subtle hint of a thick fog"; and on a vehicle scene the car template keeps the world's own light and
-# weather words beside the new ones ("clear blue summer sky" with "a thick fog"). Regression sweep on #273.
+# strength, on the plain base scene. Its object phrases change the count or the thing ("add an eagle" -> "a flock of
+# birds", "add a human" -> "a small group of people") and carry no size or position, so the model draws them small or
+# not at all; a partial strength reads "a subtle hint of a thick fog"; and on a vehicle scene the car template keeps the
+# world's own light and weather words beside the new ones ("clear blue summer sky" with "a thick fog"). Regression sweep
+# on #273. On a scene with changes the table only appends its phrase, so "make it snow" on the neon city kept "light
+# rain falling" beside "winter scenery with snow on the ground"; and an amount word the table does not turn into a
+# strength is lost ("gradually add some fog" wrote "a thick fog"). Regression sweep on 243a1e7 (#285).
 FAST_PATH_KINDS = frozenset({"season", "weather", "time", "world"})
 
 
-def fast_path_ok(operations: list[dict], snapshot: dict) -> bool:
-    """True when the dictionary's `operations` for a whole sentence may skip Sonnet: undo, reset, remove, strength
-    changes and explicit new scenes, and adds of FAST_PATH_KINDS at full strength on a scene without a vehicle."""
+def _amount_words():
+    """The strength words of the keyword table (commands/reader.py: "a little", "light", "a lot", "more", "less", ...)
+    and "some", as one pattern."""
+    from commands.reader import _HIGH_RX, _LESS_RX, _LOW_RX, _MORE_RX
+    return [_LOW_RX, _HIGH_RX, _MORE_RX, _LESS_RX, re.compile(r"\bsome\b")]
+
+
+def says_amount(text: str) -> bool:
+    """True when `text` holds a strength or amount word ("add some fog", "a little rain", "light snow", "more fog")."""
+    low = text.lower()
+    return any(rx.search(low) for rx in _amount_words())
+
+
+def fast_path_ok(operations: list[dict], snapshot: dict, text: str) -> bool:
+    """True when the dictionary's `operations` for the whole sentence `text` may skip Sonnet: undo, reset, remove,
+    strength changes and explicit new scenes, and adds of FAST_PATH_KINDS only on the plain base scene (no changes, no
+    vehicle) at full strength with no strength or amount word in the sentence. Every other add goes to Sonnet."""
     from .car_template import vehicle_subject
     for op in operations:
         if op["op"] != "add":
             continue
-        if op.get("kind") not in FAST_PATH_KINDS or op.get("strength", 1.0) != 1.0 \
-                or vehicle_subject(snapshot.get("base")) is not None:
+        if op.get("kind") not in FAST_PATH_KINDS or op.get("strength", 1.0) != 1.0 or snapshot.get("changes") \
+                or vehicle_subject(snapshot.get("base")) is not None or says_amount(text):
             return False
     return True
 
@@ -118,11 +135,20 @@ class FinalReadingService:
         fr = self._final_reader
         entry = fr.lookup(text, snapshot)  # the content block, pinned, cached or measured: no call
         reading = dictionary_reading(text, snapshot) if entry is None else None
-        whole = reading is not None and fast_path_ok(reading, snapshot)
+        whole = reading is not None and fast_path_ok(reading, snapshot, text)
         if kind is SentenceKind.MIXED:
-            # The final reader leaves undo and reset to the dictionary, which reads the whole sentence. When it does
-            # not read every clause by itself, Sonnet is still asked first, as the content check.
-            if entry is None and not whole:
+            split = leading_controls(text, snapshot)
+            if split is not None:
+                # "undo and add a dog": the edits are read on the scene the controls give. `whole` is not trusted
+                # here (dictionary_reading tries an undo on a snapshot with no history), and a saved answer for the
+                # whole sentence is used only when it is a block (an older build saved answers it then discarded).
+                if entry is not None and fr.result(entry, text, snapshot) == {"blocked": True}:
+                    return self._blocked(text)
+                return self._controls_then_edits(msg, *split)
+            # Any other mix ("add a dog and undo") goes to the dictionary, which runs the undo where it is said. Sonnet
+            # is asked first, as the content check, only when the keyword table does not read every clause by itself:
+            # fast_path_ok is about prompt quality, and its answer would be discarded here, so it is not a reason to wait.
+            if entry is None and reading is None:
                 entry = fr.ask(text, snapshot, self.committed_prompt)
             if entry is not None and fr.result(entry, text, snapshot) == {"blocked": True}:
                 return self._blocked(text)
@@ -145,6 +171,47 @@ class FinalReadingService:
         if out["steer"] is not None:
             self._model_prompts.setdefault(out["steer"]["prompt"], result["prompt"])
         return self._mapped(out)
+
+    def _controls_then_edits(self, msg: dict, controls: list[dict], edits: str) -> dict:
+        """A sentence of bare undo or reset clauses followed by edit clauses that the dictionary does not read
+        whole. The controls run first on a trial copy of the scene (with its undo history), and the edits are read
+        on the scene they give, as one EDIT sentence: the dictionary when it reads them whole, else the final reader
+        (so "undo and add a dog" on a free scene reaches Sonnet with the scene before the last edit). The controls
+        and the edits' operations then apply as one batch: one undo step, and nothing applies when the edits are
+        blocked, not understood or unread."""
+        from commands.composer import compose
+        text = msg["text"]
+        before = self._svc.snapshot()
+        after = self._svc_trial(controls)
+        fr = self._final_reader
+        entry = fr.lookup(edits, after)
+        reading = dictionary_reading(edits, after) if entry is None else None
+        if reading is not None and fast_path_ok(reading, after, edits):
+            return self._dictionary(msg, before)  # the keyword table reads the whole sentence with the real undo
+        if entry is None:
+            entry = fr.ask(edits, after, self._model_prompts.get(compose(after), compose(after)))
+        result = fr.result(entry, edits, after)
+        if result is None:
+            return self._dictionary(msg, before)  # no answer: as for any sentence (not understood on a free scene)
+        if result.get("blocked"):
+            return self._blocked(text)
+        if result.get("not_understood"):
+            log.info("final reader: %r not understood, no steer", text[:100])
+            return self._mapped(self._svc.apply_final(text, []))
+        out = self._svc.apply_final(text, controls + result["operations"])
+        if out["steer"] is not None:
+            self._model_prompts.setdefault(out["steer"]["prompt"], result["prompt"])
+        return self._mapped(out)
+
+    def _svc_trial(self, operations: list[dict]) -> dict:
+        """The snapshot after `operations` on a copy of the service's scene with its undo history (an undo needs the
+        history, which a snapshot does not carry). The live scene is not changed."""
+        import copy
+        with self._svc._lock:  # CommandService has no public trial with history; this reads it under its lock
+            trial = copy.deepcopy(self._svc._state)
+        for op in operations:
+            trial.apply(op)
+        return trial.snapshot()
 
     def _blocked(self, text: str) -> dict:
         log.info("final reader: %r blocked, no steer", text[:100])
@@ -222,6 +289,20 @@ def sentence_kind(text: str, snapshot: dict) -> SentenceKind:
     if all(k is ClauseKind.BARE_CONTROL for k in kinds):
         return SentenceKind.CONTROL
     return SentenceKind.MIXED if ClauseKind.BARE_CONTROL in kinds else SentenceKind.EDIT
+
+
+def leading_controls(text: str, snapshot: dict) -> tuple[list[dict], str] | None:
+    """(the undo and reset operations, the rest of the sentence) when `text` is one or more bare undo or reset
+    clauses followed only by edit clauses ("undo and add a dog", "reset, then make the grass dry"); else None
+    (no control first, a control after an edit, or nothing after the controls)."""
+    from commands.reader import read, split_commands
+    clauses = split_commands(text) or [text]
+    readings = [read(clause, snapshot) for clause in clauses]
+    kinds = [clause_kind(clause, reading) for clause, reading in zip(clauses, readings)]
+    n = next((i for i, k in enumerate(kinds) if k is not ClauseKind.BARE_CONTROL), len(kinds))
+    if n == 0 or n == len(kinds) or any(k is not ClauseKind.EDIT for k in kinds[n:]):
+        return None
+    return [readings[i]["op"] for i in range(n)], " and ".join(clauses[n:])
 
 
 def clause_kind(clause: str, reading: dict) -> ClauseKind:

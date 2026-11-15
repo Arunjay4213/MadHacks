@@ -58,3 +58,15 @@ def test_his_spot_never_carries_the_next_clause():
     # "next to the car and make it winter".
     phrase = person_add(SENTENCE, SceneState().snapshot())["phrase"]
     assert phrase == f"{JENSEN}, a large figure standing next to the car, facing the camera"
+
+
+def test_a_long_place_goes_to_the_model_and_the_fallback_keeps_it_whole():
+    # Greptile on #279: the shortcut's word limit must not cut the place of the engine's fallback add.
+    text = "add jensen next to the tall green wooden picnic table"
+    meadow = SceneState().snapshot()
+    assert whole_sentence(text, meadow) is None
+    assert person_add(text, meadow)["phrase"].endswith("standing next to the tall green wooden picnic table, facing the camera")
+    chat, reader, svc = service({})  # the model gives nothing usable: the engine adds him itself
+    out = svc.handle(final(text))
+    assert len(chat.sent) == 1 and "jensen" not in chat.sent[0]["sentence"] and labels(out) == ["jensen huang"]
+    assert "next to the tall green wooden picnic table, facing the camera" in out["steer"]["prompt"]

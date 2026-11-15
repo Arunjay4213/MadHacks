@@ -160,15 +160,22 @@ def test_the_pinned_demo_plays_every_entry_and_jensen_huang_with_no_call():
     svc = FinalReadingService(CommandService(semantic_reader=lambda *a: None), reader)
     base = compose(SceneState().snapshot())
     seen = {}  # composed prompt -> the words the model sees for it: the first rich prompt of that scene
+    paths = {base: []}  # composed prompt -> the pinned sentences that reach it from the meadow
     for e in entries:
-        if e["prompt_before"] == base and compose(svc._svc.snapshot()) != base:
-            svc.handle(final("reset"))  # the file starts a chain again from the meadow
+        if compose(svc._svc.snapshot()) != e["prompt_before"]:
+            # A new chain, a spoken variant of the step before, or a chain that goes on from an earlier scene: start
+            # again from the meadow and say the pinned sentences that reach that scene.
+            assert e["prompt_before"] in paths, e["sentence"]
+            svc.handle(final("reset"))
+            for said in paths[e["prompt_before"]]:
+                svc.handle(final(said))
         assert compose(svc._svc.snapshot()) == e["prompt_before"], e["sentence"]
         out = svc.handle(final(e["sentence"]))
+        paths.setdefault(compose(svc._svc.snapshot()), [*paths[e["prompt_before"]], e["sentence"]])
         assert out["steer"]["prompt"] == seen.setdefault(compose(svc._svc.snapshot()), e["prompt"]), e["sentence"]
         if e["sentence"] == "add jensen huang":
             assert labels(out)[-1] == "jensen huang" and JENSEN in out["steer"]["prompt"].lower()
-    assert reader.stats()["calls"] == 0 and reader.stats()["pinned_hits"] == len(entries)
+    assert reader.stats()["calls"] == 0 and reader.stats()["pinned_hits"] >= len(entries)
     assert [e["sentence"] for e in entries].count("add jensen huang") >= 2
 
 

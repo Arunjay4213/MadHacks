@@ -71,7 +71,7 @@ It sits in `PROTOCOL` in `lib.js` and in `fake-server.mjs`.
 2. Text box sends: done (paste at once, simulated keys after 200 ms, typing after 1.5 s; no Enter needed).
 3. Live mic: done. Push-to-talk key is `PUSH_TO_TALK_CODE` in `lib.js` (default backtick), ignored with Ctrl/Cmd/Alt
    so it never clashes with Wispr Flow's Ctrl hotkey, and never types into the box. (The hands-free mic toggle was
-   removed in the Cue redesign, #276, on the owner's decision.) Blocked-mic and network errors are explained; the mic is disabled outside a
+   removed in the redesign, #276, on the owner's decision.) Blocked-mic and network errors are explained; the mic is disabled outside a
    secure context (HTTPS or localhost). Needs a real voice test on the demo laptop.
 4. Chips and undo on real state: done. Checked against the engine (fake backend, `--reader commands`, 672x384):
    stack, remove by name and chip x, undo, unmatched words in red, delay steady at ~575 ms. Real-model check pending

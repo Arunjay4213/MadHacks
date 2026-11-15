@@ -23,9 +23,9 @@ Its wire format follows `contracts/README.md`.
 
 ## What the page shows
 
-The layout is the "Cue" design (placeholder name): one white window on a pale blue page, everything in one centred column.
+The page is branded "Mirage", the product name (decided by the lead on 2026-11-15), with "live voice-steered video" as the subtitle. The layout is one white window on a pale blue page, everything in one centred column.
 
-- Header: "Cue · Say it. See it." on the left (plus a "Mock server" badge when the server is the fake one); on the right the status capsule. Connected, it shows the delay ("0.9 s": the time from your command to the first frame of the chunk it applies to, "Live" until a command has been measured; an unmatched command is never measured), green, amber over 1.5 s, red over 3 s, with the server's stage stamps on hover. Otherwise it is amber "Reconnecting…" (or "Connecting…" before the first connection) or grey "Offline" after about 8 s of failed retries.
+- Header: "Mirage · live voice-steered video" on the left (plus a "Mock server" badge when the server is the fake one); on the right the status capsule. Connected, it shows the delay ("0.9 s": the time from your command to the first frame of the chunk it applies to, "Live" until a command has been measured; an unmatched command is never measured), green, amber over 1.5 s, red over 3 s, with the server's stage stamps on hover. Otherwise it is amber "Reconnecting…" (or "Connecting…" before the first connection) or grey "Offline" after about 8 s of failed retries.
 - The video on a pale blue mat, at the engine's 672x384 shape, never cropped or stretched. The chips sit on it at the top left, one per change the server holds, each with a × to remove it, in blue, red and amber in the order the changes first appeared.
 - Banners under the header: the video notice (connecting, connection lost, paused) and the error message.
 - The voice line under the video, the words in orange quotes:
@@ -96,8 +96,8 @@ This is how to check a page change against the live engine before it is merged (
 
 ## Demo day
 
-Both pages are served by the engine: this one at `/app/` and Lucid Studio at `/studio/`.
-On 2026-11-14 the lead named Lucid Studio the judges' page "for now" with `web/` as the tested fallback, and later approved the big-screen redesign of `web/` (PR #104); which page the judges see is the lead's call.
+Both pages are served by the engine: this one at `/app/` and the studio page (`lucid-studio/`, also branded Mirage) at `/studio/`.
+On 2026-11-14 the lead named the studio page the judges' page "for now" with `web/` as the tested fallback, and later approved the big-screen redesign of `web/` (PR #104); which page the judges see is the lead's call.
 
 1. Open `https://<tunnel address>/app/` in Chrome and allow the microphone the first time Chrome asks.
 2. Press Full screen.

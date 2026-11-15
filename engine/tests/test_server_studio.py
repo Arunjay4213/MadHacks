@@ -1,4 +1,4 @@
-"""The /studio/ routes that serve the Lucid Studio build. A temp folder stands in for the build."""
+"""The /studio/ routes that serve the studio page build (lucid-studio/dist). A temp folder stands in for the build."""
 
 import asyncio
 

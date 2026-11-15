@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Run the repo's pytest suite on devbox instead of the laptop (the laptop has under 6 GB of RAM).
+# Usage: rtest [-C <repo or worktree dir>] [pytest args...]
+#   rtest                         # full default suite of the repo you are in
+#   rtest -C /path/to/worktree -m tools
+#   rtest engine/tests/test_prompt_lock.py -x
+# It copies the working tree (with uncommitted edits, without .git and media) to devbox and runs pytest there.
+set -euo pipefail
+dir="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+if [ "${1:-}" = "-C" ]; then dir="$(cd "$2" && { git rev-parse --show-toplevel 2>/dev/null || pwd; })"; shift 2; fi
+key="$(printf '%s' "$dir" | sha1sum | cut -c1-12)"
+remote="madhacks-test/src/$key"
+ssh -o ConnectTimeout=15 devbox "mkdir -p ~/$remote"
+rsync -a --delete \
+  --exclude .git --exclude node_modules --exclude 'venv/' --exclude '.venv/' --exclude __pycache__ \
+  --exclude '*.mp4' --exclude '*.webm' --exclude '*.pt' --exclude '*.safetensors' --exclude 'dist/' \
+  "$dir/" "devbox:$remote/"
+args=""; for a in "$@"; do args="$args $(printf '%q' "$a")"; done
+ssh -o ConnectTimeout=15 devbox "cd ~/$remote && ~/madhacks-test/venv/bin/python -m pytest -q -p no:cacheprovider $args"

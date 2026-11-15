@@ -1,4 +1,4 @@
-# Live voice-steered video: MadHacks build plan
+# Mirage, live voice-steered video: MadHacks build plan
 14 Nov 2026 · Ishaan (`@Tactacion`)
 
 ## What we are building
@@ -404,6 +404,8 @@ Setup and reading are fair game before the event; project code is not.
 ## Status
 
 Added on 2026-11-15 at about 00:40 UTC by the docs sweep (issue #124); the plan above is unchanged.
+
+Product name: Mirage, decided by the lead on 2026-11-15 (subtitle "live voice-steered video").
 
 | Gate | Result | Source |
 |---|---|---|

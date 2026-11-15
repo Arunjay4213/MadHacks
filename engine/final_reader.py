@@ -19,14 +19,14 @@ The light check (check_reply): blocked; understood false or an empty prompt is n
 MAX_PROMPT_WORDS words and commands.state.MAX_FREE_PROMPT_CHARS characters; on a car scene (the prompt on screen is
 the car template) that is not a new scene, the new prompt is still the car template with a drivable road
 (car_template.template_problems). A reply that fails is asked again once, with the reasons, when the first call took
-under half the wait; otherwise the dictionary reads the sentence (the fallback).
+under RETRY_SHARE (3/7) of the wait; otherwise the dictionary reads the sentence (the fallback).
 
 Content block: a small word list (BLOCKED_WORDS) is checked first, with no call at all; the model also flags
 sexual, violent or hateful requests with "blocked": true in the same reply.
 
 Determinism: the cache is keyed by (composed prompt of the scene before, sentence_key(sentence)); for a free scene the
 composed prompt is its own prompt. A result is chosen once: a Sonnet result, a block or a "not understood" is saved to
-a JSON file (written atomically) and never regenerated, also across restarts. A timeout (final_timeout_s, 3.0 s by
+a JSON file (written atomically) and never regenerated, also across restarts. A timeout (final_timeout_s, 3.5 s by
 default), a failed call or a reply that fails the check gives the fallback, final for that key for the life of the
 process on a composed scene (a late answer is dropped, late_dropped), and not saved to disk, so a passing outage does
 not disable a sentence for good. On a free scene a fallback is not kept: the dictionary cannot edit that scene, so
@@ -61,11 +61,17 @@ log = logging.getLogger("engine.final_reader")
 # Thinking off at effort low. Adaptive thinking at effort medium graded a little better on a short test prompt, but on
 # the real system prompt the regression sweep (2026-11-15, 209 chains) measured p50 2.16 s against 1.65 s, 14 timeouts
 # against 5 at the 3 s wait, and replies that began with reasoning prose instead of JSON.
-DEFAULT_TIMEOUT_S = 3.0
+# The wait is 3.5 s: on a long chain (about 300 tokens of prompt) the sweep measured a median call of 1.98 s, and 2 of 3
+# runs of "make it slow" timed out at 3.0 s (#285). The lead rejected 5.5 s as too slow on screen.
+DEFAULT_TIMEOUT_S = 3.5
 DEFAULT_EFFORT = "low"              # output_config.effort
 DEFAULT_THINKING = "between_tools"  # thinking.type: between_tools is thinking off
 DEFAULT_MAX_TOKENS = 1024
 HTTP_TIMEOUT_S = 10.0        # a call may finish after the wait; its answer is then dropped
+# A retry starts only when the first call took at most this share of the wait, so a second call as long as the first
+# still fits with room to spare: 1.5 s of the live 3.5 s, as it was with half of 3.0 s. With half of 3.5 s (1.75 s),
+# retries after 1.6 s first calls ran past the wait (#285).
+RETRY_SHARE = 3 / 7
 WORKERS = 4
 DEFAULT_CACHE_FILE = "~/.cache/madhacks/final_reader.json"
 DEFAULT_DEMO_PROMPTS = str(Path(__file__).resolve().parent / "demo_prompts.json")
@@ -202,12 +208,13 @@ Rules:
 - Return the complete new prompt, never a diff. Keep everything the sentence does not change word for word (the
   subject, the objects, their positions, the camera, the light), so the picture does not jump. Change only what the
   sentence asks, and make that change clearly visible.
-- Stay within about {asked_words} words also when the scene has grown: describe the older things more briefly (keep each
-  of them, in fewer words) instead of growing the prompt. The thing the sentence adds or changes is always written in
-  full.
+- The prompt is at most {asked_words} words, also when the scene has grown: describe the older things more briefly
+  (keep each of them, in fewer words) instead of growing the prompt. The thing the sentence adds or changes is always
+  written in full. When the prompt on screen is already longer than {asked_words} words, the new prompt is shorter
+  than it: compress the oldest details first (a long reply is slow, and a late reply is lost).
 - Camera: keep the camera wording as it is unless the user asks for another camera, framing or view (zoom in or out,
-  a wider or closer shot, side view, aerial or drone view, front view, low angle, pan); then rewrite the camera
-  wording to match ("zoom out": a wide establishing shot from further away, the subject smaller in the frame).
+  a wider or closer shot, side view, aerial or drone view, front view, low angle, pan), or a vehicle starts driving
+  (the camera then follows it, below); then rewrite the camera wording to match ("zoom out": a wide establishing shot from further away, the subject smaller in the frame).
 - No sounds, no story or time order ("now", "again", "still", "no longer").
 - A video model cannot draw "no": it draws every noun it reads. A request to remove or not have something becomes a
   positive description of what is there instead, with the thing's word left out: "no clouds" -> "a clear, cloudless
@@ -221,6 +228,11 @@ Rules:
   infer what happens to them, so for every object say where it is, what it stands or drives on, and which way it
   faces, in words that fit the new place. A thing that cannot stay where it was gets a plausible spot: an animal
   stands on the ground beside the road.
+- A new place or setting named in any words ("city background", "in the city", "middle of the city", "at the
+  beach") replaces the old place in the same way; "keep everything word for word" does not keep the old place. The
+  landscape of the old place (the meadow, the oak tree, the grass) goes unless the user mentions it. The subject the
+  user is talking about (the car) becomes the main subject, placed in the new place with a direction and camera that
+  suit it: a car in a city drives along a street, with the camera behind it unless the user asks otherwise.
 - A sentence that describes a whole new scene, a place together with its own main subject or action ("I now want a
   city at night with a car driving on the road", "show me a harbour with fishing boats", "a mountain village with
   people skating on a frozen lake"), starts a new scene: "new_scene" is true, the prompt describes only what the
@@ -232,9 +244,18 @@ Rules:
   "add snow near the river" adds snow and no river.
 - Ground, plants and climate ("arid", "no grass", "dry", "lush", "cut the grass", "kill the tree's leaves") change the
   ground, the plants and the place in the prompt. Nothing stops a later change of place: the prompt is free text.
-- Objects get explicit size and position words. The first object is large and in the centre ("a red car parked beside
-  the oak tree in the centre of the frame, facing the camera, large and clearly visible"); a later one takes a free
-  place ("a large male lion standing in the foreground at the left of the frame, facing the camera").
+- Objects get explicit size and position words. The first object is large and in the centre ("a large brown horse
+  standing beside the oak tree in the centre of the frame, facing the camera, large and clearly visible"); a later one
+  takes a free place ("a large male lion standing in the foreground at the left of the frame, facing the camera").
+- A driving car or other road vehicle is always written with the car template's first sentence and camera sentence
+  word for word (below): seen from directly behind with its rear lights facing the camera, moving forward away from the
+  camera, the camera following directly behind in a low tracking shot at the same speed, the white dashed centre line
+  rushing toward the viewer. This is the only driving shot the video model draws forward; any other wording made cars
+  reverse, leave the road or turn toward the camera. A request to see the car from the side or the front keeps this
+  shot and its forward motion, unless the user says the words "side view": then the camera moves to the side and the
+  prompt says which way the car's front points and that it drives forward. A car the user adds or names drives in
+  this shot by default. Every other vehicle in the scene is parked and still, at the side of the road or at a curb,
+  away from people, never between a person and the camera.
 - Counts agree everywhere in the prompt. "add another tree" rewrites the scene with the new number ("a wide shot of
   a meadow with two oak trees, one in the centre and a second, taller one in the foreground at the left"), never
   "a single oak tree" next to "a second tree": the model then draws one.
@@ -251,7 +272,11 @@ Rules:
   rear wheels both in view, its nose pointing to the left edge of the frame".
 - Seasons, weather and time of day are written visibly ("thick white snow covering the whole ground", "a dark night
   sky with a full moon"). "sunny" replaces night. More or less of something ("a little more snow") rewrites it with
-  visibly more or less of it.
+  visibly more or less of it. Amount words set how much: "some fog" is a light, thin fog, "a little" is faint, "a
+  lot" or "heavy" is thick; never write "thick" for "some".
+- A new weather keeps the current season unless the user asks to remove it: "make it rain" on a snowy night keeps
+  the snow on the ground and the night, with rain falling over it. Only what falls from the sky is replaced: snow
+  falling replaces rain falling.
 - A named person: when the sentence holds their visual description (the engine puts it there for people it
   knows), write that description; for any other real person describe their usual look (hair, glasses, clothes),
   never the name. "person_chip" is their chip.
@@ -261,8 +286,9 @@ Rules:
 
 The chips: one short label (1 to 3 words, lower case, at most {max_label} characters) for each thing the user added
 or changed that is still in the picture (objects, place, season, weather, time, camera), in the order they were
-added. Keep the current chips that still apply, with the same labels; drop a chip when its thing is gone. A new scene
-starts with the chips of what the user named.
+added. Keep the current chips that still apply, with the same labels; drop a chip when its thing is gone. The chips
+match the prompt: a chip whose words are no longer in the new prompt is dropped. A new scene starts with the chips of
+what the user named.
 
 "understood" is false, with an empty prompt, only when the sentence is not about the picture at all, asks for nothing
 to change ("don't add a lion", "never mind", "leave it"), or asks to undo or reset: then nothing changes on screen. A short or loose sentence about the picture ("zoom out", "more trees",
@@ -361,9 +387,11 @@ def load_pinned(path: str | Path | None) -> dict[tuple[str, str], Entry]:
     {"sentence", "prompt_before", "operations": [op, ...], "prompt"} (other keys, such as "canonical", "model" or
     "fingerprint", are notes and ignored). The entries are replayed in order on a commands.state.SceneState that
     starts at `base` (commands.state.DEFAULT_BASE for the list form). An entry whose
-    prompt_before is the composed prompt of the base starts again from the base (a reset came before it).
-    An entry is skipped, with a log line, when its prompt_before is not the composed prompt of the replayed
-    scene, its operations do not apply (checked_operations, then one batch), or its prompt is not text.
+    prompt_before is the composed prompt of the base starts again from the base (a reset came before it). An entry
+    whose prompt_before is an earlier scene of the file (not the one the entry before it leads to) is read on that
+    scene: a spoken variant of a step ("make it snow" beside "make it winter") follows the step it varies.
+    An entry is skipped, with a log line, when its prompt_before is no scene the entries before it reached, its
+    operations do not apply (checked_operations, then one batch), or its prompt is not text.
     """
     if path is None:
         return {}
@@ -391,6 +419,7 @@ def load_pinned(path: str | Path | None) -> dict[tuple[str, str], Entry]:
         return {}
     pinned: dict[tuple[str, str], Entry] = {}
     scene = SceneState(base)
+    scenes: dict[str, SceneState] = {}  # composed prompt -> the first replayed scene with it, for variants
     for n, e in enumerate(entries):
         try:
             sentence, before, prompt = e["sentence"], e["prompt_before"], e["prompt"]
@@ -398,8 +427,11 @@ def load_pinned(path: str | Path | None) -> dict[tuple[str, str], Entry]:
                 raise ValueError("sentence, prompt_before and prompt must be nonempty text")
             if before == start:
                 scene = SceneState(base)
-            if compose(scene.snapshot()) != before:
-                raise ValueError("prompt_before is not the scene the entries before it lead to")
+            elif compose(scene.snapshot()) != before:
+                if before not in scenes:
+                    raise ValueError("prompt_before is no scene the entries before it reached")
+                scene = scenes[before]
+            scenes.setdefault(before, scene)
             ops = checked_operations(e["operations"], scene.snapshot()) if isinstance(e["operations"], list) else None
             if not ops:
                 raise ValueError("the operations are not valid for that scene")
@@ -411,6 +443,7 @@ def load_pinned(path: str | Path | None) -> dict[tuple[str, str], Entry]:
             continue
         pinned[(before, sentence_key(sentence))] = Entry(Outcome.PINNED, tuple(ops), prompt, scene_record(scene.snapshot()))
         scene = trial
+        scenes.setdefault(compose(trial.snapshot()), trial)
     log.info("final reader: %d of %d demo prompts pinned from %s", len(pinned), len(entries), path)
     return pinned
 
@@ -426,11 +459,13 @@ class Verdict(enum.Enum):
     BLOCKED = "blocked"                # the model refused the sentence
     INVALID = "invalid"                # not JSON or not an object: asked again, else the dictionary
     UNCHANGED = "unchanged"            # the prompt is the one on screen (often a cut took the change): as INVALID
+    NOT_FORWARD = "not_forward"        # a driving vehicle without the car template's forward motion: as INVALID
     FAILED = "failed"                  # the call failed: the dictionary path
 
 
-RETRY_VERDICTS = frozenset({Verdict.INVALID, Verdict.UNCHANGED, Verdict.REPAIRED})
-VERDICT_RANK = {Verdict.FAILED: 0, Verdict.INVALID: 1, Verdict.UNCHANGED: 1, Verdict.NOT_UNDERSTOOD: 2,
+RETRY_VERDICTS = frozenset({Verdict.INVALID, Verdict.UNCHANGED, Verdict.NOT_FORWARD, Verdict.REPAIRED})
+VERDICT_RANK = {Verdict.FAILED: 0, Verdict.INVALID: 1, Verdict.UNCHANGED: 1, Verdict.NOT_FORWARD: 1,
+                Verdict.NOT_UNDERSTOOD: 2,
                 Verdict.REPAIRED: 3,
                 Verdict.ACCEPTED: 4, Verdict.BLOCKED: 4}
 
@@ -470,6 +505,50 @@ def reply_chips(chips, person_chip: str | None = None) -> list[str]:
     return out[:16]
 
 
+# Words of a chip label that say nothing about what is drawn ("second dog", "the city", "light fog"): never the evidence
+# for a chip.
+_CHIP_FILLER = frozenset("""a an the of in on at to and with some more less second third another light heavy thick thin
+    little bit lot very""".split())
+
+
+def _chip_terms(label: str) -> set[str]:
+    """The words that show `label`'s thing is in a prompt. Keywords of the keyword table inside the label are read left
+    to right, longest first, and each stands for all its entry's aliases ("winter": "snow", "frost", ...; the "fog" of
+    "light fog": "mist", "haze", ...), so "lightning bugs" are fireflies and never the storm's "lightning". The other
+    words count as themselves, except filler and amount words when the label has anything else ("light" alone stays)."""
+    from commands.dictionary import KEYWORDS, normalize
+    words = normalize(label).split()
+    labels, rest, i = set(), [], 0
+    while i < len(words):
+        j = next((j for j in range(len(words), i, -1) if " ".join(words[i:j]) in KEYWORDS), None)
+        if j is None:
+            rest.append(words[i])
+            i += 1
+            continue
+        labels.add(KEYWORDS[" ".join(words[i:j])]["label"])
+        i = j
+    content = {w for w in rest if w not in _CHIP_FILLER}
+    terms = content if content or labels else set(rest)
+    return terms | {k for k, e in KEYWORDS.items() if e["label"] in labels}
+
+
+def _says(prompt: str, term: str) -> bool:
+    return re.search(rf"(?<![a-z]){re.escape(term)}(?:s|es)?(?![a-z])", prompt.lower()) is not None
+
+
+def chips_in_prompt(chips: list[str], before: str, after: str, keep: str | None = None) -> tuple[list[str], list[str]]:
+    """(the chips to show, the chips dropped). A chip is dropped when its words left the prompt: some term of it is
+    in the prompt on screen `before` and none is in the new prompt `after` ("winter" after a rain reply that took all
+    the snow out). A chip with no words in either prompt ("zoom out", "slow motion") cannot be judged and stays, and
+    so does `keep` (the named person's chip, whose name is never in the prompt)."""
+    shown, dropped = [], []
+    for chip in chips:
+        terms = _chip_terms(chip)
+        left = chip != keep and terms and any(_says(before, t) for t in terms) and not any(_says(after, t) for t in terms)
+        (dropped if left else shown).append(chip)
+    return shown, dropped
+
+
 def _fits(text: str) -> bool:
     return len(text.split()) <= MAX_PROMPT_WORDS and len(text) <= MAX_FREE_PROMPT_CHARS
 
@@ -495,6 +574,25 @@ def fit_prompt(prompt: str) -> tuple[str, tuple[str, ...]]:
                   f"cut {len(cut)} sentences from the end",)
 
 
+def retry_fits(elapsed_s: float, timeout_s: float) -> bool:
+    """True when the first call (`elapsed_s`) took at most RETRY_SHARE of the wait: a retry then fits."""
+    return elapsed_s <= timeout_s * RETRY_SHARE + 1e-9
+
+
+_VEHICLE_RX = re.compile(r"\b(?:car|cars|sports car|truck|van|bus|jeep|suv|taxi|motorcycle|motorbike|vehicle)\b")
+_DRIVING_RX = re.compile(r"\b(?:drives?|driving|races?|racing|speeds?|speeding|cruis(?:es|ing)|zooms?|zooming)\b")
+
+
+def drives_without_template(prompt: str, sentence: str = "") -> bool:
+    """True when `prompt` has a vehicle that drives but not the car template's forward motion (car_template.FORWARD,
+    "moving forward away from the camera"), and the user did not ask for a "side view" in so many words. Only the
+    template's shot is drawn forward by the video model; other driving wording reversed the car or left the road."""
+    low = prompt.lower()
+    if "side view" in sentence.lower():
+        return False
+    return bool(_VEHICLE_RX.search(low) and _DRIVING_RX.search(low)) and car_template.FORWARD.strip(" ,.").lower() not in low
+
+
 def check_reply(reply, user: dict) -> Attempt:
     """The light check of one parsed reply for the user message `user` (the dictionary it was sent). It repairs what
     it can instead of refusing a reasonable sentence: only a reply that is not an object falls back."""
@@ -510,9 +608,17 @@ def check_reply(reply, user: dict) -> Attempt:
     if prompt == " ".join(str(user.get("prompt") or "").split()):
         why = "the prompt is the one on screen, so nothing would change" + (f" ({problems[0]})" if problems else "")
         return Attempt(Verdict.UNCHANGED, Entry(Outcome.FALLBACK), (why,))
+    if drives_without_template(prompt, user.get("sentence") or ""):
+        return Attempt(Verdict.NOT_FORWARD, Entry(Outcome.FALLBACK),
+                       ("a driving vehicle must use the car template's first sentence and camera sentence word for "
+                        f"word (seen from directly behind ...{car_template.FORWARD}); any other driving shot reverses",))
     if user.get("car_scene") and reply.get("new_scene") is not True:
         problems += tuple(car_template.template_problems(prompt, view_change=bool(user.get("view_change"))))
-    op = {"op": "free_scene", "prompt": prompt, "chips": reply_chips(reply.get("chips"), user.get("person_chip"))}
+    chips, dropped = chips_in_prompt(reply_chips(reply.get("chips"), user.get("person_chip")),
+                                     str(user.get("prompt") or ""), prompt, user.get("person_chip"))
+    if dropped:
+        log.info("final reader: chips %s dropped: their words left the prompt", dropped)
+    op = {"op": "free_scene", "prompt": prompt, "chips": chips}
     return Attempt(Verdict.REPAIRED if problems else Verdict.ACCEPTED, Entry(Outcome.SONNET, (op,), prompt), problems)
 
 
@@ -853,8 +959,8 @@ class FinalReader:
 
     def _call(self, text: str, snapshot: dict, current: str, pending: Pending | None = None) -> Entry:
         """Worker thread: one Sonnet call, checked, and one retry with the reasons when the reply fails the light
-        check and the first call took less than half the wait (so on the live 3 s wait at about 2 s a call, the
-        retry happens only in offline runs). Never raises."""
+        check and a second call as long as the first still fits in the wait (retry_fits: on the live 3.5 s wait, a
+        first call under 1.5 s). Never raises."""
         t0 = time.perf_counter()
         first = self._attempt(text, snapshot, current, None)
         best = first
@@ -862,7 +968,7 @@ class FinalReader:
             pending.usable = first.entry  # a retry that runs past the wait must not lose this edit
         if first.verdict in RETRY_VERDICTS:
             elapsed = time.perf_counter() - t0
-            if elapsed < self.timeout_s / 2:
+            if retry_fits(elapsed, self.timeout_s):
                 with self._lock:
                     self.retries += 1
                 log.warning("final reader: asking again for %r: %s", _short(text), "; ".join(first.reasons)[:400])
@@ -876,13 +982,13 @@ class FinalReader:
             self.verdicts[best.verdict.value] += 1
             if best.verdict is Verdict.FAILED:
                 self.errors += 1
-            elif best.verdict in (Verdict.INVALID, Verdict.UNCHANGED):
+            elif best.verdict in (Verdict.INVALID, Verdict.UNCHANGED, Verdict.NOT_FORWARD):
                 self.rejects += 1
             elif best.verdict is Verdict.REPAIRED:
                 self.repaired += 1
         if best.verdict is Verdict.REPAIRED:
             log.warning("final reader: %r used with repairs: %s", _short(text), "; ".join(best.reasons)[:400])
-        if best.verdict in (Verdict.FAILED, Verdict.INVALID, Verdict.UNCHANGED):
+        if best.verdict in (Verdict.FAILED, Verdict.INVALID, Verdict.UNCHANGED, Verdict.NOT_FORWARD):
             log.warning("final reader: no usable reply for %r: %s", _short(text), "; ".join(best.reasons)[:400])
         elif best.verdict is Verdict.BLOCKED:
             log.info("final reader: the model blocked %r", _short(text))
@@ -978,9 +1084,10 @@ def fingerprint(system_prompt: str, model: str, build: str = PROMPT_BUILD) -> st
 
 
 def call_options(environ=os.environ) -> dict:
-    """The Sonnet call's effort, thinking and max_tokens from FINAL_READER_EFFORT (low, medium, high; default medium),
-    FINAL_READER_THINKING (the thinking type; default adaptive; between_tools is thinking off) and
-    FINAL_READER_MAX_TOKENS (default 4096), so they can be measured against each other without a code change."""
+    """The Sonnet call's effort, thinking and max_tokens from FINAL_READER_EFFORT (low, medium, high; default
+    DEFAULT_EFFORT, low), FINAL_READER_THINKING (the thinking type; default DEFAULT_THINKING, between_tools, which is
+    thinking off; adaptive turns it on) and FINAL_READER_MAX_TOKENS (default DEFAULT_MAX_TOKENS, 1024), so they can be
+    measured against each other without a code change."""
     out = {"effort": environ.get("FINAL_READER_EFFORT") or DEFAULT_EFFORT,
            "thinking": environ.get("FINAL_READER_THINKING") or DEFAULT_THINKING}
     if out["effort"] not in ("low", "medium", "high"):
