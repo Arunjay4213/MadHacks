@@ -9,7 +9,7 @@ scene operations and the rich prompt the video model sees.
 `snapshot` is commands.state.SceneState.snapshot() of the scene before the sentence. The operations use the
 shapes of commands/state.py and are checked with slow_reader.validate, one by one, against that snapshot.
 The prompt is built from the composed (canonical) prompt of the new scene and the model's details by a
-PromptSpec: the engine's stand-in below, or commands.rewriter (SYSTEM_PROMPT, validate_rewrite) once it exists.
+PromptSpec from commands.rewriter (SYSTEM_PROMPT, validate_rewrite).
 
 The model's reply, JSON: {"blocked": bool, "operations": [op, ...], "details": str}.
 The validator gets {"details": str} only. A clause of the details it rejects is logged with the reason and cut;
@@ -41,7 +41,6 @@ import copy
 import dataclasses
 import enum
 import hashlib
-import importlib
 import json
 import logging
 import os
@@ -135,11 +134,6 @@ def blocked_word(text: str) -> str | None:
 
 # --- the prompt part ------------------------------------------------------------------------------------
 
-STYLE = "Cinematic, highly detailed, realistic, sharp focus."
-# "motion blur on the road" only fits a vehicle on a road. Measured on GPU (2026-11-14): with that tail every
-# winter and night frame of the oak meadow grew a road or a tyre track, so it is used only when the scene has a road.
-VEHICLE_STYLE = car_template.STYLE
-
 # Measured by the steering owner with optical flow (board, 2026-11-14): a vehicle subject drives backwards in 1 of
 # 3 seeds with a short prompt, and forward in 3 of 3 with this wording. Added to SUBJECT when the subject is a
 # vehicle and does not already say how it moves. LANE_CUE is also added to the phrase of a vehicle added on a road.
@@ -164,49 +158,6 @@ OBJECT_MAX_PHRASE = 240  # a named person's description and place (engine/people
 # A saved or pinned operation was checked with FINAL_MAX_PHRASE before with_lane_cue added ", " + LANE_CUE, so a
 # cache hit is checked with room for it (the 120-character default refused the pinned racing car).
 CACHED_MAX_PHRASE = FINAL_MAX_PHRASE + len(", " + LANE_CUE)
-
-STANDIN_DETAILS = """The "details" field is the WORLD of the new scene, for the Wan2.1 text-to-video model.
-The engine builds the video prompt as SUBJECT + OBJECTS + WORLD + STYLE. SUBJECT is the scene's base sentence,
-OBJECTS are the phrases of the scene's extra changes (objects, animals, people), word for word, and STYLE is a
-fixed style sentence; all three are added by the engine, so never repeat, rephrase or contradict them, and say
-nothing about the camera, shots, lenses or editing.
-Write WORLD in about 50 words (never more than 60), plain present tense, no lists, no line breaks:
-- First the ground or road of that place, then two or three concrete things on both sides, then the light or sky.
-- The season, weather and time of day of the new scene must appear in WORLD. Objects, animals and people are
-  already in OBJECTS: do not describe them again, and never say where they are.
-- A place REPLACES the world. It is never added to the old one: "make it a desert" turns the meadow into a
-  desert, and nothing of the old landscape (grass, meadow, fields) is described. The objects and animals of the
-  scene stay, now in the new place.
-- Do not add any object, creature, person or vehicle the scene does not name, and no motion or events beyond
-  what it says. Mention a road only when the scene has one.
-- If changes conflict (sunlight and rain), blend them plausibly, such as sun breaking through rain clouds.
-Examples of WORLD:
-- start: "a two-lane country road through green fields and trees under a clear blue summer sky, bright sunshine."
-- desert: "a long straight desert highway between red sandstone mesas and sand dunes, heat haze, orange sunset sky."
-- winter: "a snowy mountain road between pine forests covered in thick white snow, snow falling, cold blue overcast light."
-- neon city: "a wet city street at night in the rain, tall skyscrapers with glowing neon signs on both sides, reflections on the asphalt."
-"""
-
-
-def standin_validate(prompt: str, reply, objects=()) -> str | None:
-    """SUBJECT + OBJECTS + WORLD + STYLE from the canonical prompt of the new scene (SUBJECT is its part before the
-    first ";"), the phrases of its extra changes (`objects`, kept word for word right after SUBJECT so a lion
-    stays the same lion in every later prompt) and the reply's details. The canonical prompt for empty details;
-    None for details that are not one plain paragraph of at most 80 words."""
-    details = reply.get("details") if isinstance(reply, dict) else None
-    if not isinstance(details, str):
-        return None
-    details = details.strip()
-    if not details:
-        return prompt
-    if "\n" in details or len(details.split()) > 80:
-        return None
-    base = prompt.split(";")[0].strip()
-    subject = ", ".join([with_forward_motion(base), *objects])
-    subject = subject[:1].upper() + subject[1:]
-    world = details if details.endswith(".") else details + "."
-    return f"{subject}, {world} {VEHICLE_STYLE if is_vehicle(base) and has_road(prompt) else STYLE}"
-
 
 def _words(text: str) -> set[str]:
     return set(re.findall(r"[a-z]+", text.lower()))
@@ -255,14 +206,15 @@ def scene_prefix(scene: dict) -> str:
 
 @dataclasses.dataclass(frozen=True)
 class PromptSpec:
-    """How the prompt part is asked for and checked. `validate(scene, reply)` gets the snapshot of the new scene
-    and {"details": str}, and gives the text the model sees, or None to reject the details. With commands.rewriter,
-    `prefix` and `check` (validate_rewrite itself) let the engine find out why details are rejected and repair them."""
+    """How the details field is asked for and checked (commands.rewriter). `validate(scene, reply)` gets the snapshot
+    of the new scene and {"details": str}, and gives the text the model sees, or None to reject the details.
+    `prefix(scene)` is the text the details follow, and `check` is validate_rewrite itself, which lets the engine find
+    out why details are rejected and repair them."""
     name: str
     details_instructions: str
     validate: Callable[[dict, dict], str | None]
-    prefix: Callable[[dict], str] | None = None
-    check: Callable[[str, dict], str | None] | None = None
+    prefix: Callable[[dict], str]
+    check: Callable[[str, dict], str | None]
 
 
 def _scene_phrases(scene: dict, kinds: tuple[str, ...]) -> list[str]:
@@ -270,44 +222,22 @@ def _scene_phrases(scene: dict, kinds: tuple[str, ...]) -> list[str]:
     return [c["phrase"].rstrip(".") for c in scene["changes"] if c["kind"] in kinds and c["strength"] > 0]
 
 
-def _scene_objects(scene: dict) -> list[str]:
-    """The phrases of the scene's extra changes that are on (strength above 0), in the order they were added."""
-    return [c["phrase"] for c in scene["changes"] if c["kind"] == "extra" and c["strength"] > 0]
-
-
-def _standin_spec_validate(scene: dict, reply: dict) -> str | None:
-    from commands.composer import compose
-    return standin_validate(compose(scene), reply, _scene_objects(scene))
-
-
-STANDIN = PromptSpec("engine stand-in", STANDIN_DETAILS, _standin_spec_validate)
-
-
-def rewriter_validate(validate_rewrite: Callable[[str, dict], str | None]) -> Callable[[dict, dict], str | None]:
-    """commands.rewriter.validate_rewrite on scene_prefix(scene): the composed prompt of the scene with its objects
-    right after the subject and FORWARD_MOTION in a vehicle subject."""
-    def validate(scene: dict, reply: dict) -> str | None:
-        return validate_rewrite(scene_prefix(scene), reply)
-    return validate
-
-
-def prompt_spec(import_rules: Callable[[], object] = lambda: importlib.import_module("commands.rewriter")) -> PromptSpec:
-    """commands.rewriter (SYSTEM_PROMPT, validate_rewrite) when it imports, else the engine stand-in.
+def prompt_spec() -> PromptSpec:
+    """commands.rewriter: its SYSTEM_PROMPT is the rules for the details field, and validate_rewrite checks the
+    details against scene_prefix(scene), the composed prompt of the new scene with its objects right after the
+    subject and FORWARD_MOTION in a vehicle subject.
 
     commands.rewriter.build_messages is not used. It is made for a separate call that only writes details:
     its user message is the finished scene text, where "the command is context only and never permission to
     add, remove or change anything", and its few-shot replies are {"details"} alone. The engine's one call has
     to apply the command (the operations) and describe the scene after it, in about 1.8 s; with
-    build_messages that would be two calls in a row, past the 3 s wait. Its SYSTEM_PROMPT is used as the rules
-    for the details field, and validate_rewrite checks them against the composed prompt of the new scene.
+    build_messages that would be two calls in a row, past the 3 s wait.
     """
-    try:
-        rules = import_rules()
-        return PromptSpec("commands.rewriter", rules.SYSTEM_PROMPT, rewriter_validate(rules.validate_rewrite),
-                          scene_prefix, rules.validate_rewrite)
-    except Exception as exc:  # not there yet, or not the agreed shape
-        log.info("final reader: commands.rewriter not usable (%r); using the engine's stand-in prompt", exc)
-        return STANDIN
+    from commands import rewriter
+
+    def validate(scene: dict, reply: dict) -> str | None:
+        return rewriter.validate_rewrite(scene_prefix(scene), reply)
+    return PromptSpec("commands.rewriter", rewriter.SYSTEM_PROMPT, validate, scene_prefix, rewriter.validate_rewrite)
 
 
 # --- why details are rejected, and the repair -----------------------------------------------------------
@@ -375,10 +305,7 @@ def why_rejected(check: Callable[[str, dict], str | None], prefix: str, details:
 def repair_details(spec: PromptSpec, scene: dict, details: str) -> Repair:
     """The prompt for `details`, cutting the clauses that break a rule: first the clauses with a word the
     validator or the engine refuses, then clauses from the end until it fits the word limits. Each cut is kept
-    with its reason. Without spec.check (the stand-in) the details are taken or rejected whole."""
-    if spec.check is None or spec.prefix is None:
-        prompt = spec.validate(scene, {"details": details})
-        return Repair(prompt, () if prompt is not None else ((details, "the engine stand-in refuses it"),))
+    with its reason."""
     from commands.dictionary import normalize
     prefix = spec.prefix(scene)
     banned = engine_banned(scene)
@@ -585,9 +512,7 @@ def operations_instructions() -> str:
 
 
 def details_limits(spec: PromptSpec) -> str:
-    """The engine's limits on details, with the words commands.rewriter refuses; empty for the stand-in."""
-    if spec.check is None:
-        return ""
+    """The engine's limits on details, with the words commands.rewriter refuses."""
     from commands.dictionary import KEYWORDS
     extras = sorted({a for a, e in KEYWORDS.items() if e["kind"] == "extra"})
     return _DETAILS_LIMITS.format(position=", ".join(sorted(POSITION_WORDS)), extras=", ".join(extras),
@@ -597,8 +522,6 @@ def details_limits(spec: PromptSpec) -> str:
 def details_budget(spec: PromptSpec, snapshot: dict) -> int:
     """The words details may have: what the validator's total limit leaves after the prompt of the scene before,
     less room for a new phrase, between 12 and 45."""
-    if spec.prefix is None:
-        return 50
     from commands import rewriter
     left = rewriter.MAX_TOTAL_WORDS - len(spec.prefix(snapshot).split()) - 15
     return max(12, min(45, left))
@@ -726,16 +649,16 @@ def load_pinned(path: str | Path | None) -> dict[tuple[str, str], Entry]:
 class FinalReader:
     """Callable `reader(text, snapshot)`; see the module docstring. Never raises."""
 
-    def __init__(self, state: FinalReaderState, reason: str = "", chat=None, spec: PromptSpec = STANDIN,
+    def __init__(self, state: FinalReaderState, reason: str = "", chat=None, spec: PromptSpec | None = None,
                  timeout_s: float = DEFAULT_TIMEOUT_S, cache_file: CacheFile | None = None,
                  pinned: dict[tuple[str, str], Entry] | None = None) -> None:
         if state is FinalReaderState.ON and chat is None:
             raise ValueError("an ON final reader needs a chat client")
         self.state = state
         self.reason = reason
-        self.spec = spec
+        self.spec = spec or prompt_spec()
         self.timeout_s = timeout_s
-        self.system_prompt = (f"{operations_instructions()}\n{spec.details_instructions}\n{details_limits(spec)}\n"
+        self.system_prompt = (f"{operations_instructions()}\n{self.spec.details_instructions}\n{details_limits(self.spec)}\n"
                               f"{car_template.instructions()}")
         self._chat = chat
         self._file = cache_file
