@@ -257,6 +257,39 @@ Latency: the steer chunk is slow only because it runs 5 model passes (4 denoisin
 Whether a short schedule also works with t = 800 (`steer_steps=800,500`) is being measured now.
 Candidate live setting, not deployed: `--backend-opt steer_anchor_t=800 --backend-opt steer_noise=fixed`.
 
+### The cost of a cut, and two options to cut it (experimental, off by default)
+
+A normal chunk is 3 model passes: 2 denoising passes and the context pass that writes its clean frame into the frame KV cache (official step 3.3).
+A steer cut today is 5: the 4 first-frame denoising passes and its context pass.
+Measured on a shared GPU (the L40S box, other jobs on it, 672x384, TAEHV, 8 cuts per run to snow, neon, desert and car; medians):
+
+| | Passes | Per pass | Chunk |
+|---|---|---|---|
+| normal chunk | 3 | 91 to 101 ms | 272 to 277 ms (p90 325 to 336) |
+| steer cut, first-frame schedule (today) | 5 | 79 to 86 ms | 410 ms |
+| steer cut, `steer_steps=1000,500` | 3 | 80 to 85 ms | 247 ms |
+
+The cut chunk's 2-step schedule is #174's `steer_steps=1000,500`; sharpness after the cut was the same as with 4 steps (518 against 519).
+Two more options take passes off the path between a command and the new picture:
+
+- `defer_context` (0): each chunk's context pass runs at the start of the next `generate_chunk` instead of at the end of its own, so the latent goes to the decoder one pass (about 90 ms) sooner. The deferred pass runs before the next chunk's text-cache reset, under the cond it was made with, so the cache gets exactly what it got before. When the next chunk rebases (every re-anchor, a refresh from the clean anchor, the automatic `steer_rebase`/`refresh_every` rebases) the pass is skipped and counted in `context_passes_skipped`: the rebase clears the frame cache and re-encodes the frames it keeps from the history, so the pass would be thrown away. `reset()` drops a pending pass. Nothing else changes: the same passes in the same order minus the skipped ones, the same latents, RNG draws, clean anchor (saved 3 chunks after a steer), refresh from it, `last_rebase` (`SteerStart` included) and decoder input (`engine/tests/test_cut_latency.py` replays the recorded runs). A steer from the last clean latent (`steer_anchor_t`) reads the history, not the cache, so it is unaffected. With `steer_steps=1000,500` and `defer_context` a cut's latent is ready after 2 passes instead of 5.
+- `Backend.interrupt()` (any thread; nothing happens unless it is called): the `generate_chunk` in flight stops at its next pass boundary with `ChunkInterrupted` (attribute `chunk_interrupted = True`), so a steer cut does not wait behind an old-scene chunk that would be shown and then cut away. Only a chunk that continues the video is stopped, never a rebase or the first chunk of a video; an interrupt that misses the last boundary (or arrives between chunks) is dropped when the next chunk starts or at `reset()`. The stopped call leaves the backend as if it had not been made: chunk and frame index (the cut takes its chunk number, so the decoder sees no gap), history, clean anchor and its capture chunk, `last_rebase`, `rebases`, `auto_rebases`, the automatic steer's change tracking, and the main noise stream, which is rolled back to where it was before the call. So with `steer_noise=fresh` the cut draws exactly what it would have drawn had `reanchor()` come one chunk sooner, wherever the interrupt landed, and a seeded replay does not depend on thread timing. The frame cache keeps the stopped passes' noisy frame at the next position, which is valid: a cut clears it, and a normal chunk at that position overwrites it, as each denoising pass of a chunk does. If the stopped call had rebuilt the text cache for a new cond, the cache is marked stale and the next chunk rebuilds it from its own cond. `interrupted_chunks` counts stops.
+
+Neither does much alone on the live engine: the engine holds about 5 frames (312 ms) of old video ahead of a command, in its playout queue and in the chunk being generated, and the cut waits behind them.
+The large gain needs two engine-side changes, which are the engine owner's (`engine/engine.py`, not in the backend): drop the queued old frames when a steer cut's frames arrive (flush), and call `backend.interrupt()` when `ReanchorPolicy.fires_next_chunk()` says the next chunk is a steer.
+Measured with the real engine code and a test backend sleeping at the live per-pass timings (not the GPU), 24 cached commands over localhost, command to first new frame on screen, median / p90:
+
+| Variant | ms |
+|---|---|
+| today | 566 / 674 |
+| 2-step cut only | 572 / 642 |
+| + deferred cache pass | 523 / 635 |
+| + flush | 414 / 471 |
+| + flush + interrupt | 300 / 376 |
+| interrupt without flush | 350 / 430 |
+
+Dissolve after the cut: with the flush the dissolve starts from the last decoded frame, which may have been dropped. On the GPU recordings `cut_fade_frames=4` (linear) gave a pop of 17.8 mean / 24 max (mean absolute pixel change between consecutive frames), within normal motion (p99 17 to 23), with the new picture complete 250 ms sooner than with 8; 2 frames popped at 25.6 / 34. A suggested flag change, not made here.
+
 ## Using the backend from a plain Python script
 
 Run from `~/madhacks` with `~/engine-venv` active:

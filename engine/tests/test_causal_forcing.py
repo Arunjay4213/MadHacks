@@ -730,7 +730,7 @@ GOLDEN_STEER_TAIL = -0.8254
 DEFAULT_STEER_OPTIONS = {"steer_anchor_t": None, "steer_noise": "fresh", "steer_steps": None, "steer_noise_first_frame": False}
 
 
-@pytest.mark.parametrize("options", [{}, DEFAULT_STEER_OPTIONS])
+@pytest.mark.parametrize("options", [{}, DEFAULT_STEER_OPTIONS, {**DEFAULT_STEER_OPTIONS, "defer_context": False}])
 def test_steer_options_off_are_bit_for_bit_unchanged(no_cuda, options):
     (calls, sums), outs = _legacy_run(make_backend(**options))
     assert _same_trace((calls, sums), GOLDEN)

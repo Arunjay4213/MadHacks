@@ -137,6 +137,21 @@ class ReanchorPolicy:
         with self._lock:
             return self._pending is not None
 
+    def fires_next_chunk(self) -> bool:
+        """True when the next next_chunk call returns a steer anchor: a steer scheduled by a
+        ramp-1 target (a normal command) that no chunk has seen yet, with the gap met by then.
+
+        The engine may then stop the chunk in flight (backend.interrupt()), so the cut does not wait
+        behind an old-scene chunk. A ramp-1 move is over after one get_cond, so the next chunk is not
+        moving and every threshold is due. Conservative: False for ramps, refreshes, a steer that
+        already waited a chunk on the gap, and anything a newer target may still replace; a newer
+        applied target after a True replaces the steer as usual (the stopped chunk is then simply
+        generated again)."""
+        with self._lock:
+            p = self._pending
+            return (p is not None and p.seen == 0 and p.ramp == 1
+                    and self._since + 1 >= self._cfg.min_gap_chunks)
+
     def on_target(self, msg: Mapping[str, Any], result: Mapping[str, Any]) -> None:
         """Schedule (or cancel) a steer anchor for an applied contract-2 message.
 

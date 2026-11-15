@@ -632,3 +632,66 @@ def test_two_thread_hammer() -> None:
     assert anchors
     nums = [n for n, _ in anchors]
     assert all(b - a >= cfg.min_gap_chunks for a, b in zip(nums, nums[1:]))
+
+
+# --- fires_next_chunk (for the engine's interrupt of the chunk in flight) -----
+
+
+def test_fires_next_chunk_for_a_sudden_command_past_the_gap() -> None:
+    e = Engine(NO_REFRESH)
+    assert not e.policy.fires_next_chunk()  # nothing pending
+    e.send(_msg("winter", ramp=1))
+    assert e.policy.fires_next_chunk()
+    a = e.step()
+    assert a is not None and a.reason == "steer"
+    assert not e.policy.fires_next_chunk()  # it fired
+
+
+def test_fires_next_chunk_not_inside_the_gap() -> None:
+    e = Engine(NO_REFRESH)
+    e.send(_msg("winter", ramp=1))
+    assert e.step() is not None
+    e.send(_msg("desert", ramp=1))
+    assert not e.policy.fires_next_chunk()  # the gap since that anchor is not met yet
+    assert e.run(GAP - 1) == []
+    assert e.policy.fires_next_chunk() is False  # seen > 0: waiting on the gap, not a fresh command
+    assert e.step() is not None
+
+
+@pytest.mark.parametrize("ramp", [2, 4, 12])
+def test_fires_next_chunk_not_for_a_ramp(ramp: int) -> None:
+    e = Engine(NO_REFRESH)
+    e.send(_msg("winter", ramp=ramp))
+    assert not e.policy.fires_next_chunk()  # it fires at the end of the ramp, not on the next chunk
+    assert e.step() is None
+
+
+def test_fires_next_chunk_not_for_a_refresh_or_a_skipped_steer() -> None:
+    e = Engine(ReanchorConfig(refresh_every_chunks=GAP))
+    got = []
+    for _ in range(2 * GAP):
+        assert not e.policy.fires_next_chunk()  # a refresh is not a steer
+        got.append(e.step())
+    assert REFRESH in got
+    e.send(_msg("winter", ramp=1, provisional=True, cap=0.5))  # provisional_strength 0: nothing scheduled
+    assert not e.policy.fires_next_chunk()
+    e.policy.on_reset()
+    e.send(_msg("snow", ramp=1))
+    assert not e.policy.fires_next_chunk()  # right after a reset: inside the gap
+
+
+def test_fires_next_chunk_is_never_wrong_on_a_random_run() -> None:
+    """Whenever it says yes, the next next_chunk returns a steer anchor."""
+    rng = random.Random(7)
+    e = Engine(ReanchorConfig(min_gap_chunks=3, refresh_every_chunks=10))
+    yes = 0
+    for _ in range(3000):
+        if rng.random() < 0.25:
+            e.send(_msg(rng.choice("abcdefgh"), rng.choice([1, 1, 2, 3, 6, 12]),
+                        provisional=rng.random() < 0.2, strength=rng.choice([None, 0.5])))
+        fires = e.policy.fires_next_chunk()
+        a = e.step()
+        if fires:
+            yes += 1
+            assert a is not None and a.reason == "steer"
+    assert yes > 50
