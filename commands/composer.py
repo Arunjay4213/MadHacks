@@ -64,11 +64,14 @@ _ROAD_RX = re.compile(r"\b(?:road|roads|highway|highways|street|streets|motorway
 # Measured on the live GPU (acceptance run, 2026-11-15): with the road named only inside the car's phrase
 # ("a red car racing along a road ..."), the meadow showed a car cut off in the grass and no road; with the road as
 # part of the scene, right after the subject and before the car, it showed the road and the car on it.
+_VEHICLE_RX = re.compile(r"\b(?:car|cars|truck|van|bus|motorcycle|motorbike|jeep|taxi|pickup)\b", re.IGNORECASE)
 ROAD_CLAUSE = "a straight grey asphalt road with white lane markings runs across the scene"
 
 
 def with_road(base: str, extras, world: str = "") -> str:
-    """The base with ROAD_CLAUSE after it when an object is on a road the scene does not have."""
-    if any(_ROAD_RX.search(e) for e in extras) and not _ROAD_RX.search(f"{base} {world}"):
+    """The base with ROAD_CLAUSE after it when an object is on a road the scene does not have. A vehicle base ("a red
+    sports car") is left alone: the engine draws it with the car template, which has its own road."""
+    if (any(_ROAD_RX.search(e) for e in extras) and not _ROAD_RX.search(f"{base} {world}")
+            and not _VEHICLE_RX.search(base)):
         return f"{base}, {ROAD_CLAUSE}"
     return base
