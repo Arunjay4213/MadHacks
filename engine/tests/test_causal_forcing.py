@@ -277,6 +277,12 @@ def start_latent(b, x, step, rng):
     return b.scheduler.add_noise(x.flatten(0, 1), noise.flatten(0, 1), t).unflatten(0, x.shape[:2])
 
 
+def refresh_rng(b):
+    """The noise state of a refresh from the clean anchor with refresh_noise "fixed", the live default: a generator
+    seeded by (1000003 * video seed + anchor chunk) mod 2^64 (engine/MODEL_NOTES.md), not the main noise stream."""
+    return torch.Generator().manual_seed((1_000_003 * b._video_seed + b.clean_anchor_chunk) % (1 << 64)).get_state()
+
+
 def test_clean_anchor_saved_three_chunks_after_reset(no_cuda):
     b = make_backend()
     a = torch.full((1, 3, 8), 1.0)
@@ -290,12 +296,13 @@ def test_clean_anchor_saved_three_chunks_after_reset(no_cuda):
 
 
 def test_refresh_starts_from_the_clean_anchor_and_keeps_it(no_cuda):
-    b = make_backend(refresh_noise="fresh")
+    b = make_backend()
     a = torch.full((1, 3, 8), 1.0)
     b.reset(seed=0)
     outs = [b.generate_chunk(a) for _ in range(10)]
     clean = outs[3].latents
-    out, calls, rng = reanchored_chunk(b, a, 0.5, "clean")
+    out, calls, _ = reanchored_chunk(b, a, 0.5, "clean")
+    rng = refresh_rng(b)
     assert torch.allclose(calls[0]["x"], start_latent(b, clean, 2, rng))
     assert not torch.allclose(calls[0]["x"], start_latent(b, outs[-1].latents, 2, rng))
     assert [c["t"] for c in calls] == [[int(t)] for t in b.first_chunk_steps[2:]] + [[0]]
@@ -304,12 +311,12 @@ def test_refresh_starts_from_the_clean_anchor_and_keeps_it(no_cuda):
     # The refresh does not replace the clean anchor, so every refresh starts from the same picture.
     outs += [out] + [b.generate_chunk(a) for _ in range(6)]
     assert b._clean_anchor is clean and b.clean_anchor_chunk == 3
-    _, calls, rng = reanchored_chunk(b, a, 0.5, "clean")
-    assert torch.allclose(calls[0]["x"], start_latent(b, clean, 2, rng))
+    _, calls, _ = reanchored_chunk(b, a, 0.5, "clean")
+    assert torch.allclose(calls[0]["x"], start_latent(b, clean, 2, refresh_rng(b)))
 
 
 def test_steer_reanchor_drops_and_recaptures_the_clean_anchor(no_cuda):
-    b = make_backend(refresh_noise="fresh")
+    b = make_backend()
     a, c = torch.full((1, 3, 8), 1.0), torch.full((1, 3, 8), 2.0)
     b.reset(seed=0)
     outs = [b.generate_chunk(a) for _ in range(10)]
@@ -324,17 +331,18 @@ def test_steer_reanchor_drops_and_recaptures_the_clean_anchor(no_cuda):
     assert b.last_rebase == cf.Rebase(0, 0, 2, False)
     outs += [out, b.generate_chunk(c)]  # chunk 13 = 10 + 3: the new clean anchor, under the new cond
     assert b._clean_anchor is outs[13].latents and b.clean_anchor_chunk == 13
-    _, calls, rng = reanchored_chunk(b, c, 0.5, "clean")
-    assert torch.allclose(calls[0]["x"], start_latent(b, outs[13].latents, 2, rng))
+    _, calls, _ = reanchored_chunk(b, c, 0.5, "clean")
+    assert torch.allclose(calls[0]["x"], start_latent(b, outs[13].latents, 2, refresh_rng(b)))
 
 
 def test_clean_refresh_at_full_strength_is_pure_noise(no_cuda):
-    b = make_backend(refresh_noise="fresh")
+    b = make_backend()
     a = torch.full((1, 3, 8), 1.0)
     b.reset(seed=0)
     outs = [b.generate_chunk(a) for _ in range(6)]
-    _, calls, rng = reanchored_chunk(b, a, 1.0, "clean")
-    assert torch.equal(calls[0]["x"], torch.randn(outs[0].latents.shape, generator=torch.Generator().set_state(rng)))
+    _, calls, _ = reanchored_chunk(b, a, 1.0, "clean")
+    noise = torch.randn(outs[0].latents.shape, generator=torch.Generator().set_state(refresh_rng(b)))
+    assert torch.equal(calls[0]["x"], noise)
     assert b.last_rebase == cf.Rebase(0, 0, 0, False)
     assert b.clean_anchor_chunk == 3  # kept
 
@@ -452,7 +460,7 @@ def test_first_frame_pad_option_is_checked():
 
 def test_clean_refresh_after_a_scene_change_without_steer_recaptures(no_cuda):
     """A cond change with no steer re-anchor (e.g. a provisional): the refresh must not bring the old scene back."""
-    b = make_backend(refresh_noise="fresh")
+    b = make_backend()
     a, c = torch.full((1, 3, 8), 1.0), torch.full((1, 3, 8), 2.0)
     b.reset(seed=0)
     outs = [b.generate_chunk(a) for _ in range(6)]
@@ -464,17 +472,17 @@ def test_clean_refresh_after_a_scene_change_without_steer_recaptures(no_cuda):
     assert b._clean_anchor is None
     outs += [out] + [b.generate_chunk(c) for _ in range(3)]  # chunk 13 = 10 + 3: saved again, under c
     assert b.clean_anchor_chunk == 13 and b._clean_anchor is outs[13].latents
-    _, calls, rng = reanchored_chunk(b, c, 0.5, "clean")
-    assert torch.allclose(calls[0]["x"], start_latent(b, outs[13].latents, 2, rng))
+    _, calls, _ = reanchored_chunk(b, c, 0.5, "clean")
+    assert torch.allclose(calls[0]["x"], start_latent(b, outs[13].latents, 2, refresh_rng(b)))
     assert b.last_rebase.from_clean
 
 
 def test_clean_refresh_accepts_an_equal_cond_object(no_cuda):
-    b = make_backend(refresh_noise="fresh")
+    b = make_backend()
     b.reset(seed=0)
     outs = [b.generate_chunk(torch.full((1, 3, 8), 1.0)) for _ in range(6)]
-    _, calls, rng = reanchored_chunk(b, torch.full((1, 3, 8), 1.0), 0.5, "clean")  # equal values, new object
-    assert torch.allclose(calls[0]["x"], start_latent(b, outs[3].latents, 2, rng))
+    _, calls, _ = reanchored_chunk(b, torch.full((1, 3, 8), 1.0), 0.5, "clean")  # equal values, new object
+    assert torch.allclose(calls[0]["x"], start_latent(b, outs[3].latents, 2, refresh_rng(b)))
     assert b.last_rebase.from_clean
 
 
@@ -607,7 +615,7 @@ def test_cut_without_fade_ends_a_running_dissolve(no_cuda, monkeypatch):
     assert values(d.decode(chunk(7, 0.3))) == [px(0.3)] * 4
 
 
-# ---------------------------------------------------------------- refresh noise and start timestep
+# ---------------------------------------------------------------- refresh noise
 
 
 def refreshes(b, n_refresh=2, gap=6):
@@ -679,56 +687,9 @@ def test_fixed_refresh_noise_leaves_steers_and_normal_chunks_alone(no_cuda):
     assert all(torch.equal(x, y) for x, y in zip(outs["fixed"], outs["fresh"]))
 
 
-@pytest.mark.parametrize("t, want_steps", [(125, None), (250, 1), (500, 2)])
-def test_refresh_anchor_t_sets_the_start_level(no_cuda, t, want_steps):
-    b = make_backend(refresh_anchor_t=t, refresh_noise="fresh")
-    a = torch.full((1, 3, 8), 1.0)
-    b.reset(seed=0)
-    outs = [b.generate_chunk(a) for _ in range(6)]
-    _, calls, rng = reanchored_chunk(b, a, 0.5, "clean")
-    tw = b._timestep(t)
-    sched = [tw] + [s for s in b.first_chunk_steps if s < tw]
-    assert [c["t"] for c in calls] == [[int(s)] for s in sched] + [[0]]
-    if want_steps is not None:
-        assert len(sched) == want_steps  # 250 and 500 are on the first-frame grid (steps 3 and 2)
-    g = torch.Generator().set_state(rng)
-    noise = torch.randn(outs[3].latents.shape, generator=g)
-    want = b.scheduler.add_noise(outs[3].latents.flatten(0, 1), noise.flatten(0, 1), tw * torch.ones([1], dtype=torch.long))
-    assert torch.allclose(calls[0]["x"], want.unflatten(0, outs[3].latents.shape[:2]))
-    assert b.last_rebase.from_clean
-
-
-def test_refresh_anchor_t_only_for_refreshes_from_the_clean_anchor(no_cuda):
-    b = make_backend(refresh_anchor_t=125)
-    a = torch.full((1, 3, 8), 1.0)
-    b.reset(seed=0)
-    for _ in range(6):
-        b.generate_chunk(a)
-    _, calls, _ = reanchored_chunk(b, a, 0.5, "last")  # a steer keeps the strength mapping (step 2)
-    assert [c["t"] for c in calls] == [[int(s)] for s in b.first_chunk_steps[2:]] + [[0]]
-
-
-@pytest.mark.parametrize("options", [{"refresh_noise": "same"}, {"refresh_anchor_t": 0}, {"refresh_anchor_t": 1001}])
-def test_refresh_options_are_checked(options):
+def test_refresh_options_are_checked():
     with pytest.raises(ValueError):
-        make_backend(**options)
-
-
-def test_refresh_noise_is_fixed_by_default_and_seeded_by_the_anchor(no_cuda):
-    b = make_backend()
-    assert b.refresh_noise == "fixed" and b.refresh_anchor_t is None
-    a = torch.full((1, 3, 8), 1.0)
-    b.reset(seed=0)
-    outs = [b.generate_chunk(a) for _ in range(6)]
-    _, calls, _ = reanchored_chunk(b, a, 0.5, "clean")
-    g = torch.Generator().manual_seed(1_000_003 * 0 + 3)  # the video's seed (0) and the anchor chunk (3)
-    noise = torch.randn(outs[3].latents.shape, generator=g)
-    t = b.first_chunk_steps[2] * torch.ones([1], dtype=torch.long)
-    want = b.scheduler.add_noise(outs[3].latents.flatten(0, 1), noise.flatten(0, 1), t).unflatten(0, outs[3].latents.shape[:2])
-    assert torch.allclose(calls[0]["x"], want)
-
-
-# ---------------------------------------------------------------- steer start: steer_anchor_t, steer_noise, steer_steps
+        make_backend(refresh_noise="same")
 
 
 def _steer_run(b):

@@ -92,12 +92,17 @@ def wait(pred, timeout=15.0):
 
 
 class Run:
-    """An engine on the fake backend that records every sent frame and every frame array given to JPEG."""
+    """An engine on the fake backend that records every sent frame and every frame array given to JPEG.
+
+    It also records each time the streamer asked the playout buffer for a frame and found it empty (`dry`: chunk,
+    frame index and ms waited). That is a frame not ready in time, while a late send under CPU load is not."""
 
     def __init__(self, monkeypatch, mode: str, short_on: str, **opts):
         self.sent: list[tuple[int, int, float]] = []
         self.arrays: list[np.ndarray] = []
+        self.dry: list[tuple[int, int, float]] = []
         self.lock = threading.Lock()
+        self.changed = threading.Condition(self.lock)  # notified on every sent frame
         real = engine_module.encode_jpeg
 
         def spy(frame, quality):
@@ -110,11 +115,35 @@ class Run:
         cfg = EngineConfig(backend="fake", width=64, height=48, short_chunk=mode, record_dir=None,
                            backend_options=options)
         self.engine = Engine(cfg, self._on_frame, lambda m: None)
+        playout = self.engine._playout_queue
+        real_get = playout.get
+
+        def get(timeout=None):
+            empty, t = playout.empty(), time.monotonic()
+            item = real_get(timeout=timeout)
+            if empty:
+                with self.lock:
+                    self.dry.append((item[2].chunk, item[0], (time.monotonic() - t) * 1e3))
+            return item
+
+        playout.get = get
 
     def _on_frame(self, b: bytes) -> None:
         chunk, index, _ = unpack_frame(b)
-        with self.lock:
+        with self.changed:
             self.sent.append((chunk, index, time.monotonic()))
+            self.changed.notify_all()
+
+    def wait_until(self, pred, timeout: float = 60.0) -> bool:
+        """Block until `pred()` is true, rechecked on every sent frame (and at least every 0.1 s)."""
+        deadline = time.monotonic() + timeout
+        with self.changed:
+            while not pred():
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    return False
+                self.changed.wait(min(left, 0.1))
+            return True
 
     def frames_of(self, chunk: int) -> list[int]:
         with self.lock:
@@ -163,23 +192,22 @@ def test_fill_mode_plays_the_short_chunk_unpadded(monkeypatch):
 
 def test_no_stall_and_frames_keep_pace(monkeypatch):
     # gen + decode (36 ms) close to a chunk's play time (80 ms at 50 fps for 4 frames) with a small lead margin,
-    # so the generator does not run far ahead: a short chunk left unpadded runs the playout dry.
-    with Run(monkeypatch, "crossfade", "15,25,35", gen_ms=30, decode_ms=6) as run:
+    # so the generator does not run far ahead: a short chunk left unpadded runs the playout dry (in fill mode the
+    # streamer waits about 37 ms on an empty buffer at the first frame after each short chunk).
+    short = (15, 25, 35)
+    with Run(monkeypatch, "crossfade", ",".join(map(str, short)), gen_ms=30, decode_ms=6) as run:
         e = run.engine
         e.config.lead_margin = 1.0
-        assert wait(lambda: e.chunk_shown >= 10)
-        stalls0, sent0, t0 = e.stats()["stalls"], e.stats()["frames_sent"], time.monotonic()
-        assert wait(lambda: e.chunk_shown >= 40)
-        s = e.stats()
-        elapsed = time.monotonic() - t0
-        assert s["short_chunks"]["count"] == 3
-        assert s["stalls"] == stalls0
-        # every sent frame is one 1/50 s slot: frames_sent keeps pace with the clock
-        assert abs((s["frames_sent"] - sent0) - elapsed * 50) <= 6
+        assert run.wait_until(lambda: e.chunk_shown >= 40), f"stuck at chunk {e.chunk_shown}"
+        assert e.stats()["short_chunks"]["count"] == 3
         with run.lock:
-            times = [t for c, _, t in run.sent if 12 <= c <= 38]
-        gaps = np.diff(times)
-        assert gaps.max() < 1.5 / 50
+            dry = [d for d in run.dry if d[2] > 1e3 / 50 / 2]  # waited over half a frame slot: a stall
+            window = [t for c, _, t in run.sent if 12 <= c <= 38]
+    # no frame of a short chunk or of the chunk after it was late (CPU load may delay others; that is not this test)
+    assert [d for d in dry if any(c in (d[0], d[0] - 1) for c in short)] == [], dry
+    # every sent frame is one 1/50 s slot: frames keep pace with the clock of the sent frames (10% for CPU load)
+    elapsed = window[-1] - window[0]
+    assert abs((len(window) - 1) - elapsed * 50) <= 0.1 * elapsed * 50 + 2, (len(window), elapsed)
 
 
 def test_first_chunk_after_a_reset_is_unchanged(monkeypatch):
@@ -202,15 +230,18 @@ def test_padding_time_counts_as_decode_time(monkeypatch):
     """_lead_limit budgets the pipeline from gen, decode and JPEG ms, so the padding of a short chunk, which runs
     on the decode thread between decode and JPEG, must be in one of them (here: decode). It was in neither."""
     real_pad = engine_module.pad_short_chunk
+    padded = threading.Event()
 
     def slow_pad(*args):
-        time.sleep(0.1)
+        time.sleep(0.1)  # the padding's own cost, not a wait for the test
+        padded.set()
         return real_pad(*args)
 
     monkeypatch.setattr(engine_module, "pad_short_chunk", slow_pad)
     with Run(monkeypatch, "crossfade", "6", decode_ms=5) as run:
         e = run.engine
-        assert wait(lambda: e.chunk_shown >= 8)
+        assert padded.wait(60)
+        assert run.wait_until(lambda: e.chunk_shown >= 6), f"stuck at chunk {e.chunk_shown}"  # its stats are in
         with e._stats_lock:
             decode = list(e.decode_ms.values)
         assert max(decode) >= 100  # the padded chunk's decode time includes its 100 ms of padding

@@ -15,9 +15,8 @@ import pytest
 
 from commands.service import CommandService
 from commands.state import SceneState
-from engine.final_reader import (FORWARD_MOTION, STYLE, VEHICLE_STYLE, CacheFile, FinalReader, FinalReaderState,
-                                 expand_operations,
-                                 fingerprint, load, prompt_spec, scene_after)
+from engine.final_reader import (FORWARD_MOTION, STANDIN, STYLE, VEHICLE_STYLE, CacheFile, FinalReader,
+                                 FinalReaderState, expand_operations, fingerprint, load, prompt_spec, scene_after)
 from engine.foundry import FoundryMessages
 from engine.reader import FinalReadingService, load_reader
 
@@ -51,7 +50,8 @@ class FakeChat:
 
 
 def reader(chat, **kwargs):
-    return FinalReader(FinalReaderState.ON, chat=chat, **kwargs)
+    """The live reader: the spec of commands.rewriter (prompt_spec), unless a test checks the stand-in's wording."""
+    return FinalReader(FinalReaderState.ON, chat=chat, **{"spec": prompt_spec(), **kwargs})
 
 
 def snap(*ops, base="a wide shot of a red car driving along a road"):
@@ -64,7 +64,7 @@ def snap(*ops, base="a wide shot of a red car driving along a road"):
 def test_operations_and_the_standin_prompt():
     chat = FakeChat({"make it winter": "```json\n" + reply([WINTER], "a snowy mountain road between pine forests, "
                                                                      "snow falling, cold blue light") + "\n```"})
-    r = reader(chat)
+    r = reader(chat, spec=STANDIN)
     out = r("make it winter", snap())
     assert out["operations"] == [WINTER]
     assert out["prompt"] == ("A wide shot of a red car driving along a road, " + FORWARD_MOTION + ", a snowy mountain road between pine forests, snow "
@@ -107,7 +107,7 @@ def test_invalid_replies_fall_back():
 def test_rejected_details_keep_the_edit_with_the_short_prompt():
     # The user said "make it winter" and the model understood it; only its wording was too long. Winter still
     # happens, with the composed prompt, rather than the sentence being thrown away.
-    r = reader(FakeChat({"make it winter": reply([WINTER], "x " * 200)}))
+    r = reader(FakeChat({"make it winter": reply([WINTER], "x " * 200)}), spec=STANDIN)
     out = r("make it winter", snap())
     assert out == {"operations": [WINTER], "prompt": "a wide shot of a red car driving along a road; snow on the ground"}
     assert r.stats()["details_rejected"] == 1 and r.stats()["rejects"] == 0
@@ -270,7 +270,7 @@ def test_wrapper_end_to_end_with_the_real_service():
                                                  "a snowy meadow around a white lighthouse, a lion nearby"),
         "make them fight with weapons": reply(blocked=True),
     })
-    svc = FinalReadingService(service(), reader(chat))
+    svc = FinalReadingService(service(), reader(chat, spec=STANDIN))
     winter = svc.handle(final("make it winter"))
     assert winter["steer"]["prompt"].startswith("A wide shot of a meadow with a single oak tree, a snowy meadow")
     assert winter["steer"]["prompt"].endswith(" " + STYLE) and "road" not in winter["steer"]["prompt"]
@@ -337,7 +337,7 @@ def test_a_named_colour_wins_over_making_a_duplicate_look_different():
     chat = FakeChat({"add a red car racing on a road": reply(
         [second], "a country road through green fields, a second red car racing alongside it in the next lane, "
                   "bright sunshine")})
-    r = reader(chat)
+    r = reader(chat, spec=STANDIN)
     out = r("add a red car racing on a road", snap(red, base="a wide shot of a meadow with a single oak tree"))
     system = " ".join(chat.calls[0][0].split())
     assert "A colour, type or size the user names ALWAYS wins" in system
