@@ -554,6 +554,7 @@ So a new sentence costs about 1.8 s extra, and a pinned or cached sentence costs
   On a scene without a vehicle the prompt is then the short composed prompt.
   On a vehicle scene the fallback still gets the car template (PR #238): the road, scene and light on screen are kept unless the sentence changed the world, season, weather or time, new objects become object sentences, and an undo back to that state gives the same words.
 - The cache is keyed by (composed prompt before the sentence, sentence).
+  The sentence part of every pinned and cache key is normalized (`sentence_key`: lower case, trimmed, spaces collapsed, end punctuation `. , ! ? ; :` and surrounding quotes stripped, inner words kept), at load, at lookup and in the disk cache, so "Make it winter." from voice hits the pinned "make it winter"; the content check and Sonnet still get the original text.
   A Sonnet result or a block is chosen once and saved to `--final-cache` (JSON, written atomically, tied to a fingerprint of the system prompt and the model), so a restart gives the same result and nothing is regenerated.
   A fallback is final for that key for the life of the process, and an answer that arrives after the wait is dropped (`late_dropped`); fallbacks are not saved, so a passing outage does not disable a sentence for good.
 - The model sees one prompt per scene state: the first rich prompt chosen for a composed prompt replaces it in every later steer (an undo back to it, a chip removal), in `likely_prompts` and in `committed_prompt`, so a state always gives the same embedding.
