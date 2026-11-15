@@ -2,138 +2,158 @@
   {
     "sentence": "make it winter",
     "prompt_before": "a wide shot of a meadow with a single oak tree",
-    "canonical": "a wide shot of a meadow with a single oak tree; a snowy winter landscape with thick white snow covering the ground",
     "operations": [
       {
         "op": "add",
         "label": "winter",
         "kind": "season",
-        "phrase": "a snowy winter landscape with thick white snow covering the ground",
+        "phrase": "a wintry snowy landscape with frozen ground and a thick layer of snow",
         "strength": 1.0
       }
     ],
-    "prompt": "A wide shot of a meadow with a single oak tree, a wide snow-covered meadow with deep white drifts and a bare frosted oak branches standing alone in the middle, a few frozen grass tips poking through the snow, soft snowflakes falling, pale grey overcast sky with cold blue light. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
-    "model": "claude-sonnet-5-5",
-    "prompt_spec": "engine stand-in",
-    "fingerprint": "e34e056d6043a52e",
-    "generated_at": "2026-11-14T23:35:10+00:00"
+    "prompt": "a wide shot of a meadow with a single oak tree; a wintry snowy landscape with frozen ground and a thick layer of snow; pale snow drifts over frozen earth, crisp icy air, soft diffused white light, delicate frost crystals on every surface",
+    "generated_at": "2026-11-15T00:12:30+00:00",
+    "canonical": "a wide shot of a meadow with a single oak tree; a wintry snowy landscape with frozen ground and a thick layer of snow"
   },
   {
     "sentence": "add a red car",
-    "prompt_before": "a wide shot of a meadow with a single oak tree; a snowy winter landscape with thick white snow covering the ground",
-    "canonical": "a wide shot of a meadow with a single oak tree; a snowy winter landscape with thick white snow covering the ground; a red car parked in the snow near the oak tree",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; a wintry snowy landscape with frozen ground and a thick layer of snow",
     "operations": [
       {
         "op": "add",
         "label": "red car",
         "kind": "extra",
-        "phrase": "a red car parked in the snow near the oak tree",
+        "phrase": "a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible",
         "strength": 1.0
       }
     ],
-    "prompt": "A wide shot of a meadow with a single oak tree, a snow-covered meadow with thick white snow on the ground, a single bare oak tree standing in the middle, and a red car parked on a faint track beside the tree with snow on its roof, soft cold overcast light and a pale grey winter sky. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
-    "model": "claude-sonnet-5-5",
-    "prompt_spec": "engine stand-in",
-    "fingerprint": "e34e056d6043a52e",
-    "generated_at": "2026-11-14T23:35:12+00:00"
+    "prompt": "a wide shot of a meadow with a single oak tree; a wintry snowy landscape with frozen ground and a thick layer of snow; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; pale frozen ground, crisp glittering white surfaces, cold muted light, soft grey and blue tones, clear icy air",
+    "generated_at": "2026-11-15T00:12:32+00:00",
+    "canonical": "a wide shot of a meadow with a single oak tree; a wintry snowy landscape with frozen ground and a thick layer of snow; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible"
   },
   {
     "sentence": "make it night",
-    "prompt_before": "a wide shot of a meadow with a single oak tree; a snowy winter landscape with thick white snow covering the ground; a red car parked in the snow near the oak tree",
-    "canonical": "a wide shot of a meadow with a single oak tree; a snowy winter landscape with thick white snow covering the ground; a dark night sky with stars and soft moonlight on the snow; a red car parked in the snow near the oak tree",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; a wintry snowy landscape with frozen ground and a thick layer of snow; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible",
     "operations": [
       {
         "op": "add",
         "label": "night",
         "kind": "time",
-        "phrase": "a dark night sky with stars and soft moonlight on the snow",
+        "phrase": "a dark night with deep blue shadows and a pale glow of moonlight",
         "strength": 1.0
       }
     ],
-    "prompt": "A wide shot of a meadow with a single oak tree, a wide snow-covered meadow with a single bare oak tree, a red car parked in the snow beside the tree, thick white snow covering the ground and glowing faintly under bright moonlight, a dark star-filled night sky above, long blue shadows across the snow. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
-    "model": "claude-sonnet-5-5",
-    "prompt_spec": "engine stand-in",
-    "fingerprint": "e34e056d6043a52e",
-    "generated_at": "2026-11-14T23:35:14+00:00"
+    "prompt": "a wide shot of a meadow with a single oak tree; a wintry snowy landscape with frozen ground and a thick layer of snow; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a dark night with deep blue shadows and a pale glow of moonlight; pale moonlit glow across drifted snow, deep blue shadows, crisp frozen ground, glittering ice crystals",
+    "generated_at": "2026-11-15T00:12:33+00:00",
+    "canonical": "a wide shot of a meadow with a single oak tree; a wintry snowy landscape with frozen ground and a thick layer of snow; a dark night with deep blue shadows and a pale glow of moonlight; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible"
   },
   {
     "sentence": "add a lion",
-    "prompt_before": "a wide shot of a meadow with a single oak tree; a snowy winter landscape with thick white snow covering the ground; a dark night sky with stars and soft moonlight on the snow; a red car parked in the snow near the oak tree",
-    "canonical": "a wide shot of a meadow with a single oak tree; a snowy winter landscape with thick white snow covering the ground; a dark night sky with stars and soft moonlight on the snow; a red car parked in the snow near the oak tree; a lion standing in the snow",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; a wintry snowy landscape with frozen ground and a thick layer of snow; a dark night with deep blue shadows and a pale glow of moonlight; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible",
     "operations": [
       {
         "op": "add",
         "label": "lion",
         "kind": "extra",
-        "phrase": "a lion standing in the snow",
+        "phrase": "a large male lion standing in the foreground at the left of the frame, facing the camera",
         "strength": 1.0
       }
     ],
-    "prompt": "A wide shot of a meadow with a single oak tree, a snow-covered meadow with deep white snow stretching to the horizon, a red car parked in the snow beside the oak tree, and a tawny lion standing in the snow a few steps away from the car, its mane dusted with frost, under a dark starry night sky with soft moonlight glowing on the snow. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
-    "model": "claude-sonnet-5-5",
-    "prompt_spec": "engine stand-in",
-    "fingerprint": "e34e056d6043a52e",
-    "generated_at": "2026-11-14T23:35:15+00:00"
+    "prompt": "a wide shot of a meadow with a single oak tree; a wintry snowy landscape with frozen ground and a thick layer of snow; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a dark night with deep blue shadows and a pale glow of moonlight; frozen ground glittering with frost, deep blue shadows, pale silver light, crisp cold air, soft powdery snow textures",
+    "generated_at": "2026-11-15T00:12:35+00:00",
+    "canonical": "a wide shot of a meadow with a single oak tree; a wintry snowy landscape with frozen ground and a thick layer of snow; a dark night with deep blue shadows and a pale glow of moonlight; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera"
   },
   {
     "sentence": "sunny",
-    "prompt_before": "a wide shot of a meadow with a single oak tree; a snowy winter landscape with thick white snow covering the ground; a dark night sky with stars and soft moonlight on the snow; a red car parked in the snow near the oak tree; a lion standing in the snow",
-    "canonical": "a wide shot of a meadow with a single oak tree; a snowy winter landscape with thick white snow covering the ground; bright sunshine and a clear blue sky over the snow; a dark night sky with stars and soft moonlight on the snow; a red car parked in the snow near the oak tree; a lion standing in the snow",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; a wintry snowy landscape with frozen ground and a thick layer of snow; a dark night with deep blue shadows and a pale glow of moonlight; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera",
     "operations": [
       {
         "op": "add",
-        "label": "sunny",
-        "kind": "weather",
-        "phrase": "bright sunshine and a clear blue sky over the snow",
+        "label": "day",
+        "kind": "time",
+        "phrase": "bright daytime with clear sunlight and crisp, well-lit surroundings",
         "strength": 1.0
       }
     ],
-    "prompt": "A wide shot of a meadow with a single oak tree, a meadow covered in thick white snow around a single bare oak tree, a red car parked in the snow beside the trunk, a lion standing in the snow nearby, bright sunshine glittering on the snowy ground under a clear blue sky, long soft shadows stretching across the drifts. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
-    "model": "claude-sonnet-5-5",
-    "prompt_spec": "engine stand-in",
-    "fingerprint": "e34e056d6043a52e",
-    "generated_at": "2026-11-14T23:35:17+00:00"
+    "prompt": "a wide shot of a meadow with a single oak tree; a wintry snowy landscape with frozen ground and a thick layer of snow; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; bright daytime with clear sunlight and crisp, well-lit surroundings; crisp snow, pale grass, warm golden light, clear air",
+    "generated_at": "2026-11-15T00:12:36+00:00",
+    "canonical": "a wide shot of a meadow with a single oak tree; a wintry snowy landscape with frozen ground and a thick layer of snow; bright daytime with clear sunlight and crisp, well-lit surroundings; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera"
   },
   {
     "sentence": "make it a desert",
-    "prompt_before": "a wide shot of a meadow with a single oak tree; a snowy winter landscape with thick white snow covering the ground; bright sunshine and a clear blue sky over the snow; a dark night sky with stars and soft moonlight on the snow; a red car parked in the snow near the oak tree; a lion standing in the snow",
-    "canonical": "a wide shot of a meadow with a single oak tree; a dry desert landscape of golden sand dunes and cracked earth; bright sunshine and a clear blue sky over the snow; a dark night sky with stars and soft moonlight on the snow; a red car parked in the snow near the oak tree; a lion standing in the snow",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; a wintry snowy landscape with frozen ground and a thick layer of snow; bright daytime with clear sunlight and crisp, well-lit surroundings; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera",
     "operations": [
-      {
-        "op": "remove",
-        "id": "c1"
-      },
       {
         "op": "add",
         "label": "desert",
-        "kind": "season",
-        "phrase": "a dry desert landscape of golden sand dunes and cracked earth",
+        "kind": "world",
+        "phrase": "a long straight desert highway between red sandstone mesas and sand dunes, heat haze, orange sunset sky.",
         "strength": 1.0
       }
     ],
-    "prompt": "A wide shot of a meadow with a single oak tree, sand dunes and cracked dry earth stretch to the horizon on both sides of the oak tree, with scattered red rocks and dry shrubs. A red car is parked in the sand beside the tree and a lion stands nearby on the dunes. Bright sunshine breaks through a dark starry night sky, casting soft moonlight and warm light across the sand. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
-    "model": "claude-sonnet-5-5",
-    "prompt_spec": "engine stand-in",
-    "fingerprint": "e34e056d6043a52e",
-    "generated_at": "2026-11-14T23:35:19+00:00"
+    "prompt": "a wide shot of a single oak tree; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a long straight desert highway between red sandstone mesas and sand dunes, heat haze; bright daytime with clear sunlight and crisp, well-lit surroundings; warm golden sand, fine rippled textures, dry shimmering air, pale ochre tones",
+    "generated_at": "2026-11-15T00:12:37+00:00",
+    "canonical": "a wide shot of a single oak tree; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a long straight desert highway between red sandstone mesas and sand dunes, heat haze; bright daytime with clear sunlight and crisp, well-lit surroundings"
   },
   {
     "sentence": "add a red car racing on a road",
-    "prompt_before": "a wide shot of a meadow with a single oak tree; a dry desert landscape of golden sand dunes and cracked earth; bright sunshine and a clear blue sky over the snow; a dark night sky with stars and soft moonlight on the snow; a red car parked in the snow near the oak tree; a lion standing in the snow",
-    "canonical": "a wide shot of a meadow with a single oak tree; a dry desert landscape of golden sand dunes and cracked earth; bright sunshine and a clear blue sky over the snow; a dark night sky with stars and soft moonlight on the snow; a red car parked in the snow near the oak tree; a lion standing in the snow; a blue racing car speeding along a paved road",
+    "prompt_before": "a wide shot of a single oak tree; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a long straight desert highway between red sandstone mesas and sand dunes, heat haze; bright daytime with clear sunlight and crisp, well-lit surroundings",
     "operations": [
       {
         "op": "add",
-        "label": "racing car",
+        "label": "second red car",
         "kind": "extra",
-        "phrase": "a blue racing car speeding along a paved road",
+        "phrase": "a second small red car racing in the next lane at the right of the frame, white dashed lane markings rush toward the viewer",
         "strength": 1.0
       }
     ],
-    "prompt": "A wide shot of a meadow with a single oak tree, a dry desert of golden sand dunes and cracked earth with a single oak tree, a paved road crossing the sand with a second blue racing car speeding along it, a red car parked in the sand near the oak tree, a lion standing on the dunes, a dark night sky full of stars, soft moonlight on the sand. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
-    "model": "claude-sonnet-5-5",
-    "prompt_spec": "engine stand-in",
-    "fingerprint": "e34e056d6043a52e",
-    "generated_at": "2026-11-14T23:35:21+00:00"
+    "prompt": "a wide shot of a single oak tree; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a second small red car racing in the next lane at the right of the frame, white dashed lane markings rush toward the viewer; a long straight desert highway between red sandstone mesas and sand dunes, heat haze; bright daytime with clear sunlight and crisp, well-lit surroundings; warm red sandstone tones, fine drifting sand",
+    "generated_at": "2026-11-15T00:12:39+00:00",
+    "canonical": "a wide shot of a single oak tree; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a second small red car racing in the next lane at the right of the frame, white dashed lane markings rush toward the viewer; a long straight desert highway between red sandstone mesas and sand dunes, heat haze; bright daytime with clear sunlight and crisp, well-lit surroundings"
+  },
+  {
+    "sentence": "new scene of a red sports car driving along a country road",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "new_scene",
+        "base": "a red sports car driving along a country road"
+      }
+    ],
+    "prompt": "A red sports car speeds forward along a straight two-lane country road, driving away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the asphalt and the white dashed lane markings rush toward the viewer beneath it. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "generated_at": "2026-11-15T00:12:40+00:00",
+    "canonical": "a red sports car driving along a country road"
+  },
+  {
+    "sentence": "make it winter",
+    "prompt_before": "a red sports car driving along a country road",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "season",
+        "phrase": "deep snow covers the ground and a cold wintry atmosphere",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car speeds forward along a straight two-lane country road, driving away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the asphalt and the white dashed lane markings rush toward the viewer beneath it. Deep snow covers the ground and a cold wintry atmosphere; powdery snow, crisp frosty air, pale silver light, soft cold blue tones. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "generated_at": "2026-11-15T00:12:42+00:00",
+    "canonical": "a red sports car driving along a country road; deep snow covers the ground and a cold wintry atmosphere"
+  },
+  {
+    "sentence": "make it night",
+    "prompt_before": "a red sports car driving along a country road; deep snow covers the ground and a cold wintry atmosphere",
+    "operations": [
+      {
+        "op": "add",
+        "label": "night",
+        "kind": "time",
+        "phrase": "dark night with a bright moon in the sky and deep blue shadows",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car speeds forward along a straight two-lane country road, driving away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the asphalt and the white dashed lane markings rush toward the viewer beneath it. Deep snow covers the ground and a cold wintry atmosphere; dark night with a bright moon in the sky and deep blue shadows; pale snow glittering, cold silvery light, deep blue shadows, frosty air. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "generated_at": "2026-11-15T00:12:43+00:00",
+    "canonical": "a red sports car driving along a country road; deep snow covers the ground and a cold wintry atmosphere; dark night with a bright moon in the sky and deep blue shadows"
   }
 ]
