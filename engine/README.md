@@ -31,6 +31,8 @@ Unit tests:
 .venv-engine/bin/python -m pytest engine/tests -q
 ```
 
+The demo harness tests (`test_demo_run*.py`) are marked `tools` and left out by default (root `pytest.ini`); add `-m tools` to run them.
+
 ## Demo harness
 
 `engine/tools/demo_run.py` plays a timed script of commands against an engine and records what comes back, so a demo can be repeated and two versions of the engine can be compared frame by frame.

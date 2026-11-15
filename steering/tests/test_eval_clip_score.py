@@ -6,6 +6,8 @@ from steering.eval import run_engine as re_
 from steering.eval import scenarios as sc
 from steering.tests.test_eval_run_engine import FakeBackend
 
+pytestmark = pytest.mark.tools  # a tool's tests: run with pytest -m tools (pytest.ini)
+
 
 def _ramp(t: int, steer: int, length: int) -> torch.Tensor:
     """0 before `steer`, linear rise to 1 over `length` frames, then 1."""

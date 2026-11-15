@@ -1,9 +1,12 @@
 import os
 
+import pytest
 import torch
 
 from engine.backends.fake import FakeBackend
 from steering.eval import follow_probe as fp
+
+pytestmark = pytest.mark.tools  # a tool's tests: run with pytest -m tools (pytest.ini)
 
 FAST = ["--backend", "fake", "--backend-opt", "gen_ms=0", "--backend-opt", "decode_ms=0",
         "--backend-opt", "encode_ms=0", "--width", "64", "--height", "48", "--device", "cpu",

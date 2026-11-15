@@ -9,6 +9,8 @@ from steering.eval import scenarios as sc
 from steering.eval import sheet
 from steering.tests.test_eval_run_engine import FakeBackend
 
+pytestmark = pytest.mark.tools  # a tool's tests: run with pytest -m tools (pytest.ini)
+
 
 def _frames(t: int = 20, h: int = 24, w: int = 32) -> torch.Tensor:
     """Mid-grey frames whose brightness steps up a little per frame."""

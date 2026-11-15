@@ -19,6 +19,8 @@ from steering.eval.scenarios import (
     run,
 )
 
+pytestmark = pytest.mark.tools  # a tool's tests: run with pytest -m tools (pytest.ini)
+
 FPS = 16.0
 
 

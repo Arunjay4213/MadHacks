@@ -23,6 +23,8 @@ from steering.eval.embedding_stats import (
     token_shift,
 )
 
+pytestmark = pytest.mark.tools  # a tool's tests: run with pytest -m tools (pytest.ini)
+
 D = 16
 
 
