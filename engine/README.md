@@ -260,6 +260,23 @@ python -m engine.server --backend fake|causal_forcing --reader standin|commands 
 - SIGINT or SIGTERM shuts down cleanly, finalizes the open recording and moves the engine to STOPPED.
 - The process exits with code 70 when the engine reaches FAILED, so systemd restarts it.
 
+### Real backend options (`--backend-opt`, `causal_forcing`)
+
+The full list with defaults is in the `load()` docstring of `engine/backends/causal_forcing.py`; the re-anchor ones:
+
+- `clean_anchor_after` (3), `first_frame_pad` (`hold`), `cut_fade_frames` (0), `cut_fade_refresh` (1): see "Re-anchor" and `steering/README.md`.
+- `refresh_noise` (`fixed`, the default since PR #128; `fresh` is the old behaviour): a refresh from the clean anchor draws all its noise from a generator seeded by the video's seed and the clean anchor's chunk, so every refresh from one anchor returns to the same picture.
+- `refresh_anchor_t` (unset, or 1..1000): the level the clean anchor is noised to on a refresh, instead of the strength's anchor step (500 = step 2, 250 = step 3); unset on the live engine.
+- Seeds: `reset(seed=N)` replays the same video, refreshes and fixed-noise steers included; any int seed works (the derived seed is reduced to 64 bits, PR #152); an unseeded reset takes the previous video's seed plus one, so it gets new refresh and steer noise (PR #144).
+- `steer_anchor_t` (unset, or 1..1000): a steer (a re-anchor with source `last` at a strength above 0.75, which every command is) starts from the last clean latent noised to this level instead of pure noise; with no clean latent yet, from pure noise as before.
+- `steer_noise` (`fresh` or `fixed`): `fixed` draws all of the steer chunk's noise from a generator seeded by the video's seed, the same for every steer of the video, without advancing the main noise stream.
+- `steer_steps` (unset, or a comma list such as `800,500`): the steer chunk's schedule, strictly descending in 0..1000, starting at `steer_anchor_t` (or at 1000 when it is unset); unset means `steer_anchor_t` and the first-frame steps below it, or today's first-frame schedule.
+- `steer_noise_first_frame` (0): 1 makes the first frame of every video use the fixed steer noise too.
+
+The four steer options are off by default, and then nothing changes; a bad value stops the backend at load, before any weights are read.
+They keep the shot's layout across a world change (tree trunk shift 12 to 21 px against 56 to 96 px, one seed so far, more runs in progress); see `engine/MODEL_NOTES.md`, "Steer start".
+They are not on the live engine yet.
+
 ## Endpoints
 
 All on one origin; the message shapes are in `contracts/README.md`.
