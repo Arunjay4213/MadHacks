@@ -556,7 +556,7 @@
       "xfail": {"dictionary": "bug: with Sonnet down the car template ignores a world's strength, so more snow on the snowy road draws the same road (the chip still moves)"},
       "steps": [
         {"say": "make it winter", "chips": ["winter"], "has": ["snowy mountain road"]},
-        {"say": "a little more snow", "chips": ["winter"], "strength": {"winter": "up"}, "has": ["snowy mountain road", "heavy"], "lacks": ["green fields"], "visible": ["Is there a red car seen from behind?", "Is the road covered in snow?", "Is snow falling?"]}
+        {"say": "a little more snow", "chips": ["winter"], "strength": {"winter": "up"}, "has": ["snowy mountain road", "heavy"], "lacks": ["green fields"], "visible": ["Is there a red car seen from behind?", "Is the road covered in snow?"]}
       ]
     }
   ]

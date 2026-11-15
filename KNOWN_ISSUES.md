@@ -40,6 +40,11 @@ Options: pick one page for the demo and keep the other as a fallback, and pick o
 - **Added objects are small or at the edge.**
   Size and position words in the prompt help ("a large ... in the foreground at the left of the frame").
   The lion was the weakest case.
+- **A car racing on a road, added to the plain meadow, is lost.**
+  Live A/B on 2026-11-15 (issue #267): with the road clause ("a straight grey asphalt road ... runs across the scene") the road is drawn but the car is tiny, oncoming or gone in 4 of 4 runs, also with a longer road clause.
+  The car template wording ("A red car, seen from directly behind ..., drives fast along a straight grey asphalt road through a green meadow ...") kept a large car on the road in 2 of 2.
+  In the demo chain the same sentence after "make it a desert" works, because the desert world names its highway.
+  Options: write a moving vehicle object on a scene without a vehicle base with the car template (a composer change that moves the chain's keys and pins), or keep the demo to the car scene for driving.
 - **No real faces.**
   The 1.3B model cannot draw a specific person.
   Named people are mapped to a description of their look (Jensen Huang becomes a man in a black leather jacket).
