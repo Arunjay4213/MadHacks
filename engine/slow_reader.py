@@ -75,14 +75,15 @@ def _strength(value, default=None):
     return round(float(value), 2)
 
 
-def validate(reply, snapshot: dict) -> dict | None:
-    """The model's reply as a clean operation for SceneState.apply, or None if it is not exactly one valid edit."""
+def validate(reply, snapshot: dict, max_phrase: int = MAX_PHRASE) -> dict | None:
+    """The model's reply as a clean operation for SceneState.apply, or None if it is not exactly one valid edit.
+    `max_phrase` is the longest phrase in characters (the final reader allows longer, positioned phrases)."""
     if not isinstance(reply, dict):
         return None
     op = reply.get("op")
     ids = {c["id"] for c in snapshot.get("changes", [])}
     if op == "add":
-        label, phrase = _text(reply.get("label"), MAX_LABEL), _text(reply.get("phrase"), MAX_PHRASE)
+        label, phrase = _text(reply.get("label"), MAX_LABEL), _text(reply.get("phrase"), max_phrase)
         kind, strength = reply.get("kind"), _strength(reply.get("strength"), 1.0)
         if label is None or phrase is None or kind not in KINDS or strength is None:
             return None
