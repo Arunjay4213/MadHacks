@@ -1,0 +1,307 @@
+{
+  "about": "What a user should get for each sentence. Format and how to run: README.md, section Acceptance. Expectations come from what the user asked for, never from what the code prints today.",
+  "cases": [
+    {
+      "name": "demo-meadow-chain",
+      "note": "Every meadow line of engine/demo_prompts.json, in script order.",
+      "start": "meadow",
+      "live": true,
+      "steps": [
+        {"say": "make it winter", "chips": ["winter"], "has": ["snow"], "visible": ["Is the ground covered in snow?", {"q": "Is it night?", "expect": "no"}]},
+        {"say": "add a red car", "chips": ["winter", "car"], "has": ["red car", "snow"], "visible": ["Is there a red car?", "Is the ground covered in snow?"]},
+        {"say": "make it night", "chips": ["night", "car", "winter"], "has": ["night", "red car", "snow"], "visible": ["Is it night?", "Is there a red car?"]},
+        {"say": "add a lion", "chips": ["lion", "night", "car"], "has": ["lion", "red car", "night"], "visible": ["Is there a lion?", "Is it night?"]},
+        {"say": "sunny", "chips": ["day", "lion", "car"], "no_chips": ["night"], "has": ["lion", "red car"], "lacks": ["night"], "visible": [{"q": "Is it night?", "expect": "no"}, "Is the sky bright, as in daytime?", "Is there a lion?"]},
+        {"say": "add jensen huang", "chips": ["jensen huang", "lion"], "has": ["leather jacket", "glasses", "lion"], "visible": ["Is there a man in a black leather jacket?"]},
+        {"say": "remove jensen huang", "chips": ["lion", "car"], "no_chips": ["jensen huang"], "has": ["lion", "red car"], "lacks": ["leather jacket"], "visible": [{"q": "Is there a man in a black leather jacket?", "expect": "no"}, "Is there a lion?"]},
+        {"say": "make it a desert", "chips": ["desert", "lion", "car"], "no_chips": ["winter"], "has": ["desert", "sand", "lion", "red car"], "lacks": ["snow"], "visible": ["Is the ground sand or desert?", {"q": "Is there snow on the ground?", "expect": "no"}, "Is there a lion?", "Is there a red car?"]},
+        {"say": "add a red car racing on a road", "chips": ["desert"], "has": ["racing", "road", "desert"], "lacks": ["snow"], "visible": ["Is the ground sand or desert?", "Is there a road?"]}
+      ]
+    },
+    {
+      "name": "demo-car-chain",
+      "note": "Every car line of engine/demo_prompts.json: Jensen in and out, and the 7 measured car worlds.",
+      "start": "car",
+      "live": true,
+      "steps": [
+        {"say": "add jensen huang", "chips": ["jensen huang"], "has": ["red sports car", "leather jacket"], "visible": ["Is there a red car seen from behind?", "Is there a man in a black leather jacket?"]},
+        {"say": "remove jensen huang", "no_chips": ["jensen huang"], "has": ["red sports car", "country road"], "lacks": ["leather jacket"], "visible": ["Is there a red car seen from behind?", {"q": "Is there a man in a black leather jacket?", "expect": "no"}]},
+        {"say": "make it winter", "chips": ["winter"], "has": ["red sports car", "snowy mountain road"], "lacks": ["desert", "green fields"], "visible": ["Is there a red car seen from behind?", "Is there snow beside the road?"]},
+        {"say": "make it a desert", "chips": ["desert"], "no_chips": ["winter"], "has": ["red sports car", "desert highway"], "lacks": ["snow"], "visible": ["Is there a red car seen from behind?", "Is the land beside the road desert or sand?", {"q": "Is there snow?", "expect": "no"}]},
+        {"say": "make it night", "no_chips": ["desert"], "has": ["red sports car", "night"], "lacks": ["desert", "midday", "afternoon sun"], "visible": ["Is it night?", "Is there a red car seen from behind?"]},
+        {"say": "make it autumn", "chips": ["autumn"], "has": ["red sports car", "autumn"], "lacks": ["neon", "night"], "visible": ["Are there orange, red or yellow autumn leaves?", {"q": "Is it night?", "expect": "no"}]},
+        {"say": "make it sunset", "chips": ["sunset"], "has": ["red sports car", "sun setting"], "lacks": ["autumn"], "visible": ["Is the sky orange or pink, as at sunset?", "Is there a red car seen from behind?"]},
+        {"say": "make it rain", "chips": ["rain"], "has": ["red sports car", "rain"], "lacks": ["sun setting"], "visible": ["Is the road wet, or is it raining?", "Is there a red car seen from behind?"]},
+        {"say": "take me to the beach", "chips": ["ocean"], "no_chips": ["rain"], "has": ["red sports car", "ocean"], "lacks": ["heavy rain"], "visible": ["Is the sea or ocean visible?", "Is there a red car seen from behind?"]}
+      ]
+    },
+    {
+      "name": "car-on-road",
+      "note": "Bug fixed on 2026-11-14: the red car racing on a road came out parked.",
+      "start": "meadow",
+      "live": true,
+      "steps": [
+        {"say": "add a red car racing on a road", "chips": ["car"], "has": ["red", "road", "racing"], "lacks": ["parked"], "visible": ["Is there a red car?", "Is there a road?"]}
+      ]
+    },
+    {
+      "name": "add-snow-near-the-river",
+      "note": "Bug fixed on 2026-11-14: 'near the river' is a place, not a request for a river.",
+      "xfail": {"sonnet": "bug: Sonnet adds a river the scene does not have; 'add snow near the river' should add only snow. Not stable: a recording under the earlier rules (before #224) added only snow, so the final reader's rules should say that 'near X' only places an object"},
+      "steps": [
+        {"say": "add snow near the river", "chips": ["winter"], "no_chips": ["river"], "has": ["snow"], "lacks": ["river"]}
+      ]
+    },
+    {
+      "name": "undo-the-winter",
+      "note": "Bug fixed on 2026-11-14: 'undo the winter' removes the winter, not the last change.",
+      "start": "meadow",
+      "live": true,
+      "steps": [
+        {"say": "make it winter", "chips": ["winter"], "has": ["snow"]},
+        {"say": "add a lion", "chips": ["winter", "lion"], "has": ["snow", "lion"]},
+        {"say": "undo the winter", "chips": ["lion"], "no_chips": ["winter"], "has": ["lion"], "lacks": ["snow"], "visible": ["Is there a lion?", {"q": "Is the ground covered in snow?", "expect": "no"}]}
+      ]
+    },
+    {
+      "name": "a-little-more-snow",
+      "note": "Bug fixed on 2026-11-14: 'a little more snow' moves the strength from where it is.",
+      "steps": [
+        {"say": "make it winter", "chips": ["winter"], "has": ["snow"]},
+        {"say": "a little more snow", "chips": ["winter"], "strength": {"winter": "up"}, "has": ["snow"]},
+        {"say": "a little less snow", "chips": ["winter"], "strength": {"winter": "down"}, "has": ["snow"]}
+      ]
+    },
+    {
+      "name": "turn-it-into-a-beach",
+      "note": "Bug fixed on 2026-11-14: a place replaces the world and keeps the objects.",
+      "start": "meadow",
+      "live": true,
+      "steps": [
+        {"say": "add a red car", "chips": ["car"], "has": ["red car"]},
+        {"say": "turn it into a beach", "chips": ["ocean", "car"], "has": ["ocean", "red car"], "lacks": ["meadow"], "visible": ["Is the sea or ocean visible?", "Is there a red car?"]}
+      ]
+    },
+    {
+      "name": "desert-after-winter",
+      "note": "Bug fixed on 2026-11-14: a desert after winter has no snow.",
+      "start": "meadow",
+      "live": true,
+      "steps": [
+        {"say": "make it winter", "chips": ["winter"], "has": ["snow"]},
+        {"say": "make it a desert", "chips": ["desert"], "no_chips": ["winter"], "has": ["desert", "sand"], "lacks": ["snow", "winter", "frost"], "visible": ["Is the ground sand or desert?", {"q": "Is there snow on the ground?", "expect": "no"}]}
+      ]
+    },
+    {
+      "name": "car-desert-after-winter",
+      "start": "car",
+      "steps": [
+        {"say": "make it winter", "chips": ["winter"], "has": ["snowy mountain road"]},
+        {"say": "make it a desert", "chips": ["desert"], "no_chips": ["winter"], "has": ["desert highway"], "lacks": ["snow"]},
+        {"say": "undo", "chips": ["winter"], "no_chips": ["desert"], "has": ["snowy mountain road"], "lacks": ["desert"]},
+        {"say": "undo", "no_chips": ["winter", "desert"], "has": ["country road"], "lacks": ["snow", "desert"]}
+      ]
+    },
+    {
+      "name": "remove-the-forest-keeps-trees",
+      "note": "Bug fixed on 2026-11-14: removing the forest world keeps a tree the user added.",
+      "steps": [
+        {"say": "add some trees", "chips": ["trees"], "has": ["trees"]},
+        {"say": "take me to the forest", "chips": ["forest", "trees"], "has": ["forest"]},
+        {"say": "remove the forest", "chips": ["trees"], "no_chips": ["forest"], "has": ["trees"], "lacks": ["pine forest"]}
+      ]
+    },
+    {
+      "name": "back-to-the-meadow",
+      "steps": [
+        {"say": "make it a desert", "chips": ["desert"], "has": ["desert"]},
+        {"say": "take me back to the meadow", "no_chips": ["desert"], "has": ["meadow"], "lacks": ["desert", "sand"]}
+      ]
+    },
+    {
+      "name": "compound-add-and-night",
+      "steps": [
+        {"say": "add a dog and make it night", "chips": ["dog", "night"], "has": ["dog", "night"]}
+      ]
+    },
+    {
+      "name": "compound-two-animals",
+      "steps": [
+        {"say": "add a dog and a cat", "chips": ["dog", "cat"], "has": ["dog", "cat"]}
+      ]
+    },
+    {
+      "name": "compound-add-and-stop-the-rain",
+      "steps": [
+        {"say": "make it rain", "chips": ["rain"], "has": ["rain"]},
+        {"say": "add a dog and stop the rain", "chips": ["dog"], "no_chips": ["rain"], "has": ["dog"], "lacks": ["rain"]}
+      ]
+    },
+    {
+      "name": "compound-remove-and-add",
+      "steps": [
+        {"say": "add a lion", "chips": ["lion"], "has": ["lion"]},
+        {"say": "remove the lion and add a horse", "chips": ["horse"], "no_chips": ["lion"], "has": ["horse"], "lacks": ["lion"]}
+      ]
+    },
+    {
+      "name": "reset-and-add",
+      "steps": [
+        {"say": "make it winter", "chips": ["winter"], "has": ["snow"]},
+        {"say": "reset and add a dog", "chips": ["dog"], "no_chips": ["winter"], "has": ["dog", "meadow"], "lacks": ["snow"]}
+      ]
+    },
+    {
+      "name": "pace-words",
+      "live": true,
+      "note": "Gate 4: a slow change must still arrive in full.",
+      "steps": [
+        {"say": "slowly make it winter", "chips": ["winter"], "has": ["snow"], "slow": true, "visible": ["Is the ground covered in snow?"], "look_after_s": 8, "strength": {"winter": "full"}},
+        {"say": "make it night", "chips": ["night", "winter"], "has": ["night"], "slow": false},
+        {"say": "gradually add some fog", "chips": ["fog"], "has": ["fog"], "slow": true, "strength": {"fog": "full"}}
+      ]
+    },
+    {
+      "name": "strength-words",
+      "steps": [
+        {"say": "add a little fog", "chips": ["fog"], "strength": {"fog": "low"}, "has": ["fog"]},
+        {"say": "make it rain a lot", "chips": ["rain"], "strength": {"rain": "high"}, "has": ["rain"]}
+      ]
+    },
+    {
+      "name": "undo-and-taps",
+      "steps": [
+        {"say": "make it winter", "chips": ["winter"], "has": ["snow"]},
+        {"say": "add a lion", "chips": ["winter", "lion"], "has": ["lion"]},
+        {"say": "undo", "chips": ["winter"], "no_chips": ["lion"], "has": ["snow"], "lacks": ["lion"]},
+        {"tap": "undo", "no_chips": ["winter", "lion"], "lacks": ["snow", "lion"]},
+        {"say": "make it night", "chips": ["night"], "has": ["night"]},
+        {"tap": "remove", "chip": "night", "no_chips": ["night"], "lacks": ["night"]},
+        {"say": "add a dog", "chips": ["dog"]},
+        {"tap": "reset", "no_chips": ["dog"], "has": ["meadow"], "lacks": ["dog"]}
+      ]
+    },
+    {
+      "name": "go-back-and-never-mind",
+      "steps": [
+        {"say": "make it winter", "chips": ["winter"]},
+        {"say": "go back", "no_chips": ["winter"], "lacks": ["snow"]},
+        {"say": "add a lion", "chips": ["lion"]},
+        {"say": "never mind", "no_chips": ["lion"], "lacks": ["lion"]}
+      ]
+    },
+    {
+      "name": "remove-by-name",
+      "steps": [
+        {"say": "add a lion", "chips": ["lion"]},
+        {"say": "add a red car", "chips": ["lion", "car"]},
+        {"say": "remove the lion", "chips": ["car"], "no_chips": ["lion"], "has": ["red car"], "lacks": ["lion"]}
+      ]
+    },
+    {
+      "name": "jensen-by-another-name",
+      "xfail": {"dictionary": "bug: with Sonnet down, 'remove jensen' is unmatched; only the full name 'remove jensen huang' finds the chip (engine/people.py aliases are used for adds only)"},
+      "steps": [
+        {"say": "add the nvidia ceo", "chips": ["jensen huang"], "has": ["leather jacket"]},
+        {"say": "remove jensen", "no_chips": ["jensen huang"], "lacks": ["leather jacket"]}
+      ]
+    },
+    {
+      "name": "jensen-next-to-the-car",
+      "start": "car",
+      "steps": [
+        {"say": "add jensen huang next to the car", "chips": ["jensen huang"], "has": ["red sports car", "leather jacket"]}
+      ]
+    },
+    {
+      "name": "new-scene",
+      "steps": [
+        {"say": "make it winter", "chips": ["winter"]},
+        {"say": "new scene of a lighthouse on a cliff", "no_chips": ["winter"], "has": ["lighthouse", "cliff"], "lacks": ["oak", "snow"]}
+      ]
+    },
+    {
+      "name": "stays-unmatched",
+      "note": "Sentences that ask for nothing a picture can show must change nothing.",
+      "steps": [
+        {"say": "make it winter", "chips": ["winter"]},
+        {"say": "make it nice", "understood": false, "chips": ["winter"]},
+        {"say": "um okay", "understood": false, "chips": ["winter"]},
+        {"say": "what time is it", "understood": false, "chips": ["winter"]}
+      ]
+    },
+    {
+      "name": "blocked-content",
+      "steps": [
+        {"say": "add a naked man", "understood": false, "lacks": ["naked"]},
+        {"say": "add a murdered body", "understood": false, "lacks": ["murder"]}
+      ]
+    },
+    {
+      "name": "snowy-and-snowman",
+      "steps": [
+        {"say": "make it winter and add a snowman", "chips": ["winter", "snowman"], "has": ["snow", "snowman"]}
+      ]
+    },
+    {
+      "name": "remove-the-snow",
+      "steps": [
+        {"say": "make it winter", "chips": ["winter"], "has": ["snow"]},
+        {"say": "remove the snow", "no_chips": ["winter"], "lacks": ["snow"]}
+      ]
+    },
+    {
+      "name": "night-then-day",
+      "steps": [
+        {"say": "make it night", "chips": ["night"], "has": ["night"]},
+        {"say": "make it day", "chips": ["day"], "no_chips": ["night"], "lacks": ["night"]}
+      ]
+    },
+    {
+      "name": "recolour-an-object",
+      "xfail": {"dictionary": "bug: with Sonnet down, 'make the dog black' changes nothing and is not shown as unmatched either: the keyword table re-reads it as the existing dog and drops the colour"},
+      "steps": [
+        {"say": "add a dog", "chips": ["dog"]},
+        {"say": "make the dog black", "chips": ["dog"], "has": ["black"]}
+      ]
+    },
+    {
+      "name": "remove-the-car-near-the-forest",
+      "steps": [
+        {"say": "take me to the forest", "chips": ["forest"]},
+        {"say": "add a red car", "chips": ["car", "forest"]},
+        {"say": "remove the car near the forest", "chips": ["forest"], "no_chips": ["car"], "has": ["forest"], "lacks": ["red car"]}
+      ]
+    },
+    {
+      "name": "negation-adds-nothing",
+      "steps": [
+        {"say": "don't add a lion", "understood": false, "lacks": ["lion"]}
+      ]
+    },
+    {
+      "name": "car-scene-objects-and-weather",
+      "start": "car",
+      "steps": [
+        {"say": "add a lion", "chips": ["lion"], "has": ["red sports car", "lion"]},
+        {"say": "make it foggy", "chips": ["fog", "lion"], "has": ["red sports car", "fog", "lion"]},
+        {"say": "remove the lion", "no_chips": ["lion"], "has": ["red sports car"], "lacks": ["lion"]}
+      ]
+    },
+    {
+      "name": "car-remove-the-desert",
+      "start": "car",
+      "steps": [
+        {"say": "make it a desert", "chips": ["desert"], "has": ["desert highway"]},
+        {"say": "remove the desert", "no_chips": ["desert"], "has": ["red sports car"], "lacks": ["desert"]}
+      ]
+    },
+    {
+      "name": "car-new-scene-keeps-template",
+      "steps": [
+        {"say": "new scene of a blue truck driving on a highway", "has": ["blue truck", "seen from directly behind"], "lacks": ["oak", "meadow"]},
+        {"say": "make it a desert", "chips": ["desert"], "has": ["blue truck", "desert"], "lacks": ["red sports car"]}
+      ]
+    }
+  ]
+}
