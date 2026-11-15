@@ -58,8 +58,11 @@ for _label, _segments, _aliases in _TABLE:
 DEFAULT_WORLD = WORLDS["country road"]
 
 # Setting verbs only. "make it" needs an article ("make it a desert"), so "make it night" never matches.
+# "turn it into", "change it to" and "make this a" name the whole scene ("it"/"this"), never one object, so
+# "turn the tree into a lighthouse" stays an object transform for the slow reader.
 _SETTING_RX = re.compile(
-    r"^(?:please\s+)?(?P<verb>make it(?=\s+an?\b)|take me (?:back )?to|go (?:back )?to|switch to|"
+    r"^(?:please\s+)?(?P<verb>make (?:it|this)(?=\s+an?\b)|turn (?:it|this) into|change (?:it|this) (?:in)?to|"
+    r"take me (?:back )?to|go (?:back )?to|switch to|"
     r"set (?:it|the scene|everything) (?:in|on|at)|move (?:it|us|me|the scene|everything) (?:back )?to|"
     r"change the (?:scene|setting|world|location|background|place|scenery) to)\s+(?:(a|an|the)\s+)?(.+)$")
 # "take me to the beach at night": a known place plus season/weather/time words only.
@@ -79,10 +82,9 @@ def world_op(text: str) -> dict | None:
     place. Season/weather/time/object words, negation and transforms return None for the reader to handle.
     """
     t = normalize(text)
-    if _BLOCKED_RX.search(t):
-        return None
     m = _SETTING_RX.match(t)
-    if not m:
+    # Checked after the verb, so the verb's own "into" is allowed; "into" later in the sentence still blocks.
+    if not m or _BLOCKED_RX.search(t[m.end("verb"):]):
         return None
     article, place = m.group(2), _FILLER_TAIL_RX.sub("", m.group(3)).strip()
     if not place:
@@ -92,8 +94,8 @@ def world_op(text: str) -> dict | None:
     combo = _place_with_conditions(place)
     if combo:
         return combo
-    if m.group("verb").startswith("make it"):
-        return None  # "make it a little spooky" is a mood, not a place: only known places after "make it a"
+    if m.group("verb").startswith(("make", "turn", "change it", "change this")):
+        return None  # "make it a little spooky", "turn it into a painting": a look, not a place: known places only
     words = place.split()
     if KEYWORD_RX.search(place) or len(words) > _MAX_PLACE_WORDS or set(words) <= _VAGUE:
         return None  # "make it a dog", "a desert at night", "misty grove": the reader handles dictionary words

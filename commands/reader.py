@@ -223,11 +223,11 @@ def read(text: str, snapshot: dict) -> dict:
     t = _norm(text)
     pace = _pace(t)
     out = lambda op, keyword=None: {"op": op, "keyword": keyword, "pace": pace}  # noqa: E731
-    if _NEGATION_RX.search(t) or _TRANSFORM_RX.search(t):
-        return out(None)
-    setting = world_op(t)
+    setting = world_op(t)  # before the transform check: "turn it into a beach" is a world change (world_op blocks negation)
     if setting:
         return out(setting, setting["label"])
+    if _NEGATION_RX.search(t) or _TRANSFORM_RX.search(t):
+        return out(None)
     if _POSITION_RX.search(t):
         return out(None)
     m = _UNDO_RX.search(t)
