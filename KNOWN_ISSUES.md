@@ -12,7 +12,9 @@ Gate 3 (stacking several changes and undo) and Gate 4 (pace words such as "slowl
   But with about 5 or more objects in the scene the model drops some: "add a tree" never showed a second tree and the lion vanished, and one undo showed fewer objects than the chips.
   Keep demo chains to about 4 objects at once.
 - **Gate 4a, "slowly": partly.**
-  It ramps over about 3 s, but "slowly" also lowered the strength to 0.6, so winter never fully arrived (a bug, fix in progress).
+  Before 03:52 UTC a slow change did not visibly arrive on live (engine/samples/acceptance_live_0342.jpg): the reader gave strength 0.6 (fixed in #226), and the slow ramp re-anchored at slow_strength 0.5, which does not change the world, so each refresh returned to the old scene.
+  Since 03:52 UTC the live engine runs `--reanchor-opt slow_strength=1.0` (#240): "slowly make it winter" reaches full winter in two dissolved steps about 2 s apart and stays (engine/samples/slow_winter_after_0353.jpg).
+  Pace words are not used in the demo script.
 - **Gate 4b, strength: shown.**
   "a little snowy" gives frosted grass, "snowy" gives deep snow; "a lot more snow" after winter is only a modest change.
 - **Gate 4c, early steering: not shown.**
@@ -46,6 +48,7 @@ Options: pick one page for the demo and keep the other as a fallback, and pick o
   On one L40S, 480x832 is not real time (417 ms per chunk against a 250 ms budget).
   An H100 would allow it; it costs about 6.88 USD per hour on demand and is planned only for judging.
   More denoising steps and the full Wan decoder were tested and rejected: slower, and not better looking.
+  torch.compile was tested on machine 2 (04:10 UTC): generation 193 to 148 ms median per chunk, but the frames are not equal to the uncompiled run (max pixel difference 255, sharpness up to 45% different per frame), so it stays off; CUDA graphs crash on the model's cache code.
 - **A new sentence takes about 2.5 s.**
   Known and pinned sentences take about 0.6 s; a new one waits about 2 s for the Sonnet rewrite.
   In progress: Ishaan's latency plan (median 566 to 300 ms), faster end of speech on the page, and compiled model steps.
