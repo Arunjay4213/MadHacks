@@ -535,7 +535,9 @@ def sentence_key(text: str) -> str:
     kept, so "Make it winter." and "  make it   winter " share the key "make it winter" and "make it winter
     please" does not. Not commands.dictionary.normalize: that one turns hyphens, commas and accented letters
     inside the sentence into spaces, which changes words. Only the key uses this; the content check and Sonnet
-    get the original text."""
+    get the original text. A non-string raises TypeError, which the file loaders skip as a bad entry."""
+    if not isinstance(text, str):
+        raise TypeError(f"a sentence must be a string, got {type(text).__name__}")
     text = " ".join(text.casefold().split())
     return " ".join(text.strip(_KEY_EDGE).split())
 

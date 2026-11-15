@@ -84,3 +84,18 @@ def test_the_disk_cache_is_shared_by_spoken_forms_and_old_raw_keys_still_load(tm
     assert chat3.calls == []
     assert isinstance(loaded[(compose(scene), "make it winter")], Entry)
     assert loaded[(compose(scene), "make it winter")].outcome is Outcome.SONNET
+
+
+@pytest.mark.parametrize("bad", [None, 3, ["make it winter"]])
+def test_a_restart_keeps_the_saved_answers_when_one_cache_entry_is_broken(tmp_path, bad):
+    scene = SceneState("a wide shot of a quiet harbour").snapshot()
+    cache = tmp_path / "cache.json"
+    r = load("sonnet", chat=CountingChat(), cache_path=str(cache), demo_prompts=None)
+    r("make it winter", scene)
+    data = json.loads(cache.read_text())
+    data["entries"].insert(0, {**data["entries"][0], "sentence": bad})  # a hand-edited or damaged entry
+    cache.write_text(json.dumps(data))
+    chat = CountingChat()
+    r2 = load("sonnet", chat=chat, cache_path=str(cache), demo_prompts=None)  # must not fail at startup
+    r2("make it winter", scene)
+    assert chat.calls == [] and r2.stats()["cache_hits"] == 1  # the good saved answer still replays
