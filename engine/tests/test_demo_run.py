@@ -19,6 +19,8 @@ from engine.tools.demo_run import (
     shown_at,
 )
 
+pytestmark = pytest.mark.tools  # a tool's tests: run with pytest -m tools (pytest.ini)
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "tools" / "demo_scripts"
 
 

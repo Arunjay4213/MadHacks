@@ -114,6 +114,7 @@ python3 -m venv ../.venv-steering
 ```
 
 Run from the repo root.
+The `steering/tests/test_eval_*` tests are marked `tools` and left out by default (root `pytest.ini`); add `-m tools` to run them.
 
 ## Re-anchor policy (`steering/reanchor.py`)
 

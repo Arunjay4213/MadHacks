@@ -7,6 +7,8 @@ import torch
 
 from steering.eval import row_order_check as roc
 
+pytestmark = pytest.mark.tools  # a tool's tests: run with pytest -m tools (pytest.ini)
+
 L, D = 32, 8
 
 

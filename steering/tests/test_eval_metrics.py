@@ -3,6 +3,8 @@ import torch
 
 from steering.eval.metrics import find_cuts, frame_change, summarize, transition_span
 
+pytestmark = pytest.mark.tools  # a tool's tests: run with pytest -m tools (pytest.ini)
+
 T, C, H, W = 60, 3, 16, 16
 
 

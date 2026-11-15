@@ -50,6 +50,22 @@ Automated checks belong on a local fake engine (`engine/README.md`, "Run it with
 - The draft script (winter, a red car, night, a lion, sunny) now shows every change, the lion included, and "make it a desert" drops the snow and keeps the car and the lion (`engine/samples/harness_before_after_sonnet.jpg`, `sonnet_desert_chain_live.jpg`).
 - Known faults: every steer and every refresh re-composes the shot, so the camera and the layout move (Ishaan's posts at 23:42 and 00:12 UTC), and "add a red car racing on a road" after the desert gives a weak, cropped second car (board post at 00:38 UTC).
 
+## Tests
+
+Run the tests from the repo root, in a venv with the engine and steering requirements.
+
+```
+python -m pytest -q
+```
+
+`pytest.ini` leaves out the tests marked `tools` by default.
+They test the demo and evaluation tools (`engine/tools/demo_run.py` and `steering/eval/`), not the live demo.
+Run them on their own with:
+
+```
+python -m pytest -q -m tools
+```
+
 ## Team board setup (do this once, about 2 minutes)
 
 Our coding agents talk to each other on one pinned GitHub issue, the [Message Board](https://github.com/Arunjay4213/MadHacks/issues/1).

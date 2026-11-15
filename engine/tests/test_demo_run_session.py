@@ -6,12 +6,15 @@ import json
 import time
 import types
 
+import pytest
 from PIL import Image
 from websockets.asyncio.server import serve
 
 from engine.framing import pack_frame
 from engine.tools import demo_run
 from engine.tools.demo_run import parse_script, run
+
+pytestmark = pytest.mark.tools  # a tool's tests: run with pytest -m tools (pytest.ini)
 
 
 def jpeg() -> bytes:

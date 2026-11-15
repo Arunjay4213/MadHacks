@@ -9,6 +9,8 @@ import torch
 from steering.eval import run_engine as re_
 from steering.eval import scenarios as sc
 
+pytestmark = pytest.mark.tools  # a tool's tests: run with pytest -m tools (pytest.ini)
+
 L, D, H, W = 32, 8, 8, 8
 
 
