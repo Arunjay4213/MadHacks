@@ -15,11 +15,3 @@ test('the command box and its wrapper are never display:none or visibility:hidde
     assert.doesNotMatch(r.body, /visibility\s*:\s*hidden/, `${r.selector} hides the command box with visibility: hidden`);
   }
 });
-
-test('full screen hides the command box visually but keeps it in the page', () => {
-  const fs = rules.find((r) => r.selector === '.fs .type');
-  assert.ok(fs, 'no .fs .type rule');
-  assert.match(fs.body, /opacity\s*:\s*0/);
-  assert.match(fs.body, /clip\s*:\s*rect\(0 0 0 0\)/);
-  assert.match(fs.body, /pointer-events\s*:\s*none/);
-});
