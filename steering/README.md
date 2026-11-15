@@ -150,6 +150,13 @@ The steer strengths and the gap are still untuned.
 
 With the default gap of 8, a slow ramp shorter than 14 chunks gets 2 anchors, not 3, and below 24 chunks the gap pushes later anchors back (the last one can land a few chunks after the ramp ends, still on the full target).
 
+`policy.fires_next_chunk()` (thread safe) is True when the next `next_chunk` call returns a steer anchor: a steer from a ramp-1 target (a normal command) that no chunk has seen yet, with the gap met by then.
+A ramp-1 move is over after one `get_cond`, so on the next chunk the steerer is not moving and the anchor is due.
+It is for the engine's steer worker, right after `on_target`: if a chunk with no anchor is being generated, `backend.interrupt()` can stop it so the cut does not wait behind an old-scene chunk (see `engine/MODEL_NOTES.md`, "The cost of a cut").
+It is conservative: False for ramps, refreshes, a steer that already waited a chunk on the gap, and while nothing is pending.
+A newer applied target that arrives after a True replaces the steer as usual; the stopped chunk is then simply generated again.
+The engine does not call it yet.
+
 ```python
 from steering.reanchor import ReanchorPolicy
 policy = ReanchorPolicy()                      # ReanchorConfig(...) to tune
