@@ -770,11 +770,14 @@ class FinalReader:
             return self._given(measured, snapshot)
         with self._lock:
             self.calls += 1
-        fut = self._pool.submit(self._call, text, snapshot)
+        first_usable: list[Entry] = []  # set by the worker before a retry, when its first reply is usable
+        fut = self._pool.submit(self._call, text, snapshot, first_usable)
         try:
             entry = fut.result(timeout=self.timeout_s)
         except concurrent.futures.TimeoutError:
-            entry = None
+            entry = first_usable[0] if first_usable else None
+            if entry is not None:
+                log.info("final reader: the retry for %r ran out of time; using its first reply", _short(text))
         late = entry is None
         with self._lock:
             if late:
@@ -875,13 +878,15 @@ class FinalReader:
         log.info("final reader: the cached operations for %r no longer fit the scene; reading it again", _short(key[1]))
         return None
 
-    def _call(self, text: str, snapshot: dict) -> Entry | None:
+    def _call(self, text: str, snapshot: dict, first_usable: list | None = None) -> Entry | None:
         """Worker thread: one Sonnet call, checked, and one retry with the reasons when the first reply is not
         fully usable and the first call took less than half the wait (so on the live 3 s wait at 1.8 s a call,
         the retry happens only in offline runs such as the demo prompts regeneration). Never raises."""
         t0 = time.perf_counter()
         first = self._attempt(text, snapshot, None)
         best = first
+        if first.verdict in RETRY_VERDICTS and first.entry.outcome is Outcome.SONNET and first_usable is not None:
+            first_usable.append(first.entry)  # a retry that runs past the wait must not lose this edit
         if first.verdict in RETRY_VERDICTS:
             elapsed = time.perf_counter() - t0
             if elapsed < self.timeout_s / 2:

@@ -191,3 +191,22 @@ def test_a_cache_written_by_another_prompt_build_is_not_reused(tmp_path):
     assert CacheFile(tmp_path / "c.json", fingerprint("system", "m", "an older build")).load()
     assert CacheFile(tmp_path / "c.json", fingerprint("system", "m")).load() == {}
     assert fingerprint("system", "m") == fingerprint("system", "m", PROMPT_BUILD)
+
+
+def test_a_slow_retry_keeps_the_usable_first_reply():
+    # Greptile on PR #120 (final_reader.py:867): the first reply had valid operations but no usable details, the
+    # retry ran past the wait, and the dictionary fallback was cached instead of the first reply's edit.
+    import time
+
+    class SlowSecond(ReplayChat):
+        def complete(self, system, messages):
+            if len(self.calls) == 1:
+                time.sleep(0.6)
+            return super().complete(system, messages)
+
+    chat = SlowSecond({"make it winter": reply([WINTER], "the camera pans slowly")})
+    reader = FinalReader(FinalReaderState.ON, chat=chat, spec=prompt_spec(), timeout_s=0.4)
+    from commands.state import SceneState
+    res = reader("make it winter", SceneState().snapshot())
+    assert res is not None and res["operations"] == [WINTER]
+    assert "snow on the ground" in res["prompt"] and reader.stats()["retries"] == 1
