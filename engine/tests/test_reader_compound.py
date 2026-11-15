@@ -76,7 +76,7 @@ def test_a_mixed_sentence_the_model_blocks_is_blocked():
     svc, chat = wrapper({})
     final(svc, "make it winter")
     out = final(svc, "reset and add a man with no clothes", 2)
-    assert chat.sentences[-1] == "reset and add a man with no clothes"
+    assert chat.sentences[-1] == "add a man with no clothes"  # the edit, read on the scene after the reset
     assert out["steer"] is None and out["state"]["unmatched"] is True
     assert labels(out) == ["winter"]
 

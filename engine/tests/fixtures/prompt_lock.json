@@ -3935,7 +3935,7 @@
    {
     "say": "reset and add a dog",
     "steer": {
-     "prompt": "a wide shot of a meadow with a single oak tree; a dog standing nearby",
+     "prompt": "a wide shot of a meadow with a single oak tree; a golden retriever standing in the centre of the frame, facing the camera, large and clearly visible; tall swaying grass, soft dew on the blades, warm gentle light, clear open air",
      "ramp_chunks": 1,
      "provisional": false,
      "cap": 1.0
@@ -3949,19 +3949,12 @@
       }
      ],
      "heard": "reset and add a dog",
-     "keyword": "dog",
+     "keyword": null,
      "unmatched": false
     },
-    "committed": "a wide shot of a meadow with a single oak tree; a dog standing nearby",
-    "likely_prompts_sha": "5ce21e91179c8778",
-    "model_calls": [
-     {
-      "prompt": "a wide shot of a meadow with a single oak tree",
-      "chips": [],
-      "sentence": "reset and add a dog",
-      "car_scene": false
-     }
-    ]
+    "committed": "a wide shot of a meadow with a single oak tree; a golden retriever standing in the centre of the frame, facing the camera, large and clearly visible; tall swaying grass, soft dew on the blades, warm gentle light, clear open air",
+    "likely_prompts_sha": "ea8b39b7b428f60e",
+    "model_calls": []
    },
    {
     "say": "start over with a beach",
@@ -3987,7 +3980,7 @@
     "likely_prompts_sha": "4ff3c3c67a3958bc",
     "model_calls": [
      {
-      "prompt": "a wide shot of a meadow with a single oak tree; a dog standing nearby",
+      "prompt": "a wide shot of a meadow with a single oak tree; a golden retriever standing in the centre of the frame, facing the camera, large and clearly visible; tall swaying grass, soft dew on the blades, warm gentle light, clear open air",
       "chips": [
        "dog"
       ],
@@ -4004,10 +3997,10 @@
    "state": "on",
    "reason": null,
    "prompt_spec": "free scene",
-   "calls": 2,
+   "calls": 1,
    "cache_hits": 0,
    "pinned": 228,
-   "pinned_hits": 1,
+   "pinned_hits": 2,
    "template_hits": 0,
    "person_hits": 0,
    "blocked": 0,
@@ -4017,12 +4010,11 @@
    "rejects": 0,
    "repaired": 0,
    "retries": 0,
-   "errors": 1,
+   "errors": 0,
    "verdicts": {
-    "accepted": 1,
-    "failed": 1
+    "accepted": 1
    },
-   "cache_size": 2,
+   "cache_size": 1,
    "timeout_s": 5.0,
    "cache_file": null
   }

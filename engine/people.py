@@ -42,8 +42,8 @@ SPOTS = (("in the foreground at the left of the frame", "left"),
          ("in the foreground at the right of the frame", "right"),
          ("in the middle ground at the centre of the frame", "centre"))
 _ADD = re.compile(r"^(?:please\s+)?(?:add|put|place|bring|show|insert|include|drop)\b")
-# A place in the sentence ("next to the big red car"): at most four words after the article, none of them a word
-# that starts another edit. So in "add jensen next to the car and make it winter" (or ", delete the dog": the comma
+# A place in the sentence ("next to the big red car"): words after the article up to a word that starts another
+# edit. So in "add jensen next to the car and make it winter" (or ", delete the dog": the comma
 # is gone after normalize) the spot is "next to the car" and the rest stays in the sentence, where whole_sentence
 # sees it and leaves the sentence to the model (Greptile, #273). A doubtful sentence goes to the model: that costs
 # one call, a wrong shortcut drops the user's edit.
@@ -51,7 +51,10 @@ _CLAUSE_WORDS = ("and|then|also|plus|but|while|with|make|turn|change|set|switch|
                  "remove|delete|erase|get|take|lose|drop|stop|no|without|undo|reset|clear|go|show|give|let|"
                  "don't|dont|never|more|less|so")
 _RELATIVE = re.compile(r"\b(?P<spot>(?:next to|beside|near|in front of|behind|on top of) (?:the|a|an)"
-                       rf"(?: (?!(?:{_CLAUSE_WORDS})\b)[a-z']+){{1,4}})\b")
+                       rf"(?P<object>(?: (?!(?:{_CLAUSE_WORDS})\b)[a-z']+)+))\b")
+# The shortcut takes a spot of at most this many words after the article: a longer one may hide a verb this list
+# lacks ("next to the car paint the sky blue"), so it goes to the model. The engine's fallback add keeps it whole.
+_SHORTCUT_SPOT_WORDS = 4
 
 
 # Words a bare mention may have besides the name: "i want jensen", "show me jensen huang please".
@@ -164,6 +167,8 @@ def whole_sentence(text: str, snapshot: dict) -> dict | None:
         t = _normalize(text)
         spot_m = _RELATIVE.search(t)
         if spot_m is not None:  # every word besides the spot must still be part of the add
+            if len(spot_m.group("object").split()) > _SHORTCUT_SPOT_WORDS:
+                return None
             t = t[:spot_m.start()] + " " + t[spot_m.end():]
         if not all(w in _ADD_WORDS for w in _rest(t, m.alias)):
             return None
