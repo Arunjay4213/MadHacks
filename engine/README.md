@@ -527,6 +527,10 @@ So a new sentence costs about 1.8 s extra, and a pinned or cached sentence costs
   A vehicle added on a road gets "white dashed lane markings rush toward the viewer" at the end of its phrase; `FORWARD_MOTION` ends with the same cue.
 - A new place (an add of kind world) clears the earlier season and weather in `commands/state.py` (#115), so a desert after "make it winter" has no snow; the time of day stays.
   The engine moves a sentence's world add before its season and weather adds, so "take me to a snowy desert" keeps the snow it asked for.
+- Pace words (slowly, gradually, gently, little by little, suddenly) set how fast a change appears, never its strength (PR #226).
+  The pace is read from the sentence by `CommandService.apply_final` (slow is 12 chunks), and strength stays 1.0 unless the sentence also has a strength word (such as "a little", "slightly", "a lot", "very", "more", "less").
+  The model sometimes reads "slowly" as weaker (winter at 0.6, so winter never fully arrives), so `pace_keeps_strength` sets every other non-zero strength to 1.0 after the reply when the sentence has a pace word and no strength word, and logs it at INFO.
+  A strength of 0 is a removal and stays 0; the word lists are the ones `commands/reader.py` uses.
 - Named people (`engine/people.py`): the video model cannot draw real faces, so "add jensen huang" (also "jensen", "the nvidia ceo") reaches Sonnet with a visual description instead of the name, and the engine sets the add itself: the chip label stays "jensen huang" (so "remove jensen huang" and undo find it) and the phrase is the description plus "a large figure standing <spot>, facing the camera", where the spot is the sentence's own ("next to the car") or the first free one (left, right, centre foreground).
   Only adds are rewritten; with no usable reply the engine's add is used (`Outcome.PERSON`). An object phrase may have 240 characters for this.
 - Vehicle scenes (`engine/car_template.py`): a scene whose base is a vehicle on a road gets Ishaan's measured car template, and the base is kept as the bare vehicle ("a red sports car") with its world as one change of kind world.
