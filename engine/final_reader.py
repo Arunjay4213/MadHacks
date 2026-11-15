@@ -484,6 +484,9 @@ Rules for operations:
 - edit_base and new_scene come before any other operation of the sentence.
 - To remove or weaken something, use the id of the matching change. "a little" means strength 0.3, "a lot" or
   "very" means 1.3.
+- Pace words (slowly, gradually, gently, little by little, suddenly) set how fast a change appears, never its
+  strength. Strength stays 1.0 unless the sentence has a strength word (a little, a lot, more, less, slightly,
+  very).
 - If the sentence is vague, not about the picture, or asks to undo or reset, reply with an empty operations list.
 
 Set "blocked" to true, with no operations, if the sentence asks for sexual, violent (gore, killing, injury) or
@@ -537,6 +540,29 @@ def _vocabulary_lines() -> str:
         if alias != e["label"]:
             words[(e["label"], e["kind"])].append(alias)
     return "\n".join(f"  {label} ({kind}): {', '.join(aliases) or label}" for (label, kind), aliases in words.items())
+
+
+def pace_keeps_strength(text: str, ops: list) -> list:
+    """The operations with every strength set to 1.0 when the sentence has a pace word and no strength word.
+
+    A pace word ("slowly make it winter") sets the ramp (commands/ reads it from the sentence), never the strength,
+    but the model has read "slowly" as a weaker change (winter at 0.6, so winter never fully arrives). A strength
+    of 0 is a removal and stays. The word lists are the ones commands/reader.py reads the sentence with.
+    """
+    from commands.dictionary import normalize
+    from commands.reader import _HIGH_RX, _LESS_RX, _LOW_RX, _MORE_RX, _pace
+    t = normalize(text) if isinstance(text, str) else ""
+    if _pace(t) is None or any(rx.search(t) for rx in (_LOW_RX, _HIGH_RX, _MORE_RX, _LESS_RX)):
+        return ops
+    out = []
+    for op in ops:
+        strength = op.get("strength") if isinstance(op, dict) else None
+        if isinstance(strength, (int, float)) and not isinstance(strength, bool) and strength not in (0, 1.0):
+            log.info("final reader: %r has a pace word and no strength word: %s %r strength %s -> 1.0",
+                     _short(text), op.get("op"), op.get("label", op.get("id")), strength)
+            op = {**op, "strength": 1.0}
+        out.append(op)
+    return out
 
 
 def operations_instructions() -> str:
@@ -999,6 +1025,7 @@ class FinalReader:
         ops = people.with_person(text, reply.get("operations"), snapshot)  # a named person: the engine's add
         if not isinstance(ops, list) or not 1 <= len(ops) <= MAX_OPERATIONS:
             return Attempt(Verdict.EMPTY, Entry(Outcome.FALLBACK), ("no operations",))
+        ops = pace_keeps_strength(text, ops)
         try:
             clean = expand_operations(ops, snapshot)
             after = scene_after(snapshot, clean) if clean is not None else None
