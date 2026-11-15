@@ -29,13 +29,15 @@ The shared `74-continuity-prompts` checkout was not switched, stashed or reset.
   retry of a second whole insert, hidden-source GPU pause and frame-before-control timing.
 - Final #118 regressions preserve unsubmitted drafts beyond five seconds, cancel
   retries when the field is edited, and retain queued pins from submission time.
+  Draft correlation uses own/inherited timestamps, so another viewer can still
+  complete the same text without being hidden as a local draft.
 
 ## Verification, 2026-11-14
 
 - `npm test`: 22 passing.
 - `npm run build`: passes (known lazy Three bundle size warning).
 - `npm audit`: zero vulnerabilities.
-- `LUCID_ENGINE_URL=http://127.0.0.1:8100 npm run test:browser`: 19 passing.
+- `LUCID_ENGINE_URL=http://127.0.0.1:8100 npm run test:browser`: 20 passing.
   Covers 1440x900, 1280x720, 390x844, 375x667; real production `/studio/`
   against a local CPU fake engine (winter/river/remove/undo/reset/unmatched),
   controlled speech, WebGL denial, source attribution, async decode and mic cleanup.

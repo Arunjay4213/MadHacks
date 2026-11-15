@@ -67,14 +67,16 @@ describe('web engine parity', () => {
   });
   it('keeps a draft unconfirmed until submitted or cleared', () => {
     const heard = makeHeardTracker();
-    heard.sentPartial('make it winter');
+    heard.sentPartial('make it winter', 101, 99);
     expect(heard.classify('make it winter', 99)).toBe('pending');
     heard.sentFinal('make it winter', 300);
     expect(heard.classify('make it winter', 300)).toBe('confirmed');
     expect(heard.classify('add a lion', 301)).toBe('other');
-    heard.sentPartial('add a lion');
-    expect(heard.classify('add a lion', 99)).toBe('pending');
-    heard.sentPartial('make it night');
+    heard.sentPartial('add a lion', 501, 500);
+    expect(heard.classify('add a lion', 501)).toBe('pending');
+    expect(heard.classify('add a lion', 500)).toBe('pending');
+    expect(heard.classify('add a lion', 777)).toBe('other');
+    heard.sentPartial('make it night', 6001, 6000);
     heard.clearPartials();
     expect(heard.classify('make it night', 99)).toBe('other');
   });

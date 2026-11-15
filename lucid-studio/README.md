@@ -128,10 +128,13 @@ A local real CPU engine can be used without touching the shared GPU service:
 root, then open `?server=127.0.0.1:8100`. It renders test frames, not model video.
 The optional integration test uses `LUCID_ENGINE_URL=http://127.0.0.1:8100`.
 
-Unsubmitted drafts remain unconfirmed until finalized or cleared, including long
+Own unsubmitted drafts remain unconfirmed until finalized or cleared, including long
 thinking pauses. An edit cancels any older automatic retry of a pending paste.
 Custom send-only adapters serialize successful scene edits and capture spatial
 pins when submitted, so a slow response cannot erase changes or lose placement.
 
 The CPU integration also sends a final immediately after Reset and verifies its
 new correlated frame, covering the engine-owned #103 race fix.
+
+Draft echoes correlate with their own or inherited server timestamps. Another
+viewer submitting the same words is still shown as a completed command.

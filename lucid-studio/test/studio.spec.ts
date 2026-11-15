@@ -115,12 +115,13 @@ test('partial echoes never claim understanding; a confirmed LLM final without a 
   const e = await engine(page);
   const input = page.locator('#editor-thought');
   await input.pressSequentially('make it night and', { delay: 40 });
-  e.state({ changes: [], heard: 'make it night and', keyword: 'night', t_client: 1, unmatched: false });
+  const partialT = e.sent.filter(m => m.type === 'partial').at(-1)!.t_client;
+  e.state({ changes: [], heard: 'make it night and', keyword: 'night', t_client: partialT, unmatched: false });
   await expect(page.locator('.words-status')).not.toContainText('understood');
   await expect(page.locator('.words-label')).toHaveText('Hearing…');
   await page.waitForTimeout(5100);
   expect(e.sent.filter(m => m.type === 'final')).toHaveLength(0);
-  e.state({ changes: [], heard: 'make it night and', keyword: 'night', t_client: 1, unmatched: false });
+  e.state({ changes: [], heard: 'make it night and', keyword: 'night', t_client: partialT, unmatched: false });
   await expect(page.locator('.words-label')).toHaveText('Hearing…');
   await expect(page.locator('.words-status')).toHaveText('');
   await input.press('Enter');
@@ -401,4 +402,16 @@ test('queued spatial edits retain the submitted pin after its visual expires', a
   const coords = await page.evaluate(() => (window as unknown as {mutationPayloads: {spatialCoords: {x: number; y: number}}[]}).mutationPayloads[1].spatialCoords);
   expect(coords.x).toBeCloseTo(0.25, 2);
   expect(coords.y).toBeCloseTo(0.5, 2);
+});
+
+
+test('an old draft does not hide another viewer completing the same words', async ({ page }) => {
+  const e = await engine(page);
+  const input = page.locator('#editor-thought');
+  await input.pressSequentially('make it winter and', { delay: 40 });
+  await input.press('Meta+a');
+  await input.pressSequentially('add a river and', { delay: 40 });
+  e.state({ changes: [{ id: 'winter', label: 'winter', strength: 1 }], heard: 'make it winter and', keyword: 'winter', t_client: 999, unmatched: false });
+  await expect(page.locator('.words-label')).toHaveText('Heard');
+  await expect(page.locator('.words-status')).toHaveText('Understood: winter');
 });
