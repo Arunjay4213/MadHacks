@@ -195,6 +195,28 @@ Refresh interval, 360 chunks at step 2, with the restart (mean saturation per 60
 So 24 stays the default. 48 is the longest interval that stays nearly clean on the car (`--reanchor-opt refresh_every_chunks=48` halves the jumps); 72 drifts on both scenes.
 Still open: each refresh snaps the composition back to the clean anchor (on the car the same trees and road layout every 6 s).
 
+#### Refresh noise: why every refresh re-rolled the scene, and the fix
+
+Live (`cut_fade_frames=8`, static parked-car scene) every 6 s refresh gave a different composition: the car moved, the snow layout changed.
+The cause is the refresh noise. Step 2 of the first-frame schedule is warped t = 833 (sigma about 0.83), and each refresh drew fresh noise, so each refresh was a new sample near the clean anchor.
+The anchor itself does not walk: in every run below each refresh used the clean anchor saved at chunk 3.
+Fix: backend option `refresh_noise` (default now `fixed`; `fresh` is the old behaviour). A refresh from the clean anchor draws its start noise and its in-step noise from a generator seeded by the anchor (video id and the anchor's chunk), so every refresh from one anchor gives the same picture; a steer makes a new anchor and so new noise. Steers and normal chunks still use the main noise stream.
+A second option, `refresh_anchor_t` (None by default; 1-1000, the config's unwarped scale, 500 = step 2, 250 = step 3), noises the anchor to a chosen level instead of the strength's step.
+
+Measured (360 chunks, refresh every 24, `cut_fade_frames=8`, no commands; "re-roll" = mean absolute difference between the frame 1 s after a refresh and the frame 1 s after the previous refresh, against the change over 1 s elsewhere; car shift = movement of the red car's centroid between those frames, 672x384 px):
+
+| Variant | parked: re-roll (normal) | parked: car shift | car scene: car shift | drift over 360 chunks |
+|---|---|---|---|---|
+| fresh noise, step 2 (old live) | 30.4 (11.7) | 48 px | 8 px | none |
+| **fixed noise, step 2 (new default)** | **10.9 (12.1)** | 31 px | **5 px** | none |
+| fresh noise, t = 250 (step 3) | 24.9 (8.5) | 18 px | 22 px | slight |
+| fresh noise, t = 125 | 36.7 (10.9) | broken | 33 px | the picture breaks (blocky grass, odd shapes): 125 is below the distilled grid |
+| fixed noise, t = 250 | 12.1 (9.6) | 7 px | 17 px | the car scene drifts by about 80 s (odd trees and structures, sharpness up) |
+| fresh noise, step 2, every 48 | 30.2 (10.2) | 41 px | 12 px | none |
+
+With fixed noise the refresh-to-refresh change on the static scene is the same as normal motion, and the composition holds for the whole 90 s (`engine/samples/refresh_noise_fixed_parked.jpg` against `refresh_noise_fresh_parked.jpg`; the car scene: `refresh_noise_fixed_car.jpg`). A lower level alone does not fix it, and t = 250 drifts on a moving scene (`refresh_t250_car_drift.jpg`). A longer interval keeps the re-roll, only rarer.
+What remains with fixed noise is the snap back to one picture at each refresh (dissolved over 0.5 s by `cut_fade_frames`).
+
 ## Using the backend from a plain Python script
 
 Run from `~/madhacks` with `~/engine-venv` active:

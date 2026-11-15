@@ -443,7 +443,7 @@ class Backend:
         clean_anchor_after: int = 3,
         cut_fade_frames: int = 0,
         cut_fade_refresh: bool = True,
-        refresh_noise: str = "fresh",
+        refresh_noise: str = "fixed",
         refresh_anchor_t: Optional[int] = None,
     ) -> None:
         """Generation state: lock, stream, RNG, caches, counters, automatic rebase settings.

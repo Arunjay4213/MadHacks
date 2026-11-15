@@ -289,7 +289,7 @@ def test_clean_anchor_saved_three_chunks_after_reset(no_cuda):
 
 
 def test_refresh_starts_from_the_clean_anchor_and_keeps_it(no_cuda):
-    b = make_backend()
+    b = make_backend(refresh_noise="fresh")
     a = torch.full((1, 3, 8), 1.0)
     b.reset(seed=0)
     outs = [b.generate_chunk(a) for _ in range(10)]
@@ -308,7 +308,7 @@ def test_refresh_starts_from_the_clean_anchor_and_keeps_it(no_cuda):
 
 
 def test_steer_reanchor_drops_and_recaptures_the_clean_anchor(no_cuda):
-    b = make_backend()
+    b = make_backend(refresh_noise="fresh")
     a, c = torch.full((1, 3, 8), 1.0), torch.full((1, 3, 8), 2.0)
     b.reset(seed=0)
     outs = [b.generate_chunk(a) for _ in range(10)]
@@ -328,7 +328,7 @@ def test_steer_reanchor_drops_and_recaptures_the_clean_anchor(no_cuda):
 
 
 def test_clean_refresh_at_full_strength_is_pure_noise(no_cuda):
-    b = make_backend()
+    b = make_backend(refresh_noise="fresh")
     a = torch.full((1, 3, 8), 1.0)
     b.reset(seed=0)
     outs = [b.generate_chunk(a) for _ in range(6)]
@@ -451,7 +451,7 @@ def test_first_frame_pad_option_is_checked():
 
 def test_clean_refresh_after_a_scene_change_without_steer_recaptures(no_cuda):
     """A cond change with no steer re-anchor (e.g. a provisional): the refresh must not bring the old scene back."""
-    b = make_backend()
+    b = make_backend(refresh_noise="fresh")
     a, c = torch.full((1, 3, 8), 1.0), torch.full((1, 3, 8), 2.0)
     b.reset(seed=0)
     outs = [b.generate_chunk(a) for _ in range(6)]
@@ -469,7 +469,7 @@ def test_clean_refresh_after_a_scene_change_without_steer_recaptures(no_cuda):
 
 
 def test_clean_refresh_accepts_an_equal_cond_object(no_cuda):
-    b = make_backend()
+    b = make_backend(refresh_noise="fresh")
     b.reset(seed=0)
     outs = [b.generate_chunk(torch.full((1, 3, 8), 1.0)) for _ in range(6)]
     _, calls, rng = reanchored_chunk(b, torch.full((1, 3, 8), 1.0), 0.5, "clean")  # equal values, new object
@@ -628,7 +628,7 @@ def test_fixed_refresh_noise_gives_the_same_picture_every_refresh(no_cuda):
     (o1, c1), (o2, c2) = refreshes(make_backend(refresh_noise="fixed"))
     assert torch.equal(c1[0]["x"], c2[0]["x"])  # same start latent
     assert torch.equal(o1.latents, o2.latents)  # and the same denoised picture
-    (f1, d1), (f2, d2) = refreshes(make_backend())  # fresh (default): a new sample each time
+    (f1, d1), (f2, d2) = refreshes(make_backend(refresh_noise="fresh"))  # fresh: a new sample each time
     assert not torch.equal(d1[0]["x"], d2[0]["x"])
 
 
@@ -660,7 +660,7 @@ def test_fixed_refresh_noise_leaves_steers_and_normal_chunks_alone(no_cuda):
 
 @pytest.mark.parametrize("t, want_steps", [(125, None), (250, 1), (500, 2)])
 def test_refresh_anchor_t_sets_the_start_level(no_cuda, t, want_steps):
-    b = make_backend(refresh_anchor_t=t)
+    b = make_backend(refresh_anchor_t=t, refresh_noise="fresh")
     a = torch.full((1, 3, 8), 1.0)
     b.reset(seed=0)
     outs = [b.generate_chunk(a) for _ in range(6)]
@@ -691,3 +691,17 @@ def test_refresh_anchor_t_only_for_refreshes_from_the_clean_anchor(no_cuda):
 def test_refresh_options_are_checked(options):
     with pytest.raises(ValueError):
         make_backend(**options)
+
+
+def test_refresh_noise_is_fixed_by_default_and_seeded_by_the_anchor(no_cuda):
+    b = make_backend()
+    assert b.refresh_noise == "fixed" and b.refresh_anchor_t is None
+    a = torch.full((1, 3, 8), 1.0)
+    b.reset(seed=0)
+    outs = [b.generate_chunk(a) for _ in range(6)]
+    _, calls, _ = reanchored_chunk(b, a, 0.5, "clean")
+    g = torch.Generator().manual_seed(1_000_003 * b.video_id + 3)
+    noise = torch.randn(outs[3].latents.shape, generator=g)
+    t = b.first_chunk_steps[2] * torch.ones([1], dtype=torch.long)
+    want = b.scheduler.add_noise(outs[3].latents.flatten(0, 1), noise.flatten(0, 1), t).unflatten(0, outs[3].latents.shape[:2])
+    assert torch.allclose(calls[0]["x"], want)
