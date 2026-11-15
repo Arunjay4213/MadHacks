@@ -94,6 +94,7 @@ def person_add(text: str, snapshot: dict) -> dict | None:
     return {"op": "add", "label": m.person.label, "kind": "extra", "phrase": phrase, "strength": 1.0}
 
 
+_FILLER = re.compile(r"\b(?:the|please|now|from the scene|from the picture)\b")
 _REMOVE = re.compile(r"^(?:please\s+)?(?:remove|delete|erase|take away|take out|get rid of|lose|drop)\b")
 
 
@@ -102,7 +103,12 @@ def person_remove(text: str, snapshot: dict) -> dict | None:
     The keyword table knows only the chip label ("jensen huang"), so without this a short alias is unmatched when
     the model is unavailable."""
     m = mention(text)
-    if m.intent is not Intent.OTHER or not _REMOVE.match(_normalize(text)):
+    if m.intent is not Intent.OTHER:
+        return None
+    # Only a sentence that is nothing but this removal: "remove the dog near jensen" removes the dog, and a compound
+    # ("remove jensen huang and add a dog") goes to the keyword table whole, which reads every clause.
+    target = _REMOVE.sub("", _normalize(text), count=1)
+    if not _REMOVE.match(_normalize(text)) or " ".join(_FILLER.sub(" ", target).split()) != " ".join(_FILLER.sub(" ", m.alias).split()):
         return None
     chip = next((c for c in snapshot["changes"] if c["label"] == m.person.label), None)
     return None if chip is None else {"op": "remove", "id": chip["id"]}

@@ -143,3 +143,12 @@ def test_the_pinned_demo_plays_every_entry_and_jensen_huang_with_no_call():
             assert labels(out)[-1] == "jensen huang" and JENSEN in out["steer"]["prompt"].lower()
     assert reader.stats()["calls"] == 0 and reader.stats()["pinned_hits"] == len(entries)
     assert [e["sentence"] for e in entries].count("add jensen huang") >= 2
+
+
+def test_person_remove_only_for_a_sentence_that_is_just_that_removal():
+    from engine.people import person_remove
+    snap = {"changes": [{"id": "c1", "label": "jensen huang"}, {"id": "c2", "label": "dog"}]}
+    assert person_remove("remove jensen", snap) == {"op": "remove", "id": "c1"}
+    assert person_remove("please remove the nvidia ceo", snap) == {"op": "remove", "id": "c1"}
+    assert person_remove("remove the dog near jensen", snap) is None  # the dog is the target
+    assert person_remove("remove jensen huang and add a dog", snap) is None  # the keyword table reads both clauses

@@ -341,7 +341,7 @@ def read(text: str, snapshot: dict) -> dict:
                     phrase = _additional(phrase, entry, keyword, snapshot)
                 return out({"op": "add", **entry, "phrase": phrase, "strength": strength}, keyword)
     if existing:
-        if strength == existing["strength"] and _unread_words(rest):
+        if _unread_words(rest):
             # "make the dog black": a change to an object the table cannot write. Keeping the strength would change
             # nothing and still look understood; unmatched shows the user the words were not used.
             return out(None, keyword)
@@ -353,7 +353,8 @@ def read(text: str, snapshot: dict) -> dict:
 _LEAD = r"^(?:(?:also|then|please|now|and)\s+)*(?:(?:slowly|gradually|gently|suddenly|instantly|quickly|immediately)\s+)?"
 _COLOURS = {"black", "white", "red", "orange", "yellow", "green", "blue", "purple", "pink", "grey", "gray", "brown",
             "golden", "gold", "silver"}
-_EDIT_VERBS = {"make", "turn", "set", "keep", "change", "let", "have", "get", "go", "now", "please", "it", "its", "it's"}
+_EDIT_VERBS = {"make", "turn", "set", "keep", "change", "let", "have", "get", "go", "now", "please", "it", "its", "it's",
+               "just", "only", "even", "again", "back", "still", "ok", "okay", "so"}
 
 
 def _unread_words(rest: str) -> bool:
@@ -479,7 +480,7 @@ def style_fallback(text: str, snapshot: dict | None = None):
     existing = _find(snapshot or {}, what)
     if existing:
         strength = strength_for(strength_words, existing["strength"])
-        if strength == existing["strength"] and set(what.split()) - set(existing["label"].split()):
+        if set(what.split()) - set(existing["label"].split()):
             return None  # "make the dog black": a description of the dog it cannot write; nothing would change
         return {"op": "set_strength", "id": existing["id"], "strength": strength}
     return {"op": "add", "label": what, "kind": "extra", "phrase": "the whole scene looks " + ("like " if like else "") + what,

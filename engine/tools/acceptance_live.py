@@ -344,7 +344,7 @@ def write_report(out: Path, played: list[Played], frames: list, calib: dict | No
                "delay_ms_range": [delays[0], delays[-1]] if delays else None,
                "vision_calls": judge.calls,
                "calibration_accuracy": calib.get("accuracy") if calib else None,
-               "overall": ("pass" if judged and len(passed) == len(judged) and not unjudged
+               "overall": ("pass" if (judged or known) and len(passed) == len(judged) and not unjudged
                            and not meta.get("aborted") else "fail"), **meta}
     (out / "results.json").write_text(json.dumps({"summary": summary, "steps": steps}, indent=2) + "\n")
     lines = ["# Acceptance run (real model, vision judge)", "",

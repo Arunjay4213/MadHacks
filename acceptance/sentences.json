@@ -512,6 +512,23 @@
       "steps": [
         {"say": "just the beach, no car", "lacks": ["red sports car"], "has": ["beach"]}
       ]
+    },
+    {
+      "name": "recolour-a-weak-object-sonnet-down",
+      "modes": ["dictionary"],
+      "steps": [
+        {"say": "add a little dog", "chips": ["dog"]},
+        {"say": "make the dog black", "understood": false, "chips": ["dog"]}
+      ]
+    },
+    {
+      "name": "remove-the-dog-near-jensen",
+      "modes": ["dictionary"],
+      "steps": [
+        {"say": "add jensen huang", "chips": ["jensen huang"]},
+        {"say": "add a dog", "chips": ["dog"]},
+        {"say": "remove the dog near jensen", "chips": ["jensen huang"], "no_chips": ["dog"]}
+      ]
     }
   ]
 }
