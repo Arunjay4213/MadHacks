@@ -537,7 +537,6 @@ So a new sentence costs about 1.8 s extra, and a pinned or cached sentence costs
   A sentence that names one measured world (country, winter, desert, neon city, ocean coast, sunset, autumn, rain; "make it night" is the neon city) is composed by the engine with no call (`template_hits`): it swaps road, scene and light together, and the subject and camera sentences stay word for word.
   Any other sentence on a vehicle scene asks Sonnet for `road`, `scene` and `light`; the engine checks them (one sentence each, no camera words) and builds the template itself.
 - Road words in details are used only when the scene has a road: on GPU the oak meadow grew a road or tyre tracks from them.
-  `commands.rewriter.build_messages` is not used: it is made for a separate details-only call whose command is "context only", and the engine needs one call that applies the command too (two calls in a row would not fit the 3 s wait).
 - Content block: a short word list (`BLOCKED_WORDS`) is checked first with no call, and the model sets `blocked: true` for sexual, violent or hateful requests.
   A blocked final gives no steer: the words show as unmatched, and one log line says why.
 - A timeout (`--final-timeout-s`, 3.0 s), a failed call or a reply that does not validate keeps the keyword table's result and the short prompt.

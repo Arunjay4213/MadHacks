@@ -1,6 +1,7 @@
 """Prompt enrichment contract for the engine's cached LLM rewrite (issue #74). Pure stdlib: no network, no cache.
 
-The engine sends build_messages(prompt) to the LLM and passes the reply to validate_rewrite(prompt, reply).
+The engine's Sonnet final reader uses SYSTEM_PROMPT as the rules for its "details" field and passes the reply
+to validate_rewrite(prompt, reply).
 The canonical composed prompt is always kept verbatim as the prefix, and only a bounded world/light/texture
 "details" sentence is appended, so subject, motion and camera wording stay byte-identical across edits.
 Output depends only on (prompt, reply). Cache stability is the engine's job: it caches by exact prompt text and
@@ -33,33 +34,6 @@ Rules:
 - You cannot see the video: never mention earlier frames or what happened before or after.
 - No negations.
 If nothing can be added safely, reply {"details": ""}."""
-
-_EXAMPLES = [
-    ("a wide shot of a quiet lake shore at dawn; a small wooden boat resting on the water",
-     "soft pink light low on the horizon, calm glassy water reflecting the sky, cool fresh air, gentle dew on the reeds "
-     "along the shore, fine ripples catching a warm glow, smooth wet pebbles at the waterline, delicate tonal gradients, "
-     "photorealistic, cinematic, sharp detail"),
-    ("a wide shot of a mountain road; a red car driving forward, away from the camera; night time under a full moon",
-     "silver moonlight on the asphalt, deep blue shadows across the rocky slopes, crisp cold air, faint dew on the guard "
-     "stones, cool reflections along the road surface, fine grain on the weathered rock faces, soft contrast in the "
-     "distant ridgelines, photorealistic, cinematic, sharp detail"),
-]
-
-
-def build_messages(prompt: str, command: str | None = None) -> list[dict]:
-    """System prompt, two few-shot pairs, then the user message: the canonical prompt, or, when the final
-    spoken text is given, JSON {"scene": prompt, "command": command} (context only; the scene is authoritative).
-    Raises ValueError for a non-string or empty prompt, or a non-string command."""
-    if not isinstance(prompt, str) or not prompt.strip():
-        raise ValueError("prompt must be a non-empty string")
-    if command is not None and not isinstance(command, str):
-        raise ValueError("command must be a string or None")
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    for user, details in _EXAMPLES:
-        messages += [{"role": "user", "content": user}, {"role": "assistant", "content": json.dumps({"details": details})}]
-    user = prompt if command is None else json.dumps({"scene": prompt, "command": command})
-    return messages + [{"role": "user", "content": user}]
-
 
 def _rx(words):
     return re.compile(r"\b(?:" + "|".join(sorted(map(re.escape, words), key=len, reverse=True)) + r")\b")

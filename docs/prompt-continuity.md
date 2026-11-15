@@ -17,14 +17,11 @@ Confirmed ramps are one chunk: the anchor fires at full target. Explicit gradual
 
 ## Enrichment boundary
 
-The commands.rewriter module exports SYSTEM_PROMPT, build_messages(prompt), and validate_rewrite(prompt, reply).
-Input is exact canonical text, with an optional full final command as context.
-With build_messages, the model replies with JSON containing only a details string for world, light and texture.
-The engine does not use build_messages.
-It makes one Sonnet call that reads the command and writes the details together, with SYSTEM_PROMPT as part of its rules and validate_rewrite to check the details.
+The commands.rewriter module exports SYSTEM_PROMPT and validate_rewrite(prompt, reply).
+The engine makes one Sonnet call that reads the command and writes the details together, with SYSTEM_PROMPT as part of its rules and validate_rewrite to check the details.
 That call returns JSON {blocked, operations, details}, not only a details string.
 Validated output retains the source verbatim and appends bounded detail. Empty details return the source; invalid replies return None.
-Target 60–100 total words when useful; maximum 60 added words and 100 total. No new actors, camera moves, motion, events, weather, or claims of seeing previous frames.
+Target 60–100 total words when useful; maximum 60 added words and 180 total. No new actors, camera moves, motion, events, weather, or claims of seeing previous frames.
 Lexical checks cannot prove semantic faithfulness; inspect outputs and compare frames.
 
 Arunjay owns the Foundry call, timeout, bounded cache, likely-prompt prefetch and off switch.

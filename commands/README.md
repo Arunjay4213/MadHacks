@@ -150,10 +150,9 @@ Sources: [model card](https://huggingface.co/sentence-transformers/all-MiniLM-L6
 ## The rewriter and how the engine uses it
 
 `rewriter.py` holds the rules for prompt enrichment, with no network call and no cache.
-`SYSTEM_PROMPT` tells a language model to write only a `details` sentence of world, light, texture and atmosphere for the scene; `validate_rewrite(prompt, reply)` keeps the composed prompt word for word as the prefix and checks the details (at most 60 added words and 100 in total; no camera, motion, events, history words, negation, or objects and weather the scene does not have).
-`build_messages(prompt, command=None)` builds a details-only request.
+`SYSTEM_PROMPT` tells a language model to write only a `details` sentence of world, light, texture and atmosphere for the scene; `validate_rewrite(prompt, reply)` keeps the composed prompt word for word as the prefix and checks the details (at most 60 added words and 180 in total; no camera, motion, events, history words, negation, or objects and weather the scene does not have).
 
-The engine's Sonnet final reader (`engine/final_reader.py`, live since engine PR #125) uses `SYSTEM_PROMPT` and `validate_rewrite`, but not `build_messages`, because it needs one call that returns the operations and the details together within its 3 s wait.
+The engine's Sonnet final reader (`engine/final_reader.py`, live since engine PR #125) uses `SYSTEM_PROMPT` and `validate_rewrite` in one call that returns the operations and the details together within its 3 s wait.
 For every final sentence the engine:
 
 1. takes the full scene with `CommandService.snapshot()`,

@@ -225,14 +225,8 @@ def _scene_phrases(scene: dict, kinds: tuple[str, ...]) -> list[str]:
 def prompt_spec() -> PromptSpec:
     """commands.rewriter: its SYSTEM_PROMPT is the rules for the details field, and validate_rewrite checks the
     details against scene_prefix(scene), the composed prompt of the new scene with its objects right after the
-    subject and FORWARD_MOTION in a vehicle subject.
-
-    commands.rewriter.build_messages is not used. It is made for a separate call that only writes details:
-    its user message is the finished scene text, where "the command is context only and never permission to
-    add, remove or change anything", and its few-shot replies are {"details"} alone. The engine's one call has
-    to apply the command (the operations) and describe the scene after it, in about 1.8 s; with
-    build_messages that would be two calls in a row, past the 3 s wait.
-    """
+    subject and FORWARD_MOTION in a vehicle subject. One call gives the operations and the details together,
+    because two calls in a row would not fit the 3 s wait."""
     from commands import rewriter
 
     def validate(scene: dict, reply: dict) -> str | None:
