@@ -104,6 +104,20 @@ def test_frames_closing_before_the_end_fails(tmp_path, monkeypatch):
     assert report["commands"][0]["replied"]
 
 
+def test_frames_closing_mid_run_stops_sending_commands_at_once(tmp_path, monkeypatch, capsys):
+    # Without video nothing can be measured, so the harness must stop changing the shared video right away.
+    engine = TinyEngine(close_frames_after_s=0.4)
+    script = {"end": 8.0, "steps": [{"at": 0.1, "say": "make it winter"}, {"at": 5.0, "say": "make it night"},
+                                    {"at": 6.0, "say": "add a lion"}]}
+    t = time.monotonic()
+    code, report = play(tmp_path, monkeypatch, engine, script)
+    assert code == 1 and report["complete"] is False
+    assert time.monotonic() - t < 3.0  # stopped at the close, not at the next step (5 s) or the end (8 s)
+    assert [m["text"] for m in engine.received] == ["make it winter"]  # nothing sent after the close
+    assert any("/frames connection closed" in r for r in report["failures"])
+    assert "/frames closed" in capsys.readouterr().out
+
+
 def test_font_falls_back_when_pillow_has_no_size_argument(monkeypatch):
     real = ImageFont.load_default
     calls = []
