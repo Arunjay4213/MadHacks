@@ -131,12 +131,17 @@ def sentence_kind(text: str, snapshot: dict) -> SentenceKind:
     """Classify each clause the way CommandService splits the sentence, so a clause like "add ..." after
     "reset and" is seen and cannot ride past the content check on the reset.
 
-    A scene reset makes the whole sentence EDIT: the keyword table would read it as a plain reset and drop the
-    scene, and the final reader's new_scene already clears the changes, so a bare reset next to it adds nothing."""
+    A scene reset with no undo or reset after it makes the whole sentence EDIT: the keyword table would read it
+    as a plain reset and drop the scene, and the final reader's new_scene already clears the changes, so a bare
+    reset before it adds nothing. An undo or reset after it ("start over with a beach and reset") must still run
+    last, which only the keyword table does, so that sentence is MIXED."""
     from commands.reader import read, split_commands
     kinds = [clause_kind(clause, read(clause, snapshot)) for clause in split_commands(text) or [text]]
     if ClauseKind.SCENE_RESET in kinds:
-        return SentenceKind.EDIT
+        last_scene = len(kinds) - 1 - kinds[::-1].index(ClauseKind.SCENE_RESET)
+        if ClauseKind.BARE_CONTROL not in kinds[last_scene + 1:]:
+            return SentenceKind.EDIT
+        return SentenceKind.MIXED
     if all(k is ClauseKind.BARE_CONTROL for k in kinds):
         return SentenceKind.CONTROL
     return SentenceKind.MIXED if ClauseKind.BARE_CONTROL in kinds else SentenceKind.EDIT

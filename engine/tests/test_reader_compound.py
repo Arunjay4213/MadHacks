@@ -164,3 +164,16 @@ def test_a_bare_start_over_keeps_the_fast_path():
         out = final(svc, sentence, 2)
         assert chat.sentences == ["make it winter"], sentence  # no call
         assert labels(out) == [], sentence
+
+
+def test_a_control_after_a_scene_reset_still_runs_last():
+    """Greptile on PR #164: "start over with a beach and reset" ends on the initial scene, as said."""
+    for sentence in ("start over with a beach and reset", "start over with a beach and start over"):
+        svc, chat = wrapper({"make it winter": reply([WINTER]), sentence: reply([BEACH])})
+        final(svc, "make it winter")
+        out = final(svc, sentence, 2)
+        assert chat.sentences[-1] == sentence  # still the content check
+        assert labels(out) == [] and "beach" not in out["steer"]["prompt"], sentence
+    svc, _ = wrapper({"make it winter": reply([WINTER])})
+    final(svc, "make it winter")
+    assert_blocked(svc, final(svc, "start over with a naked man and reset", 2))
