@@ -46,7 +46,7 @@ export default function App({ adapter, source, remoteModifiers, initialPrompt }:
   const world = useGenerativeWorld({
     adapter: endpoint ? engine.adapter : adapter,
     remoteModifiers: endpoint ? engine.remoteState?.modifiers ?? [] : remoteModifiers,
-    partial: endpoint ? text => engine.sendText('partial', text) : undefined,
+    partial: endpoint ? text => { if (text) engine.sendText('partial', text); else engine.clearPartials(); } : undefined,
     tap: endpoint ? engine.tap : undefined,
     notify, requestAudio: async () => audioApi.current ? audioApi.current.request() : false,
     stopAudio: () => audioApi.current?.stop(),
@@ -55,24 +55,25 @@ export default function App({ adapter, source, remoteModifiers, initialPrompt }:
   const effectiveSource = source ?? engine.source;
   const sourceLabel = endpoint ? (engine.remoteState?.fake ? 'CPU FAKE ENGINE · TEST VIDEO' : 'ENGINE STREAM')
     : live ? 'EXTERNAL VIDEO SOURCE' : 'PROCEDURAL STUDY';
-  const [words, setWords] = useState({ text: '', keyword: '', unmatched: false, kind: 'local' });
+  const [words, setWords] = useState({ text: '', keyword: '', unmatched: false, kind: 'local', remote: false, confirmed: false });
   const localCommit = useCallback((text: string) => {
-    setWords({ text, keyword: '', unmatched: false, kind: 'final' });
+    setWords({ text, keyword: '', unmatched: false, kind: 'final', remote: false, confirmed: false });
     return world.commit(text);
   }, [world.commit]);
   const localPartial = useCallback((text: string) => {
-    setWords({ text, keyword: '', unmatched: false, kind: 'partial' });
+    setWords({ text, keyword: '', unmatched: false, kind: 'partial', remote: false, confirmed: false });
     world.partial(text);
   }, [world.partial]);
   useEffect(() => {
-    if (world.transcript) setWords({ text: world.transcript, keyword: '', unmatched: false, kind: world.interim ? 'partial' : 'final' });
+    if (world.transcript) setWords({ text: world.transcript, keyword: '', unmatched: false, kind: world.interim ? 'partial' : 'final', remote: false, confirmed: false });
   }, [world.transcript, world.interim]);
   const heard = engine.remoteState?.heard;
   const keyword = engine.remoteState?.keyword ?? '';
   const unmatched = engine.remoteState?.unmatched ?? false;
   const kind = engine.remoteState?.kind ?? 'server';
   const tClient = engine.remoteState?.tClient;
-  useEffect(() => { if (heard !== null && heard !== undefined) setWords({ text: heard, keyword, unmatched, kind }); }, [heard, keyword, unmatched, kind, tClient]);
+  const confirmed = engine.remoteState?.confirmed ?? false;
+  useEffect(() => { if (heard !== null && heard !== undefined) setWords({ text: heard, keyword, unmatched, kind, remote: kind !== 'partial', confirmed }); }, [heard, keyword, unmatched, kind, tClient, confirmed]);
   const keywordAt = words.keyword ? words.text.toLowerCase().indexOf(words.keyword.toLowerCase()) : -1;
   const pointer = useRef({ x: 0.5, y: 0.5 });
   const registerAudio = useCallback((api: AudioControls) => { audioApi.current = api; }, []);
@@ -147,9 +148,12 @@ export default function App({ adapter, source, remoteModifiers, initialPrompt }:
       <div className="composition-actions"><button disabled={disabled} onClick={world.undo}>↶ Undo</button><button disabled={disabled} onClick={world.reset}>Reset scene</button></div>
     </div>
     <CommandInput compact commit={localCommit} partial={localPartial} disabled={disabled} />
+    <div className="words-label">{words.text ? (words.remote ? 'Heard' : words.kind === 'partial' ? 'Hearing…' : 'Sent') : ''}</div>
     <p className="server-words" data-kind={words.kind} data-unmatched={words.unmatched} aria-live="polite" aria-atomic="true">
       {keywordAt < 0 ? words.text : <>{words.text.slice(0, keywordAt)}<mark>{words.text.slice(keywordAt, keywordAt + words.keyword.length)}</mark>{words.text.slice(keywordAt + words.keyword.length)}</>}
     </p>
+    <p className="words-status" data-unmatched={words.unmatched}>{words.remote && words.kind !== 'partial'
+      ? words.unmatched ? 'Not understood' : words.keyword ? `Understood: ${words.keyword}` : words.confirmed ? 'Understood' : '' : ''}</p>
     <p className="editor-hint">Try <button disabled={disabled} onClick={() => void localCommit('make it winter')}>winter</button>, then <button disabled={disabled} onClick={() => void localCommit('also add a river')}>a river</button>.<br/>Your next thought builds on the last.</p>
     <button className="gesture-link" onClick={() => setHelp(true)}>Keyboard & voice gestures ↗</button>
     {endpoint && <div className="editor-timing"><p className="editor-latency" title="Command sent → first frame tagged with its chunk drawn to the source canvas. Chunk proxy; semantic change and screen paint are not measured.">{engine.latency === null ? '—' : `${engine.latency} ms`} <span>TO FIRST CORRELATED FRAME</span></p>

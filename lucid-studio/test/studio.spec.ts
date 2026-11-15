@@ -111,6 +111,20 @@ test('server words override local words even with a repeated timestamp; chips wa
   await expect(page.getByRole('button', { name: 'Remove winter', exact: true })).toHaveCount(0);
 });
 
+test('partial echoes never claim understanding; a confirmed LLM final without a keyword can', async ({ page }) => {
+  const e = await engine(page);
+  const input = page.locator('#editor-thought');
+  await input.pressSequentially('make it night', { delay: 40 });
+  e.state({ changes: [], heard: 'make it night', keyword: 'night', t_client: 1, unmatched: false });
+  await expect(page.locator('.words-status')).not.toContainText('understood');
+  await expect(page.locator('.words-label')).toHaveText('Hearing…');
+  await input.press('Enter');
+  await expect.poll(() => e.sent.some(m => m.type === 'final')).toBe(true);
+  const t = e.sent.find(m => m.type === 'final')!.t_client;
+  e.state({ changes: [], heard: 'make it night', t_client: t, unmatched: false });
+  await expect(page.locator('.words-status')).toHaveText('Understood');
+});
+
 test('latency is measured once and a frame stall remains visible after two seconds', async ({ page }) => {
   const e = await engine(page);
   await page.locator('#editor-thought').fill('make it winter');
@@ -312,4 +326,44 @@ test('releasing push-to-talk during permission does not cancel a newer request o
   await page.keyboard.up('Backquote');
   await expect.poll(() => page.evaluate(() => (window as unknown as {audioRequests: {stream: MediaStream}[]}).audioRequests.every(r => r.stream.getTracks().every(t => t.readyState === 'ended')))).toBe(true);
   await context.close();
+});
+
+
+test('custom adapter commands keep scene changes in submission order despite pending sends', async ({ page }) => {
+  await page.goto('/test/fixtures/app.html?mode=delayed');
+  await enter(page);
+  await page.getByRole('button', { name: 'winter', exact: true }).click();
+  await page.getByRole('button', { name: 'a river', exact: true }).click();
+  await page.evaluate(() => (window as unknown as {pendingMutations: {release: () => void}[]}).pendingMutations[0].release());
+  await expect.poll(() => page.evaluate(() => (window as unknown as {pendingMutations: unknown[]}).pendingMutations.length)).toBe(2);
+  await page.evaluate(() => (window as unknown as {pendingMutations: {release: () => void}[]}).pendingMutations[1].release());
+  await expect(page.getByRole('button', { name: 'Remove winter', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Remove river', exact: true })).toBeVisible();
+});
+
+test('a second whole insert is sent once when the first asynchronous send completes', async ({ page }) => {
+  await page.goto('/test/fixtures/app.html?mode=delayed');
+  await enter(page);
+  const input = page.locator('#editor-thought');
+  await input.fill('make it winter');
+  await input.fill('add a river');
+  await page.evaluate(() => (window as unknown as {pendingMutations: {release: () => void}[]}).pendingMutations[0].release());
+  await expect.poll(() => page.evaluate(() => (window as unknown as {pendingMutations: unknown[]}).pendingMutations.length)).toBe(2);
+  await page.evaluate(() => (window as unknown as {pendingMutations: {release: () => void}[]}).pendingMutations[1].release());
+  await expect(input).toHaveValue('');
+  expect(await page.evaluate(() => (window as unknown as {mutations: string[]}).mutations)).toEqual(['make it winter', 'add a river']);
+});
+
+test('an external source draws its poster, then stops hidden GPU redraws', async ({ page }) => {
+  await page.addInitScript(() => {
+    const w = window as unknown as { gpuDraws: number }; w.gpuDraws = 0;
+    const draw = WebGL2RenderingContext.prototype.drawElements;
+    WebGL2RenderingContext.prototype.drawElements = function (...args: Parameters<typeof draw>) { w.gpuDraws++; return draw.apply(this, args); };
+  });
+  await page.goto('/test/fixtures/app.html?mode=external');
+  await expect(page.locator('.hero-preview')).toHaveCSS('background-image', /data:image\/jpeg/);
+  await page.waitForTimeout(350);
+  const draws = await page.evaluate(() => (window as unknown as {gpuDraws: number}).gpuDraws);
+  await page.waitForTimeout(350);
+  expect(await page.evaluate(() => (window as unknown as {gpuDraws: number}).gpuDraws)).toBe(draws);
 });

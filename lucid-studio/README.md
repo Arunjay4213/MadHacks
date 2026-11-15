@@ -68,7 +68,8 @@ With a send-only custom adapter the simulator maintains the desired composition;
 with `remoteModifiers`, the caller's/server's state is authoritative.
 
 The included websocket adapter maps final text to contract 1 and interim speech
-and typed text to partial messages. Server words retain keyword highlighting and
+and typed text to partial messages. Draft echoes say “hearing”; acknowledged
+commands say “heard” with understood/not-understood status. Server words retain keyword highlighting and
 unmatched styling; chips remain server-authoritative. Controls disable on a lost
 connection, while unsent text stays editable. Connection and two-second frame-stall
 notices persist until the stream recovers. It consumes contract 4 and frames with the six-byte
@@ -85,7 +86,7 @@ command service's default meadow. No server files or shared contracts are change
 ## Performance
 
 - The hero uses a one-time poster from the selected source, not a second continuous WebGL context.
-- The heavy renderer loads separately from the initial UI; procedural animation pauses outside the editor,
+- The heavy renderer loads separately from the initial UI and pauses outside the editor after the poster,
   caps its procedural target at 700,000 pixels and skips it when live texture output fully replaces it.
 - Pointer movement updates a ref. FFT updates stay inside the voice agent instead
   of rerendering the editor. The particle context exists only during vocal feedback.

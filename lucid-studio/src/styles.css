@@ -231,3 +231,7 @@ button:disabled { cursor: default; opacity: 0.35; }
 .prompt-scroll { overflow: visible; }
 @media (min-width: 701px) { .generation-column { position: sticky; top: 24px; } }
 @media (max-width: 700px) { .prompt-column { min-height: 0; } }
+.words-label { min-height: 12px; margin-top: 18px; color: #869a86; font-size: 8px; letter-spacing: 1px; text-transform: uppercase; }
+.server-words { margin-top: 6px; min-height: 1.5em; }
+.words-status { min-height: 12px; margin: 6px 0 0; color: #9eb58c; font-size: 10px; }
+.words-status[data-unmatched="true"] { color: #efa6a0; }

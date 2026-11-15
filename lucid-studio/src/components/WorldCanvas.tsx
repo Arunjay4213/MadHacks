@@ -135,7 +135,8 @@ function Scene({ modifiers, source, impulse, pointer, reducedMotion, active, onR
       video.autoplay = true;
       video.srcObject = source;
       const v = video;
-      v.onloadedmetadata = () => setAspect(v.videoWidth, v.videoHeight);
+      v.onloadedmetadata = () => { setAspect(v.videoWidth, v.videoHeight); invalidate(); };
+      v.onloadeddata = () => invalidate();
       v.play().catch(() => {}); // autoplay may be blocked; muted inline video normally plays
       tex = new THREE.VideoTexture(v);
     }
@@ -186,6 +187,7 @@ function Scene({ modifiers, source, impulse, pointer, reducedMotion, active, onR
 
   useFrame((_, rawDt) => {
     const { goal: g, pointer: p, impulse: imp, reducedMotion: still, demand: onDemand, onReady: ready_ } = latest.current;
+    if (active === false && ready.current) return;
     if (source && !sourceTex.current) { invalidate(); return; }
     const dt = Math.min(rawDt, 0.1);
     const u = world.material.uniforms;
@@ -249,7 +251,7 @@ function Scene({ modifiers, source, impulse, pointer, reducedMotion, active, onR
       ready_?.(preview);
     }
     // In demand mode keep rendering while something is still settling or a video is playing.
-    if (onDemand && (moving || sourceTex.current)) invalidate();
+    if (onDemand && active !== false && (moving || sourceTex.current)) invalidate();
   }, 1);
 
   return null;

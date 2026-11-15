@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TranscriptGate, makeInputClassifier, isPushToTalk, isResetShortcut, finalizeDelay } from './input';
-import { parseEngineState, engineBaseUrl, videoNotice, makeLatencyTracker } from './engine';
+import { parseEngineState, engineBaseUrl, videoNotice, makeLatencyTracker, makeHeardTracker } from './engine';
 
 describe('web input parity', () => {
   it('flushes leftover speech once, without replaying a committed final', () => {
@@ -65,6 +65,19 @@ describe('web engine parity', () => {
     expect(parseEngineState({ heard: 'unmatched', unmatched: true })?.heard).toBe('unmatched');
     expect(parseEngineState({ changes: [{ id: 'r', label: 2 }] })).toBeNull();
   });
+  it('distinguishes a pending partial from a confirmed final and expires abandoned drafts', () => {
+    const heard = makeHeardTracker();
+    heard.sentPartial('make it winter', 100);
+    expect(heard.classify('make it winter', 99, 200)).toBe('pending');
+    heard.sentFinal('make it winter', 300);
+    expect(heard.classify('make it winter', 300, 400)).toBe('confirmed');
+    expect(heard.classify('add a lion', 301, 400)).toBe('other');
+    heard.sentPartial('add a lion', 500);
+    expect(heard.classify('add a lion', 99, 5501)).toBe('other');
+    heard.sentPartial('make it night', 6000);
+    heard.clearPartials();
+    expect(heard.classify('make it night', 99, 6100)).toBe('other');
+  });
   it('accepts web server aliases and uses secure sockets on HTTPS pages', () => {
     const loc = { protocol: 'https:', host: 'studio.test' };
     expect(engineBaseUrl('localhost:8100', loc)).toBe('wss://localhost:8100');
@@ -81,6 +94,15 @@ describe('web engine parity', () => {
     expect(videoNotice({ ...link, controlOpen: true, framesOpen: true, lastFrameAt: 100 }, 2101)).toContain('paused');
     expect(videoNotice({ ...link, everConnected: true }, 5000)).toContain('Connection lost');
     expect(videoNotice({ ...link, controlOpen: true, framesOpen: true, lastFrameAt: 100 }, 200)).toBeNull();
+  });
+  it('correlates a frame already drawn before its control message, once', () => {
+    const timing = makeLatencyTracker();
+    timing.sent(100);
+    expect(timing.onFrameDrawn(4, 120)).toBeNull();
+    expect(timing.onFrameDrawn(5, 160)).toBeNull();
+    expect(timing.onServer({ tClient: 100, appliesFromChunk: 5, unmatched: false, stamps: { shown: 50 } }))
+      .toEqual({ ms: 60, stamps: { shown: 50 } });
+    expect(timing.onServer({ tClient: 100, appliesFromChunk: 5, unmatched: false })).toBeNull();
   });
   it('measures each local final once and ignores unmatched or foreign command echoes', () => {
     const tracker = makeLatencyTracker();

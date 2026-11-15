@@ -14,9 +14,14 @@ export default function CommandInput({ commit, partial, compact = false, disable
   const classifier = useRef(makeInputClassifier());
   const composing = useRef(false);
   const sending = useRef(false);
+  const pending = useRef(false);
+  const mounted = useRef(true);
+  const blocked = useRef(disabled);
+  blocked.current = disabled;
   const flush = async () => {
     clearTimeout(timer.current);
-    if (disabled || composing.current || sending.current) return;
+    if (blocked.current || composing.current || !mounted.current) return;
+    if (sending.current) { pending.current = true; return; }
     const value = input.current?.value;
     const text = value?.trim();
     if (!text) return;
@@ -24,8 +29,12 @@ export default function CommandInput({ commit, partial, compact = false, disable
     sending.current = true;
     try {
       if (await commit(text) && input.current && input.current.value === value) input.current.value = '';
-    } finally { sending.current = false; }
+    } finally {
+      sending.current = false;
+      if (pending.current) { pending.current = false; void flush(); }
+    }
   };
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; clearTimeout(timer.current); }; }, []);
   useEffect(() => { if (disabled) clearTimeout(timer.current); return () => clearTimeout(timer.current); }, [disabled]);
   const submit = (event: FormEvent) => { event.preventDefault(); void flush(); };
   const change = (inputType: string, data: string | null) => {
@@ -34,7 +43,7 @@ export default function CommandInput({ commit, partial, compact = false, disable
     const kind = classifier.current.classify(inputType, data, performance.now());
     if (kind === 'whole') { void flush(); return; }
     const text = input.current?.value.trim();
-    if (!text) return;
+    if (!text) { partial(''); return; }
     partial(text);
     const delay = finalizeDelay(kind, text);
     if (delay !== null) timer.current = setTimeout(() => void flush(), delay);

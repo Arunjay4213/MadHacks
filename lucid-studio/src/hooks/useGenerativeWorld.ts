@@ -16,6 +16,8 @@ interface Options {
 export function useGenerativeWorld(options: Options) {
   const [world, setWorld] = useState(emptyWorld);
   const worldRef = useRef(world);
+  const mutationQueue = useRef(Promise.resolve(true));
+  const mutationGeneration = useRef(0);
   const [transcript, setTranscript] = useState('');
   const [interim, setInterim] = useState(false);
   const [listening, setListening] = useState(false);
@@ -42,7 +44,8 @@ export function useGenerativeWorld(options: Options) {
     if (!partial) dissolve.current = setTimeout(() => setTranscript(''), 1100);
   }, []);
 
-  const commit = useCallback(async (prompt: string, simulate = true) => {
+  const performCommit = useCallback(async (prompt: string, simulate = true) => {
+    const generation = mutationGeneration.current;
     const text = prompt.trim();
     if (!text) return false;
     showWords(text);
@@ -61,6 +64,7 @@ export function useGenerativeWorld(options: Options) {
         return false;
       }
     }
+    if (generation !== mutationGeneration.current) return false;
     if (opts.current.remoteModifiers === undefined) {
       if (!intent) { opts.current.notify('Try “make it winter”, “add a river”, or “turn to night”.'); return false; }
       worldRef.current = next;
@@ -70,6 +74,14 @@ export function useGenerativeWorld(options: Options) {
     setPin(null);
     return true;
   }, [showWords]);
+
+  const commit = useCallback((prompt: string, simulate = true) => {
+    if (!opts.current.adapter || opts.current.remoteModifiers !== undefined) return performCommit(prompt, simulate);
+    const generation = mutationGeneration.current;
+    const result = mutationQueue.current.then(() => generation === mutationGeneration.current ? performCommit(prompt, simulate) : false);
+    mutationQueue.current = result;
+    return result;
+  }, [performCommit]);
 
   const partial = useCallback((text: string) => {
     showWords(text, true);
@@ -185,6 +197,7 @@ export function useGenerativeWorld(options: Options) {
   useEffect(() => () => {
     desired.current = null;
     voiceGeneration.current++;
+    mutationGeneration.current++;
     clearTimeout(restart.current);
     const rec = recognition.current;
     if (rec) { rec.onend = null; rec.onresult = null; rec.onerror = null; rec.abort(); }

@@ -63,8 +63,9 @@ merging #40. Resume in the managed worktree; modify only `lucid-studio/`.
   hook and keyed server words; disable mutations while disconnected.
 - [x] QA: reproduce shader failures on a fresh browser; desktop/mobile contained
   layout, denied mic, restart, IME/Wispr, cleanup and local CPU fake engine.
-- [ ] Delivery: tests/build/audit, whole-branch review, scoped commits, fetch/rebase,
-  PR `Closes #40`, merge and notify board/engine owner and lauda.
+- Delivery: PR [#94](https://github.com/Arunjay4213/MadHacks/pull/94) carries
+  `Closes #40`; tests/build/audit and independent review are complete. Merge and
+  board/engine/lauda notifications follow the authorized repository workflow.
 
 Keep local procedural output explicitly labeled; label an engine fake only when
 its message says `fake: true`. Keep source props distinct from a requested engine.

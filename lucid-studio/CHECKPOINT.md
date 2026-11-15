@@ -14,7 +14,8 @@ The shared `74-continuity-prompts` checkout was not switched, stashed or reset.
   utterance, leftover interim flush, deduped/restarting toggle voice, text partials,
   Wispr whole inserts, 2.5s/600ms typing/burst pauses, unfinished sentence guard,
   IME, focus restoration and Option/Alt+R reset.
-- Server-authoritative keyed chips and highlighted/unmatched words; disabled
+- Server-authoritative keyed chips and highlighted/unmatched words, with #84
+  hearing/heard/understood labels and correlation that never calls a draft understood; disabled
   disconnected mutations with editable retained text; persistent connection and
   >2s frame-stall notices; `?server=` and `?engine=` aliases.
 - One-shot local-command latency and stage stamps captured from the same sample;
@@ -24,13 +25,15 @@ The shared `74-continuity-prompts` checkout was not switched, stashed or reset.
 - External sources provide the poster immediately; a send-only custom adapter
   preserves the labeled procedural simulator. Simulation is never labeled AI video.
 - Permission races cannot cancel a newer microphone request; late tracks are stopped.
+- Automated PR review findings reproduced and fixed: ordered custom-adapter commands,
+  retry of a second whole insert, hidden-source GPU pause and frame-before-control timing.
 
 ## Verification, 2026-11-14
 
-- `npm test`: 20 passing.
+- `npm test`: 22 passing.
 - `npm run build`: passes (known lazy Three bundle size warning).
 - `npm audit`: zero vulnerabilities.
-- `LUCID_ENGINE_URL=http://127.0.0.1:8100 npm run test:browser`: 13 passing.
+- `LUCID_ENGINE_URL=http://127.0.0.1:8100 npm run test:browser`: 17 passing.
   Covers 1440x900, 1280x720, 390x844, 375x667; real production `/studio/`
   against a local CPU fake engine (winter/river/remove/undo/reset/unmatched),
   controlled speech, WebGL denial, source attribution, async decode and mic cleanup.

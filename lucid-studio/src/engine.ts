@@ -8,6 +8,7 @@ export interface EngineState {
   keyword: string;
   kind: 'partial' | 'final' | 'server';
   fake: boolean;
+  confirmed?: boolean;
   stamps: Record<string, number>;
   tClient: number | null;
   appliesFromChunk: number | null;
@@ -59,22 +60,48 @@ export function videoNotice(link: Link, now: number) {
 }
 export function makeLatencyTracker() {
   const sent = new Set<number>();
+  const draws: { chunk: number; at: number }[] = [];
   let pending: { t: number; chunk: number; stamps: Record<string, number> } | null = null;
+  const measure = (at: number) => {
+    if (!pending) return null;
+    const sample = { ms: Math.round(at - pending.t), stamps: { ...pending.stamps } };
+    sent.delete(pending.t); pending = null;
+    return sample;
+  };
   return {
     sent(t: number) { sent.add(t); if (sent.size > 100) sent.delete(sent.values().next().value!); },
     onServer(m: Pick<EngineState, 'tClient' | 'appliesFromChunk' | 'unmatched'> & { stamps?: Record<string, number> }) {
-      if (m.tClient === null || m.appliesFromChunk === null || !sent.has(m.tClient) || m.unmatched) return;
+      if (m.tClient === null || m.appliesFromChunk === null || !sent.has(m.tClient) || m.unmatched) return null;
       if (pending?.t === m.tClient) pending.stamps = m.stamps ?? {};
       else pending = { t: m.tClient, chunk: m.appliesFromChunk, stamps: m.stamps ?? {} };
+      const drawn = draws.find(d => d.chunk >= pending!.chunk && d.at >= pending!.t);
+      return drawn ? measure(drawn.at) : null;
     },
     onFrameDrawn(chunk: number, now = Date.now()) {
-      if (!pending || chunk < pending.chunk) return null;
-      const sample = { ms: Math.round(now - pending.t), stamps: { ...pending.stamps } };
-      sent.delete(pending.t);
-      pending = null;
-      return sample;
+      draws.push({ chunk, at: now });
+      if (draws.length > 100) draws.shift();
+      return pending && chunk >= pending.chunk && now >= pending.t ? measure(now) : null;
     },
-    reset() { sent.clear(); pending = null; },
+    reset() { sent.clear(); draws.length = 0; pending = null; },
+  };
+}
+
+// Mirrors web/lib.js: an echoed draft is not a confirmed operation.
+export function makeHeardTracker() {
+  const partials = new Map<string, number>();
+  const finals: { text: string; t: number }[] = [];
+  return {
+    sentPartial(text: string, now = Date.now()) {
+      partials.set(text, now);
+      if (partials.size > 50) partials.delete(partials.keys().next().value!);
+    },
+    sentFinal(text: string, t: number) { partials.clear(); finals.push({ text, t }); if (finals.length > 50) finals.shift(); },
+    clearPartials() { partials.clear(); },
+    classify(text: string | null, t: number | null, now = Date.now()) {
+      if (finals.some(f => f.text === text && f.t === t)) return 'confirmed';
+      const sentAt = text === null ? undefined : partials.get(text);
+      return sentAt !== undefined && now - sentAt < 5000 ? 'pending' : 'other';
+    },
   };
 }
 
@@ -88,6 +115,7 @@ export function useEngineStream(endpoint: string | null, notify: (text: string) 
   const notifyRef = useRef(notify);
   notifyRef.current = notify;
   const timing = useRef(makeLatencyTracker());
+  const heard = useRef(makeHeardTracker());
 
   useEffect(() => {
     setCanvas(null); setState(null); setConnected(false); setSample(null);
@@ -161,7 +189,11 @@ export function useEngineStream(endpoint: string | null, notify: (text: string) 
           if (data && typeof data.error === 'string') { notifyRef.current(data.error); return; }
           const incoming = parseEngineState(data);
           if (!incoming) { notifyRef.current('Ignored an invalid engine message'); return; }
-          timing.current.onServer(incoming);
+          const status = heard.current.classify(incoming.heard, incoming.tClient);
+          incoming.confirmed = status === 'confirmed' && incoming.kind !== 'partial';
+          if (status === 'pending') { incoming.kind = 'partial'; incoming.keyword = ''; incoming.unmatched = false; }
+          const measured = timing.current.onServer(incoming);
+          if (measured !== null) setSample(measured);
           setState(previous => {
             const next = { ...incoming, modifiers: incoming.modifiers ?? previous?.modifiers };
             return JSON.stringify(previous) === JSON.stringify(next) ? previous : next;
@@ -190,7 +222,8 @@ export function useEngineStream(endpoint: string | null, notify: (text: string) 
   const sendText = (type: 'partial' | 'final', text: string) => {
     if (control.current?.readyState !== WebSocket.OPEN) throw new Error('Engine disconnected. Command was not queued.');
     const timestamp = Date.now();
-    if (type === 'final') { setSample(null); timing.current.sent(timestamp); }
+    if (type === 'final') { setSample(null); timing.current.sent(timestamp); heard.current.sentFinal(text, timestamp); }
+    else heard.current.sentPartial(text);
     control.current.send(JSON.stringify({ type, text, t_client: timestamp }));
   };
   const adapter: WorldStreamAdapter = { sendMutation: async payload => sendText('final', payload.prompt) };
@@ -198,5 +231,5 @@ export function useEngineStream(endpoint: string | null, notify: (text: string) 
     if (control.current?.readyState !== WebSocket.OPEN) throw new Error('Engine disconnected. Command was not queued.');
     control.current.send(JSON.stringify({ type: 'tap', action, ...(id ? { id } : {}) }));
   };
-  return { source: canvas, remoteState: state, connected, latency: sample?.ms ?? null, stamps: sample?.stamps ?? {}, notice, adapter, sendText, tap };
+  return { source: canvas, remoteState: state, connected, latency: sample?.ms ?? null, stamps: sample?.stamps ?? {}, clearPartials: () => heard.current.clearPartials(), notice, adapter, sendText, tap };
 }
