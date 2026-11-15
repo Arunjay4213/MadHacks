@@ -416,7 +416,9 @@ kbd { font: 12px var(--mono); }
    app.js sets html.fs while the document is in full screen. */
 .fs body { padding: 0; background: #000; }
 .fs .window { border: 0; border-radius: 0; background: #000; box-shadow: none; }
-.fs .header, .fs .type { display: none; }
+.fs .header { display: none; }
+/* Hidden but still focusable: Wispr Flow pastes into the box, so it must keep focus in full screen too. */
+.fs .type { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; border: 0; overflow: hidden; clip: rect(0 0 0 0); opacity: 0; pointer-events: none; }
 .fs .banners { top: 16px; }
 .fs .column { padding: 0; }
 .fs .mat { position: fixed; inset: 0; padding: 0; border: 0; border-radius: 0; background: #000; }

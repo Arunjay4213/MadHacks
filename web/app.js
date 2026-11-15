@@ -406,7 +406,8 @@ document.addEventListener('fullscreenchange', () => {
   const label = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
   el.fullscreen.setAttribute('aria-label', label); // icon-only button: keep the icon, change the label
   el.fullscreen.title = document.fullscreenElement ? 'Exit full screen (Esc)' : 'Full screen';
-  refocus();
+  refocus(); // so Ctrl -> Wispr Flow types into the box at once, in full screen and after it
+  setTimeout(refocus, 400); // again once the full-screen animation has settled
 });
 // Back to the starting scene (the scene reset is undoable; the picture restarts cleanly).
 el.reset.addEventListener('click', () => send(tapMsg('reset')));
