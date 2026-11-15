@@ -93,7 +93,7 @@ The live command line is `ExecStart` in `engine/deploy/madhacks-engine.service`:
 ```
 python -m engine.server --backend causal_forcing --reader commands --width 672 --height 384 \
     --backend-opt vae=taehv --backend-opt cut_fade_frames=8 \
-    --reanchor on --reanchor-opt refresh_every_chunks=48 --final-reader sonnet \
+    --reanchor on --reanchor-opt refresh_every_chunks=24 --final-reader sonnet \
     --host 127.0.0.1 --port 8000 --record-dir /home/ubuntu/recordings
 ```
 
@@ -105,7 +105,7 @@ The unit also sets `COMMAND_SEMANTIC=1` and loads `~/.madhacks-foundry.env`.
 | `--backend-opt vae=taehv` | The stock Wan VAE decodes in 157 ms per chunk against 21.5 ms for TAEHV, with an almost identical picture (Ishaan, board post at 23:53 UTC). |
 | `--reanchor on` | Moving the embedding alone does not change the picture: the model keeps copying its old frames. A re-anchor restarts the next chunk from a noised copy of the picture under the new prompt (Gate 2, PR #57). |
 | Refresh (default on with `--reanchor on`) | Without it the picture over-saturates by 25 to 30 s and breaks by 40 to 60 s; a refresh from the clean anchor keeps it clean (PR #83, board post at 23:47 UTC). |
-| `--reanchor-opt refresh_every_chunks=48` | Each refresh re-composes the shot, so a refresh every 48 chunks (12 s) halves the jumps of the default 24; 48 was the longest interval that stayed nearly clean on the car (PR #83, Ishaan's interim request at 00:12 UTC). |
+| `--reanchor-opt refresh_every_chunks=24` | A refresh from the clean frame every 24 chunks (6 s) keeps the picture from drifting (PR #83). Since PR #128 a refresh draws its noise from a generator seeded by the clean anchor (`refresh_noise=fixed`, the default), so it returns to the same picture instead of re-arranging the scene; live since 01:50 UTC on 2026-11-15 (PR #184). Rollback: `--backend-opt refresh_noise=fresh` or `refresh_every_chunks=48`. |
 | Decoder restart (always on, `first_frame_pad=hold` default) | A re-anchor chunk is a first frame; decoding it as a continuation gave a washed-out, ghosted chunk (sharpness 498 against 2049 before; 1871 after, PR #83). |
 | `--backend-opt cut_fade_frames=8` | A re-anchor is a hard cut; dissolving from the last shown frame over 8 frames (0.5 s) brings the largest frame-to-frame change at a steer from 82 to 13 (PR #113). Refreshes fade too (`cut_fade_refresh` default 1); Ishaan saw no double car on the live recording, so it stays on (board post at 00:12 UTC). |
 | `--reader commands` | The `commands/` scene state, dictionary and composer read every sentence. |
@@ -114,7 +114,7 @@ The unit also sets `COMMAND_SEMANTIC=1` and loads `~/.madhacks-foundry.env`.
 | `--demo-prompts` (default `engine/demo_prompts.json`) | The demo sentences' Sonnet prompts are pinned, so every run draws the same words and a prompt checked on the GPU stays as checked (see "Final reader (Sonnet)"). |
 | `--record-dir /home/ubuntu/recordings` | Every video is saved as an mp4, for the backup video and for checks such as Ishaan's refresh review. |
 
-Rollback for the last deploy (PR #125): remove `--final-reader sonnet` and `--reanchor-opt refresh_every_chunks=48`.
+Rollback for the last deploy (01:50 UTC, PR #184): `--backend-opt refresh_noise=fresh`, or back to `refresh_every_chunks=48`.
 
 ### Deploy and restart
 
@@ -378,10 +378,10 @@ With `--reanchor off`, the default, no policy exists and every chunk is exactly 
 `--reanchor-opt KEY=VALUE` sets one field of `steering.reanchor.ReanchorConfig`, without a change to the steering code.
 It may be repeated; the fields and their defaults are in `steering/reanchor.py`.
 Each value is converted to the field's type: an int, a float, or for `refresh_every_chunks` an int or `none`.
-The live engine refreshes every 48 chunks instead of the default 24 (see "Live flags and why each is set"):
+The live engine refreshes every 24 chunks, the default, and passes it explicitly (see "Live flags and why each is set"):
 
 ```
---reanchor on --reanchor-opt refresh_every_chunks=48
+--reanchor on --reanchor-opt refresh_every_chunks=24
 ```
 
 `refresh_every_chunks=none` turns the refresh off.
