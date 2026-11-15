@@ -15,7 +15,7 @@ from commands.service import CommandService
 from commands.state import SceneState
 from engine import car_template
 from engine.final_reader import (CacheFile, FinalReader, FinalReaderState, Outcome, Verdict, call_options, check_reply,
-                                 fingerprint, fit_prompt, load, reply_chips)
+                                 MAX_PROMPT_WORDS, fingerprint, fit_prompt, load, reply_chips)
 from engine.foundry import FoundryMessages
 from engine.reader import FinalReadingService, load_reader
 
@@ -98,13 +98,13 @@ def test_blocked_not_understood_and_unusable_replies(answer, verdict):
 
 
 def test_a_long_prompt_is_cut_at_sentences_not_refused():
-    long = " ".join(f"Sentence {n} has five words." for n in range(60))  # 300 words
+    long = " ".join(f"Sentence {n} has five words." for n in range(80))  # 400 words
     prompt, cut = fit_prompt(long)
-    assert len(prompt.split()) <= 180 and prompt.startswith("Sentence 0 has") and prompt.endswith(".") and cut
+    assert len(prompt.split()) <= MAX_PROMPT_WORDS and prompt.startswith("Sentence 0 has") and prompt.endswith(".") and cut
     style_kept, _ = fit_prompt(car_prompt() + " " + long.replace("Sentence", "Extra") + " " + car_template.STYLE)
     assert style_kept.endswith(car_template.STYLE) and car_template.is_template(style_kept)
     a = check_reply(json.loads(reply(long, ["x"])), {})
-    assert a.verdict is Verdict.REPAIRED and len(a.entry.prompt.split()) <= 180
+    assert a.verdict is Verdict.REPAIRED and len(a.entry.prompt.split()) <= MAX_PROMPT_WORDS
 
 
 def test_chips_are_cleaned_never_a_reason_to_refuse():
@@ -185,6 +185,16 @@ def test_failed_calls_and_unusable_replies_fall_back_and_are_final_in_the_proces
     s = r.stats()
     assert s["rejects"] == 2 and s["errors"] == 1 and s["retries"] == 2  # unusable replies are asked again once
     assert r("f", snap()) is None and len(chat.calls) == 5  # a fallback is final in this process: no new call
+
+
+def test_a_reply_that_leaves_the_prompt_on_screen_is_not_used():
+    # Regression sweep on #273: a cut took the new object away, the prompt stayed the same and only the chip changed.
+    on_screen = "A bare oak tree in a meadow."
+    chat = FakeChat({"add a lake": reply(on_screen + "  ", ["bare tree", "lake"])})
+    r = reader(chat)
+    free = snap({"op": "free_scene", "prompt": on_screen, "chips": ["bare tree"]})
+    assert r("add a lake", free, current_prompt=on_screen) is None  # the dictionary path: not understood there
+    assert r.stats()["verdicts"] == {"unchanged": 1} and r.stats()["retries"] == 1 and len(chat.calls) == 2
 
 
 def test_a_fallback_on_a_free_scene_is_asked_again():
@@ -270,7 +280,7 @@ def test_load_states_and_call_options():
     env = {"FOUNDRY_ENDPOINT": "https://madhacks-foundry.openai.azure.com", "FOUNDRY_KEY": "k"}
     r = load("sonnet", environ=env, cache_path=None)
     assert r.state is FinalReaderState.ON and r._chat.model == "claude-sonnet-5-5"
-    assert (r._chat.effort, r._chat.thinking, r._chat.max_tokens) == ("medium", "adaptive", 4096)
+    assert (r._chat.effort, r._chat.thinking, r._chat.max_tokens) == ("low", "between_tools", 1024)
     assert r._chat._url == "https://madhacks-foundry.services.ai.azure.com/anthropic/v1/messages"
     r2 = load("sonnet", environ={**env, "FINAL_READER_EFFORT": "medium", "FINAL_READER_THINKING": "adaptive",
                                  "FINAL_READER_MAX_TOKENS": "4096"}, cache_path=None)
@@ -311,16 +321,32 @@ def test_the_order_control_pinned_dictionary_then_sonnet():
     svc = wrapper(chat, pinned=load_pinned(DEFAULT_DEMO_PROMPTS))
     out = svc.handle(final("make it winter"))  # pinned: no call
     assert "snow" in out["steer"]["prompt"] and not chat.calls
-    out = svc.handle(final("add a dog and a cat"))  # the dictionary reads every word: no call
-    assert [c["label"] for c in out["state"]["changes"]] == ["winter", "dog", "cat"] and not chat.calls
+    out = svc.handle(final("make it night"))  # the dictionary reads every word and writes a time well: no call
+    labels = [c["label"] for c in out["state"]["changes"]]
+    assert "night" in labels and not chat.calls
     out = svc.handle(final("kill the tree's leaves"))  # the dictionary would add "trees": Sonnet writes it
     assert len(chat.calls) == 1 and chat.calls[0][1]["prompt"] != svc._svc.snapshot()["base"]
-    assert "a dog standing nearby" in chat.calls[0][1]["prompt"]  # the prompt on screen, the rich one
+    assert "night" in chat.calls[0][1]["prompt"]  # the prompt on screen
     assert out["steer"]["prompt"] == "A wide shot of a meadow with a bare oak tree."
     assert [c["label"] for c in out["state"]["changes"]] == ["bare tree"] and not out["state"]["unmatched"]
     assert svc.committed_prompt == out["steer"]["prompt"] and svc.likely_prompts() == [out["steer"]["prompt"]]
     out = svc.handle(final("undo"))  # control: no call, back to the composed scene and its rich prompt
-    assert len(chat.calls) == 1 and [c["label"] for c in out["state"]["changes"]] == ["winter", "dog", "cat"]
+    assert len(chat.calls) == 1 and [c["label"] for c in out["state"]["changes"]] == labels
+
+
+def test_object_adds_partial_strengths_and_vehicle_scenes_go_to_sonnet():
+    # Regression sweep on #273: the table wrote "add an eagle" as a flock of birds, "add a human" as a group of
+    # people, "add a little fog" as "a subtle hint of a thick fog", and on the car scene kept the summer sky in fog.
+    from engine.reader import fast_path_ok
+    from commands.service import dictionary_reading
+    meadow = snap()
+    for text in ("add an eagle", "add a human", "add a dog and a cat", "add a little fog"):
+        ops = dictionary_reading(text, meadow)
+        assert ops is None or not fast_path_ok(ops, meadow), text
+    for text in ("make it winter", "make it night", "take me to the beach", "make it foggy"):
+        assert fast_path_ok(dictionary_reading(text, meadow), meadow), text
+    car = snap(base="a red sports car driving along a country road")
+    assert not fast_path_ok(dictionary_reading("make it foggy", car), car)
 
 
 def test_the_leads_stuck_sequence_changes_the_prompt_every_step():
@@ -399,8 +425,8 @@ def test_a_mixed_sentence_the_dictionary_cannot_read_is_still_checked_by_the_mod
     svc = wrapper(chat)
     out = svc.handle(final("reset and add a bloody axe"))
     assert out["steer"] is None and out["state"]["unmatched"] and len(chat.calls) == 1
-    out = svc.handle(final("reset and add a dog"))  # read whole: the dictionary, no call
-    assert [c["label"] for c in out["state"]["changes"]] == ["dog"] and len(chat.calls) == 1
+    out = svc.handle(final("reset and make it night"))  # read whole and written well: the dictionary, no call
+    assert [c["label"] for c in out["state"]["changes"]] == ["night"] and len(chat.calls) == 1
 
 
 def test_engine_reports_the_final_reader():

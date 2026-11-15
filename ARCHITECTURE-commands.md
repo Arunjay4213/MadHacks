@@ -62,7 +62,7 @@ Partials never reach Sonnet, the content block or the car template.
 6. The fast path: with no entry, when `commands.service.dictionary_reading(text, snapshot)` reads the whole sentence (a composed scene only), `CommandService.handle` reads it, with no call; `_dictionary` gives a vehicle scene the car template through `fallback_prompt`.
 7. Otherwise `FinalReader.ask(text, snapshot, committed_prompt)`: `_call` runs on the thread pool and the caller waits `timeout_s` (3.0 s live).
    1. `_attempt` sends one user message (`user_message`): the prompt on screen (the rich one), the chips, the sentence with a named person replaced (`people.for_model`), `car_scene` (`car_template.is_template` of the prompt on screen), and `view_change` and `person_chip` when they apply.
-   2. `check_reply` is the light check: `blocked` gives BLOCKED; `understood` false or an empty prompt gives NOT_UNDERSTOOD; `fit_prompt` cuts a prompt over 180 words or 1600 characters at sentences; `reply_chips` cleans the chips; on a car scene that is not a new scene, `car_template.template_problems` checks the template (only a drivable road with `view_change`).
+   2. `check_reply` is the light check: `blocked` gives BLOCKED; `understood` false or an empty prompt gives NOT_UNDERSTOOD; `fit_prompt` cuts a prompt over 300 words or 1900 characters at sentences; `reply_chips` cleans the chips; on a car scene that is not a new scene, `car_template.template_problems` checks the template (only a drivable road with `view_change`).
       The result is one operation `{"op": "free_scene", "prompt", "chips"}`, `Verdict.ACCEPTED`, or `REPAIRED` when something was cut or broken (still used).
    3. REPAIRED and INVALID (not a JSON object) are asked again once, with the reasons, when the first call took under half the wait; a REPAIRED first reply is kept in `Pending.usable` if the retry runs late.
    4. On a timeout the entry is FALLBACK, kept in memory only, and a late answer is counted as `late_dropped`; SONNET, BLOCKED and NOT_UNDERSTOOD entries are saved to the disk cache.
@@ -115,7 +115,7 @@ This runs when the final reader gives None, for CONTROL and MIXED sentences, and
 | Deliberately unmatched text (negation, transforms) | `reader.is_blocked`, `reader._NEGATION_RX`, `_TRANSFORM_RX`, `world._BLOCKED_RX`, the inline regex in `semantic.SemanticReader.__call__` | Three word lists with small differences. The name `is_blocked` is easy to confuse with the content block. |
 | Fallback order on the dictionary path | `service._final`: read, vector, slow reader, style | |
 | Fallback order on the engine path | `FinalReadingService._final`: control, block, pinned, cache, measured template, dictionary fast path, Sonnet, dictionary | |
-| Phrase and prompt length limits | `slow_reader.MAX_PHRASE` 120, `final_reader.CACHED_MAX_PHRASE`, `final_reader.MAX_PROMPT_WORDS` 180, `state.MAX_FREE_PROMPT_CHARS` 1600 | |
+| Phrase and prompt length limits | `slow_reader.MAX_PHRASE` 120, `final_reader.CACHED_MAX_PHRASE`, `final_reader.MAX_PROMPT_WORDS` 300, `state.MAX_FREE_PROMPT_CHARS` 1900 | |
 | Batch size | `state.apply` (literal 16), `reader.MAX_CLAUSES` 16, `final_reader.BATCH_LIMIT` 16, `slow_reader.BATCH_LIMIT` 16 | One number in four places. |
 | Base edit ("turn the tree into a lighthouse") keeps the changes | Sonnet's free prompt live; `slow_reader.edit_base` (#210) with `--final-reader off` | |
 | Free scene or composed scene | `state.Origin` (the snapshot's `origin`) | Owner; `service.dictionary_reading` and `SceneState.apply` refuse dictionary edits of a free scene. |

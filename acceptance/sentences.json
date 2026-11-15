@@ -107,7 +107,7 @@
       "steps": [
         {"say": "add some trees", "chips": ["trees"], "has": ["trees"]},
         {"say": "take me to the forest", "chips": ["forest", "trees"], "has": ["forest"]},
-        {"say": "remove the forest", "chips": ["trees"], "no_chips": ["forest"], "has": ["trees"], "lacks": ["pine forest"]}
+        {"say": "remove the forest", "chips": ["trees"], "no_chips": ["forest"], "lacks": ["pine forest"], "visible": ["Are there several trees?"]}
       ]
     },
     {
@@ -161,7 +161,18 @@
       ]
     },
     {
+      "name": "strength-words-in-the-prompt",
+      "note": "Regression sweep on #273: the keyword table wrote 'a subtle hint of a thick fog'. A little fog is light fog, a lot of rain is heavy rain.",
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "add a little fog", "chips": ["fog"], "has": ["fog"], "lacks": ["thick fog"]},
+        {"say": "make it rain a lot", "chips": ["rain"], "has": ["heavy rain"]}
+      ]
+    },
+    {
       "name": "strength-words",
+      "note": "Chip strengths exist only on the dictionary path; Sonnet writes the amount into the prompt (strength-words-in-the-prompt).",
+      "modes": ["dictionary"],
       "steps": [
         {"say": "add a little fog", "chips": ["fog"], "strength": {"fog": "low"}, "has": []},
         {"say": "make it rain a lot", "chips": ["rain"], "strength": {"rain": "high"}, "has": ["rain"]}

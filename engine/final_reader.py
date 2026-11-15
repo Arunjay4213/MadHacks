@@ -58,23 +58,24 @@ from .slow_reader import validate as validate_operation
 
 log = logging.getLogger("engine.final_reader")
 
-# With adaptive thinking at effort medium (below), 50 blind-graded calls on 2026-11-15 took 1.84 s p50, 2.09 s p90 and
-# 2.21 s at most (none over 3 s), graded 4.54 against 4.40 for thinking off at effort low, and wrote a prompt every
-# time for "undo that, put the ocean back", which thinking off answered in prose. Effort high graded 4.64 but took
-# 3.41 s p90, too slow for the 3 s wait.
+# Thinking off at effort low. Adaptive thinking at effort medium graded a little better on a short test prompt, but on
+# the real system prompt the regression sweep (2026-11-15, 209 chains) measured p50 2.16 s against 1.65 s, 14 timeouts
+# against 5 at the 3 s wait, and replies that began with reasoning prose instead of JSON.
 DEFAULT_TIMEOUT_S = 3.0
-DEFAULT_EFFORT = "medium"       # output_config.effort
-DEFAULT_THINKING = "adaptive"   # thinking.type ("between_tools" is thinking off)
-DEFAULT_MAX_TOKENS = 4096       # room for the thinking; the reply itself is about 200 tokens
+DEFAULT_EFFORT = "low"              # output_config.effort
+DEFAULT_THINKING = "between_tools"  # thinking.type: between_tools is thinking off
+DEFAULT_MAX_TOKENS = 1024
 HTTP_TIMEOUT_S = 10.0        # a call may finish after the wait; its answer is then dropped
 WORKERS = 4
 DEFAULT_CACHE_FILE = "~/.cache/madhacks/final_reader.json"
 DEFAULT_DEMO_PROMPTS = str(Path(__file__).resolve().parent / "demo_prompts.json")
 LOG_CHARS = 100
 FENCE = re.compile(r"^\s*```[A-Za-z]*\s*|\s*```\s*$")
-# The video model's text encoder (umT5) reads at most 512 tokens. English prompts run about 4 characters and 1.4
-# tokens a word, so 180 words and commands.state.MAX_FREE_PROMPT_CHARS (1600 characters) stay near 400 tokens.
-MAX_PROMPT_WORDS = 180
+# The video model's text encoder (umT5) reads at most 512 tokens. Sonnet's prompts measured at most 1.4 tokens a word
+# and at least 3.9 characters a token (54 recorded prompts, the real tokenizer), so 300 words (420 tokens) and
+# commands.state.MAX_FREE_PROMPT_CHARS (1900 characters, 487 tokens) stay under it. The cap only guards: a cut that takes
+# the sentence with the change away gives an unchanged prompt (Verdict.UNCHANGED).
+MAX_PROMPT_WORDS = 300
 ASKED_PROMPT_WORDS = 100     # what the system prompt asks for (60 to 100), so a long reply still fits the cap
 # Characters of a pinned or measured operation's phrase: a world sentence from commands/world.py is about 250, and a
 # saved racing car's phrase ends with the lane cue the old final reader added (", white dashed lane markings ...").
@@ -201,6 +202,9 @@ Rules:
 - Return the complete new prompt, never a diff. Keep everything the sentence does not change word for word (the
   subject, the objects, their positions, the camera, the light), so the picture does not jump. Change only what the
   sentence asks, and make that change clearly visible.
+- Stay within about {asked_words} words also when the scene has grown: describe the older things more briefly (keep each
+  of them, in fewer words) instead of growing the prompt. The thing the sentence adds or changes is always written in
+  full.
 - Camera: keep the camera wording as it is unless the user asks for another camera, framing or view (zoom in or out,
   a wider or closer shot, side view, aerial or drone view, front view, low angle, pan); then rewrite the camera
   wording to match ("zoom out": a wide establishing shot from further away, the subject smaller in the frame).
@@ -421,11 +425,13 @@ class Verdict(enum.Enum):
     NOT_UNDERSTOOD = "not_understood"  # understood false, or no prompt: unmatched, nothing changes
     BLOCKED = "blocked"                # the model refused the sentence
     INVALID = "invalid"                # not JSON or not an object: asked again, else the dictionary
+    UNCHANGED = "unchanged"            # the prompt is the one on screen (often a cut took the change): as INVALID
     FAILED = "failed"                  # the call failed: the dictionary path
 
 
-RETRY_VERDICTS = frozenset({Verdict.INVALID, Verdict.REPAIRED})
-VERDICT_RANK = {Verdict.FAILED: 0, Verdict.INVALID: 1, Verdict.NOT_UNDERSTOOD: 2, Verdict.REPAIRED: 3,
+RETRY_VERDICTS = frozenset({Verdict.INVALID, Verdict.UNCHANGED, Verdict.REPAIRED})
+VERDICT_RANK = {Verdict.FAILED: 0, Verdict.INVALID: 1, Verdict.UNCHANGED: 1, Verdict.NOT_UNDERSTOOD: 2,
+                Verdict.REPAIRED: 3,
                 Verdict.ACCEPTED: 4, Verdict.BLOCKED: 4}
 
 
@@ -501,6 +507,9 @@ def check_reply(reply, user: dict) -> Attempt:
         return Attempt(Verdict.NOT_UNDERSTOOD, Entry(Outcome.NOT_UNDERSTOOD),
                        ("understood false" if reply.get("understood") is False else "no prompt",))
     prompt, problems = fit_prompt(" ".join(prompt.split()))
+    if prompt == " ".join(str(user.get("prompt") or "").split()):
+        why = "the prompt is the one on screen, so nothing would change" + (f" ({problems[0]})" if problems else "")
+        return Attempt(Verdict.UNCHANGED, Entry(Outcome.FALLBACK), (why,))
     if user.get("car_scene") and reply.get("new_scene") is not True:
         problems += tuple(car_template.template_problems(prompt, view_change=bool(user.get("view_change"))))
     op = {"op": "free_scene", "prompt": prompt, "chips": reply_chips(reply.get("chips"), user.get("person_chip"))}
@@ -867,13 +876,13 @@ class FinalReader:
             self.verdicts[best.verdict.value] += 1
             if best.verdict is Verdict.FAILED:
                 self.errors += 1
-            elif best.verdict is Verdict.INVALID:
+            elif best.verdict in (Verdict.INVALID, Verdict.UNCHANGED):
                 self.rejects += 1
             elif best.verdict is Verdict.REPAIRED:
                 self.repaired += 1
         if best.verdict is Verdict.REPAIRED:
             log.warning("final reader: %r used with repairs: %s", _short(text), "; ".join(best.reasons)[:400])
-        if best.verdict in (Verdict.FAILED, Verdict.INVALID):
+        if best.verdict in (Verdict.FAILED, Verdict.INVALID, Verdict.UNCHANGED):
             log.warning("final reader: no usable reply for %r: %s", _short(text), "; ".join(best.reasons)[:400])
         elif best.verdict is Verdict.BLOCKED:
             log.info("final reader: the model blocked %r", _short(text))

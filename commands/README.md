@@ -53,7 +53,7 @@ A scene is in one of two named states, `state.Origin` (the snapshot's `origin` f
 - `free`: a full prompt written by the engine's Sonnet final reader (the snapshot's `prompt`), with the chips Sonnet named as changes of kind `free` (`{"id", "label", "kind": "free", "phrase": "", "strength": 1.0}`).
   The base is kept as it was and is unused while free, so every snapshot has the same shape.
 
-`{"op": "free_scene", "prompt": str, "chips": [str, ...]}` makes the scene free in one undo step, from either state: the prompt is nonempty text of at most 1600 characters (`MAX_FREE_PROMPT_CHARS`), and the chips are 0 to 16 labels of at most 24 characters, lower case, without duplicates.
+`{"op": "free_scene", "prompt": str, "chips": [str, ...]}` makes the scene free in one undo step, from either state: the prompt is nonempty text of at most 1900 characters (`MAX_FREE_PROMPT_CHARS`, under umT5's 512 tokens), and the chips are 0 to 16 labels of at most 24 characters, lower case, without duplicates.
 A chip that keeps its label keeps its id, so the page does not redraw it.
 On a free scene only undo, reset, `new_scene` (which makes the scene composed again) and another `free_scene` apply; `add`, `remove` and `set_strength` raise `ValueError`, so the dictionary never edits a prompt it did not write.
 `compose` of a free scene is its prompt, so the engine's pinned and cache keys (`compose(snapshot)`, sentence) are one rule for both states.

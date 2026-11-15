@@ -66,7 +66,7 @@ class FreeSceneStateTests(unittest.TestCase):
 
     def test_invalid_free_scenes_are_refused(self):
         state = SceneState()
-        for op in (free(prompt=""), free(prompt="x" * 1700), free(chips=["a" * 25]), free(chips=["x"] * 17),
+        for op in (free(prompt=""), free(prompt="x" * 2000), free(chips=["a" * 25]), free(chips=["x"] * 17),
                    {"op": "free_scene", "prompt": "p", "chips": "lion"}):
             with self.assertRaises(ValueError):
                 state.apply(op)
