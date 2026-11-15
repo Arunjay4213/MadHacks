@@ -218,3 +218,15 @@ def test_no_road_words_in_a_scene_without_a_road():
     assert VEHICLE_STYLE not in standin_validate("a red car parked in a meadow", {"details": "green grass."})
     assert VEHICLE_STYLE in standin_validate("a red car driving along a road", {"details": "green fields."})
     assert STANDIN.name == "engine stand-in"
+
+
+def test_a_second_red_car_gets_its_own_label_and_the_first_one_stays():
+    # Real shape: "add a red car racing on a road" with a red car in the scene came back with the label "red car",
+    # and commands.state replaced the first car with it. A "second" object now gets its own label.
+    second = {"op": "add", "label": "red car", "kind": "extra", "strength": 1.0,
+              "phrase": "a second small red car racing in the next lane at the right of the frame"}
+    chat = ReplayChat({"add a red car": reply([CAR], "soft green grass, warm light"),
+                       "add a red car racing on a road": reply([second], "warm dry air, fine dust")})
+    _, (_, res) = play(chat, ["add a red car", "add a red car racing on a road"])
+    assert [c["label"] for c in res["scene"]["changes"]] == ["red car", "second red car"]
+    assert CAR["phrase"] in res["prompt"] and second["phrase"] + ", " + LANE_CUE in res["prompt"]

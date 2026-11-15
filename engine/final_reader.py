@@ -484,6 +484,8 @@ Rules for operations:
 - If an add names a kind the scene already has, its phrase describes a second one with a clear position. A
   colour, type or size the user names ALWAYS wins: "add a red car racing on a road" when the scene has a red car
   gives "a second small red car racing in the next lane at the right of the frame", differing only by position.
+  A second one always gets its own label ("second red car"): an add with the label of an existing change
+  replaces that change.
   Only when the user names no attribute ("add a car"), give the second one another colour or type.
 - A vehicle on a road ("add a red car racing on a road") gets this cue at the end of its phrase: "{lane_cue}".
 {place_rule}
@@ -1039,13 +1041,36 @@ def expand_operations(ops: list, snapshot: dict) -> list[dict] | None:
             anchor = anchor_for_base(clean["base"])
             clean = {**clean, "base": anchor.base} if anchor else clean
         rebuilt = rebuilt or clean["op"] == "new_scene"
-        out.append(with_lane_cue(canonical_change(canonical_world(clean))))
+        out.append(with_lane_cue(distinct_label(canonical_change(canonical_world(clean)), snapshot, out)))
     if not rebuilt and any(o["op"] == "add" and o["kind"] == "world" for o in out):
         replaced = {o["kind"] for o in out if o["op"] == "add"}
         removed = {o["id"] for o in out if o["op"] == "remove"}
         out += [{"op": "remove", "id": c["id"]} for c in snapshot["changes"]
                 if c["kind"] in ("season", "weather") and c["kind"] not in replaced and c["id"] not in removed]
     return out if len(out) <= BATCH_LIMIT else None
+
+
+_ORDINALS = ("second", "third", "fourth", "fifth", "sixth")
+
+
+def distinct_label(op: dict, snapshot: dict, earlier: list[dict]) -> dict:
+    """An add of a second object (kind extra, its phrase says "second", "another", ...) with the label of an existing
+    change gets its own label ("second red car"): commands.state replaces a change of the same label, so the
+    first red car would be lost. Any other operation is returned as it is."""
+    if op.get("op") != "add" or op.get("kind") != "extra":
+        return op
+    words = _words(op["phrase"])
+    if not words & {"another", "other", *_ORDINALS}:
+        return op
+    taken = {c["label"] for c in snapshot["changes"]} | {o.get("label") for o in earlier}
+    if op["label"] not in taken:
+        return op
+    noun = op["label"].split()[-1]
+    for ordinal in _ORDINALS:
+        for label in (f"{ordinal} {op['label']}", f"{ordinal} {noun}"):
+            if label not in taken and len(label) <= 24:  # slow_reader.MAX_LABEL
+                return {**op, "label": label}
+    return op
 
 
 def with_lane_cue(op: dict) -> dict:
