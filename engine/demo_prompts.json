@@ -312,5 +312,1840 @@
     "canonical": "a red sports car; a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Sunny tropical day, clear blue sky, sparkling light on the water",
     "source": "engine car template",
     "generated_at": "2026-11-15T01:24:17+00:00"
+  },
+  {
+    "sentence": "make it a neon city",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "neon city",
+        "kind": "world",
+        "phrase": "a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere.",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; glossy wet pavement, shimmering magenta and cyan reflections, glass facades, humid glowing air",
+    "canonical": "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:56+00:00"
+  },
+  {
+    "sentence": "make it rain",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "rain",
+        "kind": "weather",
+        "phrase": "steady rain falling, wet glistening grass and leaves",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; steady rain falling, wet glistening grass and leaves; soaked green grass, glistening water droplets, damp cool air, muted saturated greens",
+    "canonical": "a wide shot of a meadow with a single oak tree; steady rain falling, wet glistening grass and leaves",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:56+00:00"
+  },
+  {
+    "sentence": "make it sunset",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "sunset",
+        "kind": "time",
+        "phrase": "the sun setting low on the horizon, a glowing orange and pink sky, warm golden backlight",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; the sun setting low on the horizon, a glowing orange and pink sky, warm golden backlight; long soft shadows across the grass, warm amber glow on the blades, gentle orange and pink tints",
+    "canonical": "a wide shot of a meadow with a single oak tree; the sun setting low on the horizon, a glowing orange and pink sky, warm golden backlight",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:56+00:00"
+  },
+  {
+    "sentence": "make it autumn",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "autumn",
+        "kind": "season",
+        "phrase": "autumn colors, orange and golden leaves, fallen leaves scattered across the grass",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; autumn colors, orange and golden leaves, fallen leaves scattered across the grass; warm amber and rust tones across the grass, scattered golden leaf litter on the ground, crisp cool air, muted earthy colours",
+    "canonical": "a wide shot of a meadow with a single oak tree; autumn colors, orange and golden leaves, fallen leaves scattered across the grass",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:56+00:00"
+  },
+  {
+    "sentence": "add a dog",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "dog",
+        "kind": "extra",
+        "phrase": "a golden retriever standing in the centre of the frame, facing the camera, large and clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; a golden retriever standing in the centre of the frame, facing the camera, large and clearly visible; tall swaying grass, soft dew on the blades, warm gentle light, clear open air",
+    "canonical": "a wide shot of a meadow with a single oak tree; a golden retriever standing in the centre of the frame, facing the camera, large and clearly visible",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:57+00:00"
+  },
+  {
+    "sentence": "make it winter",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; a golden retriever standing in the centre of the frame, facing the camera, large and clearly visible",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "season",
+        "phrase": "winter landscape with snow-covered ground and frosty air",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter landscape with snow-covered ground and frosty air; a golden retriever standing in the centre of the frame, facing the camera, large and clearly visible; pale snow drifts across the open ground, frost glittering on bare branches, soft muted colours, cold crisp air",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter landscape with snow-covered ground and frosty air; a golden retriever standing in the centre of the frame, facing the camera, large and clearly visible",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:59+00:00"
+  },
+  {
+    "sentence": "add a lion",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "lion",
+        "kind": "extra",
+        "phrase": "a large male lion standing in the centre of the frame beside the oak tree, facing the camera, large and clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; a large male lion standing in the centre of the frame beside the oak tree, facing the camera, large and clearly visible; tall swaying grass, soft golden light, dewy green blades, warm earthy tones",
+    "canonical": "a wide shot of a meadow with a single oak tree; a large male lion standing in the centre of the frame beside the oak tree, facing the camera, large and clearly visible",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:58+00:00"
+  },
+  {
+    "sentence": "make it night",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; a large male lion standing in the centre of the frame beside the oak tree, facing the camera, large and clearly visible",
+    "operations": [
+      {
+        "op": "add",
+        "label": "night",
+        "kind": "time",
+        "phrase": "dark night sky with a bright full moon casting cool silver light",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; a large male lion standing in the centre of the frame beside the oak tree, facing the camera, large and clearly visible; dark night sky with a bright full moon casting cool silver light; cool silver light across the grass, deep blue shadows, dew glistening on the blades, soft hush of cold air",
+    "canonical": "a wide shot of a meadow with a single oak tree; dark night sky with a bright full moon casting cool silver light; a large male lion standing in the centre of the frame beside the oak tree, facing the camera, large and clearly visible",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:59+00:00"
+  },
+  {
+    "sentence": "add a tree",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "tree",
+        "kind": "extra",
+        "phrase": "a large tree standing in the centre of the frame, clearly visible and fully in view",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; a large tree standing in the centre of the frame, clearly visible and fully in view; tall green grass, scattered wild textures, soft warm light, fresh clear air, rich earthy colours",
+    "canonical": "a wide shot of a meadow with a single oak tree; a large tree standing in the centre of the frame, clearly visible and fully in view",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:58+00:00"
+  },
+  {
+    "sentence": "add a house",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "house",
+        "kind": "extra",
+        "phrase": "a large white farmhouse with a red roof standing in the centre of the frame, facing the camera, large and clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; a large white farmhouse with a red roof standing in the centre of the frame, facing the camera, large and clearly visible; tall swaying grass, soft golden light across the open ground, dew on the blades, warm earthy colours",
+    "canonical": "a wide shot of a meadow with a single oak tree; a large white farmhouse with a red roof standing in the centre of the frame, facing the camera, large and clearly visible",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:57+00:00"
+  },
+  {
+    "sentence": "add some birds",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "birds",
+        "kind": "extra",
+        "phrase": "a large flock of birds flying in the centre of the frame above the meadow, large and clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; a large flock of birds flying in the centre of the frame above the meadow, large and clearly visible; tall swaying grass, soft green hillside, dewy blades catching light",
+    "canonical": "a wide shot of a meadow with a single oak tree; a large flock of birds flying in the centre of the frame above the meadow, large and clearly visible",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:01+00:00"
+  },
+  {
+    "sentence": "add jensen huang",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "jensen huang",
+        "kind": "extra",
+        "phrase": "a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera; soft green grass textures, dew on the blades, warm earthy tones, fine pollen in the air",
+    "canonical": "a wide shot of a meadow with a single oak tree; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:00+00:00"
+  },
+  {
+    "sentence": "make it winter",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "season",
+        "phrase": "deep winter, snow covering the ground and the bare branches, frost in the air",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; deep winter, snow covering the ground and the bare branches, frost in the air; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera; pale snow-dusted grass, frosted ground, cold crisp air, soft silver-white light, muted blue-grey tones",
+    "canonical": "a wide shot of a meadow with a single oak tree; deep winter, snow covering the ground and the bare branches, frost in the air; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:01+00:00"
+  },
+  {
+    "sentence": "slowly make it rain",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "rain",
+        "kind": "weather",
+        "phrase": "steady rain falling over the meadow, wet grass and glistening puddles",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; steady rain falling over the meadow, wet grass and glistening puddles; wet glistening grass, dark damp soil, soft diffuse grey light, cool moist air, muted green tones",
+    "canonical": "a wide shot of a meadow with a single oak tree; steady rain falling over the meadow, wet grass and glistening puddles",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:59+00:00"
+  },
+  {
+    "sentence": "make it a little snowy",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "season",
+        "phrase": "light snow dusting the ground and falling gently",
+        "strength": 0.3
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; a subtle hint of light snow dusting the ground and falling gently; pale cold air, thin frost on the grass, soft white powder on the ground, muted silver-blue tones, gentle diffuse light",
+    "canonical": "a wide shot of a meadow with a single oak tree; a subtle hint of light snow dusting the ground and falling gently",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:01+00:00"
+  },
+  {
+    "sentence": "make it night",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "night",
+        "kind": "time",
+        "phrase": "dark night under a deep starry sky with soft moonlight",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight; silvery moonlit grass, cool blue shadows, dew glistening on the ground, deep indigo air, soft pale highlights across the textured earth",
+    "canonical": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:33+00:00"
+  },
+  {
+    "sentence": "add a dog",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight",
+    "operations": [
+      {
+        "op": "add",
+        "label": "dog",
+        "kind": "extra",
+        "phrase": "a large brown dog standing beside the oak tree in the centre of the frame, facing the camera, large and clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; a large brown dog standing beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; dark night under a deep starry sky with soft moonlight; dew-damp grass with silvery sheen, soft cool shadows across the ground, faint cool blue tones, fine pale highlights on the grass blades",
+    "canonical": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight; a large brown dog standing beside the oak tree in the centre of the frame, facing the camera, large and clearly visible",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:35+00:00"
+  },
+  {
+    "sentence": "remove the dog",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight; a large brown dog standing beside the oak tree in the centre of the frame, facing the camera, large and clearly visible",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c2"
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight; cool silver moonlight washing over the grass, dew glinting on the blades, deep blue shadows pooling across the ground, a soft hush of night air",
+    "canonical": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:37+00:00"
+  },
+  {
+    "sentence": "add a lion",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight",
+    "operations": [
+      {
+        "op": "add",
+        "label": "lion",
+        "kind": "extra",
+        "phrase": "a large male lion with a full mane standing in the centre of the frame, facing the camera, large and clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; a large male lion with a full mane standing in the centre of the frame, facing the camera, large and clearly visible; dark night under a deep starry sky with soft moonlight; silvery moonlight pooling on the soil, deep indigo shadows, faint cold air over the open ground",
+    "canonical": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight; a large male lion with a full mane standing in the centre of the frame, facing the camera, large and clearly visible",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:39+00:00"
+  },
+  {
+    "sentence": "remove the lion",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight; a large male lion with a full mane standing in the centre of the frame, facing the camera, large and clearly visible",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c3"
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight; dew-damp grass glinting silver, soft cool shadows, deep blue-black air, faint cold luster across the open ground",
+    "canonical": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:40+00:00"
+  },
+  {
+    "sentence": "add a house",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight",
+    "operations": [
+      {
+        "op": "add",
+        "label": "house",
+        "kind": "extra",
+        "phrase": "a large wooden farmhouse standing in the centre of the frame beside the oak tree, facing the camera, clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; a large wooden farmhouse standing in the centre of the frame beside the oak tree, facing the camera, clearly visible; dark night under a deep starry sky with soft moonlight; tall silvery grass with dew-damp blades, soft cool shadows across the ground, faint pale glow on the horizon, deep blue shadowed air",
+    "canonical": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight; a large wooden farmhouse standing in the centre of the frame beside the oak tree, facing the camera, clearly visible",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:42+00:00"
+  },
+  {
+    "sentence": "remove the house",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight; a large wooden farmhouse standing in the centre of the frame beside the oak tree, facing the camera, clearly visible",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c4"
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight; cool silver light over the grass, dew-damp blades with a faint sheen, deep blue shadows pooling in the hollows",
+    "canonical": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:44+00:00"
+  },
+  {
+    "sentence": "add jensen huang",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight",
+    "operations": [
+      {
+        "op": "add",
+        "label": "jensen huang",
+        "kind": "extra",
+        "phrase": "a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera; dark night under a deep starry sky with soft moonlight; dew-damp grass, soft silver light on the blades, deep blue shadows, faint pale glow across the ground",
+    "canonical": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:46+00:00"
+  },
+  {
+    "sentence": "remove jensen huang",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c5"
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight; dew-damp grass with soft silvery highlights, cool blue-black shadows across the ground, a faint pale glow on the horizon, fine texture in the grass",
+    "canonical": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:47+00:00"
+  },
+  {
+    "sentence": "make it rain",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight",
+    "operations": [
+      {
+        "op": "add",
+        "label": "rain",
+        "kind": "weather",
+        "phrase": "steady rainfall with fine streaks of falling rain and wet glistening surfaces",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; steady rainfall with fine streaks of falling rain and wet glistening surfaces; dark night under a deep starry sky with soft moonlight; wet grass bending under falling droplets, dark damp earth, glossy leaf surfaces, cool moist air, deep blue-black shadows, faint silver gleam on puddles",
+    "canonical": "a wide shot of a meadow with a single oak tree; steady rainfall with fine streaks of falling rain and wet glistening surfaces; dark night under a deep starry sky with soft moonlight",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:49+00:00"
+  },
+  {
+    "sentence": "stop the rain",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; steady rainfall with fine streaks of falling rain and wet glistening surfaces; dark night under a deep starry sky with soft moonlight",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c6"
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight; wet grass blades faintly silvered by moonlight, deep blue shadows across the dark ground, soft silver glow on the horizon",
+    "canonical": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:50+00:00"
+  },
+  {
+    "sentence": "make it winter",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "season",
+        "phrase": "deep winter with fresh snow covering the ground and frost on bare branches",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; deep winter with fresh snow covering the ground and frost on bare branches; dark night under a deep starry sky with soft moonlight; pale snow drifts across the ground, frost glitters on the grass, cold blue shadows, silver moonlight on the snow",
+    "canonical": "a wide shot of a meadow with a single oak tree; deep winter with fresh snow covering the ground and frost on bare branches; dark night under a deep starry sky with soft moonlight",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:52+00:00"
+  },
+  {
+    "sentence": "add a tree",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; deep winter with fresh snow covering the ground and frost on bare branches; dark night under a deep starry sky with soft moonlight",
+    "operations": [
+      {
+        "op": "add",
+        "label": "tree",
+        "kind": "extra",
+        "phrase": "a large tree standing in the centre of the frame, tall and clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; deep winter with fresh snow covering the ground and frost on bare branches; a large tree standing in the centre of the frame, tall and clearly visible; dark night under a deep starry sky with soft moonlight; pale blue shadows across the smooth drifts, glittering ice crystals on every surface, cold silver light, soft white and deep indigo tones",
+    "canonical": "a wide shot of a meadow with a single oak tree; deep winter with fresh snow covering the ground and frost on bare branches; dark night under a deep starry sky with soft moonlight; a large tree standing in the centre of the frame, tall and clearly visible",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:48:54+00:00"
+  },
+  {
+    "sentence": "suddenly make it night",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "night",
+        "kind": "time",
+        "phrase": "dark night under a deep starry sky with soft moonlight",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight; silvery moonlit grass, cool blue shadows, dew glistening on the ground, deep indigo air, soft pale highlights across the textured earth",
+    "canonical": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight",
+    "source": "the pinned 'make it night' entry (a synonym)",
+    "generated_at": "2026-11-15T03:48:59+00:00"
+  },
+  {
+    "sentence": "make it a neon city",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight",
+    "operations": [
+      {
+        "op": "add",
+        "label": "neon city",
+        "kind": "world",
+        "phrase": "a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere.",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; dark night under a deep starry sky with soft moonlight; wet glossy pavement mirroring vivid pink and blue neon glow, dark deep night sky above, shimmering colourful reflections on glass towers",
+    "canonical": "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; dark night under a deep starry sky with soft moonlight",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:01+00:00"
+  },
+  {
+    "sentence": "slowly make it night",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "night",
+        "kind": "time",
+        "phrase": "dark night under a deep starry sky with soft moonlight",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight; silvery moonlit grass, cool blue shadows, dew glistening on the ground, deep indigo air, soft pale highlights across the textured earth",
+    "canonical": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight",
+    "source": "the pinned 'make it night' entry (a synonym)",
+    "generated_at": "2026-11-15T03:48:59+00:00"
+  },
+  {
+    "sentence": "make it nighttime",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "night",
+        "kind": "time",
+        "phrase": "dark night under a deep starry sky with soft moonlight",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight; silvery moonlit grass, cool blue shadows, dew glistening on the ground, deep indigo air, soft pale highlights across the textured earth",
+    "canonical": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight",
+    "source": "the pinned 'make it night' entry (a synonym)",
+    "generated_at": "2026-11-15T03:49:01+00:00"
+  },
+  {
+    "sentence": "make it snowy",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "season",
+        "phrase": "winter, snow covering the ground and bare branches",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a soft white blanket over the grass, frost-dusted textures, pale cold light, muted silver and blue tones",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "source": "the pinned 'make it winter' entry (a synonym)",
+    "generated_at": "2026-11-15T03:49:01+00:00"
+  },
+  {
+    "sentence": "add a dog",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "operations": [
+      {
+        "op": "add",
+        "label": "dog",
+        "kind": "extra",
+        "phrase": "a large brown dog standing in the centre of the frame beside the oak tree, facing the camera, clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large brown dog standing in the centre of the frame beside the oak tree, facing the camera, clearly visible; frost-dusted grass blades, pale blue shadows across white drifts, cold crisp air, soft diffuse light, glittering ice crystals",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large brown dog standing in the centre of the frame beside the oak tree, facing the camera, clearly visible",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:03+00:00"
+  },
+  {
+    "sentence": "remove the dog",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large brown dog standing in the centre of the frame beside the oak tree, facing the camera, clearly visible",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c2"
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; frost-dusted grass, pale blue shadows on the snow, crisp cold air, soft diffuse white light, fine ice crystals glittering on the ground",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:04+00:00"
+  },
+  {
+    "sentence": "add a lion",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "operations": [
+      {
+        "op": "add",
+        "label": "lion",
+        "kind": "extra",
+        "phrase": "a large male lion standing beside the oak tree in the centre of the frame, facing the camera, large and clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large male lion standing beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; pale cold light, soft drifting powder, frosted textures, quiet muted tones of white and grey",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large male lion standing beside the oak tree in the centre of the frame, facing the camera, large and clearly visible",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:06+00:00"
+  },
+  {
+    "sentence": "remove the lion",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large male lion standing beside the oak tree in the centre of the frame, facing the camera, large and clearly visible",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c3"
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; Fine powdery snow drifts across the open ground, pale grey-blue shadows pool in the hollows, frost glitters on the dormant grass, cold crisp air and soft diffuse winter light",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:08+00:00"
+  },
+  {
+    "sentence": "add a tree",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "operations": [
+      {
+        "op": "add",
+        "label": "second tree",
+        "kind": "extra",
+        "phrase": "a second tall tree standing in the foreground at the right of the frame, large and clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a second tall tree standing in the foreground at the right of the frame, large and clearly visible; pale drifted snow across the ground, soft cold air, muted white and grey tones, fine frost textures on the surfaces, gentle diffuse light",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a second tall tree standing in the foreground at the right of the frame, large and clearly visible",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:10+00:00"
+  },
+  {
+    "sentence": "remove the tree",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a second tall tree standing in the foreground at the right of the frame, large and clearly visible",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c4"
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:14+00:00"
+  },
+  {
+    "sentence": "add a house",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "operations": [
+      {
+        "op": "add",
+        "label": "house",
+        "kind": "extra",
+        "phrase": "a large wooden house with a pitched roof standing in the centre of the frame, facing the camera, clearly visible next to the oak tree",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large wooden house with a pitched roof standing in the centre of the frame, facing the camera, clearly visible next to the oak tree; pale frozen grass, thick white drifts, crisp cold air, soft grey light, smooth glittering surfaces",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large wooden house with a pitched roof standing in the centre of the frame, facing the camera, clearly visible next to the oak tree",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:15+00:00"
+  },
+  {
+    "sentence": "remove the house",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large wooden house with a pitched roof standing in the centre of the frame, facing the camera, clearly visible next to the oak tree",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c5"
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; frost-dusted grass blades, pale cold air, soft white ground texture, muted grey-blue tones, crisp icy surfaces",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:17+00:00"
+  },
+  {
+    "sentence": "add some birds",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "operations": [
+      {
+        "op": "add",
+        "label": "birds",
+        "kind": "extra",
+        "phrase": "a large flock of dark birds perched on the bare branches of the oak tree in the centre of the frame, large and clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large flock of dark birds perched on the bare branches of the oak tree in the centre of the frame, large and clearly visible; pale muted colours, soft hush over the white ground, fine frost crystals glinting on surfaces, cold crisp air, gentle diffuse light",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large flock of dark birds perched on the bare branches of the oak tree in the centre of the frame, large and clearly visible",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:20+00:00"
+  },
+  {
+    "sentence": "remove the birds",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large flock of dark birds perched on the bare branches of the oak tree in the centre of the frame, large and clearly visible",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c6"
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; frost-dusted grass, pale blue shadows across the snow, crisp cold air, soft diffuse white light, fine ice crystals glinting on the surface",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:22+00:00"
+  },
+  {
+    "sentence": "add jensen huang",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "operations": [
+      {
+        "op": "add",
+        "label": "jensen huang",
+        "kind": "extra",
+        "phrase": "a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera; pale snow-dusted ground, crisp cold air, soft diffuse silver light, fine frost textures on the grass, muted grey and white tones",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:24+00:00"
+  },
+  {
+    "sentence": "remove jensen huang",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c7"
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; Pale snow crusting the open grassland, thin frost glittering on stalks, muted white and grey tones across the ground, crisp cold air",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:25+00:00"
+  },
+  {
+    "sentence": "make it night",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "operations": [
+      {
+        "op": "add",
+        "label": "night",
+        "kind": "time",
+        "phrase": "night, dark sky lit by cold moonlight, deep blue shadows",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; night, dark sky lit by cold moonlight, deep blue shadows; pale moonlit snow drifts across the open ground, deep blue shadows, faint silver glints on frozen crust, crisp cold air, soft dark sky",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; night, dark sky lit by cold moonlight, deep blue shadows",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:27+00:00"
+  },
+  {
+    "sentence": "add a dog",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; night, dark sky lit by cold moonlight, deep blue shadows",
+    "operations": [
+      {
+        "op": "add",
+        "label": "dog",
+        "kind": "extra",
+        "phrase": "a large dog standing in the centre of the frame beside the oak tree, facing the camera, large and clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large dog standing in the centre of the frame beside the oak tree, facing the camera, large and clearly visible; night, dark sky lit by cold moonlight, deep blue shadows; pale snow crusting the grass, cold blue shadows, faint silver sheen on the ground, crisp frozen air",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; night, dark sky lit by cold moonlight, deep blue shadows; a large dog standing in the centre of the frame beside the oak tree, facing the camera, large and clearly visible",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:29+00:00"
+  },
+  {
+    "sentence": "slowly make it winter",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "season",
+        "phrase": "winter, snow covering the ground and bare branches",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a soft white blanket over the grass, frost-dusted textures, pale cold light, muted silver and blue tones",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "source": "the pinned 'make it winter' entry (a synonym)",
+    "generated_at": "2026-11-15T03:49:01+00:00"
+  },
+  {
+    "sentence": "make it rain",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "operations": [
+      {
+        "op": "add",
+        "label": "rain",
+        "kind": "weather",
+        "phrase": "steady rain falling, wet surfaces, rain streaks in the air",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; steady rain falling, wet surfaces, rain streaks in the air; snow-dusted ground darkened by wet patches, glistening damp surfaces, cold grey diffuse light, muted pale tones",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; steady rain falling, wet surfaces, rain streaks in the air",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:03+00:00"
+  },
+  {
+    "sentence": "stop the rain",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; steady rain falling, wet surfaces, rain streaks in the air",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c2"
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; frost-dusted grass blades, pale blue shadows across the white ground, crisp cold air, soft diffuse winter light, a faint glittering sheen on the snow crust",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:05+00:00"
+  },
+  {
+    "sentence": "a little more snow",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "operations": [
+      {
+        "op": "set_strength",
+        "id": "c1",
+        "strength": 1.3
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; intense winter, snow covering the ground and bare branches; deep white drifts across the ground, crisp frosted grass tips, pale cold air, soft diffuse winter light, a hush of white",
+    "canonical": "a wide shot of a meadow with a single oak tree; intense winter, snow covering the ground and bare branches",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:06+00:00"
+  },
+  {
+    "sentence": "a little less",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; intense winter, snow covering the ground and bare branches",
+    "operations": [
+      {
+        "op": "set_strength",
+        "id": "c1",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; pale snow crusting the grass, frost glittering on bare twigs, cold crisp air, soft grey-white light, muted tones across the ground",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:08+00:00"
+  },
+  {
+    "sentence": "suddenly make it winter",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "season",
+        "phrase": "winter, snow covering the ground and bare branches",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a soft white blanket over the grass, frost-dusted textures, pale cold light, muted silver and blue tones",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "source": "the pinned 'make it winter' entry (a synonym)",
+    "generated_at": "2026-11-15T03:49:01+00:00"
+  },
+  {
+    "sentence": "winter",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "season",
+        "phrase": "winter, snow covering the ground and bare branches",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a soft white blanket over the grass, frost-dusted textures, pale cold light, muted silver and blue tones",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "source": "the pinned 'make it winter' entry (a synonym)",
+    "generated_at": "2026-11-15T03:49:01+00:00"
+  },
+  {
+    "sentence": "make it a neon city",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "operations": [
+      {
+        "op": "add",
+        "label": "neon city",
+        "kind": "world",
+        "phrase": "a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere.",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; wet reflective pavement mirroring vivid pink and blue light, glass towers with glowing signage",
+    "canonical": "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:03+00:00"
+  },
+  {
+    "sentence": "make it wintery",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "season",
+        "phrase": "winter, snow covering the ground and bare branches",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a soft white blanket over the grass, frost-dusted textures, pale cold light, muted silver and blue tones",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "source": "the pinned 'make it winter' entry (a synonym)",
+    "generated_at": "2026-11-15T03:49:02+00:00"
+  },
+  {
+    "sentence": "let it snow",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "season",
+        "phrase": "winter, snow covering the ground and bare branches",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a soft white blanket over the grass, frost-dusted textures, pale cold light, muted silver and blue tones",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "source": "the pinned 'make it winter' entry (a synonym)",
+    "generated_at": "2026-11-15T03:49:03+00:00"
+  },
+  {
+    "sentence": "make it autumn",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "operations": [
+      {
+        "op": "add",
+        "label": "autumn",
+        "kind": "season",
+        "phrase": "autumn, golden and orange fallen leaves covering the ground, warm amber foliage",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; autumn, golden and orange fallen leaves covering the ground, warm amber foliage; dry golden grass, soft amber light, crisp cool air, muted earthy colours",
+    "canonical": "a wide shot of a meadow with a single oak tree; autumn, golden and orange fallen leaves covering the ground, warm amber foliage",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:05+00:00"
+  },
+  {
+    "sentence": "make it snow",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "season",
+        "phrase": "winter, snow covering the ground and bare branches",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a soft white blanket over the grass, frost-dusted textures, pale cold light, muted silver and blue tones",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "source": "the pinned 'make it winter' entry (a synonym)",
+    "generated_at": "2026-11-15T03:49:03+00:00"
+  },
+  {
+    "sentence": "make it sunset",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "operations": [
+      {
+        "op": "add",
+        "label": "sunset",
+        "kind": "time",
+        "phrase": "sunset, low orange sun and a warm pink glow across the sky",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; sunset, low orange sun and a warm pink glow across the sky; long soft shadows across the snow, warm amber glow on frosty ground, crisp cold air, pale pink and orange reflections on the white surface",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; sunset, low orange sun and a warm pink glow across the sky",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:05+00:00"
+  },
+  {
+    "sentence": "turn it into winter",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "season",
+        "phrase": "winter, snow covering the ground and bare branches",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a soft white blanket over the grass, frost-dusted textures, pale cold light, muted silver and blue tones",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "source": "the pinned 'make it winter' entry (a synonym)",
+    "generated_at": "2026-11-15T03:49:05+00:00"
+  },
+  {
+    "sentence": "suddenly make it night",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "operations": [
+      {
+        "op": "add",
+        "label": "night",
+        "kind": "time",
+        "phrase": "night, deep darkness under a bright moonlit sky",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; night, deep darkness under a bright moonlit sky; pale snow glittering with faint silver highlights, deep blue shadows across the ground, cold crisp air, soft cool glow on the white surface",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; night, deep darkness under a bright moonlit sky",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:07+00:00"
+  },
+  {
+    "sentence": "new scene of a red sports car driving along a country road",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; night, deep darkness under a bright moonlit sky",
+    "operations": [
+      {
+        "op": "new_scene",
+        "base": "a red sports car"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:05+00:00"
+  },
+  {
+    "sentence": "make it a desert",
+    "prompt_before": "a red sports car",
+    "operations": [
+      {
+        "op": "add",
+        "label": "desert",
+        "kind": "world",
+        "phrase": "a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows.",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a long straight desert highway, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:05+00:00"
+  },
+  {
+    "sentence": "add a lion",
+    "prompt_before": "a red sports car; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+    "operations": [
+      {
+        "op": "add",
+        "label": "lion",
+        "kind": "extra",
+        "phrase": "a large male lion standing at the right side of the frame, facing the camera, large and clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a long straight desert highway, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A large male lion standing at the right side of the frame, facing the camera, large and clearly visible. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a large male lion standing at the right side of the frame, facing the camera, large and clearly visible; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:07+00:00"
+  },
+  {
+    "sentence": "new scene of a red sports car driving along a country road",
+    "prompt_before": "a red sports car; a large male lion standing at the right side of the frame, facing the camera, large and clearly visible; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+    "operations": [
+      {
+        "op": "new_scene",
+        "base": "a red sports car"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:50:25+00:00"
+  },
+  {
+    "sentence": "add a dog",
+    "prompt_before": "a red sports car",
+    "operations": [
+      {
+        "op": "add",
+        "label": "dog",
+        "kind": "extra",
+        "phrase": "a large brown dog standing in the centre of the frame beside the red sports car, facing the camera, large and clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A large brown dog standing in the centre of the frame beside the red sports car, facing the camera, large and clearly visible. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a large brown dog standing in the centre of the frame beside the red sports car, facing the camera, large and clearly visible",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:50:27+00:00"
+  },
+  {
+    "sentence": "remove the dog",
+    "prompt_before": "a red sports car; a large brown dog standing in the centre of the frame beside the red sports car, facing the camera, large and clearly visible",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c5"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:50:28+00:00"
+  },
+  {
+    "sentence": "add a lion",
+    "prompt_before": "a red sports car",
+    "operations": [
+      {
+        "op": "add",
+        "label": "lion",
+        "kind": "extra",
+        "phrase": "a large male lion standing beside the road at the right of the frame, facing the camera, large and clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A large male lion standing beside the road at the right of the frame, facing the camera, large and clearly visible. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a large male lion standing beside the road at the right of the frame, facing the camera, large and clearly visible",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:50:30+00:00"
+  },
+  {
+    "sentence": "remove the lion",
+    "prompt_before": "a red sports car; a large male lion standing beside the road at the right of the frame, facing the camera, large and clearly visible",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c6"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:50:31+00:00"
+  },
+  {
+    "sentence": "add a tree",
+    "prompt_before": "a red sports car",
+    "operations": [
+      {
+        "op": "add",
+        "label": "tree",
+        "kind": "extra",
+        "phrase": "a large green tree standing at the right side of the frame near the edge of the road, clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A large green tree standing at the right side of the frame near the edge of the road, clearly visible. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a large green tree standing at the right side of the frame near the edge of the road, clearly visible",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:50:33+00:00"
+  },
+  {
+    "sentence": "remove the tree",
+    "prompt_before": "a red sports car; a large green tree standing at the right side of the frame near the edge of the road, clearly visible",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c7"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:50:34+00:00"
+  },
+  {
+    "sentence": "add a house",
+    "prompt_before": "a red sports car",
+    "operations": [
+      {
+        "op": "add",
+        "label": "house",
+        "kind": "extra",
+        "phrase": "a large white house with a red roof standing at the right of the frame beside the road, facing the camera",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A large white house with a red roof standing at the right of the frame beside the road, facing the camera. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a large white house with a red roof standing at the right of the frame beside the road, facing the camera",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:50:36+00:00"
+  },
+  {
+    "sentence": "remove the house",
+    "prompt_before": "a red sports car; a large white house with a red roof standing at the right of the frame beside the road, facing the camera",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c8"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:50:37+00:00"
+  },
+  {
+    "sentence": "add some birds",
+    "prompt_before": "a red sports car",
+    "operations": [
+      {
+        "op": "add",
+        "label": "birds",
+        "kind": "extra",
+        "phrase": "a large flock of dark birds flying in the centre of the frame above the road, clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A large flock of dark birds flying in the centre of the frame above the road, clearly visible. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a large flock of dark birds flying in the centre of the frame above the road, clearly visible",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:50:40+00:00"
+  },
+  {
+    "sentence": "remove the birds",
+    "prompt_before": "a red sports car; a large flock of dark birds flying in the centre of the frame above the road, clearly visible",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c9"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:50:41+00:00"
+  },
+  {
+    "sentence": "make it a little snowy",
+    "prompt_before": "a red sports car",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "season",
+        "phrase": "light snow falling and a thin layer of snow on the ground",
+        "strength": 0.3
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road dusted with thin snow, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Fields and rows of bare trees line both sides of the road, a thin layer of snow on the ground and light snowflakes falling. Soft cool daylight, pale overcast sky, gentle shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a subtle hint of light snow falling and a thin layer of snow on the ground",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:50:43+00:00"
+  },
+  {
+    "sentence": "new scene of a red sports car driving along a country road",
+    "prompt_before": "a red sports car; a subtle hint of light snow falling and a thin layer of snow on the ground",
+    "operations": [
+      {
+        "op": "new_scene",
+        "base": "a red sports car"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:07+00:00"
+  },
+  {
+    "sentence": "suddenly make it night",
+    "prompt_before": "a red sports car",
+    "operations": [
+      {
+        "op": "add",
+        "label": "night",
+        "kind": "time",
+        "phrase": "dark night sky with a bright full moon and scattered stars",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Dark fields and silhouetted rows of trees line both sides of the road beneath a deep night sky. Dark night sky, cold silver moonlight, deep shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; dark night sky with a bright full moon and scattered stars",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:08+00:00"
+  },
+  {
+    "sentence": "add a dog",
+    "prompt_before": "a red sports car; dark night sky with a bright full moon and scattered stars",
+    "operations": [
+      {
+        "op": "add",
+        "label": "dog",
+        "kind": "extra",
+        "phrase": "a medium-sized brown dog standing at the right side of the road in the foreground at the right of the frame, facing the camera",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A medium-sized brown dog standing at the right side of the road in the foreground at the right of the frame, facing the camera. Dark open fields and rows of trees line both sides of the road, faint shapes of hills along the horizon. Dark night sky with a bright full moon and scattered stars, cool silver moonlight. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; dark night sky with a bright full moon and scattered stars; a medium-sized brown dog standing at the right side of the road in the foreground at the right of the frame, facing the camera",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:11+00:00"
+  },
+  {
+    "sentence": "new scene of a red sports car driving along a country road",
+    "prompt_before": "a red sports car; dark night sky with a bright full moon and scattered stars; a medium-sized brown dog standing at the right side of the road in the foreground at the right of the frame, facing the camera",
+    "operations": [
+      {
+        "op": "new_scene",
+        "base": "a red sports car"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:07+00:00"
+  },
+  {
+    "sentence": "slowly make it rain",
+    "prompt_before": "a red sports car",
+    "operations": [
+      {
+        "op": "add",
+        "label": "rain",
+        "kind": "weather",
+        "phrase": "steady rain falling, puddles and spray on the dark wet asphalt",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a wet two-lane country road in steady rain, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Rain falls over green fields and rows of trees on both sides of the road, puddles and spray on the dark asphalt, water kicked up behind the tyres. Dark grey storm clouds, dim diffuse light, glistening reflections on the road. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; steady rain falling, puddles and spray on the dark wet asphalt",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:08+00:00"
+  },
+  {
+    "sentence": "new scene of a red sports car driving along a country road",
+    "prompt_before": "a red sports car; steady rain falling, puddles and spray on the dark wet asphalt",
+    "operations": [
+      {
+        "op": "new_scene",
+        "base": "a red sports car"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:08+00:00"
+  },
+  {
+    "sentence": "make it snowy",
+    "prompt_before": "a red sports car",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "world",
+        "phrase": "a snowy mountain road.",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a snowy mountain road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a snowy mountain road",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:08+00:00"
+  },
+  {
+    "sentence": "add a dog",
+    "prompt_before": "a red sports car; a snowy mountain road",
+    "operations": [
+      {
+        "op": "add",
+        "label": "dog",
+        "kind": "extra",
+        "phrase": "a large brown dog standing at the right of the frame beside the road, facing the camera, large and clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a snowy mountain road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A large brown dog standing at the right of the frame beside the road, facing the camera, large and clearly visible. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a large brown dog standing at the right of the frame beside the road, facing the camera, large and clearly visible; a snowy mountain road",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:10+00:00"
+  },
+  {
+    "sentence": "remove the dog",
+    "prompt_before": "a red sports car; a large brown dog standing at the right of the frame beside the road, facing the camera, large and clearly visible; a snowy mountain road",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c15"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a snowy mountain road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a snowy mountain road",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:11+00:00"
+  },
+  {
+    "sentence": "add a lion",
+    "prompt_before": "a red sports car; a snowy mountain road",
+    "operations": [
+      {
+        "op": "add",
+        "label": "lion",
+        "kind": "extra",
+        "phrase": "a large male lion standing in the foreground at the left of the frame, facing the camera",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a snowy mountain road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A large male lion standing in the foreground at the left of the frame, facing the camera. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a large male lion standing in the foreground at the left of the frame, facing the camera; a snowy mountain road",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:13+00:00"
+  },
+  {
+    "sentence": "remove the lion",
+    "prompt_before": "a red sports car; a large male lion standing in the foreground at the left of the frame, facing the camera; a snowy mountain road",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c16"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a snowy mountain road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a snowy mountain road",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:14+00:00"
+  },
+  {
+    "sentence": "add jensen huang",
+    "prompt_before": "a red sports car; a snowy mountain road",
+    "operations": [
+      {
+        "op": "add",
+        "label": "jensen huang",
+        "kind": "extra",
+        "phrase": "a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a snowy mountain road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera; a snowy mountain road",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:16+00:00"
+  },
+  {
+    "sentence": "remove jensen huang",
+    "prompt_before": "a red sports car; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera; a snowy mountain road",
+    "operations": [
+      {
+        "op": "remove",
+        "id": "c17"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a snowy mountain road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a snowy mountain road",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:17+00:00"
+  },
+  {
+    "sentence": "new scene of a red sports car driving along a country road",
+    "prompt_before": "a red sports car; a snowy mountain road",
+    "operations": [
+      {
+        "op": "new_scene",
+        "base": "a red sports car"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:08+00:00"
+  },
+  {
+    "sentence": "winter",
+    "prompt_before": "a red sports car",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "world",
+        "phrase": "a snowy mountain road.",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a snowy mountain road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a snowy mountain road",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:08+00:00"
+  },
+  {
+    "sentence": "make it night",
+    "prompt_before": "a red sports car; a snowy mountain road",
+    "operations": [
+      {
+        "op": "add",
+        "label": "neon city",
+        "kind": "world",
+        "phrase": "a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere.",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a wide city street at night, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:08+00:00"
+  },
+  {
+    "sentence": "new scene of a red sports car driving along a country road",
+    "prompt_before": "a red sports car; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+    "operations": [
+      {
+        "op": "new_scene",
+        "base": "a red sports car"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:08+00:00"
+  },
+  {
+    "sentence": "let it snow",
+    "prompt_before": "a red sports car",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "world",
+        "phrase": "a snowy mountain road.",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a snowy mountain road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a snowy mountain road",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:08+00:00"
+  },
+  {
+    "sentence": "make it rain",
+    "prompt_before": "a red sports car; a snowy mountain road",
+    "operations": [
+      {
+        "op": "add",
+        "label": "rain",
+        "kind": "world",
+        "phrase": "a wet country road in heavy rain.",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a wet country road in heavy rain, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Rain pours down, puddles and spray on the dark asphalt, water kicked up behind the tyres, green fields and trees blurred by the rain. Dark grey storm clouds, dim diffuse light, glistening reflections on the road. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a wet country road in heavy rain",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:09+00:00"
+  },
+  {
+    "sentence": "new scene of a red sports car driving along a country road",
+    "prompt_before": "a red sports car; a wet country road in heavy rain",
+    "operations": [
+      {
+        "op": "new_scene",
+        "base": "a red sports car"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:09+00:00"
+  },
+  {
+    "sentence": "turn it into winter",
+    "prompt_before": "a red sports car",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "world",
+        "phrase": "a snowy mountain road.",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a snowy mountain road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a snowy mountain road",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:09+00:00"
+  },
+  {
+    "sentence": "make it sunset",
+    "prompt_before": "a red sports car; a snowy mountain road",
+    "operations": [
+      {
+        "op": "add",
+        "label": "sunset",
+        "kind": "world",
+        "phrase": "a straight open road across rolling grassland.",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight open road across rolling grassland, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Golden grass fields and a few lone trees on both sides, long shadows stretching across the road. The sun setting low on the horizon ahead, a glowing orange and pink sky, warm backlight. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a straight open road across rolling grassland",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:09+00:00"
+  },
+  {
+    "sentence": "new scene of a red sports car driving along a country road",
+    "prompt_before": "a red sports car; a straight open road across rolling grassland",
+    "operations": [
+      {
+        "op": "new_scene",
+        "base": "a red sports car"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:09+00:00"
+  },
+  {
+    "sentence": "slowly make it winter",
+    "prompt_before": "a red sports car",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "season",
+        "phrase": "winter season with snow-covered ground, snowbanks and falling snowflakes",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a snowy country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Pine forests and fields covered in thick white snow line both sides of the road, high snowbanks along the edges, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; winter season with snow-covered ground, snowbanks and falling snowflakes",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:10+00:00"
+  },
+  {
+    "sentence": "new scene of a red sports car driving along a country road",
+    "prompt_before": "a red sports car; winter season with snow-covered ground, snowbanks and falling snowflakes",
+    "operations": [
+      {
+        "op": "new_scene",
+        "base": "a red sports car"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:10+00:00"
+  },
+  {
+    "sentence": "make it wintery",
+    "prompt_before": "a red sports car",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "season",
+        "phrase": "thick white snow covers the ground and trees, snowflakes falling",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a snowy country road with plowed snowbanks along its edges, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Pine trees and fields covered in thick white snow line both sides of the road, snowflakes drifting through the cold air. Cold pale winter daylight under a soft grey sky, gentle diffuse shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; thick white snow covers the ground and trees, snowflakes falling",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:12+00:00"
+  },
+  {
+    "sentence": "new scene of a red sports car driving along a country road",
+    "prompt_before": "a red sports car; thick white snow covers the ground and trees, snowflakes falling",
+    "operations": [
+      {
+        "op": "new_scene",
+        "base": "a red sports car"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:11+00:00"
+  },
+  {
+    "sentence": "night",
+    "prompt_before": "a red sports car",
+    "operations": [
+      {
+        "op": "add",
+        "label": "neon city",
+        "kind": "world",
+        "phrase": "a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere.",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a wide city street at night, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:11+00:00"
+  },
+  {
+    "sentence": "add a lion",
+    "prompt_before": "a red sports car; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+    "operations": [
+      {
+        "op": "add",
+        "label": "lion",
+        "kind": "extra",
+        "phrase": "a large male lion standing on the sidewalk at the right of the frame, facing the camera, large and clearly visible",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a wide city street at night, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A large male lion standing on the sidewalk at the right of the frame, facing the camera, large and clearly visible. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a large male lion standing on the sidewalk at the right of the frame, facing the camera, large and clearly visible; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:13+00:00"
+  },
+  {
+    "sentence": "new scene of a red sports car driving along a country road",
+    "prompt_before": "a red sports car; a large male lion standing on the sidewalk at the right of the frame, facing the camera, large and clearly visible; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+    "operations": [
+      {
+        "op": "new_scene",
+        "base": "a red sports car"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:11+00:00"
+  },
+  {
+    "sentence": "make it nighttime",
+    "prompt_before": "a red sports car",
+    "operations": [
+      {
+        "op": "add",
+        "label": "neon city",
+        "kind": "world",
+        "phrase": "a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere.",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a wide city street at night, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:11+00:00"
+  },
+  {
+    "sentence": "make it winter",
+    "prompt_before": "a red sports car; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "world",
+        "phrase": "a snowy mountain road.",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a snowy mountain road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a snowy mountain road",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:11+00:00"
+  },
+  {
+    "sentence": "make it wintertime",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "winter",
+        "kind": "season",
+        "phrase": "winter, snow covering the ground and bare branches",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a soft white blanket over the grass, frost-dusted textures, pale cold light, muted silver and blue tones",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "source": "the pinned 'make it winter' entry (a synonym)",
+    "generated_at": "2026-11-15T03:49:04+00:00"
+  },
+  {
+    "sentence": "slowly make it night",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
+    "operations": [
+      {
+        "op": "add",
+        "label": "night",
+        "kind": "time",
+        "phrase": "night, dark sky with a bright full moon and stars, deep blue moonlit shadows",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; night, dark sky with a bright full moon and stars, deep blue moonlit shadows; pale moonlit snow crusting the open ground, cold blue shadows pooling across the white surface, faint glittering frost on every surface",
+    "canonical": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; night, dark sky with a bright full moon and stars, deep blue moonlit shadows",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T03:49:06+00:00"
+  },
+  {
+    "sentence": "new scene of a red sports car driving along a country road",
+    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; night, dark sky with a bright full moon and stars, deep blue moonlit shadows",
+    "operations": [
+      {
+        "op": "new_scene",
+        "base": "a red sports car"
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:12+00:00"
+  },
+  {
+    "sentence": "make it night time",
+    "prompt_before": "a red sports car",
+    "operations": [
+      {
+        "op": "add",
+        "label": "neon city",
+        "kind": "world",
+        "phrase": "a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere.",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a wide city street at night, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:12+00:00"
+  },
+  {
+    "sentence": "make it rain",
+    "prompt_before": "a red sports car; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+    "operations": [
+      {
+        "op": "add",
+        "label": "rain",
+        "kind": "world",
+        "phrase": "a wet country road in heavy rain.",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a wet country road in heavy rain, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Rain pours down, puddles and spray on the dark asphalt, water kicked up behind the tyres, green fields and trees blurred by the rain. Dark grey storm clouds, dim diffuse light, glistening reflections on the road. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a wet country road in heavy rain",
+    "source": "engine car template",
+    "generated_at": "2026-11-15T03:49:12+00:00"
   }
 ]

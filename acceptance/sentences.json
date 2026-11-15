@@ -302,6 +302,192 @@
         {"say": "new scene of a blue truck driving on a highway", "has": ["blue truck", "seen from directly behind"], "lacks": ["oak", "meadow"]},
         {"say": "make it a desert", "chips": ["desert"], "has": ["blue truck", "desert"], "lacks": ["red sports car"]}
       ]
+    },
+    {
+      "name": "pinned-meadow-first-steps",
+      "note": "The likely sentences pinned in engine/demo_prompts.json (issue #243): said in the pinned order, no Sonnet call.",
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "make it a neon city", "chips": ["neon city"], "has": ["neon"]},
+        {"tap": "reset"},
+        {"say": "make it sunset", "chips": ["sunset"], "has": ["sun"]},
+        {"tap": "reset"},
+        {"say": "make it autumn", "chips": ["autumn"], "has": ["autumn"]},
+        {"tap": "reset"},
+        {"say": "add a tree", "chips": ["tree"], "has": ["tree"]},
+        {"tap": "reset"},
+        {"say": "add a house", "chips": ["house"], "has": ["house"]},
+        {"tap": "reset"},
+        {"say": "add some birds", "chips": ["birds"], "has": ["birds"]},
+        {"tap": "reset"},
+        {"say": "slowly make it rain", "chips": ["rain"], "has": ["rain"], "slow": true, "strength": {"rain": "full"}},
+        {"tap": "reset"},
+        {"say": "make it a little snowy", "chips": ["winter"], "has": ["snow"], "strength": {"winter": "low"}}
+      ]
+    },
+    {
+      "name": "pinned-meadow-winter-synonyms",
+      "note": "The likely sentences pinned in engine/demo_prompts.json (issue #243): said in the pinned order, no Sonnet call.",
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "make it snowy", "chips": ["winter"], "has": ["snow"]},
+        {"tap": "reset"},
+        {"say": "let it snow", "chips": ["winter"], "has": ["snow"]},
+        {"tap": "reset"},
+        {"say": "make it snow", "chips": ["winter"], "has": ["snow"]},
+        {"tap": "reset"},
+        {"say": "make it wintery", "chips": ["winter"], "has": ["snow"]},
+        {"tap": "reset"},
+        {"say": "winter", "chips": ["winter"], "has": ["snow"]},
+        {"tap": "reset"},
+        {"say": "suddenly make it winter", "chips": ["winter"], "has": ["snow"]}
+      ]
+    },
+    {
+      "name": "pinned-meadow-winter-objects",
+      "note": "The likely sentences pinned in engine/demo_prompts.json (issue #243): said in the pinned order, no Sonnet call.",
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "make it snowy", "chips": ["winter"], "has": ["snow"]},
+        {"say": "add a dog", "chips": ["winter", "dog"], "has": ["snow", "dog"]},
+        {"say": "remove the dog", "chips": ["winter"], "no_chips": ["dog"]},
+        {"say": "add a lion", "chips": ["winter", "lion"], "has": ["lion"]},
+        {"say": "remove the lion", "chips": ["winter"], "no_chips": ["lion"]},
+        {"say": "add a tree", "chips": ["winter", "tree"], "has": ["tree"]},
+        {"say": "remove the tree", "chips": ["winter"], "no_chips": ["second tree"]},
+        {"say": "add a house", "chips": ["winter", "house"], "has": ["house"]},
+        {"say": "remove the house", "chips": ["winter"], "no_chips": ["house"]},
+        {"say": "add some birds", "chips": ["winter", "birds"], "has": ["birds"]},
+        {"say": "remove the birds", "chips": ["winter"], "no_chips": ["birds"]},
+        {"say": "add jensen huang", "chips": ["winter", "jensen huang"], "has": ["leather jacket"]},
+        {"say": "remove jensen huang", "chips": ["winter"], "no_chips": ["jensen huang"]},
+        {"say": "make it night", "chips": ["winter", "night"], "has": ["snow", "night"]},
+        {"say": "add a dog", "chips": ["winter", "night", "dog"], "has": ["dog"]}
+      ]
+    },
+    {
+      "name": "pinned-meadow-winter-strength",
+      "note": "The likely sentences pinned in engine/demo_prompts.json (issue #243): said in the pinned order, no Sonnet call.",
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "slowly make it winter", "chips": ["winter"], "slow": true, "strength": {"winter": "full"}, "has": ["snow"]},
+        {"say": "make it rain", "chips": ["winter", "rain"], "has": ["rain"]},
+        {"say": "stop the rain", "chips": ["winter"], "no_chips": ["rain"]},
+        {"say": "a little more snow", "chips": ["winter"], "strength": {"winter": "up"}},
+        {"say": "a little less", "chips": ["winter"], "strength": {"winter": "down"}}
+      ]
+    },
+    {
+      "name": "pinned-meadow-winter-then-night",
+      "note": "The likely sentences pinned in engine/demo_prompts.json (issue #243): said in the pinned order, no Sonnet call.",
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "make it wintertime", "chips": ["winter"], "has": ["snow"]},
+        {"say": "slowly make it night", "chips": ["winter", "night"], "has": ["night"], "slow": true, "strength": {"night": "full"}},
+        {"tap": "reset"},
+        {"say": "turn it into winter", "chips": ["winter"], "has": ["snow"]},
+        {"say": "suddenly make it night", "chips": ["winter", "night"], "has": ["night"], "slow": false}
+      ]
+    },
+    {
+      "name": "pinned-meadow-night",
+      "note": "The likely sentences pinned in engine/demo_prompts.json (issue #243): said in the pinned order, no Sonnet call.",
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "make it night", "chips": ["night"], "has": ["night"]},
+        {"say": "add a dog", "chips": ["night", "dog"], "has": ["dog"]},
+        {"say": "remove the dog", "chips": ["night"], "no_chips": ["dog"]},
+        {"say": "add a lion", "chips": ["night", "lion"], "has": ["lion"]},
+        {"say": "remove the lion", "chips": ["night"], "no_chips": ["lion"]},
+        {"say": "add a house", "chips": ["night", "house"], "has": ["house"]},
+        {"say": "remove the house", "chips": ["night"], "no_chips": ["house"]},
+        {"say": "add jensen huang", "chips": ["night", "jensen huang"], "has": ["leather jacket"]},
+        {"say": "remove jensen huang", "chips": ["night"], "no_chips": ["jensen huang"]},
+        {"say": "make it rain", "chips": ["night", "rain"], "has": ["rain"]},
+        {"say": "stop the rain", "chips": ["night"], "no_chips": ["rain"]},
+        {"say": "make it winter", "chips": ["night", "winter"], "has": ["snow"]},
+        {"say": "add a tree", "chips": ["night", "winter", "tree"], "has": ["tree"]},
+        {"tap": "reset"},
+        {"say": "suddenly make it night", "chips": ["night"], "has": ["night"], "slow": false},
+        {"say": "make it a neon city", "chips": ["neon city"], "has": ["neon"]},
+        {"tap": "reset"},
+        {"say": "slowly make it night", "chips": ["night"], "has": ["night"], "slow": true, "strength": {"night": "full"}},
+        {"tap": "reset"},
+        {"say": "make it nighttime", "chips": ["night"], "has": ["night"]}
+      ]
+    },
+    {
+      "name": "pinned-car-objects",
+      "note": "The likely sentences pinned in engine/demo_prompts.json (issue #243): said in the pinned order, no Sonnet call.",
+      "start": "car",
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "add a dog", "chips": ["dog"], "has": ["red sports car", "dog"]},
+        {"say": "remove the dog", "no_chips": ["dog"]},
+        {"say": "add a lion", "chips": ["lion"], "has": ["lion"]},
+        {"say": "remove the lion", "no_chips": ["lion"]},
+        {"say": "add a tree", "chips": ["tree"], "has": ["tree"]},
+        {"say": "remove the tree", "no_chips": ["tree"]},
+        {"say": "add a house", "chips": ["house"], "has": ["house"]},
+        {"say": "remove the house", "no_chips": ["house"]},
+        {"say": "add some birds", "chips": ["birds"], "has": ["birds"]},
+        {"say": "remove the birds", "no_chips": ["birds"]},
+        {"say": "make it a little snowy", "chips": ["winter"], "has": ["snow"], "strength": {"winter": "low"}}
+      ]
+    },
+    {
+      "name": "pinned-car-winter",
+      "note": "The likely sentences pinned in engine/demo_prompts.json (issue #243): said in the pinned order, no Sonnet call.",
+      "start": "car",
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "make it snowy", "chips": ["winter"], "has": ["red sports car", "snow"]},
+        {"say": "add a dog", "chips": ["winter", "dog"], "has": ["dog"]},
+        {"say": "remove the dog", "chips": ["winter"], "no_chips": ["dog"]},
+        {"tap": "reset"},
+        {"say": "new scene of a red sports car driving along a country road", "has": ["red sports car"]},
+        {"say": "winter", "chips": ["winter"], "has": ["snow"]},
+        {"say": "make it night", "chips": ["neon city"], "has": ["neon"]},
+        {"tap": "reset"},
+        {"say": "new scene of a red sports car driving along a country road", "has": ["red sports car"]},
+        {"say": "let it snow", "chips": ["winter"], "has": ["snow"]},
+        {"say": "make it rain", "chips": ["rain"], "has": ["rain"]},
+        {"tap": "reset"},
+        {"say": "new scene of a red sports car driving along a country road", "has": ["red sports car"]},
+        {"say": "turn it into winter", "chips": ["winter"], "has": ["snow"]},
+        {"say": "make it sunset", "chips": ["sunset"], "has": ["sun"]},
+        {"tap": "reset"},
+        {"say": "new scene of a red sports car driving along a country road", "has": ["red sports car"]},
+        {"say": "slowly make it winter", "chips": ["winter"], "has": ["snow"], "slow": true, "strength": {"winter": "full"}},
+        {"tap": "reset"},
+        {"say": "new scene of a red sports car driving along a country road", "has": ["red sports car"]},
+        {"say": "make it wintery", "chips": ["winter"], "has": ["snow"]}
+      ]
+    },
+    {
+      "name": "pinned-car-night",
+      "note": "The likely sentences pinned in engine/demo_prompts.json (issue #243): said in the pinned order, no Sonnet call.",
+      "start": "car",
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "make it nighttime", "chips": ["neon city"], "has": ["night"]},
+        {"say": "make it winter", "chips": ["winter"], "has": ["snow"]},
+        {"tap": "reset"},
+        {"say": "new scene of a red sports car driving along a country road", "has": ["red sports car"]},
+        {"say": "night", "chips": ["neon city"], "has": ["night"]},
+        {"say": "add a lion", "chips": ["neon city", "lion"], "has": ["lion"]},
+        {"tap": "reset"},
+        {"say": "new scene of a red sports car driving along a country road", "has": ["red sports car"]},
+        {"say": "make it night time", "chips": ["neon city"], "has": ["night"]},
+        {"say": "make it rain", "chips": ["rain"], "has": ["rain"]},
+        {"tap": "reset"},
+        {"say": "new scene of a red sports car driving along a country road", "has": ["red sports car"]},
+        {"say": "suddenly make it night", "chips": ["night"], "has": ["night"], "slow": false},
+        {"say": "add a dog", "chips": ["night", "dog"], "has": ["dog"]},
+        {"tap": "reset"},
+        {"say": "new scene of a red sports car driving along a country road", "has": ["red sports car"]},
+        {"say": "slowly make it rain", "chips": ["rain"], "has": ["rain"], "slow": true, "strength": {"rain": "full"}}
+      ]
     }
   ]
 }

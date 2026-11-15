@@ -20,33 +20,6 @@
    "recorded_at": "2026-11-15T03:20:10+00:00"
   },
   {
-   "sentence": "add a lion",
-   "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
-   "ids": "c1",
-   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"lion\", \"kind\": \"extra\", \"phrase\": \"a large male lion standing in the centre of the frame beside the oak tree, facing the camera, large and clearly visible\", \"strength\": 1.0}], \"details\": \"pale cold light, crisp frozen air, soft white drifts, fine ice crystals glittering on the ground\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "4b80383ba009302a",
-   "recorded_at": "2026-11-15T03:20:10+00:00"
-  },
-  {
-   "sentence": "undo the winter",
-   "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large male lion standing in the centre of the frame beside the oak tree, facing the camera, large and clearly visible",
-   "ids": "c1,c2",
-   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"remove\", \"id\": \"c1\"}], \"details\": \"fresh green grass swaying gently, soft dew on the blades, warm golden light, a faint scent of earth in the air\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "4b80383ba009302a",
-   "recorded_at": "2026-11-15T03:20:10+00:00"
-  },
-  {
-   "sentence": "a little more snow",
-   "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
-   "ids": "c1",
-   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"set_strength\", \"id\": \"c1\", \"strength\": 1.3}], \"details\": \"deep white drifts, crisp frozen ground, pale silver light, soft cold air, fine glittering crystals\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "4b80383ba009302a",
-   "recorded_at": "2026-11-15T03:20:10+00:00"
-  },
-  {
    "sentence": "a little less snow",
    "prompt_before": "a wide shot of a meadow with a single oak tree; intense winter, snow covering the ground and bare branches",
    "ids": "c1",
@@ -146,73 +119,10 @@
    "recorded_at": "2026-11-15T03:20:10+00:00"
   },
   {
-   "sentence": "make it rain",
-   "prompt_before": "a wide shot of a meadow with a single oak tree",
-   "ids": "",
-   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"rain\", \"kind\": \"weather\", \"phrase\": \"steady rain falling, wet glistening grass and leaves, grey overcast light\", \"strength\": 1.0}], \"details\": \"dark damp earth, glistening wet grass blades, soft diffuse grey light, cool moist air, muted green and silver tones\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "4b80383ba009302a",
-   "recorded_at": "2026-11-15T03:20:10+00:00"
-  },
-  {
-   "sentence": "add a dog and stop the rain",
-   "prompt_before": "a wide shot of a meadow with a single oak tree; steady rain falling, wet glistening grass and leaves, grey overcast light",
-   "ids": "c1",
-   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"dog\", \"kind\": \"extra\", \"phrase\": \"a golden retriever dog standing in the centre of the frame, facing the camera, large and clearly visible\", \"strength\": 1.0}, {\"op\": \"remove\", \"id\": \"c1\"}], \"details\": \"lush green grass with scattered wildflower-free patches, soft textured earth, gentle dappled light, fresh clear air, rich saturated greens\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "4b80383ba009302a",
-   "recorded_at": "2026-11-15T03:20:10+00:00"
-  },
-  {
-   "sentence": "add a lion",
-   "prompt_before": "a wide shot of a meadow with a single oak tree",
-   "ids": "",
-   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"lion\", \"kind\": \"extra\", \"phrase\": \"a large male lion standing in the centre of the frame, facing the camera, large and clearly visible\", \"strength\": 1.0}], \"details\": \"tall swaying grass, soft green and golden tones, scattered wildflower-free earth patches, gentle warm light, fresh open air\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "4b80383ba009302a",
-   "recorded_at": "2026-11-15T03:20:10+00:00"
-  },
-  {
-   "sentence": "remove the lion and add a horse",
-   "prompt_before": "a wide shot of a meadow with a single oak tree; a large male lion standing in the centre of the frame, facing the camera, large and clearly visible",
-   "ids": "c1",
-   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"remove\", \"id\": \"c1\"}, {\"op\": \"add\", \"label\": \"horse\", \"kind\": \"extra\", \"phrase\": \"a large brown horse standing in the centre of the frame, facing the camera, large and clearly visible\", \"strength\": 1.0}], \"details\": \"tall green grass, soft dew on the blades, warm gentle light, fresh clear air, rich earthy tones\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "4b80383ba009302a",
-   "recorded_at": "2026-11-15T03:20:10+00:00"
-  },
-  {
    "sentence": "reset and add a dog",
    "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches",
    "ids": "c1",
    "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"remove\", \"id\": \"c1\"}, {\"op\": \"add\", \"label\": \"dog\", \"kind\": \"extra\", \"phrase\": \"a large brown dog standing in the centre of the frame beside the oak tree, facing the camera, clearly visible\", \"strength\": 1.0}], \"details\": \"soft green grass, dewy textures, gentle warm light, fresh clear air\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "4b80383ba009302a",
-   "recorded_at": "2026-11-15T03:20:10+00:00"
-  },
-  {
-   "sentence": "slowly make it winter",
-   "prompt_before": "a wide shot of a meadow with a single oak tree",
-   "ids": "",
-   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"winter\", \"kind\": \"season\", \"phrase\": \"snow covering the ground and bare branches, frosty cold winter\", \"strength\": 1.0}], \"details\": \"pale frost glitter on the ground, soft white drifts, crisp cold air, muted silver and blue tones\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "4b80383ba009302a",
-   "recorded_at": "2026-11-15T03:20:10+00:00"
-  },
-  {
-   "sentence": "make it night",
-   "prompt_before": "a wide shot of a meadow with a single oak tree; snow covering the ground and bare branches, frosty cold winter",
-   "ids": "c1",
-   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"night\", \"kind\": \"time\", \"phrase\": \"dark night with a bright full moon casting cool silver light\", \"strength\": 1.0}], \"details\": \"pale silver light on the frozen ground, long soft shadows across the snow, glittering frost crystals, deep blue shadows, cold clear air\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "4b80383ba009302a",
-   "recorded_at": "2026-11-15T03:20:10+00:00"
-  },
-  {
-   "sentence": "gradually add some fog",
-   "prompt_before": "a wide shot of a meadow with a single oak tree; snow covering the ground and bare branches, frosty cold winter; dark night with a bright full moon casting cool silver light",
-   "ids": "c1,c2",
-   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"fog\", \"kind\": \"weather\", \"phrase\": \"soft low fog drifting thinly over the ground\", \"strength\": 1.0}], \"details\": \"frost-dusted white ground, pale silver light, cold damp air, faint pale haze, glittering ice crystals on every surface\"}",
    "model": "claude-sonnet-5-5",
    "fingerprint": "4b80383ba009302a",
    "recorded_at": "2026-11-15T03:20:10+00:00"
@@ -231,42 +141,6 @@
    "prompt_before": "a wide shot of a meadow with a single oak tree; a subtle hint of a thin light haze of fog hanging low over the ground",
    "ids": "c1",
    "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"rain\", \"kind\": \"weather\", \"phrase\": \"heavy rain falling in dense streaks from a dark sky\", \"strength\": 1.3}], \"details\": \"wet glistening grass bowed under the downpour, puddles pooling in the soil, dark damp earth, muted green and grey tones, soft diffuse light\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "4b80383ba009302a",
-   "recorded_at": "2026-11-15T03:20:10+00:00"
-  },
-  {
-   "sentence": "make it night",
-   "prompt_before": "a wide shot of a meadow with a single oak tree",
-   "ids": "",
-   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"night\", \"kind\": \"time\", \"phrase\": \"dark night with a bright full moon and scattered stars in the sky\", \"strength\": 1.0}], \"details\": \"cool silver moonlight, dew-damp grass glinting softly, deep blue shadows across the ground, faint cool mist hugging the earth\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "4b80383ba009302a",
-   "recorded_at": "2026-11-15T03:20:10+00:00"
-  },
-  {
-   "sentence": "add a dog",
-   "prompt_before": "a wide shot of a meadow with a single oak tree",
-   "ids": "",
-   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"dog\", \"kind\": \"extra\", \"phrase\": \"a large golden retriever standing in the centre of the frame, facing the camera, large and clearly visible\", \"strength\": 1.0}], \"details\": \"soft green grass, scattered wildflower-free earth patches, gentle dappled light, fresh clear air, warm muted greens\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "4b80383ba009302a",
-   "recorded_at": "2026-11-15T03:20:10+00:00"
-  },
-  {
-   "sentence": "add a red car",
-   "prompt_before": "a wide shot of a meadow with a single oak tree; a large male lion standing in the centre of the frame, facing the camera, large and clearly visible",
-   "ids": "c1",
-   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"red car\", \"kind\": \"extra\", \"phrase\": \"a red car parked in the foreground at the right of the frame, facing the camera, large and clearly visible\", \"strength\": 1.0}], \"details\": \"tall green grass, soft dew on the blades, warm earthy soil, gentle light, fresh clear air\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "4b80383ba009302a",
-   "recorded_at": "2026-11-15T03:20:10+00:00"
-  },
-  {
-   "sentence": "remove the lion",
-   "prompt_before": "a wide shot of a meadow with a single oak tree; a large male lion standing in the centre of the frame, facing the camera, large and clearly visible; a red car parked in the foreground at the right of the frame, facing the camera, large and clearly visible",
-   "ids": "c1,c2",
-   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"remove\", \"id\": \"c1\"}], \"details\": \"soft green grass swaying in a gentle haze of warm air, scattered patches of wildflower-free earth, dappled light across the open ground, fresh dewy textures, a pale open sky with muted pastel colours\"}",
    "model": "claude-sonnet-5-5",
    "fingerprint": "4b80383ba009302a",
    "recorded_at": "2026-11-15T03:20:10+00:00"
@@ -353,24 +227,6 @@
    "recorded_at": "2026-11-15T03:20:10+00:00"
   },
   {
-   "sentence": "make it day",
-   "prompt_before": "a wide shot of a meadow with a single oak tree; dark night with a bright full moon and scattered stars in the sky",
-   "ids": "c1",
-   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"day\", \"kind\": \"time\", \"phrase\": \"bright daytime with clear sunlight and a blue sky\", \"strength\": 1.0}], \"details\": \"short green grass, soft warm light on the ground, dewy blades, gentle shadows on the grass, fresh clear air\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "4b80383ba009302a",
-   "recorded_at": "2026-11-15T03:20:10+00:00"
-  },
-  {
-   "sentence": "make the dog black",
-   "prompt_before": "a wide shot of a meadow with a single oak tree; a large golden retriever standing in the centre of the frame, facing the camera, large and clearly visible",
-   "ids": "c1",
-   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"dog\", \"kind\": \"extra\", \"phrase\": \"a large black dog standing in the centre of the frame, facing the camera, large and clearly visible\", \"strength\": 1.0}], \"details\": \"soft green grass blades, dewy earth, gentle diffuse light, muted warm colours\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "4b80383ba009302a",
-   "recorded_at": "2026-11-15T03:20:10+00:00"
-  },
-  {
    "sentence": "take me to the forest",
    "prompt_before": "a wide shot of a meadow with a single oak tree",
    "ids": "",
@@ -407,33 +263,6 @@
    "recorded_at": "2026-11-15T03:20:10+00:00"
   },
   {
-   "sentence": "add a lion",
-   "prompt_before": "a red sports car",
-   "ids": "",
-   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"lion\", \"kind\": \"extra\", \"phrase\": \"a large male lion with a full mane standing beside the road at the right of the frame, facing the camera, large and clearly visible\", \"strength\": 1.0}], \"details\": \"\", \"road\": \"a straight two-lane country road\", \"scene\": \"Green fields and rows of trees line both sides of the road under a clear blue summer sky.\", \"light\": \"Bright midday sunshine, crisp shadows.\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "4b80383ba009302a",
-   "recorded_at": "2026-11-15T03:20:10+00:00"
-  },
-  {
-   "sentence": "make it foggy",
-   "prompt_before": "a red sports car; a large male lion with a full mane standing beside the road at the right of the frame, facing the camera, large and clearly visible",
-   "ids": "c1",
-   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"fog\", \"kind\": \"weather\", \"phrase\": \"thick fog hangs over the scene, softening distant shapes and muting colours\", \"strength\": 1.0}], \"details\": \"\", \"road\": \"a straight two-lane country road\", \"scene\": \"Pale fog drifts over the green fields and rows of trees on both sides of the road, softening everything beyond a short distance.\", \"light\": \"Soft diffuse grey daylight, muted colours, faint glow in the mist.\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "4b80383ba009302a",
-   "recorded_at": "2026-11-15T03:20:10+00:00"
-  },
-  {
-   "sentence": "remove the lion",
-   "prompt_before": "a red sports car; thick fog hangs over the scene, softening distant shapes and muting colours; a large male lion with a full mane standing beside the road at the right of the frame, facing the camera, large and clearly visible",
-   "ids": "c1,c2",
-   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"remove\", \"id\": \"c1\"}], \"details\": \"\", \"road\": \"a straight two-lane country road\", \"scene\": \"Pale fog drifts over the green fields and rows of trees on both sides of the road, softening everything beyond a short distance.\", \"light\": \"Soft diffuse grey daylight, muted colours, faint glow in the mist.\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "4b80383ba009302a",
-   "recorded_at": "2026-11-15T03:20:10+00:00"
-  },
-  {
    "sentence": "remove the desert",
    "prompt_before": "a red sports car; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
    "ids": "c1",
@@ -441,6 +270,96 @@
    "model": "claude-sonnet-5-5",
    "fingerprint": "4b80383ba009302a",
    "recorded_at": "2026-11-15T03:20:10+00:00"
+  },
+  {
+   "sentence": "undo the winter",
+   "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a large male lion standing beside the oak tree in the centre of the frame, facing the camera, large and clearly visible",
+   "ids": "c1,c2",
+   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"remove\", \"id\": \"c1\"}], \"details\": \"soft green grass swaying gently underfoot, dew glistening on blades, warm earthy tones in the soil, hazy golden light filtering through the air, subtle wildflower colour scattered across the ground\"}",
+   "model": "claude-sonnet-5-5",
+   "fingerprint": "4b80383ba009302a",
+   "recorded_at": "2026-11-15T04:05:19+00:00"
+  },
+  {
+   "sentence": "add a dog and stop the rain",
+   "prompt_before": "a wide shot of a meadow with a single oak tree; steady rain falling, wet glistening grass and leaves",
+   "ids": "c1",
+   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"dog\", \"kind\": \"extra\", \"phrase\": \"a large brown dog standing in the centre of the frame, facing the camera, large and clearly visible\", \"strength\": 1.0}, {\"op\": \"remove\", \"id\": \"c1\"}], \"details\": \"lush green grass with scattered wildflower-free patches, soft dappled light, gentle warm tones, fine texture on bark and blades, crisp clear air\"}",
+   "model": "claude-sonnet-5-5",
+   "fingerprint": "4b80383ba009302a",
+   "recorded_at": "2026-11-15T04:05:19+00:00"
+  },
+  {
+   "sentence": "remove the lion and add a horse",
+   "prompt_before": "a wide shot of a meadow with a single oak tree; a large male lion standing in the centre of the frame beside the oak tree, facing the camera, large and clearly visible",
+   "ids": "c1",
+   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"remove\", \"id\": \"c1\"}, {\"op\": \"add\", \"label\": \"horse\", \"kind\": \"extra\", \"phrase\": \"a brown horse standing in the centre of the frame beside the oak tree, facing the camera, large and clearly visible\", \"strength\": 1.0}], \"details\": \"short green grass with soft clover texture, warm even light across the open ground, gentle shadows beneath wide branches, fresh clear air with muted green and gold colours\"}",
+   "model": "claude-sonnet-5-5",
+   "fingerprint": "4b80383ba009302a",
+   "recorded_at": "2026-11-15T04:05:19+00:00"
+  },
+  {
+   "sentence": "gradually add some fog",
+   "prompt_before": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; night, dark sky lit by cold moonlight, deep blue shadows",
+   "ids": "c1,c2",
+   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"fog\", \"kind\": \"weather\", \"phrase\": \"fog, thin low mist drifting softly over the ground\", \"strength\": 1.0}], \"details\": \"Frost-dusted snow crust glittering faintly, pale mist hanging low over the white ground, cold moonlight softening into hazy silver, deep blue shadows, still damp air\"}",
+   "model": "claude-sonnet-5-5",
+   "fingerprint": "4b80383ba009302a",
+   "recorded_at": "2026-11-15T04:05:19+00:00"
+  },
+  {
+   "sentence": "add a red car",
+   "prompt_before": "a wide shot of a meadow with a single oak tree; a large male lion standing in the centre of the frame beside the oak tree, facing the camera, large and clearly visible",
+   "ids": "c1",
+   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"red car\", \"kind\": \"extra\", \"phrase\": \"a red car parked in the foreground at the right of the frame, facing the camera, clearly visible\", \"strength\": 1.0}], \"details\": \"tall golden grass, soft dew on the blades, warm earthy tones, gentle haze of pollen in the air, fresh green undergrowth, wide open sky\"}",
+   "model": "claude-sonnet-5-5",
+   "fingerprint": "4b80383ba009302a",
+   "recorded_at": "2026-11-15T04:05:19+00:00"
+  },
+  {
+   "sentence": "remove the lion",
+   "prompt_before": "a wide shot of a meadow with a single oak tree; a large male lion standing in the centre of the frame beside the oak tree, facing the camera, large and clearly visible; a red car parked in the foreground at the right of the frame, facing the camera, clearly visible",
+   "ids": "c1,c2",
+   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"remove\", \"id\": \"c1\"}], \"details\": \"Tall green grass swaying in a soft haze-free breeze would break rules, so: lush green grass, scattered wildflower-free clover, rolling soft earth, warm even light, fresh clear air\"}",
+   "model": "claude-sonnet-5-5",
+   "fingerprint": "4b80383ba009302a",
+   "recorded_at": "2026-11-15T04:05:19+00:00"
+  },
+  {
+   "sentence": "make it day",
+   "prompt_before": "a wide shot of a meadow with a single oak tree; dark night under a deep starry sky with soft moonlight",
+   "ids": "c1",
+   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"day\", \"kind\": \"time\", \"phrase\": \"bright clear daytime with warm natural sunlight and a pale blue sky\", \"strength\": 1.0}], \"details\": \"tall grass and soft earth underfoot, warm golden light across the green hillsides, gentle haze at the horizon, rich greens and crisp shadows\"}",
+   "model": "claude-sonnet-5-5",
+   "fingerprint": "4b80383ba009302a",
+   "recorded_at": "2026-11-15T04:05:19+00:00"
+  },
+  {
+   "sentence": "make the dog black",
+   "prompt_before": "a wide shot of a meadow with a single oak tree; a golden retriever standing in the centre of the frame, facing the camera, large and clearly visible",
+   "ids": "c1",
+   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"dog\", \"kind\": \"extra\", \"phrase\": \"a black dog standing in the centre of the frame, facing the camera, large and clearly visible\", \"strength\": 1.0}], \"details\": \"short green grass with fine dew, soft diffuse light across the open ground, gentle pale haze in the air, muted earthy tones with scattered golden highlights\"}",
+   "model": "claude-sonnet-5-5",
+   "fingerprint": "4b80383ba009302a",
+   "recorded_at": "2026-11-15T04:05:19+00:00"
+  },
+  {
+   "sentence": "make it foggy",
+   "prompt_before": "a red sports car; a large male lion standing beside the road at the right of the frame, facing the camera, large and clearly visible",
+   "ids": "c1",
+   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"add\", \"label\": \"fog\", \"kind\": \"weather\", \"phrase\": \"thick fog drifts over the road and fields, softening the distance into pale grey haze\", \"strength\": 1.0}], \"details\": \"\", \"road\": \"a straight two-lane country road\", \"scene\": \"Green fields and rows of trees line both sides of the road, half hidden in thick drifting fog.\", \"light\": \"Soft diffuse grey light, muted shadows, pale hazy sky.\"}",
+   "model": "claude-sonnet-5-5",
+   "fingerprint": "4b80383ba009302a",
+   "recorded_at": "2026-11-15T04:05:19+00:00"
+  },
+  {
+   "sentence": "remove the lion",
+   "prompt_before": "a red sports car; thick fog drifts over the road and fields, softening the distance into pale grey haze; a large male lion standing beside the road at the right of the frame, facing the camera, large and clearly visible",
+   "ids": "c1,c2",
+   "reply": "{\"blocked\": false, \"operations\": [{\"op\": \"remove\", \"id\": \"c1\"}], \"details\": \"\", \"road\": \"a straight two-lane country road\", \"scene\": \"Green fields and rows of trees line both sides of the road, half hidden in thick drifting fog.\", \"light\": \"Soft diffuse grey light, muted shadows, pale hazy sky.\"}",
+   "model": "claude-sonnet-5-5",
+   "fingerprint": "4b80383ba009302a",
+   "recorded_at": "2026-11-15T04:05:19+00:00"
   }
  ]
 }

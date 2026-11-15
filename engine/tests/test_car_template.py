@@ -159,7 +159,9 @@ def test_the_pinned_car_chain_is_what_the_live_reader_composes():
     entries = json.loads(open(DEFAULT_DEMO_PROMPTS).read())
     pinned = load_pinned(DEFAULT_DEMO_PROMPTS)
     assert len(pinned) == len(entries)
-    car = [k for k in pinned if k[1] in dict(CHAIN)][-len(CHAIN):]
+    keys = list(pinned)  # in file order; the first car chain starts with the new scene from the meadow
+    start = keys.index((compose(SceneState().snapshot()), NEW_SCENE))
+    car = [k for k in keys[start:] if k[1] in dict(CHAIN)][:len(CHAIN)]
     assert [s for _, s in car] == [s for s, _ in CHAIN]
     live = FinalReader(FinalReaderState.ON, chat=NoChat(), spec=prompt_spec())
     svc = FinalReadingService(CommandService(semantic_reader=lambda *a: None), live)
