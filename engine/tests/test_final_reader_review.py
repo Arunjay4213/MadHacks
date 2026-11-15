@@ -51,12 +51,13 @@ def test_the_phrase_limit_fits_a_measured_world_sentence():
 def test_a_pinned_250_character_world_phrase_is_used(tmp_path):
     # PR #156 makes world phrases about 250 characters. The pinned entry must load and be used live, not refused
     # by the 120-character default of the cache check (Greptile on PR #120 :1056 and PR #125 demo_prompts.json:106).
-    desert = {"op": "add", "label": "desert", "kind": "world", "phrase": DESERT_250, "strength": 1.0}
+    # an unknown label, so canonical_world keeps the long phrase instead of the built-in desert phrase
+    desert = {"op": "add", "label": "dunes world", "kind": "world", "phrase": DESERT_250, "strength": 1.0}
     path = tmp_path / "demo.json"
     path.write_text(json.dumps([{"sentence": "make it a desert", "prompt_before": compose(SceneState().snapshot()),
                                  "operations": [desert], "prompt": "PINNED desert"}]))
     pinned = load_pinned(path)
-    assert len(pinned) == 1
+    assert [op["phrase"] for e in pinned.values() for op in e.operations] == [DESERT_250]
     chat, reader, svc = service({}, pinned)
     out = svc.handle(final("make it a desert"))
     assert out["steer"]["prompt"] == "PINNED desert" and chat.calls == []
