@@ -28,9 +28,9 @@ keyword table's label and kind ("sunny" is day, of kind time).
 Content block: a small word list (BLOCKED_WORDS) is checked first, with no call at all; the model also flags
 sexual, violent or hateful requests with "blocked": true in the same reply.
 
-Determinism: the cache is keyed by (canonical prompt of the scene before, sentence). A result is chosen once:
-a Sonnet result or a block is saved to a JSON file (written atomically) and never regenerated, also across
-restarts. A timeout (final_timeout_s, 3.0 s by default), a failed call or a reply that does not validate
+Determinism: the cache is keyed by (canonical prompt of the scene before, sentence_key(sentence)), so
+"Make it winter." and "make it winter" share an entry. A result is chosen once: a Sonnet result or a block is saved to a JSON file (written
+atomically) and never regenerated, also across restarts. A timeout (final_timeout_s, 3.0 s by default), a failed call or a reply that does not validate
 gives the fallback (None): the dictionary result and the short prompt, except on a vehicle scene, where
 fallback_prompt gives the car template for the dictionary's result (#237). The fallback is final for that key for
 the life of the process, and a late answer is dropped (late_dropped). It is not saved to disk, so a passing
@@ -522,6 +522,24 @@ def details_budget(spec: PromptSpec, snapshot: dict) -> int:
     return max(12, min(45, left))
 
 
+# --- the sentence part of a key -------------------------------------------------------------------------
+
+# Characters stripped from both ends of a sentence key: end punctuation and surrounding quotes, as voice and
+# Wispr Flow add them ("Make it winter.", "\u201cmake it winter\u201d").
+_KEY_EDGE = ".,!?;:\"'`\u201c\u201d\u2018\u2019 "
+
+
+def sentence_key(text: str) -> str:
+    """The sentence part of a pinned or cache key: lower case, spaces collapsed, and end punctuation
+    (. , ! ? ; :) and surrounding quotes stripped from both ends. Inner words, apostrophes and punctuation are
+    kept, so "Make it winter." and "  make it   winter " share the key "make it winter" and "make it winter
+    please" does not. Not commands.dictionary.normalize: that one turns hyphens, commas and accented letters
+    inside the sentence into spaces, which changes words. Only the key uses this; the content check and Sonnet
+    get the original text."""
+    text = " ".join(text.casefold().split())
+    return " ".join(text.strip(_KEY_EDGE).split())
+
+
 # --- the cache file -------------------------------------------------------------------------------------
 
 class CacheFile:
@@ -553,7 +571,7 @@ class CacheFile:
                 scene = e.get("scene_before")
                 if outcome is Outcome.SONNET and not isinstance(scene, dict):
                     continue  # written before entries kept their scene: its ids cannot be mapped
-                out[(e["prompt_before"], e["sentence"])] = Entry(
+                out[(e["prompt_before"], sentence_key(e["sentence"]))] = Entry(  # old raw keys too
                     outcome, tuple(e.get("operations") or ()), e.get("prompt"), scene)
             except (KeyError, TypeError, ValueError):
                 continue
@@ -579,7 +597,7 @@ class CacheFile:
 # --- the pinned demo prompts ----------------------------------------------------------------------------
 
 def load_pinned(path: str | Path | None) -> dict[tuple[str, str], Entry]:
-    """The demo prompts file as PINNED entries keyed by (prompt_before, sentence). Never raises.
+    """The demo prompts file as PINNED entries keyed by (prompt_before, sentence_key(sentence)). Never raises.
 
     File: [entry, ...] or {"base": str, "entries": [entry, ...]}, where an entry is
     {"sentence", "prompt_before", "operations": [op, ...], "prompt"} (other keys, such as "canonical", "model" or
@@ -633,7 +651,7 @@ def load_pinned(path: str | Path | None) -> dict[tuple[str, str], Entry]:
         except Exception as exc:  # noqa: BLE001 - skip the entry, keep the others
             log.warning("final reader: demo prompt %d (%r) skipped: %r", n, _short(e.get("sentence") if isinstance(e, dict) else e), exc)
             continue
-        pinned[(before, sentence)] = Entry(Outcome.PINNED, tuple(ops), prompt, scene_record(scene.snapshot()))
+        pinned[(before, sentence_key(sentence))] = Entry(Outcome.PINNED, tuple(ops), prompt, scene_record(scene.snapshot()))
         scene = trial
     log.info("final reader: %d of %d demo prompts pinned from %s", len(pinned), len(entries), path)
     return pinned
@@ -711,7 +729,7 @@ class FinalReader:
             log.info("final reader: blocked %r (word list: %r), no call", _short(text), word)
             return {"blocked": True}
         from commands.composer import compose  # the commands/ owner's composer; imported only when ON
-        key = (compose(snapshot), text)
+        key = (compose(snapshot), sentence_key(text))  # pinned and cache keys are normalized the same way
         with self._lock:
             pinned, cached = self._pinned.get(key), self._cache.get(key)
         for found, counter in ((pinned, "pinned_hits"), (cached, "cache_hits")):
