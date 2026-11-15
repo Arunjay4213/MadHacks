@@ -506,16 +506,24 @@ _CHIP_FILLER = frozenset("""a an the of in on at to and with some more less seco
 
 
 def _chip_terms(label: str) -> set[str]:
-    """The words that show `label`'s thing is in a prompt: its own content words, and for every keyword table entry
-    named inside it ("winter", the "fog" of "light fog") all that entry's aliases ("snow", "frost", ...; "mist",
-    "haze", ...)."""
+    """The words that show `label`'s thing is in a prompt. Keywords of the keyword table inside the label are read left
+    to right, longest first, and each stands for all its entry's aliases ("winter": "snow", "frost", ...; the "fog" of
+    "light fog": "mist", "haze", ...), so "lightning bugs" are fireflies and never the storm's "lightning". The other
+    words count as themselves, except filler and amount words when the label has anything else ("light" alone stays)."""
     from commands.dictionary import KEYWORDS, normalize
     words = normalize(label).split()
-    terms = {w for w in words if w not in _CHIP_FILLER}
-    labels = {KEYWORDS[" ".join(words[i:j])]["label"] for i in range(len(words)) for j in range(i + 1, len(words) + 1)
-              if " ".join(words[i:j]) in KEYWORDS and " ".join(words[i:j]) not in _CHIP_FILLER}
-    terms |= {k for k, e in KEYWORDS.items() if e["label"] in labels}
-    return terms
+    labels, rest, i = set(), [], 0
+    while i < len(words):
+        j = next((j for j in range(len(words), i, -1) if " ".join(words[i:j]) in KEYWORDS), None)
+        if j is None:
+            rest.append(words[i])
+            i += 1
+            continue
+        labels.add(KEYWORDS[" ".join(words[i:j])]["label"])
+        i = j
+    content = {w for w in rest if w not in _CHIP_FILLER}
+    terms = content if content or labels else set(rest)
+    return terms | {k for k, e in KEYWORDS.items() if e["label"] in labels}
 
 
 def _says(prompt: str, term: str) -> bool:
