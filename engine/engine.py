@@ -1252,7 +1252,11 @@ class Engine:
             self.book.drop(rec, f"reader error: {exc!r}")
             reply({"error": f"command reader failed: {exc!r}"})
             return None
-        self.encoder.prefetch(self._likely_prompts())
+        if msg["type"] != "partial":
+            # A partial never changes the committed scene, so its likely prompts are the ones the last final or tap
+            # queued. Asking for them on every keystroke (one scene copy per keyword, about 47) held the GIL often
+            # enough to slow generation and stall the stream while someone typed.
+            self.encoder.prefetch(self._likely_prompts())
         if is_reset:
             if steer is not None:
                 self.book.decided(rec, steer)

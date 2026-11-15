@@ -464,8 +464,12 @@ contract 1 on `/control` -> reader worker thread: `reader.handle` -> `steer` (co
   The ticket exists from the moment the tap is heard, so a `POST /target`, which bypasses the reader, also waits while the tap is still being read.
   Its `embedded` stamp includes that wait, which is at most the reader's time for the tap plus about one chunk.
 - The encoder service runs on its own thread with a priority queue, caches embeddings and token ids by exact prompt text (LRU, 512 entries), shares one encoding between identical requests, and logs cache hits, misses and encode ms.
-- The reader's `likely_prompts()` are encoded at startup, and after every command they are queued again at background priority, behind any command's encoding.
+- The reader's `likely_prompts()` are encoded at startup, and after every `final` and `tap` they are queued again at background priority, behind any command's encoding.
   Each new set replaces the background prompts still queued from the last one, because those belong to an older scene.
+- A `partial` does not ask for `likely_prompts()` again: a partial never changes the committed scene, so the set queued after the last final or tap still holds.
+  Typing sends one partial per keystroke, and the engine process is CPU bound on one core (the generation thread launches GPU work from Python and holds the GIL most of the time).
+  Asking per keystroke cost about 47 scene copies each time, and on the live L40S unit it raised generation from about 195 to 240-280 ms per chunk and stalls from 26 to 135 while someone typed (journal, 2026-11-15 07:27 to 07:44 UTC).
+  On the RTX PRO 6000 test box, typing at 15 characters per second, the reader thread held the GIL in 12 to 21% of py-spy samples before this change and under 1% after (issue #274).
 - Prefetch is paced by `PrefetchPacer` (state `held`, `saving` or `ready`, shown in `/stats` as `encoder.prefetch`), because the text encoder shares the GPU with the generator.
   While a command is in flight (HEARD to SHOWN) it is `held` and no background encode starts.
   Otherwise the time generation waits at the lead gate, which is spare GPU time, is saved up; once it covers one encode (the fastest of the last 20 encodes) it is `ready` and one background encode runs.
