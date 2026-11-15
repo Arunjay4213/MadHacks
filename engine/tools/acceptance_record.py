@@ -92,7 +92,7 @@ def main(argv=None) -> int:
         run_case(case, Mode.SONNET, chat, timeout_s=RECORD_WAIT_S)
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     merged = {entry_key(e): e for e in existing}
-    if not args.case:  # every case ran: an entry no case asked for any more is dropped
+    if not args.case and not chat.failed:  # every case ran from the right scenes: drop what no case asked for
         merged = {k: e for k, e in merged.items() if k in set(chat.used)}
     merged.update({(p, s, ids): {"sentence": s, "prompt_before": p, "ids": ids, "reply": r, "model": real.model,
                                  "fingerprint": fp, "recorded_at": now}
