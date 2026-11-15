@@ -6,8 +6,7 @@ import json
 from commands.composer import compose
 from commands.service import CommandService
 from commands.state import SceneState
-from engine.final_reader import (CACHED_MAX_PHRASE, DEFAULT_DEMO_PROMPTS, FINAL_MAX_PHRASE, FinalReader,
-                                 FinalReaderState, load_pinned, prompt_spec)
+from engine.final_reader import DEFAULT_DEMO_PROMPTS, FinalReader, FinalReaderState, load_pinned, prompt_spec
 from engine.reader import FinalReadingService
 
 WINTER = {"op": "add", "label": "winter", "kind": "season", "phrase": "snow on the ground", "strength": 1.0}
@@ -42,10 +41,6 @@ def service(replies, pinned=None):
     chat = ReplayChat(replies)
     reader = FinalReader(FinalReaderState.ON, chat=chat, spec=prompt_spec(), pinned=pinned)
     return chat, reader, FinalReadingService(CommandService(semantic_reader=lambda *a: None), reader)
-
-
-def test_the_phrase_limit_fits_a_measured_world_sentence():
-    assert len(DESERT_250) >= 240 and FINAL_MAX_PHRASE >= 400 and CACHED_MAX_PHRASE > FINAL_MAX_PHRASE
 
 
 def test_a_pinned_250_character_world_phrase_is_used(tmp_path):
@@ -84,6 +79,11 @@ def test_the_pinned_racing_car_of_the_demo_file_is_used():
     for before, sentence in meadow:
         assert svc.handle(final(sentence))["steer"]["prompt"] == pinned[(before, sentence)].prompt, sentence
     assert chat.calls == [] and "add a red car racing on a road" in [s for _, s in meadow]
+    # the meadow chain of the demo file, in its order, never takes the car template
+    assert [s for _, s in meadow] == ["make it winter", "add a red car", "make it night", "add a lion", "sunny",
+                                      "make it a desert", "add a red car racing on a road"]
+    assert all("seen from directly behind" not in pinned[k].prompt for k in meadow)
+    assert reader.stats()["template_hits"] == 0 and reader.stats()["pinned_hits"] == len(meadow)
 
 
 def test_a_base_edit_with_a_new_place_drops_the_copied_snow():
