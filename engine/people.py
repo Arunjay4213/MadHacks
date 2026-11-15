@@ -40,7 +40,12 @@ SPOTS = (("in the foreground at the left of the frame", "left"),
          ("in the foreground at the right of the frame", "right"),
          ("in the middle ground at the centre of the frame", "centre"))
 _ADD = re.compile(r"^(?:please\s+)?(?:add|put|place|bring|show|insert|include|drop)\b")
-_RELATIVE = re.compile(r"\b(?P<spot>(?:next to|beside|near|in front of|behind|on top of) (?:the|a|an) [a-z ]+?)\s*$")
+# A place in the sentence ("next to the big red car"). Its words stop before a word that starts another clause, so
+# in "add jensen next to the car and make it winter" the spot is "next to the car" and "and make it winter" stays
+# in the sentence: whole_sentence then sees an extra clause and leaves the sentence to the model (Greptile, #273).
+_CLAUSE_WORDS = "and|then|also|plus|but|while|with|make|turn|add|remove|put|change|so"
+_RELATIVE = re.compile(r"\b(?P<spot>(?:next to|beside|near|in front of|behind|on top of) (?:the|a|an)"
+                       rf"(?: (?!(?:{_CLAUSE_WORDS})\b)[a-z]+)+)")
 
 
 # Words a bare mention may have besides the name: "i want jensen", "show me jensen huang please".
@@ -149,8 +154,8 @@ def whole_sentence(text: str, snapshot: dict) -> dict | None:
     if m.intent is Intent.ADD:
         t = _normalize(text)
         spot_m = _RELATIVE.search(t)
-        if spot_m is not None:
-            t = t[:spot_m.start()]
+        if spot_m is not None:  # every word besides the spot must still be part of the add
+            t = t[:spot_m.start()] + " " + t[spot_m.end():]
         if not all(w in _ADD_WORDS for w in _rest(t, m.alias)):
             return None
         return person_add(text, snapshot)
