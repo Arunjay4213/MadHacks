@@ -631,8 +631,7 @@
     },
     {
       "name": "repeat-add-gets-stronger",
-      "xfail": {"sonnet": "bug: Sonnet sometimes repeats the prompt word for word for a repeated add, so nothing changes (Verdict.UNCHANGED)"},
-      "note": "Greptile on #273: a repeated 'add a dog' changed nothing on screen and skipped Sonnet. A repeat means the user does not see it yet: the dog gets bigger or clearer.",
+      "note": "Greptile on #273: a repeated 'add a dog' changed nothing on screen and skipped Sonnet. A repeat means the user does not see it yet: the dog gets bigger or clearer. The reply recorded with the 90-word limit (2026-11-15) makes the dog stronger; live Sonnet may still sometimes repeat the prompt word for word (Verdict.UNCHANGED).",
       "start": "meadow",
       "modes": ["sonnet"],
       "steps": [
