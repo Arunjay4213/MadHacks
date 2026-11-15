@@ -196,3 +196,21 @@ def test_first_chunk_after_a_reset_is_unchanged(monkeypatch):
         # chunk 0 and the first chunk of the new video: 1 frame each, not padded and not cross-faded
         assert len(one_frame) == 2 and one_frame[0] == 0
         assert e.stats()["short_chunks"]["count"] == 0
+
+
+def test_padding_time_counts_as_decode_time(monkeypatch):
+    """_lead_limit budgets the pipeline from gen, decode and JPEG ms, so the padding of a short chunk, which runs
+    on the decode thread between decode and JPEG, must be in one of them (here: decode). It was in neither."""
+    real_pad = engine_module.pad_short_chunk
+
+    def slow_pad(*args):
+        time.sleep(0.1)
+        return real_pad(*args)
+
+    monkeypatch.setattr(engine_module, "pad_short_chunk", slow_pad)
+    with Run(monkeypatch, "crossfade", "6", decode_ms=5) as run:
+        e = run.engine
+        assert wait(lambda: e.chunk_shown >= 8)
+        with e._stats_lock:
+            decode = list(e.decode_ms.values)
+        assert max(decode) >= 100  # the padded chunk's decode time includes its 100 ms of padding
