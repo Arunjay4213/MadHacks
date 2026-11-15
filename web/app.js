@@ -3,7 +3,7 @@ import {
   PROTOCOL, finalizeDelay, partialMsg, finalMsg, tapMsg, parseFrame, parseServerMessage,
   splitKeyword, backoffMs, makeFrameGate, makeLatencyTracker, makeTranscriber,
   changesKey, commandKey, makeInputClassifier, wordsLabels, makeHeardTracker, PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
-  wsBaseUrl, fitSize, videoNotice, formatStamps, isResetShortcut, makeOrderedFinals,
+  wsBaseUrl, fitSize, videoNotice, formatStamps, isResetShortcut, makeOrderedFinals, makeSpeechEndpointer,
 } from './lib.js';
 
 const $ = (id) => document.getElementById(id);
@@ -334,7 +334,8 @@ document.addEventListener('keydown', (e) => {
 // ---------- live mic ----------
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 // Spoken commands reach the server in press order; nothing is held while disconnected.
-const ordered = makeOrderedFinals(send, () => control?.readyState === WebSocket.OPEN);
+const isControlOpen = () => control?.readyState === WebSocket.OPEN;
+const ordered = makeOrderedFinals(send, isControlOpen);
 let rec = null; // the current recognizer; an older one may still be ending
 let listening = null; // what the user asked for: 'toggle' | 'ptt' | null
 let startedAt = 0;
@@ -352,7 +353,9 @@ function startListening(mode) {
 function begin() {
   const r = new Recognition();
   const slot = ordered.open();
-  const t = makeTranscriber(slot.send);
+  // Words unchanged for SPEECH_STABLE_MS are sent as the final at once, not after Chrome's own pause.
+  const endpoint = makeSpeechEndpointer(slot.send, { isOpen: isControlOpen });
+  const t = makeTranscriber(endpoint.send);
   const previous = rec;
   rec = r;
   r.continuous = true;
@@ -369,7 +372,8 @@ function begin() {
     startWhenEnded = false;
   };
   r.onend = () => {
-    t.flush(); // this recognizer's leftover words become one final, once
+    t.flush(); // this recognizer's leftover words become one final, once (none if already sent early)
+    endpoint.close();
     slot.close(); // ...sent only after every earlier press has sent its own
     if (rec !== r) return; // an older recognizer: the page's state belongs to the newer one
     rec = null;
@@ -388,6 +392,7 @@ function begin() {
   } catch {
     // The browser refuses a second recognizer while the previous one is still ending: start this
     // press as soon as that one has flushed.
+    endpoint.close();
     slot.close(); // this attempt recorded nothing
     rec = previous;
     startWhenEnded = true;
