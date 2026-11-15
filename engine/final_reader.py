@@ -136,6 +136,9 @@ SIZE_WORDS = frozenset({"large", "small", "big", "huge", "tiny", "giant", "massi
                         "enormous"})
 PHRASE_POSITION_WORDS = POSITION_WORDS - {"shot", "closeup"} | {"near", "next", "beneath", "under", "above"}
 FINAL_MAX_PHRASE = 200  # characters; a positioned phrase is longer than the nano slow reader's 120
+# A saved or pinned operation was checked with FINAL_MAX_PHRASE before with_lane_cue added ", " + LANE_CUE, so a
+# cache hit is checked with room for it (the 120-character default refused the pinned racing car).
+CACHED_MAX_PHRASE = FINAL_MAX_PHRASE + len(", " + LANE_CUE)
 
 STANDIN_DETAILS = """The "details" field is the WORLD of the new scene, for the Wan2.1 text-to-video model.
 The engine builds the video prompt as SUBJECT + OBJECTS + WORLD + STYLE. SUBJECT is the scene's base sentence,
@@ -828,7 +831,7 @@ class FinalReader:
         """A cached SONNET or PINNED result's operations name change ids; check they still fit this snapshot."""
         if entry.outcome not in (Outcome.SONNET, Outcome.PINNED):
             return entry.result()
-        if all(validate_operation(dict(op), snapshot) == dict(op) for op in entry.operations):
+        if all(validate_operation(dict(op), snapshot, CACHED_MAX_PHRASE) == dict(op) for op in entry.operations):
             return entry.result()
         log.info("final reader: the cached operations for %r no longer fit the scene; dictionary path", _short(key[1]))
         return None

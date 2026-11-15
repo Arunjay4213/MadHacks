@@ -62,3 +62,23 @@ def test_a_season_said_with_the_place_and_a_base_edit_stays():
     svc.handle(final("make it winter"))
     out = svc.handle(final(sentence))
     assert sorted(c["label"] for c in out["state"]["changes"]) == ["desert", "winter"]
+
+
+def test_a_saved_long_object_phrase_with_the_lane_cue_is_used_again():
+    # Greptile on PR #120 (final_reader.py:1056) and PR #125 (demo_prompts.json:106): fresh operations may have
+    # 200 characters (plus the lane cue), but a cache hit was checked with the 120-character default, so a saved
+    # edit and the pinned racing car fell back to the dictionary.
+    from engine.final_reader import FINAL_MAX_PHRASE
+    phrase = ("a second small red sports car racing forward on the road in the next lane at the right of the frame, "
+              "large and clearly visible, low to the ground, seen from behind")
+    assert 120 < len(phrase) <= FINAL_MAX_PHRASE
+    sentence = "add a red car racing on a road"
+    chat, reader, svc = service({sentence: reply([{"op": "add", "label": "racing car", "kind": "extra",
+                                                    "phrase": phrase, "strength": 1.0}])})
+    first = svc.handle(final(sentence))
+    assert [c["label"] for c in first["state"]["changes"]] == ["racing car"]
+    calls = len(chat.calls)
+    svc.handle({"type": "tap", "action": "undo"})
+    again = svc.handle(final(sentence))
+    assert len(chat.calls) == calls and reader.stats()["cache_hits"] == 1
+    assert again["steer"]["prompt"] == first["steer"]["prompt"]

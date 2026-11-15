@@ -199,13 +199,11 @@ def test_the_meadow_chain_is_unchanged():
                                       "make it a desert", "add a red car racing on a road"]
     reader = FinalReader(FinalReaderState.ON, chat=NoChat(), spec=prompt_spec(), pinned=pinned)
     svc = FinalReadingService(CommandService(semantic_reader=lambda *a: None), reader)
-    # The 7th ("add a red car racing on a road") has a phrase over 120 characters, which _from_cache refuses
-    # today (Greptile on PR #125); that is fixed separately.
-    for before, sentence in meadow[:6]:
+    for before, sentence in meadow:
         out = svc.handle(final(sentence))
         assert "seen from directly behind" not in out["steer"]["prompt"], sentence
         assert out["steer"]["prompt"] == pinned[(before, sentence)].prompt, sentence
-    assert reader.stats()["template_hits"] == 0 and reader.stats()["pinned_hits"] == 6
+    assert reader.stats()["template_hits"] == 0 and reader.stats()["pinned_hits"] == 7
 
 
 FOG = {"op": "add", "label": "fog", "kind": "weather", "phrase": "thick fog", "strength": 1.0}
