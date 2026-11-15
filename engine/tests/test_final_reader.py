@@ -54,7 +54,7 @@ def reader(chat, **kwargs):
     return FinalReader(FinalReaderState.ON, chat=chat, **kwargs)
 
 
-def snap(*ops, base="a red car driving along a road"):
+def snap(*ops, base="a wide shot of a red car driving along a road"):
     s = SceneState(base)
     for op in ops:
         s.apply(op)
@@ -67,12 +67,12 @@ def test_operations_and_the_standin_prompt():
     r = reader(chat)
     out = r("make it winter", snap())
     assert out["operations"] == [WINTER]
-    assert out["prompt"] == ("A red car driving along a road, " + FORWARD_MOTION + ", a snowy mountain road between pine forests, snow "
+    assert out["prompt"] == ("A wide shot of a red car driving along a road, " + FORWARD_MOTION + ", a snowy mountain road between pine forests, snow "
                              "falling, cold blue light. " + VEHICLE_STYLE)
     system, user = chat.calls[0]
     assert "edit_base" in system and "WORLD" in system
-    assert user == {"scene": {"base": "a red car driving along a road", "changes": []},
-                    "prompt": "a red car driving along a road", "sentence": "make it winter", "details_max_words": 50}
+    assert user == {"scene": {"base": "a wide shot of a red car driving along a road", "changes": []},
+                    "prompt": "a wide shot of a red car driving along a road", "sentence": "make it winter", "details_max_words": 50}
     assert r("make it winter", snap()) == out and len(chat.calls) == 1  # cached by (prompt before, sentence)
     s = r.stats()
     assert (s["state"], s["calls"], s["cache_hits"], s["p50_ms"] is not None) == ("on", 1, 1, True)
@@ -109,7 +109,7 @@ def test_rejected_details_keep_the_edit_with_the_short_prompt():
     # happens, with the composed prompt, rather than the sentence being thrown away.
     r = reader(FakeChat({"make it winter": reply([WINTER], "x " * 200)}))
     out = r("make it winter", snap())
-    assert out == {"operations": [WINTER], "prompt": "a red car driving along a road; snow on the ground"}
+    assert out == {"operations": [WINTER], "prompt": "a wide shot of a red car driving along a road; snow on the ground"}
     assert r.stats()["details_rejected"] == 1 and r.stats()["rejects"] == 0
 
 
@@ -195,7 +195,7 @@ def test_prompt_spec_prefers_commands_rewriter(monkeypatch):
     r = reader(chat, spec=spec)
     # the vehicle subject still gets the forward-driving words with commands.rewriter
     assert r("make it winter", snap())["prompt"] == \
-        "a red car driving along a road, " + FORWARD_MOTION + "; snow on the ground; snow"
+        "a wide shot of a red car driving along a road, " + FORWARD_MOTION + "; snow on the ground; snow"
     assert "his prompt" in chat.calls[0][0]
     assert {"details": "snow"} in seen
     assert all(set(r) == {"details"} for r in seen)  # only the details key: his validator rejects any other

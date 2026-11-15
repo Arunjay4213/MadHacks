@@ -110,50 +110,5 @@
     "prompt": "a wide shot of a single oak tree; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a second small red car racing in the next lane at the right of the frame, white dashed lane markings rush toward the viewer; a long straight desert highway between red sandstone mesas and sand dunes, heat haze; bright daytime with clear sunlight and crisp, well-lit surroundings; warm red sandstone tones, fine drifting sand",
     "generated_at": "2026-11-15T00:12:39+00:00",
     "canonical": "a wide shot of a single oak tree; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a second small red car racing in the next lane at the right of the frame, white dashed lane markings rush toward the viewer; a long straight desert highway between red sandstone mesas and sand dunes, heat haze; bright daytime with clear sunlight and crisp, well-lit surroundings"
-  },
-  {
-    "sentence": "new scene of a red sports car driving along a country road",
-    "prompt_before": "a wide shot of a meadow with a single oak tree",
-    "operations": [
-      {
-        "op": "new_scene",
-        "base": "a red sports car driving along a country road"
-      }
-    ],
-    "prompt": "A red sports car speeds forward along a straight two-lane country road, driving away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the asphalt and the white dashed lane markings rush toward the viewer beneath it. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
-    "generated_at": "2026-11-15T00:12:40+00:00",
-    "canonical": "a red sports car driving along a country road"
-  },
-  {
-    "sentence": "make it winter",
-    "prompt_before": "a red sports car driving along a country road",
-    "operations": [
-      {
-        "op": "add",
-        "label": "winter",
-        "kind": "season",
-        "phrase": "deep snow covers the ground and a cold wintry atmosphere",
-        "strength": 1.0
-      }
-    ],
-    "prompt": "A red sports car speeds forward along a straight two-lane country road, driving away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the asphalt and the white dashed lane markings rush toward the viewer beneath it. Deep snow covers the ground and a cold wintry atmosphere; powdery snow, crisp frosty air, pale silver light, soft cold blue tones. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
-    "generated_at": "2026-11-15T00:12:42+00:00",
-    "canonical": "a red sports car driving along a country road; deep snow covers the ground and a cold wintry atmosphere"
-  },
-  {
-    "sentence": "make it night",
-    "prompt_before": "a red sports car driving along a country road; deep snow covers the ground and a cold wintry atmosphere",
-    "operations": [
-      {
-        "op": "add",
-        "label": "night",
-        "kind": "time",
-        "phrase": "dark night with a bright moon in the sky and deep blue shadows",
-        "strength": 1.0
-      }
-    ],
-    "prompt": "A red sports car speeds forward along a straight two-lane country road, driving away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the asphalt and the white dashed lane markings rush toward the viewer beneath it. Deep snow covers the ground and a cold wintry atmosphere; dark night with a bright moon in the sky and deep blue shadows; pale snow glittering, cold silvery light, deep blue shadows, frosty air. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
-    "generated_at": "2026-11-15T00:12:43+00:00",
-    "canonical": "a red sports car driving along a country road; deep snow covers the ground and a cold wintry atmosphere; dark night with a bright moon in the sky and deep blue shadows"
   }
 ]

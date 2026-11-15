@@ -9,8 +9,8 @@ import logging
 
 from commands.composer import compose
 from commands.service import CommandService
-from engine.final_reader import (CAR_BASE, CAR_PROMPT, FORWARD_MOTION, LANE_CUE, STANDIN, VEHICLE_STYLE, FinalReader,
-                                 FinalReaderState, ANCHORS, prompt_spec, standin_validate)
+from engine.final_reader import (FORWARD_MOTION, LANE_CUE, STANDIN, VEHICLE_STYLE, FinalReader, FinalReaderState,
+                                 prompt_spec, standin_validate)
 
 WINTER = {"op": "add", "label": "winter", "kind": "season",
           "phrase": "deep winter, snow covering the ground, frost on bare branches", "strength": 1.0}
@@ -171,31 +171,6 @@ def test_a_new_object_without_size_or_position_is_asked_again_and_then_kept_afte
     assert results[0]["prompt"].startswith(subject + LION["phrase"] + "; ")
     for res in results[1:]:  # winter comes before the objects; the lion stays verbatim right after it
         assert res["prompt"].startswith(subject + WINTER["phrase"] + "; " + LION["phrase"] + "; "), res["prompt"]
-
-
-def test_the_car_chain_keeps_ishaans_first_two_sentences():
-    # (f) "new scene of a red sports car driving along a country road" is Ishaan's tested prompt, verbatim; later
-    # prompts of that scene keep its first two sentences word for word, then the changes and the details.
-    anchor = ANCHORS[CAR_BASE]
-    lead = ("A red sports car speeds forward along a straight two-lane country road, driving away from the camera. "
-            "The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the "
-            "car centred in the frame while the asphalt and the white dashed lane markings rush toward the viewer "
-            "beneath it.")
-    assert anchor.lead == lead
-    chat = ReplayChat({
-        # the model words the base its own way; the anchored sentence still gives the anchored base
-        "new scene of a red sports car driving along a country road": reply(
-            [{"op": "new_scene", "base": "A red sports car driving along a country road."}], "green fields, haze"),
-        "make it winter": reply([WINTER], "cold pale light, powdery snow banks, frosted grass"),
-        "make it night": reply([NIGHT], "pale snow crust, glittering frost, cold dark air"),
-    })
-    _, (start, winter, night) = play(chat, ["new scene of a red sports car driving along a country road",
-                                            "make it winter", "make it night"])
-    assert start["scene"]["base"] == CAR_BASE and start["prompt"] == CAR_PROMPT
-    for res in (winter, night):
-        assert res["prompt"].startswith(lead + " "), res["prompt"]
-        assert res["prompt"].endswith(". " + anchor.style)
-    assert "Deep winter, snow covering the ground" in night["prompt"] and "pale snow crust" in night["prompt"]
 
 
 def test_position_phrases_stay_verbatim_and_details_never_place_things():
