@@ -210,14 +210,22 @@ def plan(text: str, snapshot: dict) -> Plan:
 
 
 def measured_operations(p: Plan, snapshot: dict) -> list[dict]:
-    """The operations of a MEASURED plan, as commands/state.py operations. On a bare vehicle scene: remove the
-    time changes (the world brings its own light) and add the world, which clears season, weather and the old
-    world in commands.state. Otherwise (a new scene, or a base that names its own place): a new scene of the
-    bare subject, then the world."""
-    add = {"op": "add", "label": p.world.name, "kind": "world", "phrase": f"{p.world.road}.", "strength": 1.0}
+    """The operations of a MEASURED plan, as commands/state.py operations.
+
+    The start world (country) is the bare vehicle scene itself, with no world chip: the new scene sentence maps
+    that bare state to the country template, so removing a later world chip goes back to a state that still has
+    the template (a world chip on it would leave the bare state with no template prompt after its removal).
+    On a bare vehicle scene, another world removes the time changes (the world brings its own light) and adds the
+    world, which clears season, weather and the old world in commands.state; country removes every change that
+    is not an object. Otherwise (a new scene, or a base that names its own place): a new scene of the bare
+    subject, then the world unless it is country."""
+    start = p.world.name == START_WORLD
+    add = [] if start else [{"op": "add", "label": p.world.name, "kind": "world", "phrase": f"{p.world.road}.",
+                             "strength": 1.0}]
     if p.new_scene or not is_bare(snapshot):
-        return [{"op": "new_scene", "base": p.subject}, add]
-    return [*({"op": "remove", "id": c["id"]} for c in snapshot["changes"] if c["kind"] == "time"), add]
+        return [{"op": "new_scene", "base": p.subject}, *add]
+    drop = ("world", "season", "weather", "time") if start else ("time",)
+    return [*({"op": "remove", "id": c["id"]} for c in snapshot["changes"] if c["kind"] in drop), *add]
 
 
 def camera_sentence(subject: str) -> str:
@@ -242,15 +250,23 @@ def world_prompt(subject: str, world: World, objects=()) -> str:
 
 
 def scene_objects(snapshot: dict) -> list[str]:
-    """The phrases of the scene's objects that are on, in the order they were added."""
-    return [c["phrase"] for c in snapshot["changes"] if c["kind"] == "extra" and c["strength"] > 0]
+    """The phrases of the scene's objects that are on, in the order they were added, with commands.composer's
+    strength wording (a subtle hint of, a moderate amount of, intense), so weakening a chip changes the prompt."""
+    out = []
+    for c in snapshot["changes"]:
+        if c["kind"] != "extra" or c["strength"] <= 0:
+            continue
+        s, phrase = c["strength"], c["phrase"]
+        out.append(f"a subtle hint of {phrase}" if s < 0.5 else f"a moderate amount of {phrase}" if s < 1
+                   else f"intense {phrase}" if s > 1 else phrase)
+    return out
 
 
 def current_world(snapshot: dict) -> World | None:
     """The measured world of a vehicle scene: its world change's label when it is one of WORLDS (none: country)."""
     worlds = [c for c in snapshot["changes"] if c["kind"] == "world" and c["strength"] > 0]
     if not worlds:
-        return WORLDS[START_WORLD] if is_bare(snapshot) and not snapshot["changes"] else None
+        return WORLDS[START_WORLD] if is_bare(snapshot) else None
     return WORLDS.get(worlds[-1]["label"])
 
 
