@@ -3,7 +3,8 @@
 import re
 
 from .state import KINDS
-from .world import car_prompt, compose_base, is_road_scene, road_scene_subject, road_scene_world, world_with_overrides
+from .world import (car_prompt, change_wording, compose_base, is_road_scene, road_scene_subject, road_scene_world,
+                    world_with_overrides)
 
 _ARTICLE_RX = re.compile(r"^(a|an|the)\s+(.+)$", re.IGNORECASE | re.DOTALL)
 
@@ -31,13 +32,14 @@ def strength_phrase(phrase: str, strength: float) -> str:
     return phrase
 
 
-def _phrases(changes):
-    """(extras, modifiers): the phrases of the non-world changes that have an effect, strength-worded, by kind."""
+def _phrases(changes, world_change=None):
+    """(extras, modifiers): the phrases of the non-world changes that have an effect, strength-worded, by kind.
+    A change the shown world words itself ("sunny" on the snowy mountain road) takes that world's sentence."""
     extras, modifiers = [], []
     for change in sorted(changes, key=lambda c: KINDS.index(c['kind'])):
         if change['kind'] == 'world' or change['strength'] == 0:
             continue
-        phrase = strength_phrase(change['phrase'], change['strength'])
+        phrase = strength_phrase(change_wording(world_change, change), change['strength'])
         (extras if change['kind'] == 'extra' else modifiers).append(phrase)
     return extras, modifiers
 
@@ -47,10 +49,10 @@ def compose(snapshot):
     if is_road_scene(base):
         # A road scene is always Ishaan's car template, and on it a winter season is the snowy mountain road.
         world_change, rest = road_scene_world(base, changes)
-        extras, modifiers = _phrases(rest)
+        extras, modifiers = _phrases(rest, world_change)
         return car_prompt(world_with_overrides(world_change, rest), extras, modifiers, road_scene_subject(base))
     worlds = [c for c in changes if c['kind'] == 'world' and c['strength'] > 0]  # zero strength: no effect
-    extras, modifiers = _phrases(changes)
+    extras, modifiers = _phrases(changes, worlds[-1] if worlds else None)
     if worlds:
         world = world_with_overrides(worlds[-1], changes)
         base = compose_base(base, world).partition(world)[0].rstrip(' ;,')

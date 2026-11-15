@@ -72,6 +72,13 @@ _TABLE = [
     ("meadow", [("a green meadow with soft grass", {}), (", under a clear blue sky", {"time": "day", "weather": "clear"})],
      ["meadow", "the meadow", "grassland"]),
 ]
+# A sunlit time change says the weather too: "sunny" and "make it day" (the dictionary's "bright daytime sunlight under a
+# clear blue sky") conflict with a built-in overcast light, rain or falling snow, unless a weather change says otherwise.
+_SUNLIT = frozenset({"clear", "haze"})
+_IMPLIED = {"day": {"weather": _SUNLIT}, "noon": {"weather": _SUNLIT}}
+# A world's own light sentence for an explicit change, in the style of Ishaan's measured light: on the snowy road a
+# sunny day is winter sunshine, so the road stays snowy instead of getting the generic daylight sentence.
+_LIGHT_WORDING = {("snowy mountain road", "day"): "bright winter sunshine in a clear blue sky, sparkling snow, crisp shadows"}
 _SEGMENTS = {label: segments for label, segments, _ in _TABLE}
 _PHRASES = {"".join(text for text, _ in segments) + ".": label for label, segments, _ in _TABLE}
 WORLDS: dict[str, dict] = {}
@@ -154,9 +161,12 @@ def world_phrase(snapshot: dict) -> str:
 def world_with_overrides(world_change: dict | None, changes: list) -> str | None:
     """The active world's phrase with conflicting BUILT-IN sky/time/weather segments removed.
 
-    A segment is dropped only when an explicit change of the same kind (time, weather, season) names a
-    different label: "desert" + "night" loses the afternoon sun but keeps the heat haze. Other changes and
-    the scene state are untouched. Unknown (fallback) world phrases are returned literally. None if no world.
+    A segment is dropped when an explicit change of the same kind (time, weather, season) names a different
+    label: "desert" + "night" loses the afternoon sun but keeps the heat haze. A sunlit time (day, noon) also
+    drops built-in weather that is not sunlit, unless an explicit weather change says the weather: "snowy
+    mountain road" + "sunny" loses the overcast light and the falling snow but keeps the snowy road and forest.
+    Other changes and the scene state are untouched. Unknown (fallback) world phrases are returned literally.
+    None if no world.
     """
     if world_change is None:
         return None
@@ -164,10 +174,20 @@ def world_with_overrides(world_change: dict | None, changes: list) -> str | None
     segments = _SEGMENTS.get(_PHRASES.get(phrase))
     if segments is None:
         return phrase
-    explicit = {c["kind"]: c["label"] for c in changes
-                if c.get("kind") in ("time", "weather", "season") and c.get("strength", 1.0) > 0}  # zero = no effect
-    kept = [text for text, tags in segments if all(explicit.get(k, v) == v for k, v in tags.items())]
+    active = [c for c in changes if c.get("kind") in ("time", "weather", "season") and c.get("strength", 1.0) > 0]
+    explicit = {c["kind"]: c.get("label") for c in active}  # zero strength = no effect
+    implied = {kind: values for c in active for kind, values in _IMPLIED.get(c.get("label"), {}).items()
+               if kind not in explicit}
+    kept = [text for text, tags in segments
+            if all(explicit.get(k, v) == v and v in implied.get(k, {v}) for k, v in tags.items())]
     return "".join(kept) + "."
+
+
+def change_wording(world_change: dict | None, change: dict) -> str:
+    """The phrase a change is written with in this world: the world's own light sentence for it if it has one
+    ("sunny" on the snowy mountain road), else the change's phrase."""
+    world = _PHRASES.get(world_change["phrase"]) if world_change else None
+    return _LIGHT_WORDING.get((world, change.get("label")), change["phrase"])
 
 
 _WORLD_ALIAS_RX = re.compile(r"\b(?:" + "|".join(sorted(map(re.escape, WORLDS), key=len, reverse=True)) + r")\b")

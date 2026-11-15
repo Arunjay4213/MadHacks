@@ -72,6 +72,9 @@ Repeating the current world still clears a later season.
 The known places are in `world.py`: country road, desert, snowy mountain road, neon city, ocean coast (also "beach" and "sea"), Mars, forest and meadow.
 The first six are Ishaan's tested sentences, word for word (country road is the world of his tested car prompt); forest was added at the lead's request, and meadow lets "take me back to the meadow" return to the oak scene.
 A later season, weather or time change removes the matching built-in part of the world sentence (for example the desert's afternoon sun after "make it night").
+A sunlit time ("sunny", "make it day", "noon") also removes built-in weather that is not sunlit, such as overcast light, rain or falling snow, unless a weather change names the weather itself.
+A world can word such a change in its own light sentence: on the snowy mountain road "sunny" becomes "Bright winter sunshine in a clear blue sky, sparkling snow, crisp shadows." in place of the overcast winter light, and the snowy road and forest stay.
+The state only gains a `day` change, so one undo brings the overcast light back.
 An arbitrary custom base that mixes an unknown world with subjects is rejected rather than edited by unsafe text surgery.
 
 ## The car scene (road scenes)
@@ -109,6 +112,10 @@ A sentence is limited to 16 operations, and nested batches are rejected.
   A world whose own name holds a preposition is still named in full: "remove the city on mars" removes the "city on mars" world.
 - "reset", "start over" and "clear everything" go back to the base scene, and the engine starts a new video.
 - "a little more snow" and "a little less snow" move the strength up or down from where it is.
+- The vector matcher and the style fallback ("make it spooky") read strength words with the same `reader.strength_for` as the dictionary.
+  "make it a little nocturnal" adds night at 0.3, and "make it much more nocturnal" with night present raises it.
+  The style fallback never keeps a strength word in the chip: "make it a little spooky" adds spooky at 0.3, and "make it less spooky" with spooky present lowers it.
+- Pace words ("slowly", "gradually", "gently", "little by little", "suddenly") set only the ramp, never the strength: "slowly make it winter" gives winter at 1.0 over 12 chunks, on every path, including the style fallback ("slowly make it spooky").
 
 ## Local vector embeddings
 

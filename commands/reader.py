@@ -415,34 +415,44 @@ def remove_target(text: str):
 
 
 _STYLE_RX = re.compile(r"^(?:please\s+)?(?:make|turn)\s+(?:it|everything|the scene|the whole scene|the world|the picture)\s+"
-                       r"(?:(?:look|feel|seem)\s+)?(?:more\s+)?(like\s+)?(.+)$")
+                       r"(?:(?:look|feel|seem)\s+)?(?P<more>more\s+)?(?P<like>like\s+)?(?P<what>.+)$")
 _MAX_STYLE_WORDS = 4
 # Praise and comparison words describe no look; "make it nice" stays unmatched (red) instead of guessing.
 _VAGUE = {"nice", "good", "better", "best", "cool", "great", "awesome", "amazing", "different", "interesting", "fun",
           "okay", "ok", "fine", "bad", "worse", "pretty", "beautiful", "work", "happen", "so", "like that", "that way"}
 
 
-def style_fallback(text: str):
+def style_fallback(text: str, snapshot: dict | None = None):
     """Last resort for a look or mood nothing else understood: "make it spooky" -> an extra change
-    "the whole scene looks spooky". None for negation, transforms, dictionary words and long phrases."""
+    "the whole scene looks spooky". None for negation, transforms, dictionary words and long phrases.
+
+    Strength words use the same strength_for as the dictionary and vector paths and never stay in the label:
+    "make it a little spooky" adds "spooky" at 0.3, and "much more" or "less" on an existing "spooky" sets its strength."""
     t = _norm(text)
     if is_blocked(t) or KEYWORD_RX.search(t):
         return None
-    m = _STYLE_RX.match(t)
+    # Pace words set the ramp (the service reads them with _pace), never the look or the strength.
+    m = _STYLE_RX.match(" ".join(_SUDDEN_RX.sub(" ", _SLOW_RX.sub(" ", t)).split()))
     if not m:
         return None
-    like, what = m.group(1), _FILLER_TAIL_RX.sub("", m.group(2)).strip()
-    if len(what.split()) > _MAX_STYLE_WORDS:
+    like, spoken = m.group("like"), _FILLER_TAIL_RX.sub("", m.group("what")).strip()
+    if len(spoken.split()) > _MAX_STYLE_WORDS:
         return None
-    strength = strength_for(what)
-    what = " ".join(_HIGH_RX.sub(" ", _LOW_RX.sub(" ", what)).split())
+    what = spoken
+    for rx in (_LOW_RX, _HIGH_RX, _MORE_RX, _LESS_RX):
+        what = rx.sub(" ", what)
+    what = " ".join(what.split())
     if not what or what in _NOT_AN_OBJECT or len(what.split()) > _MAX_STYLE_WORDS:
         return None
     if set(what.split()) <= _VAGUE | _STOP - {"black", "white", "red", "orange", "yellow", "green", "blue", "purple", "pink",
                                               "grey", "gray", "brown", "golden", "gold", "silver", "dark", "bright"}:
         return None
+    strength_words = (m.group("more") or "") + spoken
+    existing = _find(snapshot or {}, what)
+    if existing:
+        return {"op": "set_strength", "id": existing["id"], "strength": strength_for(strength_words, existing["strength"])}
     return {"op": "add", "label": what, "kind": "extra", "phrase": "the whole scene looks " + ("like " if like else "") + what,
-            "strength": strength}
+            "strength": strength_for(strength_words)}
 
 
 def is_blocked(text: str) -> bool:
