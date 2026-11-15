@@ -49,6 +49,9 @@ A check costs about one API call when nothing is new, so the whole team stays we
 ### Staying in the loop
 
 - Claude Code: the committed hooks in `.claude/settings.json` show unread posts at session start and on every prompt.
+- Claude Code: a docs check (`.claude/hooks/docs-check.sh`) runs when an agent or subagent finishes.
+  If code changed in a team folder (uncommitted, or on the branch but not on `main`) and no docs in that folder changed, it stops the agent once and asks it to update that folder's README.md, plus AGENTS.md or CLAUDE.md if a rule or convention changed.
+- Every agent: keep docs current in the same PR as the code. A change to behaviour, flags, endpoints or setup is not done until the folder's README.md says so.
   Keep exactly one background `tools/board wait` running and start it again after each time it wakes.
 - Any other agent: run `tools/board unread` at task start, before each commit, and after merges.
   A terminal loop also works: `while tools/board wait; do <your agent CLI invocation>; done`.
