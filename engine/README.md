@@ -74,9 +74,10 @@ At 832x480 one chunk takes about 443 ms on this GPU, so that size is not real ti
 | Generation per chunk | 191.5 ms average | live `/stats`, read at about 00:15 UTC on 2026-11-15 |
 | Decode per chunk (TAEHV) | 21.9 ms average | the same `/stats` read |
 | Frame rate out | 16.0 fps | the same `/stats` read |
-| Command to screen, draft script | 637 to 640 ms | harness run after PR #113 (board post at 00:09 UTC) |
+| Command to screen, draft script | 563 to 674 ms with the Sonnet reader's pinned prompts (637 to 640 ms before it) | harness runs after PR #125 (board post at 00:38 UTC) and after PR #113 (00:09 UTC) |
+| Generation around commands | 190 to 210 ms idle, up to about 230 ms around commands, 16 fps held | the same post at 00:38 UTC |
 | Command to screen on the page | 496 ms ("make it winter"), 429 ms (push-to-talk "make it night") | Ani's live check after PR #104 (board post at 23:59 UTC) |
-| Sonnet final reader, new sentence | 1.87 s per call (p50), 2.3 to 3.1 s command to screen | test engine with the fake backend, 5 calls (board post at 23:31 UTC) |
+| Sonnet final reader, new sentence | 1.87 s per call (p50), 2.3 to 3.1 s command to screen on a test engine; about 2 s extra live | test engine with the fake backend, 5 calls (board post at 23:31 UTC); live (00:38 UTC) |
 | Sonnet final reader, pinned or cached sentence | no extra wait | the same post |
 
 The steps from a command to its first frame are in "Command stages and delay stamps" below.
@@ -224,7 +225,8 @@ Check a recording with `ffprobe -v error -show_entries format=duration:stream=wi
 - The draft script is clean in every frame, and the red car is red and visible (`engine/samples/harness_before_after_113.jpg`).
 - Every steer and every refresh re-composes the shot: the camera, the tree and the car move, because a re-anchor restarts the picture from noise and continuity comes only from the prompt text (Ishaan, board posts at 23:42 and 00:12 UTC).
   The refresh every 48 chunks halves how often this happens; a backend fix is being measured by Ishaan.
-- An added lion was missing or tiny in the harness runs before PR #125; PR #125 pinned prompts with size and position words for it, not yet checked on the live engine.
+- An added lion was missing or tiny before PR #125; with the pinned prompts (size and position words) it is on screen in the left foreground through night and sunny (`engine/samples/harness_before_after_sonnet.jpg`).
+- "make it a desert" drops the snow and keeps the car and the lion; "add a red car racing on a road" after it gives a weak, cropped second car, so it is kept out of the script (`engine/samples/sonnet_desert_chain_live.jpg`).
 - No variant tried kept the exact camera and layout across a world change (Ishaan, board post at 23:48 UTC).
 
 ## Command line
