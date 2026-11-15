@@ -49,7 +49,8 @@ class FinalReadingService:
     """CommandService with the final reader in front of the dictionary for every FINAL.
 
     final_reader(text, snapshot) gives None (the service reads the sentence itself, as without this wrapper, and on
-    a vehicle scene final_reader.fallback_prompt gives the car template for the result),
+    a vehicle scene final_reader.fallback_prompt gives the car template for the result, as for an undo or reset
+    with edits, which the dictionary reads),
     {"blocked": True} (no steer: unmatched), or {"operations", "prompt"} (applied to the service's scene).
 
     The model sees one prompt per scene state: the first rich prompt chosen for a composed prompt is kept in
@@ -76,7 +77,7 @@ class FinalReadingService:
             if kind is SentenceKind.MIXED:
                 # Not blocked. The final reader leaves undo and reset to the dictionary, so its operations would
                 # drop them: the dictionary reads the whole sentence, as it would without this wrapper.
-                return self._mapped(self._svc.handle(msg))
+                return self._dictionary(msg, snapshot)
             if result is not None:
                 # The service steers to the composed prompt and _mapped gives the rich one, so an undo back to
                 # this state, or another sentence reaching it, gives the same words (the same embedding).
@@ -84,16 +85,19 @@ class FinalReadingService:
                 if out["steer"] is not None:
                     self._model_prompts.setdefault(out["steer"]["prompt"], result["prompt"])
                 return self._mapped(out)
-            # No answer (a timeout, an error or an unusable reply): the dictionary reads it. On a vehicle scene the
-            # final reader still gives the car template for the new state, so the car keeps driving forward.
-            out = self._svc.handle(msg)
-            if out["steer"] is not None and not out["state"]["unmatched"] \
-                    and out["steer"]["prompt"] not in self._model_prompts:
-                prompt = self._final_reader.fallback_prompt(snapshot, self._svc.snapshot())
-                if prompt is not None:
-                    self._model_prompts[out["steer"]["prompt"]] = prompt
-            return self._mapped(out)
+            return self._dictionary(msg, snapshot)  # no answer: a timeout, an error or an unusable reply
         return self._mapped(self._svc.handle(msg))
+
+    def _dictionary(self, msg: dict, snapshot: dict) -> dict:
+        """A final the dictionary reads (no usable answer, or an undo or reset with edits). On a vehicle scene the
+        final reader still gives the car template for the new state, so the car keeps driving forward."""
+        out = self._svc.handle(msg)
+        if out["steer"] is not None and not out["state"]["unmatched"] \
+                and out["steer"]["prompt"] not in self._model_prompts:
+            prompt = self._final_reader.fallback_prompt(snapshot, self._svc.snapshot())
+            if prompt is not None:
+                self._model_prompts[out["steer"]["prompt"]] = prompt
+        return self._mapped(out)
 
     def state_fields(self) -> dict:
         return self._svc.state_fields()

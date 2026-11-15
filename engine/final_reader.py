@@ -665,6 +665,9 @@ class FinalReader:
         # composed prompt of a vehicle scene -> the template prompt last given for it, so the next model call on
         # that scene is told its current road, scene and light (after "make it foggy", the fog stays)
         self._given_vehicle: dict[str, str] = {}
+        # composed prompt of a vehicle scene -> (the fallback prompt given for it, its world, its condition phrases),
+        # since parse_world cannot read a prompt back once a condition sentence follows the objects (fallback_prompt)
+        self._fallback_vehicle: dict[str, tuple[str, car_template.World, tuple[str, ...]]] = {}
         self._pool = concurrent.futures.ThreadPoolExecutor(max_workers=WORKERS, thread_name_prefix="final-reader")
         self.calls = 0
         self.cache_hits = 0
@@ -819,7 +822,8 @@ class FinalReader:
 
         The world is the one last given for `before` when the dictionary kept the world, season, weather and time
         changes as they were; otherwise the measured world of `after`. Season, weather and time phrases that world
-        does not already say (the ones just added, or all of them for a measured world) follow the object sentences."""
+        does not already say (the ones just added, or all of them for a measured world) follow the object sentences;
+        they are kept with the world, so a later fallback on that scene keeps both."""
         subject = car_template.vehicle_subject(after.get("base"))
         if subject is None:
             return None
@@ -830,28 +834,43 @@ class FinalReader:
 
         old_ids = {c["id"] for c in before["changes"]}
         added = [c for c in after["changes"] if c["id"] not in old_ids]
-        world = None
+        given = None
         if (before.get("base") == after["base"] and set(settings(before)) <= set(settings(after))
                 and not any(c["kind"] == "world" for c in added)):
-            world = self._given_world(before, subject)
-        if world is None:
-            world, added = car_template.current_world(after), after["changes"]
+            given = self._given_world_said(before, subject)
+        if given is not None:
+            world, earlier = given
+        else:
+            world, earlier, added = car_template.current_world(after), (), after["changes"]
         if world is None:
             return None
-        said = [strength_phrase(c["phrase"], c["strength"]) for c in added
-                if c["kind"] in ("season", "weather", "time") and c["strength"] > 0]
+        said = (*earlier, *(strength_phrase(c["phrase"], c["strength"]) for c in added
+                            if c["kind"] in ("season", "weather", "time") and c["strength"] > 0))
         prompt = car_template.world_prompt(subject, world, [*car_template.scene_objects(after), *said])
         with self._lock:
             self._given_vehicle[compose(after)] = prompt
+            self._fallback_vehicle[compose(after)] = (prompt, world, said)
         log.info("final reader: the dictionary's result on a vehicle scene gets the car template (%s)", world.name)
         return prompt
 
-    def _given_world(self, snapshot: dict, subject: str) -> "car_template.World | None":
-        """The road, scene and light of the prompt last given for this vehicle scene, or None."""
+    def _given_world_said(self, snapshot: dict, subject: str) -> "tuple[car_template.World, tuple[str, ...]] | None":
+        """The world of the prompt last given for this vehicle scene and the condition phrases it says after the
+        objects (none for a Sonnet or measured prompt; a fallback prompt's own), or None."""
         from commands.composer import compose
         with self._lock:
-            given = self._given_vehicle.get(compose(snapshot))
-        return car_template.parse_world(given, subject, car_template.scene_objects(snapshot))
+            key = compose(snapshot)
+            given, fallback = self._given_vehicle.get(key), self._fallback_vehicle.get(key)
+        world = car_template.parse_world(given, subject, car_template.scene_objects(snapshot))
+        if world is not None:
+            return world, ()
+        if fallback is not None and fallback[0] == given:
+            return fallback[1], fallback[2]
+        return None
+
+    def _given_world(self, snapshot: dict, subject: str) -> "car_template.World | None":
+        """The road, scene and light of the prompt last given for this vehicle scene, or None."""
+        given = self._given_world_said(snapshot, subject)
+        return None if given is None else given[0]
 
     def _current_vehicle_world(self, snapshot: dict, subject: str) -> "car_template.World | None":
         """The road, scene and light of the prompt last given for this vehicle scene, else its measured world."""
