@@ -65,17 +65,70 @@ A run against a URL that is not localhost changes the shared live video for ever
 The live engine runs on `madhacks-engine` (one NVIDIA L40S) in two tmux sessions: `engine` (the server) and `tunnel` (a Cloudflare quick tunnel).
 The model is Causal Forcing++ framewise 2-step at 672x384 with the TAEHV decoder; see `engine/MODEL_NOTES.md` for the model, licenses and timing table.
 One chunk is one latent frame, which is 4 video frames (0.25 s at 16 fps), so real time needs generation plus decode under 250 ms per chunk.
-Measured while serving: generation about 210 ms and decode about 21 ms per chunk, 16.0 fps out, no stalls.
 At 832x480 one chunk takes about 443 ms on this GPU, so that size is not real time on one L40S.
 
-Start the server (first time on a new machine: `bash engine/setup_gpu.sh`, then `uv pip install -r engine/requirements.txt -r steering/requirements.txt` into `~/engine-venv`):
+### Measured numbers
+
+| What | Value | Source |
+|---|---|---|
+| Generation per chunk | 191.5 ms average | live `/stats`, read at about 00:15 UTC on 2026-11-15 |
+| Decode per chunk (TAEHV) | 21.9 ms average | the same `/stats` read |
+| Frame rate out | 16.0 fps | the same `/stats` read |
+| Command to screen, draft script | 563 to 674 ms with the Sonnet reader's pinned prompts (637 to 640 ms before it) | harness runs after PR #125 (board post at 00:38 UTC) and after PR #113 (00:09 UTC) |
+| Generation around commands | 190 to 210 ms idle, up to about 230 ms around commands, 16 fps held | the same post at 00:38 UTC |
+| Command to screen on the page | 496 ms ("make it winter"), 429 ms (push-to-talk "make it night") | Ani's live check after PR #104 (board post at 23:59 UTC) |
+| Sonnet final reader, new sentence | 1.87 s per call (p50), 2.3 to 3.1 s command to screen on a test engine; about 2 s extra live | test engine with the fake backend, 5 calls (board post at 23:31 UTC); live (00:38 UTC) |
+| Sonnet final reader, pinned or cached sentence | no extra wait | the same post |
+
+The steps from a command to its first frame are in "Command stages and delay stamps" below.
+
+### Live flags and why each is set
+
+The live command line is `ExecStart` in `engine/deploy/madhacks-engine.service`:
 
 ```
-tmux new-session -d -s engine "cd ~/madhacks && source ~/engine-venv/bin/activate && python -m engine.server --backend causal_forcing --reader commands --width 672 --height 384 --backend-opt vae=taehv --reanchor on --reanchor-opt refresh_every_chunks=none --host 127.0.0.1 --port 8000 --record-dir /home/ubuntu/recordings 2>&1 | tee -a ~/runs/engine-server.log"
+python -m engine.server --backend causal_forcing --reader commands --width 672 --height 384 \
+    --backend-opt vae=taehv --backend-opt cut_fade_frames=8 \
+    --reanchor on --reanchor-opt refresh_every_chunks=48 --final-reader sonnet \
+    --host 127.0.0.1 --port 8000 --record-dir /home/ubuntu/recordings
 ```
 
-Loading takes about 70 s; `curl -s localhost:8000/stats | jq .state` prints `GENERATING` when it is up.
-The repo on the machine is a copy made with `rsync -a --delete --exclude .git ./ madhacks-engine:madhacks/` from a laptop clone, because the machine has no GitHub credentials.
+The unit also sets `COMMAND_SEMANTIC=1` and loads `~/.madhacks-foundry.env`.
+
+| Flag | Why |
+|---|---|
+| `--width 672 --height 384` | The largest size measured under the 250 ms budget on one L40S (Gate 1). |
+| `--backend-opt vae=taehv` | The stock Wan VAE decodes in 157 ms per chunk against 21.5 ms for TAEHV, with an almost identical picture (Ishaan, board post at 23:53 UTC). |
+| `--reanchor on` | Moving the embedding alone does not change the picture: the model keeps copying its old frames. A re-anchor restarts the next chunk from a noised copy of the picture under the new prompt (Gate 2, PR #57). |
+| Refresh (default on with `--reanchor on`) | Without it the picture over-saturates by 25 to 30 s and breaks by 40 to 60 s; a refresh from the clean anchor keeps it clean (PR #83, board post at 23:47 UTC). |
+| `--reanchor-opt refresh_every_chunks=48` | Each refresh re-composes the shot, so a refresh every 48 chunks (12 s) halves the jumps of the default 24; 48 was the longest interval that stayed nearly clean on the car (PR #83, Ishaan's interim request at 00:12 UTC). |
+| Decoder restart (always on, `first_frame_pad=hold` default) | A re-anchor chunk is a first frame; decoding it as a continuation gave a washed-out, ghosted chunk (sharpness 498 against 2049 before; 1871 after, PR #83). |
+| `--backend-opt cut_fade_frames=8` | A re-anchor is a hard cut; dissolving from the last shown frame over 8 frames (0.5 s) brings the largest frame-to-frame change at a steer from 82 to 13 (PR #113). Refreshes fade too (`cut_fade_refresh` default 1); Ishaan saw no double car on the live recording, so it stays on (board post at 00:12 UTC). |
+| `--reader commands` | The `commands/` scene state, dictionary and composer read every sentence. |
+| `COMMAND_SEMANTIC=1` | Turns on the CPU vector matcher in `commands/` for finals the dictionary misses (PR #73, PR #78). |
+| `--final-reader sonnet` | Every final sentence goes to one Claude Sonnet 5.5 call that returns the operations and a rich prompt, with the dictionary as the instant result for partials and the backup on a timeout (PR #87, PR #120, live since PR #125). |
+| `--demo-prompts` (default `engine/demo_prompts.json`) | The demo sentences' Sonnet prompts are pinned, so every run draws the same words and a prompt checked on the GPU stays as checked (see "Final reader (Sonnet)"). |
+| `--record-dir /home/ubuntu/recordings` | Every video is saved as an mp4, for the backup video and for checks such as Ishaan's refresh review. |
+
+Rollback for the last deploy (PR #125): remove `--final-reader sonnet` and `--reanchor-opt refresh_every_chunks=48`.
+
+### Deploy and restart
+
+First time on a new machine: `bash engine/setup_gpu.sh`, then `uv pip install -r engine/requirements.txt -r steering/requirements.txt` into `~/engine-venv`, and for the vector matcher `pip install -r commands/requirements-semantic.txt` and `python -m commands.semantic --prepare` as the `ubuntu` user.
+
+The repo on the machine is a copy made with `rsync -a --delete --exclude .git ./ madhacks-engine:madhacks/` from a laptop clone of `main`, because the machine has no GitHub credentials.
+Build Lucid Studio in that clone first (`cd lucid-studio && npm ci && npm run build`), so `lucid-studio/dist` goes with the copy.
+
+1. Post on the board before a restart: the video is gone for about 80 s, and the tunnel address stays the same.
+2. Copy the repo as above.
+3. If `engine/deploy/madhacks-engine.service` changed: `sudo cp ~/madhacks/engine/deploy/madhacks-engine.service /etc/systemd/system/ && sudo systemctl daemon-reload`.
+4. `sudo systemctl restart madhacks-engine`.
+5. Wait until `curl -s localhost:8000/stats | jq .state` prints `GENERATING` (loading takes about 70 to 90 s).
+6. Run the harness (see "Demo harness") before and after the restart, and post both sheets.
+
+A change to only `web/` or `lucid-studio/dist` needs the copy and no restart, because both are read from disk on each request.
+
+The manual way, without systemd, is the same command line in a tmux session named `engine`, with `2>&1 | tee -a ~/runs/engine-server.log`.
 
 Start the tunnel, which gives every teammate an https address without an open port:
 
@@ -164,14 +217,17 @@ Files are named by their UTC start time and the session number in this process, 
 `/stats` reports it under `recorder`: `state`, `file`, `frames_written` (in the current file), `frames_dropped` (whole run), `sessions` and `error`.
 Check a recording with `ffprobe -v error -show_entries format=duration:stream=width,height,avg_frame_rate -of compact=p=0 FILE`.
 
-### Known problems on the real model (2026-11-14)
+### What the real model does now (2026-11-15)
 
-The picture degrades when a video runs long without a reset: it is clean for about 20 s, over-contrasted by about 30 s and broken by about 60 s.
-Press Reset (or send the reset tap) to start a clean video.
-Steering works with `--reanchor on`: Gate 2 passed live after PR #57, with full winter about 2 s after "make it winter" (`engine/samples/gate2_live_make_it_winter_pass.jpg`).
-The policy's periodic refresh (every 60 chunks at strength 0.25) visibly breaks the picture on the refresh chunk (`engine/samples/refresh_breaks_picture.jpg`).
-The live engine therefore runs with the refresh off: `--reanchor-opt refresh_every_chunks=none`.
-Now the refresh starts from the clean anchor (every 24 chunks, strength 0.5), and every re-anchor chunk is decoded as a new first frame (`first_frame_pad=hold` repeats its 1 frame to 4): no long-run drift over 360 chunks and no washed-out refresh chunk, but each refresh snaps the composition back to the clean anchor (`engine/samples/refresh_clean_anchor.jpg`, `reanchor_decoder_restart.jpg`, MODEL_NOTES.md).
+- Steering works with `--reanchor on`: Gate 2 passed live after PR #57, with full winter about 2 s after "make it winter" (`engine/samples/gate2_live_make_it_winter_pass.jpg`).
+- Long-run drift is fixed: 90 s after a Reset with no commands the picture stays clean and shows the same scene (`engine/samples/drift_after_83_90s.jpg`, after PR #83).
+  Before PR #83 the picture was over-saturated by 25 to 30 s and broken by 40 to 60 s, and the old refresh (every 60 chunks at 0.25, from the last picture) broke the picture on the refresh chunk (`engine/samples/refresh_breaks_picture.jpg`).
+- The draft script is clean in every frame, and the red car is red and visible (`engine/samples/harness_before_after_113.jpg`).
+- Every steer and every refresh re-composes the shot: the camera, the tree and the car move, because a re-anchor restarts the picture from noise and continuity comes only from the prompt text (Ishaan, board posts at 23:42 and 00:12 UTC).
+  The refresh every 48 chunks halves how often this happens; a backend fix is being measured by Ishaan.
+- An added lion was missing or tiny before PR #125; with the pinned prompts (size and position words) it is on screen in the left foreground through night and sunny (`engine/samples/harness_before_after_sonnet.jpg`).
+- "make it a desert" drops the snow and keeps the car and the lion; "add a red car racing on a road" after it gives a weak, cropped second car, so it is kept out of the script (`engine/samples/sonnet_desert_chain_live.jpg`).
+- No variant tried kept the exact camera and layout across a world change (Ishaan, board post at 23:48 UTC).
 
 ## Command line
 
@@ -275,7 +331,7 @@ The decision is the enum `ChunkShape`: `full`, `video_start` or `short`.
 The padding frames count as frames of the chunk, so the lead gate's estimate of `frames_per_chunk` frames stays right.
 Each short chunk logs one line (`chunk 40: short chunk, 1 of 4 frames, mode crossfade: padded to 4 frames in 1.9 ms`).
 `/stats` has `short_chunks`: `mode`, `count`, `last_chunk`, and `last` (`chunk`, decoded `frames`, `pad_ms`).
-When the backend marks a first-frame chunk explicitly (a planned `ChunkStart.FIRST_FRAME` field), the frame count stays a correct test, so nothing here needs to change.
+The real backend's default `first_frame_pad=hold` already repeats a re-anchor chunk's 1 frame to 4, so on the live engine no chunk is short (`/stats` showed `short_chunks.count` 0); this padding matters only with `--backend-opt first_frame_pad=none` or the fake backend's `short_on_chunks`.
 
 ## Re-anchor
 
@@ -288,8 +344,9 @@ With `--reanchor off`, the default, no policy exists and every chunk is exactly 
 - `on_reset()` runs on every reset, right after `Controller.reset`.
 - `Engine._generate(cond, anchor)` is the one backend call: with an anchor it calls `backend.reanchor(strength, source=anchor.source)` and then `backend.generate_chunk(cond)`.
 - The state is an enum, `ReanchorState`: `off`, `on`, or `unsupported` when `--reanchor on` is given but the backend has no `reanchor(strength)` (logged once at load, then the engine runs as with `off`).
-- The real backend (`causal_forcing`) has `reanchor(strength)` since PR #52, so it reports `on`.
-  It cuts the frame cache and starts the next chunk from the last picture noised by an amount set by the strength.
+- The real backend (`causal_forcing`) has `reanchor(strength, source)` since PR #52, so it reports `on`.
+  It cuts the frame cache and starts the next chunk from a picture noised by an amount set by the strength: the last picture for a steer (source `last`), or the clean anchor saved 3 chunks after the last reset or steer for a refresh (source `clean`, PR #83).
+- The re-anchor chunk is marked `ChunkStart.FIRST_FRAME`, and the decoder restarts its stream state on it, as for a new video (PR #83); with `cut_fade_frames` set, the decoder dissolves into it from the last shown frame (PR #113).
 - The fake backend records each `reanchor` call and draws a white border and "re-anchor 1.00" on the next chunk's frames.
 - A re-anchor chunk is logged when it is generated and again on its decode line (`re-anchor steer 1.00`).
 - `/stats` has `reanchor`: `state`, `count`, `last_strength`, `last_reason` (`steer` or `refresh`), `last_chunk`, `config` (the options that differ from the defaults), and the policy's `chunks_since_anchor`.
@@ -299,12 +356,13 @@ With `--reanchor off`, the default, no policy exists and every chunk is exactly 
 `--reanchor-opt KEY=VALUE` sets one field of `steering.reanchor.ReanchorConfig`, without a change to the steering code.
 It may be repeated; the fields and their defaults are in `steering/reanchor.py`.
 Each value is converted to the field's type: an int, a float, or for `refresh_every_chunks` an int or `none`.
-The live engine turns the periodic refresh off:
+The live engine refreshes every 48 chunks instead of the default 24 (see "Live flags and why each is set"):
 
 ```
---reanchor on --reanchor-opt refresh_every_chunks=none
+--reanchor on --reanchor-opt refresh_every_chunks=48
 ```
 
+`refresh_every_chunks=none` turns the refresh off.
 Other examples: `--reanchor-opt steer_strength=0.9`, `--reanchor-opt min_gap_chunks=8`.
 The options are checked when the server starts, before the backend loads.
 An unknown key, a value that does not convert, or a value `ReanchorConfig` rejects makes the server exit at once with a message such as `--reanchor-opt: unknown re-anchor option 'bogus'; known options: ...`.
@@ -316,7 +374,7 @@ contract 1 on `/control` -> reader worker thread: `reader.handle` -> `steer` (co
 
 - The reader API, agreed with the `commands/` owner, is in `engine/reader.py`:
   `handle(msg) -> {"steer": contract 2 or None, "state": {...}}`, `state_fields()`, `likely_prompts()` and `committed_prompt`.
-- Every contract 1 message (`partial`, `final`, `tap`) goes to `reader.handle`, one at a time in arrival order on its own worker thread, because it may block for up to 1.5 s (the slow reader, next section).
+- Every contract 1 message (`partial`, `final`, `tap`) goes to `reader.handle`, one at a time in arrival order on its own worker thread, because it may block for up to 1.5 s (the slow reader) or 3 s (the Sonnet final reader), both below.
   If it raises ValueError, the client gets `{"error": ...}` on `/control`.
 - The stand-in reader takes a `final` text as the whole new prompt with a 4-chunk ramp, gives no steer for `partial` and `tap`, and keeps an empty changes list.
 - The `steer` dict is passed unchanged to `steering.Controller.handle`, including optional fields such as `strength` and `without_prompt`.
@@ -340,6 +398,7 @@ contract 1 on `/control` -> reader worker thread: `reader.handle` -> `steer` (co
 
 With `--reader commands`, a `final` that the commands/ matching does not understand ("add a lion", "make it day", "turn the tree into a lighthouse") goes to one LLM call, `engine/slow_reader.py`.
 It is the last fallback: the keyword table and any other matching in commands/ run first, and only what they miss reaches the LLM.
+It is used only when the Sonnet final reader is off; the live engine runs `--final-reader sonnet` since PR #125, so the live engine does not call it.
 
 - The model is an Azure AI Foundry deployment, by default `gpt-4.1-nano`, called as Azure OpenAI chat completions with JSON mode, temperature 0 and at most 120 tokens.
 - It gets the current scene (base and changes with their ids) and the sentence, and returns one operation for `commands/state.py`: add (any object goes in as kind `extra`), remove, set_strength, undo, reset, new_scene, or none.
@@ -359,6 +418,9 @@ It is the last fallback: the keyword table and any other matching in commands/ r
 With `--reader commands --final-reader sonnet`, every `final` sentence goes to one Claude Sonnet 5.5 call before the keyword table, in `engine/final_reader.py`.
 The one reply gives both the scene operations and the rich prompt the video model sees.
 The nano slow reader is not used in this mode; partials, taps and undo or reset sentences still go to the keyword table only.
+The live engine runs it since PR #125.
+First measurement, on a test engine with the fake backend and the draft script: 5 calls, p50 1.87 s, no timeouts or rejects, 2.3 to 3.1 s command to screen against 0.52 to 0.62 s without it (board post at 23:31 UTC).
+So a new sentence costs about 1.8 s extra, and a pinned or cached sentence costs nothing.
 
 - The call is the Anthropic Messages API on the team's Foundry resource: `POST https://<resource>.services.ai.azure.com/anthropic/v1/messages`, where `<resource>` is the first label of `FOUNDRY_ENDPOINT`'s host.
   `FOUNDRY_ANTHROPIC_URL` replaces the whole URL (a local fake endpoint), and `FOUNDRY_REWRITE_DEPLOYMENT` the model (default `claude-sonnet-5-5`).
@@ -422,6 +484,8 @@ python -m engine.server --backend fake --reader commands --final-reader sonnet -
 On the engine machine, load `~/.madhacks-foundry.env` first and add `--final-reader sonnet` to the usual command line.
 
 `engine/demo_prompts.json` holds the real Sonnet prompts for the demo sentences, made by this final reader as one chain from a reset, in script order.
+Since PR #125 it has 10 entries: the draft script (winter, red car, night, lion, sunny), "make it a desert", "add a red car racing on a road", and a car chain whose first prompt is Ishaan's tested car prompt word for word ("new scene of a red sports car driving along a country road", then winter and night).
+The live engine loaded all 10 as pinned (`/stats` `final_reader.pinned` 10 after the 00:32 UTC restart).
 Each entry is keyed like the cache, by `prompt_before` (the composed prompt of the scene before) and `sentence`, and also has `canonical` (the composed prompt it rewrote), `operations`, `prompt`, `model`, `fingerprint` and `generated_at`.
 Entries are hand-editable: fix a bad `prompt` in place, and keep `prompt_before` and `sentence` unchanged so a loader still matches it.
 `--demo-prompts PATH` (default `engine/demo_prompts.json`; `none` turns it off) loads it at start-up as pinned entries: they are never called or regenerated, never written to `--final-cache`, valid for any fingerprint, and checked before the cache.
@@ -461,8 +525,10 @@ Stamps use the monotonic clock and are reported as integer ms after `heard`:
 That chunk's number is sent as `applies_from_chunk`.
 `get_cond` is taken right before `generate_chunk`, after the lead gate wait, so that chunk is the first one not yet started.
 `generated` is the first chunk of the ramp, not its end: with a 4-chunk ramp that chunk carries `ease(1/4)`, about 10% of the move; half the move is on screen one chunk (0.25 s) later and all of it three chunks later.
+`commands/` now sends `ramp_chunks` 1 for a normal command (`RAMP` in `commands/reader.py`), so with `--reanchor on` the re-anchor fires on that same chunk and the new scene is there at once, dissolved in over 8 frames by `cut_fade_frames`.
 A command the reader found no operation for (an unmatched final, a tap with nothing to do) has only `heard`, and `applies_from_chunk` stays null.
 
+The live numbers are in "Measured numbers" near the top.
 Where the delay goes, measured on the fake backend at the live timings (generation 213 ms, decode 21 ms, 10 commands, cached prompts):
 
 | Part | Mean | Range |
