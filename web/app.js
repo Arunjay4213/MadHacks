@@ -88,6 +88,7 @@ function connectControl() {
     link.controlOpen = false;
     renderNotice();
     latency.reset(); // a stale command can no longer be correlated
+    ordered.dropAll(); // held spoken commands are dropped, never replayed after a reconnect
     el.latency.textContent = '—'; // no number without a measured frame
     setConnected(false);
     setTimeout(connectControl, backoffMs(attempt++));
@@ -319,7 +320,8 @@ document.addEventListener('keydown', (e) => {
 });
 // ---------- live mic ----------
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-const ordered = makeOrderedFinals(send); // spoken commands reach the server in press order
+// Spoken commands reach the server in press order; nothing is held while disconnected.
+const ordered = makeOrderedFinals(send, () => control?.readyState === WebSocket.OPEN);
 let rec = null; // the current recognizer; an older one may still be ending
 let listening = null; // what the user asked for: 'toggle' | 'ptt' | null
 let startedAt = 0;

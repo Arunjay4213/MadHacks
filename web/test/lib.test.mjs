@@ -258,6 +258,22 @@ test('heard tracker: own partials are pending, own finals confirmed, anything el
   assert.equal(g.classify('add a lion', 5, 9100), 'other');
 });
 
+test('ordered finals: nothing is held or replayed across a disconnect', () => {
+  const out = [];
+  let open = true;
+  const o = makeOrderedFinals((m) => out.push(m.text), () => open);
+  const a = o.open();
+  const b = o.open();
+  b.send({ type: 'final', text: 'undo' }); // held behind a
+  open = false;
+  o.dropAll(); // the connection closed: what was held is dropped
+  b.send({ type: 'final', text: 'add a dog' }); // while down: straight to send(), which drops it
+  open = true; // reconnected before a ends
+  a.close();
+  b.close();
+  assert.deepEqual(out, ['add a dog']); // only the immediate (dropped-by-send) call; 'undo' never replayed
+});
+
 test('ordered finals: a quick second press that ends first is still sent after the first press', () => {
   const out = [];
   const o = makeOrderedFinals((m) => out.push(`${m.type}:${m.text}`));

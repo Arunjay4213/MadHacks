@@ -291,7 +291,9 @@ export function makeLatencyTracker(maxSent = 50) {
 // Keeps spoken commands in the order the presses happened. Each press opens a slot; partials go out at
 // once (the live words line), but a press's finals wait until every earlier press has closed, so a quick
 // second press ("undo") that ends first can never reach the server before the command it undoes.
-export function makeOrderedFinals(send) {
+// While the connection is down nothing is held back: a final goes straight to send(), which drops it
+// (never replayed), and dropAll() empties what was waiting when the connection closed.
+export function makeOrderedFinals(send, isOpen = () => true) {
   const slots = [];
   // Send what the first slot holds, even if it is still open (a mic-toggle session keeps producing
   // sentences); drop it once closed and repeat, so a buffered sentence is never overtaken.
@@ -304,12 +306,16 @@ export function makeOrderedFinals(send) {
     }
   };
   return {
+    dropAll() {
+      for (const slot of slots) slot.finals.length = 0;
+    },
     open() {
       const slot = { finals: [], closed: false };
       slots.push(slot);
       return {
         send(msg) {
           if (msg.type !== 'final') return send(msg);
+          if (!isOpen()) return send(msg); // disconnected: dropped now, not replayed after a reconnect
           if (slots[0] === slot) return send(msg); // nothing earlier is waiting
           slot.finals.push(msg);
           return true;
