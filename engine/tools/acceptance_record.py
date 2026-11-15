@@ -23,10 +23,13 @@ from datetime import datetime, timezone
 from engine.final_reader import fingerprint, load
 from engine.foundry import FoundryMessages, settings_from_env
 from engine.tools.acceptance import (REPLIES_FILE, Mode, MissingReply, ReplayChat, RetryRefused, case_modes,
-                                     load_cases, reply_key, run_case)
+                                     entry_key, load_cases, reply_key, run_case)
 
 MIN_GAP_S = 2.0      # between two real calls
 HTTP_TIMEOUT_S = 30.0
+# The reader waits this long while recording (not its live 3 s), so a slow call is saved before the case moves on
+# instead of the case going on from the dictionary's scene while the call still runs.
+RECORD_WAIT_S = HTTP_TIMEOUT_S + 10.0
 
 
 class RecordingChat(ReplayChat):
@@ -37,6 +40,7 @@ class RecordingChat(ReplayChat):
         self.real = real
         self.model = real.model
         self.new: dict = {}
+        self.failed: list = []
         self._last = 0.0
 
     def complete(self, system: str, messages: list[dict]) -> str:
@@ -51,6 +55,7 @@ class RecordingChat(ReplayChat):
             text = self.real.complete(system, messages)
         except Exception as exc:  # noqa: BLE001 - reported, not saved
             print(f"  call failed for {key[1]!r}: {exc!r}", file=sys.stderr)
+            self.failed.append(key)
             raise MissingReply(key[1]) from exc
         print(f"  recorded {key[1]!r}")
         self.replies[key] = text
@@ -76,21 +81,25 @@ def main(argv=None) -> int:
         stale = [e for e in existing if e.get("fingerprint") != fp]
         existing = [e for e in existing if e.get("fingerprint") == fp]
         print(f"{len(stale)} replies were made under another system prompt or model; asking again")
-    chat = RecordingChat({(e["prompt_before"], e["sentence"]): e["reply"] for e in existing}, real)
+    chat = RecordingChat({entry_key(e): e["reply"] for e in existing}, real)
     for case in load_cases():
         if args.case and case["name"] not in args.case or Mode.SONNET not in case_modes(case):
             continue
         print(case["name"])
-        run_case(case, Mode.SONNET, chat)
+        run_case(case, Mode.SONNET, chat, timeout_s=RECORD_WAIT_S)
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    existing += [{"sentence": s, "prompt_before": p, "reply": r, "model": real.model, "fingerprint": fp,
-                  "recorded_at": now}
-                 for (p, s), r in chat.new.items()]
+    existing += [{"sentence": s, "prompt_before": p, "ids": ids, "reply": r, "model": real.model,
+                  "fingerprint": fp, "recorded_at": now}
+                 for (p, s, ids), r in chat.new.items()]
     REPLIES_FILE.write_text(json.dumps({"about": "First Sonnet replies of the final reader, recorded by "
                                                  "engine/tools/acceptance_record.py; keyed by the composed prompt "
-                                                 "before the sentence and the sentence as sent to the model.",
+                                                 "before the sentence, the sentence as sent to the model and the chip ids.",
                                         "replies": existing}, indent=1) + "\n")
     print(f"{len(chat.new)} new replies, {len(existing)} in {REPLIES_FILE}")
+    if chat.failed:
+        print(f"error: {len(chat.failed)} calls failed, so the cases after them ran from the wrong scene: "
+              f"{sorted({k[1] for k in chat.failed})}; run again", file=sys.stderr)
+        return 1
     return 0
 
 

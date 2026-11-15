@@ -41,3 +41,14 @@ def test_the_table_covers_every_demo_prompt_line():
 
 def test_both_modes_run_by_default():
     assert {m for c in load_cases() for m in case_modes(c)} == set(Mode)
+
+
+def test_every_sonnet_step_has_a_recorded_reply():
+    """Kept apart from the cases, so an xfail case cannot hide a missing reply."""
+    missing = set()
+    for case in load_cases():
+        if Mode.SONNET in case_modes(case):
+            _results, chat = run_case(case, Mode.SONNET)
+            missing |= {(case["name"], key[1]) for key in chat.missing}
+    assert not missing, ("no recorded Sonnet reply for these; run `python -m engine.tools.acceptance_record` with the "
+                         f"Foundry key: {sorted(missing)}")

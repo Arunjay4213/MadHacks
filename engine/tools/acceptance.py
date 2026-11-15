@@ -134,8 +134,15 @@ class RetryRefused(RuntimeError):
     again (it does only when the first call took under half the wait); refusing it here keeps the replay the same."""
 
 
-def reply_key(user: dict) -> tuple[str, str]:
-    return user["prompt"], user["sentence"]
+def scene_ids(scene: dict) -> str:
+    """The chip ids of the scene sent to the model, in order ("c1,c3"): a saved reply may name them (a remove), and
+    the same prompt can come back with other ids (winter added, removed and added again), so they are in the key."""
+    return ",".join(c["id"] for c in scene.get("changes", []))
+
+
+def reply_key(user: dict) -> tuple[str, str, str]:
+    """(the composed prompt before, the sentence as sent to the model, the chip ids)."""
+    return user["prompt"], user["sentence"], scene_ids(user["scene"])
 
 
 class ReplayChat:
@@ -166,20 +173,26 @@ class DownChat:
         raise ConnectionError("Sonnet is unavailable in this mode")
 
 
-def load_replies(path: Path = REPLIES_FILE) -> dict[tuple[str, str], str]:
+def entry_key(e: dict) -> tuple[str, str, str]:
+    return e["prompt_before"], e["sentence"], e["ids"]
+
+
+def load_replies(path: Path = REPLIES_FILE) -> dict[tuple[str, str, str], str]:
     if not Path(path).exists():
         return {}
-    return {(e["prompt_before"], e["sentence"]): e["reply"] for e in json.loads(Path(path).read_text())["replies"]}
+    return {entry_key(e): e["reply"] for e in json.loads(Path(path).read_text())["replies"]}
 
 
-def build_service(mode: Mode, chat=None):
-    """The live reader stack for `mode`; `chat` replaces the Sonnet client (a ReplayChat, or a recorder)."""
+def build_service(mode: Mode, chat=None, timeout_s: float | None = None):
+    """The live reader stack for `mode`; `chat` replaces the Sonnet client (a ReplayChat, or a recorder).
+    `timeout_s` replaces the reader's 3 s wait (the recorder waits for the real call to finish)."""
+    wait = {} if timeout_s is None else {"timeout_s": timeout_s}
     from commands.service import CommandService
     from engine.final_reader import load
     from engine.reader import FinalReadingService
     if mode is Mode.SONNET:
         chat = chat if chat is not None else ReplayChat(load_replies())
-        reader = load("sonnet", chat=chat, cache_path=None, demo_prompts=str(DEMO_PROMPTS))
+        reader = load("sonnet", chat=chat, cache_path=None, demo_prompts=str(DEMO_PROMPTS), **wait)
     else:
         chat = DownChat()
         reader = load("sonnet", chat=chat, cache_path=None, demo_prompts=None)
@@ -265,9 +278,9 @@ def check_step(step: dict, out: dict, before: StepResult | None, prompt: str) ->
     return r
 
 
-def run_case(case: dict, mode: Mode, chat=None) -> tuple[list[StepResult], object]:
+def run_case(case: dict, mode: Mode, chat=None, timeout_s: float | None = None) -> tuple[list[StepResult], object]:
     """Run one case from a reset in `mode`; returns the step results (start steps excluded) and the chat."""
-    svc, _reader, chat = build_service(mode, chat)
+    svc, _reader, chat = build_service(mode, chat, timeout_s)
     t = 1
     out = svc.handle({"type": "tap", "action": "reset", "t_client": t})
     for sentence in STARTS[case.get("start", "meadow")]:
@@ -296,7 +309,7 @@ def failure_report(case: dict, mode: Mode, results: list[StepResult], chat) -> l
     lines = []
     missing = getattr(chat, "missing", [])
     if missing:
-        lines.append(f"no recorded Sonnet reply for {sorted({s for _p, s in missing})}; record them with "
+        lines.append(f"no recorded Sonnet reply for {sorted({k[1] for k in missing})}; record them with "
                      f"`python -m engine.tools.acceptance_record` (needs FOUNDRY_ENDPOINT and FOUNDRY_KEY)")
     for i, r in enumerate(results):
         for p in r.problems:

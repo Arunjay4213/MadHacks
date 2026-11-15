@@ -63,6 +63,16 @@ It works on localhost and through the tunnel (`--url https://<address>`, which u
 If the engine connection drops during a run, the harness stops waiting at once, saves what it received so far, and exits with code 1 (PR #153, PR #161).
 A run against a URL that is not localhost changes the shared live video for every viewer, so the harness prints a warning and waits 5 s before it starts (`--yes` skips the wait).
 
+## Acceptance check
+
+What a user gets for each sentence is tested from one data file, `acceptance/sentences.json`; the format is in the root `README.md`, "Acceptance".
+
+- `engine/tests/test_acceptance_sentences.py` (default suite, CPU) runs every case through `FinalReadingService`, `FinalReader` and `CommandService`, with the recorded Sonnet replies of `acceptance/sonnet_replies.json` and with Sonnet down (`engine/tools/acceptance.py`).
+- `python -m engine.tools.acceptance_record [--case NAME] [--refresh-stale]` records missing Sonnet replies; it needs `FOUNDRY_ENDPOINT` and `FOUNDRY_KEY`, and waits for each real call (not the live 3 s) so a slow call is saved before the case goes on.
+- `python -m engine.tools.acceptance_live --url URL --out DIR [--calibrate] [--case NAME] [--max-calls 60] [--gap 8] [--yes]` plays the cases with `live: true` on a running engine and asks the Foundry deployment `claude-sonnet-5-5` yes/no questions about the frame 3 s after each step; `--calibrate-only` judges `acceptance/vision_calibration.json` and stops.
+  A step is never judged on a frame from before the command: with no applied frame, or a video that stopped, it is `no frame` and the run fails.
+  It changes the shared live video, so post on the board before a run on the live engine.
+
 ## The live engine on the GPU machine
 
 The live engine runs on `madhacks-engine` (one NVIDIA L40S) in two tmux sessions: `engine` (the server) and `tunnel` (a Cloudflare quick tunnel).

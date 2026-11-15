@@ -47,6 +47,7 @@
     {
       "name": "add-snow-near-the-river",
       "note": "Bug fixed on 2026-11-14: 'near the river' is a place, not a request for a river.",
+      "xfail": {"sonnet": "bug: Sonnet adds a river the scene does not have; 'add snow near the river' should add only snow. Not stable: a recording under the earlier rules (before #224) added only snow, so the final reader's rules should say that 'near X' only places an object"},
       "steps": [
         {"say": "add snow near the river", "chips": ["winter"], "no_chips": ["river"], "has": ["snow"], "lacks": ["river"]}
       ]
@@ -154,7 +155,6 @@
       "name": "pace-words",
       "live": true,
       "note": "Gate 4: a slow change must still arrive in full.",
-      "xfail": {"sonnet": "bug: Sonnet reads 'slowly' and 'gradually' as a weaker change (winter 0.6, fog 0.5), so the slow change never arrives in full (Gate 4); engine/final_reader.py's rules say nothing about pace words"},
       "steps": [
         {"say": "slowly make it winter", "chips": ["winter"], "has": ["snow"], "slow": true, "visible": ["Is the ground covered in snow?"], "look_after_s": 8, "strength": {"winter": "full"}},
         {"say": "make it night", "chips": ["night", "winter"], "has": ["night"], "slow": false},

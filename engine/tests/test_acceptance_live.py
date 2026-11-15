@@ -75,3 +75,28 @@ def test_the_frame_is_three_seconds_after_the_send_or_one_second_after_a_late_fi
 def test_every_live_step_also_asks_the_quality_question():
     qs = L.step_questions({"visible": ["Is there a lion?", {"q": "Is it night?", "expect": "no"}]})
     assert qs == [("Is there a lion?", True), ("Is it night?", False), (L.QUALITY_Q, True)]
+
+
+def test_an_old_picture_is_never_judged():
+    fl = frames([x / 4 for x in range(0, 20)])  # the video stops at 4.75 s, the socket stays open
+    stopped = L.Played("c", 0, "make it winter", {}, sent_t=4.0, t_client=1, reply={"applies_from_chunk": 30})
+    i, t = L.pick_frame(stopped, fl)
+    assert i is None and "chunk 30" in t["why"]
+    no_change = L.Played("c", 1, "make it winter", {}, sent_t=2.0, t_client=2, reply={"unmatched": True})
+    i, t = L.pick_frame(no_change, fl)
+    assert i is None and "no change" in t["why"]
+    # a step that should change nothing is judged on a fresh frame, never on one from before the send
+    nothing = L.Played("c", 2, "make it nice", {"understood": False}, sent_t=1.0, t_client=3, reply={})
+    assert L.pick_frame(nothing, fl)[0] is not None
+    late_nothing = L.Played("c", 3, "make it nice", {"understood": False}, sent_t=4.5, t_client=4, reply={})
+    i, t = L.pick_frame(late_nothing, fl)
+    assert i is None and "stopped" in t["why"]
+
+
+def test_a_calibration_with_no_answers_reports_instead_of_crashing(tmp_path):
+    import json as _json
+    cal = tmp_path / "cal.json"
+    cal.write_text(_json.dumps({"items": [{"name": "x", "image": "engine/samples/lion_meadow_frame.jpg",
+                                           "questions": [{"q": "Is there a lion?", "expect": "yes"}]}]}))
+    out = L.calibrate(L.Judge(Chat([]), max_calls=0, gap_s=0), cal, tmp_path)
+    assert out["accuracy"] is None and "no answers" in (tmp_path / "calibration.md").read_text()

@@ -37,6 +37,7 @@ from pathlib import Path
 
 LOOK_AFTER_S = 3.0      # the frame judged is this long after the step was sent ...
 SETTLE_S = 1.0          # ... or this long after its first frame, when that came later (the cut dissolves in 0.5 s)
+FRESH_S = 0.5           # the judged frame must have arrived at most this long before the look time
 STEP_GAP_S = 8.0        # between two steps
 RESET_WAIT_S = 4.0      # after the reset tap of each case
 START_WAIT_S = 8.0      # after the start scene's sentence
@@ -65,7 +66,7 @@ class Verdict(enum.Enum):
     PASS = "pass"          # every answer matches
     FAIL = "fail"          # at least one answer does not match
     UNJUDGED = "unjudged"  # no usable answer (call failed, bad reply, or the call cap was reached)
-    NO_FRAME = "no frame"  # nothing was recorded at that time
+    NO_FRAME = "no frame"  # no fresh frame to judge: the video stopped, or the change never reached the screen
 
 
 # --- the judge ---------------------------------------------------------------------------------------------------
@@ -184,13 +185,17 @@ def calibrate(judge: Judge, path: Path, out: Path) -> dict:
                "items": rows}
     (out / "calibration.json").write_text(json.dumps(summary, indent=2) + "\n")
     lines = [f"# Vision judge calibration", "",
-             f"{right} of {asked} answers right ({summary['accuracy']:.0%}) on {len(items)} frames with known contents "
+             f"{right} of {asked} answers right ({pct(summary['accuracy'])}) on {len(items)} frames with known contents "
              f"(`acceptance/vision_calibration.json`).", ""]
     for r in rows:
         lines += [f"## {r['name']}: {r['verdict']}", "", f"![]({r['frame']})", ""]
         lines += question_table(r["questions"]) + [""]
     (out / "calibration.md").write_text("\n".join(lines) + "\n")
     return summary
+
+
+def pct(x) -> str:
+    return "no answers" if x is None else f"{x:.0%}"
 
 
 def question_table(rows: list[dict]) -> list[str]:
@@ -281,7 +286,10 @@ async def play(base: str, cases: list[dict], gap_s: float) -> tuple[list[Played]
 
 
 def pick_frame(p: Played, frames: list) -> tuple[int | None, dict]:
-    """The index of the frame to judge for step `p`, and its timing: first applied frame, delay, lateness."""
+    """The index of the frame to judge for step `p` and its timing (first applied frame, delay, lateness), or None
+    with the reason in timing["why"]: an old picture must never be judged, or a step could pass on what was on
+    screen before the command. A step that should change the picture needs its first applied frame (a chunk at or
+    after applies_from_chunk), and any judged frame must be from after the send and close to the look time."""
     from engine.tools import demo_run as h
     fl = [h.Frame(t, c, i) for t, c, i, _ in frames]
     reply = p.reply or {}
@@ -294,11 +302,19 @@ def pick_frame(p: Played, frames: list) -> tuple[int | None, dict]:
     if p.next_t is not None:
         look = min(look, p.next_t - 0.05)
     i = h.frame_at(fl, look)
+    why = None
+    if p.step.get("understood", True) and first is None:
+        why = ("the engine applied no change (no applies_from_chunk)" if not isinstance(afc, int)
+               else f"no frame of chunk {afc} or later reached the screen")
+    elif i is None or fl[i].t < p.sent_t or fl[i].t < look - FRESH_S:
+        why = "no fresh frame at the look time (the video stopped)"
+    if why is not None:
+        i = None
     timing = {"sent_s": round(p.sent_t, 2), "look_s": round(look, 2), "late": late,
               "applies_from_chunk": afc, "unmatched": reply.get("unmatched"),
               "chips": [c.get("label") for c in reply.get("changes", [])],
               "delay_ms": None if first is None else round((first.t - p.sent_t) * 1000),
-              "stamps": reply.get("stamps", {})}
+              "stamps": reply.get("stamps", {}), "why": why}
     return i, timing
 
 
@@ -325,8 +341,8 @@ def write_report(out: Path, played: list[Played], frames: list, calib: dict | No
              f"{summary['late']} late (first frame after {LOOK_AFTER_S:.0f} s).",
              f"Command to screen (client side): median {summary['delay_ms_median']} ms, range "
              f"{summary['delay_ms_range']}. Vision calls: {judge.calls}"
-             + (f"; judge calibration {calib['right']} of {calib['questions']} right ({calib['accuracy']:.0%})"
-                if calib and calib.get("accuracy") is not None else "") + ".",
+             + (f"; judge calibration {calib['right']} of {calib['questions']} right ({pct(calib['accuracy'])})"
+                if calib else "") + ".",
              f"Engine: {meta.get('url')}, {meta.get('backend')}, started {meta.get('started')}.", "",
              "| case | step | verdict | delay ms | wrong answers |", "|---|---|---|---|---|"]
     for s in steps:
@@ -356,7 +372,8 @@ def judge_played(judge: Judge, played: list[Played], frames: list, out: Path) ->
         i, timing = pick_frame(p, frames)
         p.result = {"timing": timing}
         if i is None:
-            p.result.update(verdict=Verdict.NO_FRAME.value)
+            p.result.update(verdict=Verdict.NO_FRAME.value, note=timing["why"])
+            print(f"  {p.case}: {p.label}: {Verdict.NO_FRAME.value} ({timing['why']})")
             continue
         name = f"frames/{re.sub(r'[^a-z0-9]+', '-', p.case.lower())}-{p.index:02d}.jpg"
         (out / name).write_bytes(frames[i][3])
@@ -395,7 +412,10 @@ def main(argv=None) -> int:
     calib = None
     if args.calibrate or args.calibrate_only:
         calib = calibrate(judge, REPO / "acceptance" / "vision_calibration.json", out)
-        print(f"calibration: {calib['right']} of {calib['questions']} right ({calib['accuracy']})")
+        print(f"calibration: {calib['right']} of {calib['questions']} right ({pct(calib['accuracy'])})")
+        if calib["accuracy"] is None:
+            print("error: the judge gave no usable answer on the calibration frames", file=sys.stderr)
+            return 2
         if args.calibrate_only:
             return 0
 
