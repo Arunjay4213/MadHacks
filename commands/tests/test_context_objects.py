@@ -17,9 +17,10 @@ class ContextObjectTest(unittest.TestCase):
                 self.assertIsNone(read(text, snap)["op"])
 
     def test_requests_to_add_still_add(self):
-        for text in ["add a dog", "a dog", "i want a dog", "put a red car next to the tree", "add another car"]:
+        for text in ["add a dog", "a dog", "i want a dog", "put a red car next to the tree", "add another car",
+                     "add the car", "make it a dog"]:
             with self.subTest(text=text):
-                op = read(text, MEADOW if "another" not in text else CAR)["op"]
+                op = read(text, CAR if text in ("add another car", "add the car") else MEADOW)["op"]
                 self.assertEqual(op and op["op"], "add")
 
 

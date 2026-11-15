@@ -188,11 +188,13 @@ MOVER_WORDS = frozenset({"airplane", "aeroplane", "plane", "jet", "helicopter", 
                          "balloon", "car", "truck", "van", "bus", "motorcycle", "motorbike", "bike", "bicycle", "horse",
                          "horses", "dog", "deer", "boat"})
 HEADING = "seen from behind, moving forward away from the camera in the same direction as the car"
+STAYING_WORDS = frozenset({"anchored", "moored", "docked", "sleeping", "asleep", "perched", "resting", "lying", "lies",
+                           "grazing", "sits", "landed", "hovering", "floating", "stands", "still"})
 
 
 def with_heading(phrase: str) -> str:
     """An object phrase on a vehicle scene with HEADING when it names a mover and says nothing about its direction."""
-    if _words(phrase) & MOVER_WORDS and not _words(phrase) & MOTION_SAID_WORDS:
+    if _words(phrase) & MOVER_WORDS and not _words(phrase) & (MOTION_SAID_WORDS | STAYING_WORDS):
         return f"{phrase.rstrip(' .,')}, {HEADING}"
     return phrase
 
@@ -1251,9 +1253,11 @@ def place_as_new_scene(ops: list[dict], snapshot: dict) -> list[dict] | None:
     except (ValueError, TypeError, KeyError):
         return None
     kept = [c for c in rest["changes"] if c["kind"] in ("extra", "time") and c["strength"] > 0]
-    return [{"op": "new_scene", "base": PLACE_BASE}, worlds[-1],
-            *({"op": "add", "label": c["label"], "kind": c["kind"], "phrase": c["phrase"], "strength": c["strength"]}
-              for c in kept)]
+    said = [o for o in ops if o["op"] == "add" and o["kind"] in ("season", "weather")]  # "a snowy desert": kept
+    out = [{"op": "new_scene", "base": PLACE_BASE}, worlds[-1], *said,
+           *({"op": "add", "label": c["label"], "kind": c["kind"], "phrase": c["phrase"], "strength": c["strength"]}
+             for c in kept)]
+    return out if len(out) <= MAX_BATCH else None
 
 
 def bare_vehicle_operations(ops: list[dict], snapshot: dict, subject: str) -> list[dict] | None:

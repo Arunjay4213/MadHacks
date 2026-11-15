@@ -253,8 +253,10 @@ _OAK_SUBJECT = "a wide shot of a single oak tree"
 _MEADOW_BASE_RX = re.compile(r"^a wide shot of (?:an? )?(?:[\w,'-]+ ){0,3}?meadow(?: of [^;]+?)?,? with (?P<subject>[^;]+)$",
                              re.IGNORECASE)
 # A ground description said before the subject ("freshly cut short grass and ..."): it belongs to the meadow.
-_GROUND_FIRST_RX = re.compile(r"^[\w,' -]*?\b(?:grass|earth|ground|soil|sand|dirt|mud|snow|flowers|wildflowers)\b"
-                              r"[\w,' -]*? and (?=an? |the |\w+ \w+ tree)", re.IGNORECASE)
+# Only describing words before the ground noun (no article or preposition), so "a dog on the grass and" is kept.
+_GROUND_FIRST_RX = re.compile(r"^(?:(?!(?:a|an|the|on|in|with|near|by|and)\b)[\w,'-]+ ){0,5}?"
+                              r"(?:grass|earth|ground|soil|sand|dirt|mud|snow|flowers|wildflowers) and (?=an? |the )",
+                              re.IGNORECASE)
 
 
 def compose_base(base: str, world: str) -> str:

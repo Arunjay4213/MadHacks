@@ -338,7 +338,9 @@ def read(text: str, snapshot: dict) -> dict:
         if description_match:
             article, description = description_match.groups()
             description = _FILLER_TAIL_RX.sub("", description).strip()
-            if re.match(r"^to\b", description) or (article == "the" and _names(snapshot.get("base", ""), entry)):
+            explicit_add = re.match(r"^(?:please\s+)?(?:add|put|place|bring|include|build|draw)\b", t)
+            if re.match(r"^to\b", description) or (article == "the" and not explicit_add
+                                                     and _names(snapshot.get("base", ""), entry)):
                 # "i want to see the car's side profile", "show me the car" on the car scene: the object is only
                 # context (the car of the base is already there), never a second one (live, 2026-11-15).
                 return out(None, keyword)
@@ -366,7 +368,7 @@ def read(text: str, snapshot: dict) -> dict:
     return out({"op": "add", "label": entry["label"], "kind": entry["kind"], "phrase": _additional(entry["phrase"], entry, keyword, snapshot) if entry["kind"] == "extra" else entry["phrase"], "strength": strength}, keyword)
 
 
-_CONTEXT_START_RX = re.compile(r"^(?:please\s+)?(?:change|make|turn|set|switch|move|rotate|zoom|look|view|face|pan|tilt)\b")
+_CONTEXT_START_RX = re.compile(r"^(?:please\s+)?(?:change|switch|move|rotate|zoom|look|view|face|pan|tilt)\b")
 
 
 def _names(base: str, entry: dict) -> bool:

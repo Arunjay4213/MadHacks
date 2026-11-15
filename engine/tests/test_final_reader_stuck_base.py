@@ -86,3 +86,10 @@ def test_a_mover_added_by_the_dictionary_on_the_car_scene_travels_with_the_car()
     assert not out["state"]["unmatched"]
     assert "airplane, seen from behind, moving forward away from the camera in the same direction as the car" \
         in out["steer"]["prompt"]
+
+
+def test_stationary_movers_keep_their_stillness():
+    from engine.final_reader import with_heading
+    assert with_heading("a boat anchored beside the road") == "a boat anchored beside the road"
+    assert with_heading("a dog sleeping by the road") == "a dog sleeping by the road"
+    assert with_heading("an airplane").endswith("in the same direction as the car")
