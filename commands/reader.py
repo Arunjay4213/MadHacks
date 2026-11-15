@@ -144,12 +144,18 @@ def resolve(query: str, snapshot: dict):
             return c["id"]
     # Only the words before the first preposition name the target. The rest is a location
     # ("remove the car near the meadow"), so an absent car removes nothing rather than the meadow.
-    q = _PREP_RX.split(_norm(query), maxsplit=1)[0]
+    full = _norm(query)
+    q = _PREP_RX.split(full, maxsplit=1)[0]
     # Present labels as whole phrases, longest first: "dark knight" before the "dark" alias of night.
     aliases = list(KEYWORD_RX.finditer(q))
     named = []
     for change in changes:
-        for match in re.finditer(r"\b" + re.escape(_norm(change["label"])) + r"\b", q):
+        label = _norm(change["label"])
+        # A label with its own preposition ("city on mars") is matched in the whole query, but it must
+        # start before the cut: in "remove the car near the city on mars" it is still only the location.
+        for match in re.finditer(r"\b" + re.escape(label) + r"\b", full if _PREP_RX.search(label) else q):
+            if match.start() >= len(q):
+                continue
             # A named world is the target even where its name is also an alias ("forest" -> trees).
             if change["kind"] == "world" or not any(a.start() <= match.start() and match.end() <= a.end()
                        and KEYWORDS[a.group()]["label"] != change["label"] for a in aliases):
