@@ -505,6 +505,8 @@ With `--reader commands --final-reader sonnet` (live since PR #125), `engine/rea
    A blocked final gives no steer: the words show as unmatched.
 3. A pinned entry (`engine/demo_prompts.json`), then a cached one (keys below).
 4. A named person on a composed scene, when the sentence is nothing but adding or removing them ("jensen", "jensen huang", "add jensen huang next to the car", "remove jensen"; `people.whole_sentence`): the engine's own add (his hardcoded look, `people.PEOPLE`) or remove, with no call (`person_hits`).
+   The sentence must be one clause (`commands.reader.split_commands`), and a spot ("next to the big red car") is at most four words after the article and stops before a word that starts another edit.
+   So "add jensen huang next to the car and make it winter" or "..., delete the dog" is not this step: it goes to Sonnet with his look instead of his name, and the other edit applies too.
    A bare name is an add.
 5. A measured car world (`car_template.plan`, `Route.MEASURED`): "make it winter" on the car scene, or a new car scene, composed by the engine with no call (`template_hits`).
 6. The fast path: on a composed scene, when the keyword table reads every word of every clause by itself (`commands.service.dictionary_reading`: no vector matcher, no style fallback, no pass-through guess of an unknown object), the dictionary applies it with no call.
