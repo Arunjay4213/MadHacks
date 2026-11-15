@@ -518,7 +518,12 @@ With `--reader commands --final-reader sonnet` (live since PR #125), `engine/rea
 8. When the call times out, fails or the reply is not a JSON object, the dictionary reads the sentence (the fallback).
    On a free scene the dictionary can only start a new scene, so anything else shows as not understood; the old scene is never silently redrawn.
 
-A sentence that mixes undo or reset with edits goes to the dictionary after the content check (Sonnet is asked first only when the dictionary does not read every clause by itself).
+A sentence that starts with undo or reset clauses and goes on with edits ("undo and add a dog", "reset and make it night") runs the controls on a trial copy of the scene (with its undo history), and the edits are read on the scene they give, through steps 2 to 7.
+The controls and the edits' operations then apply as one batch (one undo step), and nothing applies when the edits are blocked or not understood.
+So after two free-scene edits, "undo and add a dog" shows the scene before the last edit plus the dog, and "reset and add a dog" gets the same pinned prompt as "add a dog".
+An answer saved for the whole sentence is used only when it is a block.
+Any other mix (an undo after an edit, "add a dog and undo") goes to the dictionary, which runs the undo where it is said.
+Sonnet is asked first, as the content check, only when the keyword table does not read every clause by itself, since its prompt is not used there.
 A tap on the x of a free scene's chip is read as the sentence "remove the <label>" through steps 2 to 7.
 Undo works across composed and free scenes: the scene history is a stack of snapshots, each with its `origin`.
 

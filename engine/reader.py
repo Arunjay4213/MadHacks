@@ -120,9 +120,18 @@ class FinalReadingService:
         reading = dictionary_reading(text, snapshot) if entry is None else None
         whole = reading is not None and fast_path_ok(reading, snapshot)
         if kind is SentenceKind.MIXED:
-            # The final reader leaves undo and reset to the dictionary, which reads the whole sentence. When it does
-            # not read every clause by itself, Sonnet is still asked first, as the content check.
-            if entry is None and not whole:
+            split = leading_controls(text, snapshot)
+            if split is not None:
+                # "undo and add a dog": the edits are read on the scene the controls give. `whole` is not trusted
+                # here (dictionary_reading tries an undo on a snapshot with no history), and a saved answer for the
+                # whole sentence is used only when it is a block (an older build saved answers it then discarded).
+                if entry is not None and fr.result(entry, text, snapshot) == {"blocked": True}:
+                    return self._blocked(text)
+                return self._controls_then_edits(msg, *split)
+            # Any other mix ("add a dog and undo") goes to the dictionary, which runs the undo where it is said. Sonnet
+            # is asked first, as the content check, only when the keyword table does not read every clause by itself:
+            # fast_path_ok is about prompt quality, and its answer would be discarded here, so it is not a reason to wait.
+            if entry is None and reading is None:
                 entry = fr.ask(text, snapshot, self.committed_prompt)
             if entry is not None and fr.result(entry, text, snapshot) == {"blocked": True}:
                 return self._blocked(text)
@@ -145,6 +154,47 @@ class FinalReadingService:
         if out["steer"] is not None:
             self._model_prompts.setdefault(out["steer"]["prompt"], result["prompt"])
         return self._mapped(out)
+
+    def _controls_then_edits(self, msg: dict, controls: list[dict], edits: str) -> dict:
+        """A sentence of bare undo or reset clauses followed by edit clauses that the dictionary does not read
+        whole. The controls run first on a trial copy of the scene (with its undo history), and the edits are read
+        on the scene they give, as one EDIT sentence: the dictionary when it reads them whole, else the final reader
+        (so "undo and add a dog" on a free scene reaches Sonnet with the scene before the last edit). The controls
+        and the edits' operations then apply as one batch: one undo step, and nothing applies when the edits are
+        blocked, not understood or unread."""
+        from commands.composer import compose
+        text = msg["text"]
+        before = self._svc.snapshot()
+        after = self._svc_trial(controls)
+        fr = self._final_reader
+        entry = fr.lookup(edits, after)
+        reading = dictionary_reading(edits, after) if entry is None else None
+        if reading is not None and fast_path_ok(reading, after):
+            return self._dictionary(msg, before)  # the keyword table reads the whole sentence with the real undo
+        if entry is None:
+            entry = fr.ask(edits, after, self._model_prompts.get(compose(after), compose(after)))
+        result = fr.result(entry, edits, after)
+        if result is None:
+            return self._dictionary(msg, before)  # no answer: as for any sentence (not understood on a free scene)
+        if result.get("blocked"):
+            return self._blocked(text)
+        if result.get("not_understood"):
+            log.info("final reader: %r not understood, no steer", text[:100])
+            return self._mapped(self._svc.apply_final(text, []))
+        out = self._svc.apply_final(text, controls + result["operations"])
+        if out["steer"] is not None:
+            self._model_prompts.setdefault(out["steer"]["prompt"], result["prompt"])
+        return self._mapped(out)
+
+    def _svc_trial(self, operations: list[dict]) -> dict:
+        """The snapshot after `operations` on a copy of the service's scene with its undo history (an undo needs the
+        history, which a snapshot does not carry). The live scene is not changed."""
+        import copy
+        with self._svc._lock:  # CommandService has no public trial with history; this reads it under its lock
+            trial = copy.deepcopy(self._svc._state)
+        for op in operations:
+            trial.apply(op)
+        return trial.snapshot()
 
     def _blocked(self, text: str) -> dict:
         log.info("final reader: %r blocked, no steer", text[:100])
@@ -222,6 +272,20 @@ def sentence_kind(text: str, snapshot: dict) -> SentenceKind:
     if all(k is ClauseKind.BARE_CONTROL for k in kinds):
         return SentenceKind.CONTROL
     return SentenceKind.MIXED if ClauseKind.BARE_CONTROL in kinds else SentenceKind.EDIT
+
+
+def leading_controls(text: str, snapshot: dict) -> tuple[list[dict], str] | None:
+    """(the undo and reset operations, the rest of the sentence) when `text` is one or more bare undo or reset
+    clauses followed only by edit clauses ("undo and add a dog", "reset, then make the grass dry"); else None
+    (no control first, a control after an edit, or nothing after the controls)."""
+    from commands.reader import read, split_commands
+    clauses = split_commands(text) or [text]
+    readings = [read(clause, snapshot) for clause in clauses]
+    kinds = [clause_kind(clause, reading) for clause, reading in zip(clauses, readings)]
+    n = next((i for i, k in enumerate(kinds) if k is not ClauseKind.BARE_CONTROL), len(kinds))
+    if n == 0 or n == len(kinds) or any(k is not ClauseKind.EDIT for k in kinds[n:]):
+        return None
+    return [readings[i]["op"] for i in range(n)], " and ".join(clauses[n:])
 
 
 def clause_kind(clause: str, reading: dict) -> ClauseKind:
