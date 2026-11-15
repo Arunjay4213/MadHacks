@@ -182,7 +182,11 @@ Rules:
   road") replaces the place: the ground, the background and the light. The objects stay unless the user says
   otherwise. The video model cannot infer what happens to them, so for every object say where it is, what it stands
   or drives on, and which way it faces, in words that fit the new place. A thing that cannot stay where it was gets a
-  plausible spot: a car goes on a road, never on sand, grass or water; an animal stands on the ground beside it.
+  plausible spot: an animal stands on the ground beside the road.
+- A car or other road vehicle is always on a paved road, street, bridge or car park, also when it is parked, also at a
+  beach or in a field: never on sand, grass, snow or water.
+- A place after near, by, beside, next to or behind that the prompt does not have only says where the new thing goes:
+  "add snow near the river" adds snow and no river.
 - Ground, plants and climate ("arid", "no grass", "dry", "lush", "cut the grass", "kill the tree's leaves") change the
   ground, the plants and the place in the prompt. Nothing stops a later change of place: the prompt is free text.
 - Objects get explicit size and position words. The first object is large and in the centre ("a red car parked beside
@@ -207,8 +211,8 @@ or changed that is still in the picture (objects, place, season, weather, time, 
 added. Keep the current chips that still apply, with the same labels; drop a chip when its thing is gone. A new scene
 starts with the chips of what the user named.
 
-"understood" is false, with an empty prompt, only when the sentence is not about the picture at all or asks to undo
-or reset: then nothing changes on screen. A short or loose sentence about the picture ("zoom out", "more trees",
+"understood" is false, with an empty prompt, only when the sentence is not about the picture at all, asks for nothing
+to change ("don't add a lion", "never mind", "leave it"), or asks to undo or reset: then nothing changes on screen. A short or loose sentence about the picture ("zoom out", "more trees",
 "make it cozy") is understood: write your best reading of it. "blocked" is true, with an empty prompt, when the
 sentence asks for sexual, violent (gore, killing or hurting people or animals) or hateful content; plants and
 objects are not violence.
