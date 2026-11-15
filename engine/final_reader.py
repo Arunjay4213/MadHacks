@@ -220,9 +220,17 @@ def has_road(text: str) -> bool:
     return bool(_words(text) & ROAD_WORDS)
 
 
+# Words that already say how a vehicle moves, or that it stands still: FORWARD_MOTION would contradict them
+# ("a red car parked beside the oak tree" was told to speed forward).
+MOTION_SAID_WORDS = frozenset({"forward", "away", "behind", "reversing", "reverse", "backwards", "backward", "toward",
+                               "towards", "approaching", "approaches", "oncoming", "parked", "parking", "stopped",
+                               "stationary", "standing", "idle", "idling", "still", "waiting", "abandoned", "crashed",
+                               "wrecked", "sitting"})
+
+
 def with_forward_motion(subject: str) -> str:
-    """`subject` plus FORWARD_MOTION when it names a vehicle and says nothing about its direction yet."""
-    if is_vehicle(subject) and not _words(subject) & {"forward", "away", "behind", "reversing", "backwards"}:
+    """`subject` plus FORWARD_MOTION when it names a vehicle and says nothing about its direction or standing yet."""
+    if is_vehicle(subject) and not _words(subject) & MOTION_SAID_WORDS:
         return f"{subject}, {FORWARD_MOTION}"
     return subject
 
@@ -1230,8 +1238,13 @@ def _scene_for_model(snapshot: dict) -> dict:
                         for c in snapshot.get("changes", [])]}
 
 
-def fingerprint(system_prompt: str, model: str) -> str:
-    return hashlib.sha256(json.dumps([system_prompt, model]).encode()).hexdigest()[:16]
+# Changed whenever the engine builds prompts differently from the same reply (the car template, forward motion,
+# the object order, ...), so the disk cache is not reused across that change even when the system prompt is the same.
+PROMPT_BUILD = "2026-11-15 car template, motion words, scene-matched cache"
+
+
+def fingerprint(system_prompt: str, model: str, build: str = PROMPT_BUILD) -> str:
+    return hashlib.sha256(json.dumps([system_prompt, model, build]).encode()).hexdigest()[:16]
 
 
 def load(mode: str, timeout_s: float = DEFAULT_TIMEOUT_S, cache_path: str | None = DEFAULT_CACHE_FILE,
