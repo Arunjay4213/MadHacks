@@ -147,7 +147,7 @@ def resolve(query: str, snapshot: dict):
     named = []
     for change in changes:
         for match in re.finditer(r"\b" + re.escape(_norm(change["label"])) + r"\b", q):
-            if not any(a.start() <= match.start() and match.end() <= a.end()
+            if change["kind"] == "world" or not any(a.start() <= match.start() and match.end() <= a.end()
                        and KEYWORDS[a.group()]["label"] != change["label"] for a in aliases):
                 named.append(change)
                 break
