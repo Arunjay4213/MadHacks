@@ -63,7 +63,9 @@ class TableTest(unittest.TestCase):
     def test_road_scenes_are_the_template_bases(self):
         self.assertTrue(is_road_scene(CAR_BASE))
         self.assertTrue(is_road_scene(car_prompt(ISHAAN["mars"])))
-        for base in [DEFAULT_BASE, "a red sports car driving along a country road", CAR_BASE + " "]:
+        self.assertTrue(is_road_scene("a red sports car driving along a country road"))  # the spoken car scene
+        for base in [DEFAULT_BASE, "a red car parked in a meadow", "a red sports car driving along the old harbour",
+                     CAR_BASE + " "]:
             self.assertFalse(is_road_scene(base), base)
 
     def test_no_night_highway_world(self):  # Ishaan: a plain night highway turns to orange streaks

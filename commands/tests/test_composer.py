@@ -25,6 +25,14 @@ class ComposerTests(unittest.TestCase):
                 self.assertEqual(compose({"base": "a meadow", "changes": [
                     dict(kind="weather", phrase="snow", strength=strength)]}), phrase)
 
+    def test_intense_goes_after_the_article(self):
+        # "intense a large lion" is not English: the adjective goes after the article, which agrees with it.
+        for phrase, worded in [("a large lion at the left", "an intense large lion at the left"),
+                               ("an old bridge", "an intense old bridge"), ("the river", "the intense river")]:
+            with self.subTest(phrase=phrase):
+                self.assertEqual(compose({"base": "a meadow", "changes": [
+                    dict(kind="extra", phrase=phrase, strength=1.3)]}), f"a meadow; {worded}")
+
     def test_extras_keep_their_insertion_order(self):
         self.assertEqual(compose({"base": "a meadow", "changes": [
             dict(kind="extra", phrase="a river", strength=1),

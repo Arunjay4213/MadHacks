@@ -37,6 +37,20 @@ def car_service():
 
 
 class CarSceneTest(unittest.TestCase):
+    def test_a_spoken_car_on_a_country_road_takes_a_new_world(self):
+        # With the LLM reader timed out, the dictionary path keeps the whole description as the base. The user still
+        # wants the car template, and "make it a desert" must swap the world, not be unmatched.
+        service = CommandService(semantic_reader=lambda *a: None)
+        final(service, "new scene of a red sports car driving along a country road")
+        self.assertEqual(service.snapshot()["base"], "a red sports car driving along a country road")
+        self.assertEqual(service.committed_prompt, COUNTRY)
+        result = final(service, "make it a desert")
+        self.assertFalse(result["state"]["unmatched"])
+        self.assertEqual([c["label"] for c in result["state"]["changes"]], ["desert"])
+        self.assertEqual(result["steer"]["prompt"], DESERT)
+        final(service, "undo")
+        self.assertEqual(service.committed_prompt, COUNTRY)
+
     def test_reset_gives_the_country_road_template(self):
         service = car_service()
         self.assertEqual(service.committed_prompt, COUNTRY)
