@@ -852,7 +852,8 @@ class Engine:
                     t2 = time.perf_counter()
                     jpegs = [encode_jpeg(f, quality) for f in frames]
                     t3 = time.perf_counter()
-                    meta.decode_ms, meta.jpeg_ms, meta.frames = (t1 - t0) * 1e3, (t3 - t2) * 1e3, len(jpegs)
+                    # decode_ms includes short-chunk padding (t1..t2): _lead_limit budgets from it
+                    meta.decode_ms, meta.jpeg_ms, meta.frames = (t2 - t0) * 1e3, (t3 - t2) * 1e3, len(jpegs)
                     anchor = f", re-anchor {meta.anchor.reason} {meta.anchor.strength:.2f}" if meta.anchor else ""
                     log.info("chunk %d: gen %.0f ms, decode %.0f ms, jpeg %.0f ms, %d frames, decode queue %d%s",
                              meta.chunk, meta.gen_ms, meta.decode_ms, meta.jpeg_ms, meta.frames,
