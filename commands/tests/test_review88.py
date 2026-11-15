@@ -108,6 +108,30 @@ class RemoveWorldKeepsObjectsTest(unittest.TestCase):
             r = s.handle({"type": "final", "text": f"remove the {world}", "t_client": 2})
             self.assertEqual(labels(r), ["car"], world)
 
+    def test_removing_an_absent_object_located_in_the_world_changes_nothing(self):
+        for world, spoken in [("meadow", "remove the dragon near the meadow"),
+                              ("meadow", "remove the car near the meadow"),
+                              ("meadow", "remove the car in the meadows"),
+                              ("forest", "remove the car near the forest"),
+                              ("desert", "remove the dog by the desert")]:
+            s = svc()
+            s.handle({"type": "final", "text": f"make it a {world}", "t_client": 1})
+            r = s.handle({"type": "final", "text": spoken, "t_client": 2})
+            self.assertEqual(labels(r), [world], spoken)
+
+    def test_removing_an_absent_object_near_another_object_keeps_it(self):
+        s = svc()
+        s.handle({"type": "final", "text": "add a car", "t_client": 1})
+        r = s.handle({"type": "final", "text": "remove the dragon near the car", "t_client": 2})
+        self.assertEqual(labels(r), ["car"])
+
+    def test_object_named_by_alias_beats_a_newer_world_location(self):
+        s = svc()
+        for t in ["add a car", "make it a meadow"]:
+            s.handle({"type": "final", "text": t, "t_client": 1})
+        r = s.handle({"type": "final", "text": "remove the automobile near the meadow", "t_client": 2})
+        self.assertEqual(labels(r), ["meadow"])
+
 
 class AccentedPaceTest(unittest.TestCase):
     CAFE = {"op": "add", "label": "café", "kind": "extra", "phrase": "a small café", "strength": 1.0}
