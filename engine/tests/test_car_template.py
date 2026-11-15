@@ -206,3 +206,50 @@ def test_the_meadow_chain_is_unchanged():
         assert "seen from directly behind" not in out["steer"]["prompt"], sentence
         assert out["steer"]["prompt"] == pinned[(before, sentence)].prompt, sentence
     assert reader.stats()["template_hits"] == 0 and reader.stats()["pinned_hits"] == 6
+
+
+FOG = {"op": "add", "label": "fog", "kind": "weather", "phrase": "thick fog", "strength": 1.0}
+FOGGY = {"blocked": False, "operations": [FOG], "details": "", "road": "a misty country road",
+         "scene": "Green fields and rows of trees fade into thick grey fog on both sides of the road.",
+         "light": "Soft grey morning light, no shadows."}
+
+
+def test_an_object_added_on_a_car_scene_stays_in_the_prompt_word_for_word():
+    # Greptile on PR #141: the lion was a chip but not in the template prompt.
+    lion = {"op": "add", "label": "lion", "kind": "extra", "strength": 1.0,
+            "phrase": "a large male lion standing at the left side of the road in the foreground, facing the camera"}
+    country = ct.WORLDS["country"]
+    chat = ReplayChat({"add a lion": [{"blocked": False, "operations": [lion], "details": "", "road": country.road,
+                                       "scene": country.scene, "light": country.light}],
+                       "make it foggy": [FOGGY]})
+    _, svc = service(chat)
+    svc.handle(final(NEW_SCENE))
+    for sentence in ["add a lion", "make it foggy"]:
+        prompt = svc.handle(final(sentence))["steer"]["prompt"]
+        assert f"{CAMERA} A large male lion standing at the left side of the road in the foreground, facing the " \
+               f"camera. " in prompt, prompt
+        assert ct.check_prompt(prompt, "a red sports car", [lion["phrase"]])
+    # a measured world on a scene with an object goes to the model, which keeps the lion too
+    assert ct.plan("make it winter", svc._svc.snapshot()).route is ct.Route.MODEL
+
+
+def test_the_next_model_call_is_told_the_last_road_scene_and_light():
+    # Greptile on PR #141: after "make it foggy", the next call was told the clear country world again.
+    darker = {**FOGGY, "operations": [{"op": "add", "label": "dusk", "kind": "time", "phrase": "dusk light",
+                                       "strength": 1.0}], "light": "Dim grey dusk light, no shadows."}
+    chat = ReplayChat({"make it foggy": [FOGGY], "make it a bit darker": [darker]})
+    _, svc = service(chat)
+    svc.handle(final(NEW_SCENE))
+    svc.handle(final("make it foggy"))
+    svc.handle(final("make it a bit darker"))
+    told = chat.calls[-1][1]["car_template"]
+    assert told == {"subject": "a red sports car", "road": FOGGY["road"], "scene": FOGGY["scene"],
+                    "light": FOGGY["light"]}
+
+
+def test_the_camera_sentence_names_the_vehicle():
+    # Greptile on PR #141: a motorcycle prompt told the camera to follow a car.
+    prompt = ct.world_prompt("a black motorcycle", ct.WORLDS["desert"])
+    assert "The camera follows directly behind the motorcycle in a smooth" in prompt
+    assert "keeping the motorcycle centred" in prompt and " car" not in prompt
+    assert ct.camera_sentence("a red sports car") == CAMERA  # Ishaan's sentence, exactly, for a car
