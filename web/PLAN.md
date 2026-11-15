@@ -47,6 +47,8 @@ It sits in `PROTOCOL` in `lib.js` and in `fake-server.mjs`.
   `?debug=1` logs each input's `inputType` to the console, to check how Wispr Flow inserts on the demo laptop.
 - Speech: interim results send `partial` (only when the text changed). Each final result is sent once, tracked by its index.
   Stopping (mic off or PTT release) flushes leftover interim text as one `final`, once.
+- Speech endpointing (`makeSpeechEndpointer`, states `LISTENING`, `STABLE_SENT`, `CLOSED`): interim words unchanged for 200 ms (`SPEECH_STABLE_MS`) are sent as the `final` at once, unless they look unfinished or the socket is closed.
+  Chrome's later final (or the flush) is dropped if it has the same words (case and punctuation aside), sends only its new words if it extends them, and is sent whole if it is a different sentence.
 - Frames: each received frame gets a sequence number; after async decode it is drawn only if its sequence number is newer than the last drawn one.
 - Delay: shown only if the server echoes a `t_client` this page sent plus `applies_from_chunk`.
   Value = time the first frame tagged with chunk >= `applies_from_chunk` is drawn onto the canvas, minus `t_client`, both on the page clock.

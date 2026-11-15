@@ -39,7 +39,7 @@ The layout is the "Halo" design: one centred column on a static gradient backgro
 | Text box, Enter | Sends the sentence. |
 | Typing pause of 2.5 s | Sends the sentence, unless it looks unfinished (ends in a comma, "and", "a", "on", "make it" and similar); then it waits for Enter. Endings like "start over", "undo it", "slowly" and "more" send normally (PR #114). |
 | Wispr Flow: hold Ctrl, speak, release | The sentence lands in the text box and is sent at once. |
-| Hold to talk, or hold the backtick key (`` ` ``, under Esc) | Push-to-talk: words show while you speak, and one press is one command, sent on release. A quick second press records at once, and commands reach the server in the order you pressed (PR #114). |
+| Hold to talk, or hold the backtick key (`` ` ``, under Esc) | Push-to-talk: words show while you speak, and one press is one command. It is sent once the words have not changed for 200 ms (see below), or on release, whichever comes first. A quick second press records at once, and commands reach the server in the order you pressed (PR #114). |
 | Mic | Keeps listening hands-free until clicked again. |
 | Undo | Steps back one change. |
 | × on a chip | Removes that change only. |
@@ -47,6 +47,19 @@ The layout is the "Halo" design: one centred column on a static gradient backgro
 | Full screen (top right of the video; Esc leaves) | Full screen for the demo; use Chrome's View, Enter Full Screen if the browser blocks it. |
 
 Speech while disconnected is dropped, never replayed.
+
+### Spoken commands finish after 200 ms of unchanged words (issue #188)
+
+Chrome waits about 0.5 to 1 s of silence before it marks speech final, and the engine acts only on finals.
+So the mic (Mic and push-to-talk, not the text box or Wispr Flow) sends the words as the command once they have not changed for 200 ms (`SPEECH_STABLE_MS` in `lib.js`).
+Words that end like an unfinished sentence ("make it", "... and", "add a", a comma) wait, the same rule as typing (`looksUnfinished`).
+When Chrome's own final arrives later it is dropped if it has the same words (case and punctuation aside).
+If it adds words ("make it winter" then "make it winter at night"), only the new words are sent ("at night").
+If Chrome rewrote the sentence, the new sentence is sent as its own command.
+Press order and the no-sending-while-disconnected rule are unchanged.
+The logic is `makeSpeechEndpointer` in `lib.js`, a state machine with the states `LISTENING`, `STABLE_SENT` and `CLOSED`.
+
+Known risk: a speaker who pauses mid-sentence for longer than 200 ms after a complete-looking phrase ("make it winter ... at night") gets two commands, and the second ("at night") may not be understood on its own.
 
 ## How it is served
 
