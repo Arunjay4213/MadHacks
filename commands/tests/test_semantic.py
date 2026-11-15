@@ -101,23 +101,36 @@ def nocturnal_encode(texts):
     return [[1, 0, 0] if text in night or "nocturnal" in text else [0, 1 + len(text) % 7, 1 + len(text) % 5] for text in texts]
 
 
-@unittest.skipUnless(find_spec("numpy"), "optional vector tests need numpy")
-class StrengthWordsTests(unittest.TestCase):
-    """Strength words on the vector and style paths follow reader.strength_for, as on the dictionary path."""
+class StyleWordsTests(unittest.TestCase):
+    """Strength and pace words on the style path follow reader.strength_for, as on the dictionary path.
+
+    The style path is plain Python, so these run without NumPy, with no semantic reader.
+    The vector subclass below runs them again with a semantic reader in front of the style path.
+    """
+
+    def make_semantic_reader(self):
+        return lambda *a: None  # "no semantic reader"; None would load the configured model
+
+    def service(self, base=None):
+        return CommandService(base, slow_reader=lambda *a: None, semantic_reader=self.make_semantic_reader())
 
     def run_sentences(self, *sentences):
-        service = CommandService(slow_reader=lambda *a: None, semantic_reader=SemanticReader(nocturnal_encode))
+        service = self.service()
         for i, text in enumerate(sentences):
             result = service.handle(dict(type="final", text=text, t_client=i + 1))
             self.assertFalse(result["state"]["unmatched"], text)
         return [(c["label"], c["strength"]) for c in result["state"]["changes"]]
 
-    def test_vector_path_reads_strength_words(self):
-        self.assertEqual(self.run_sentences("make it a little nocturnal"), [("night", 0.3)])
-        self.assertEqual(self.run_sentences("make it a little night"), [("night", 0.3)])  # the dictionary path agrees
-        self.assertEqual(self.run_sentences("make it a lot nocturnal"), [("night", 1.3)])
-        self.assertEqual(self.run_sentences("make it nocturnal", "make it much more nocturnal"), [("night", 1.3)])
-        self.assertEqual(self.run_sentences("make it nocturnal", "make it less nocturnal"), [("night", 0.7)])
+    def check_pace(self, cases):
+        # Gate 4: "slowly make it winter" must reach full winter, only more slowly (12 chunks instead of 1).
+        for base in (None, CAR_BASE):
+            for text, label in cases:
+                with self.subTest(base=base, text=text):
+                    result = self.service(base).handle(dict(type="final", text=text, t_client=1))
+                    self.assertEqual([(c["label"], c["strength"]) for c in result["state"]["changes"]], [(label, 1.0)])
+                    self.assertEqual(result["steer"]["ramp_chunks"], RAMP["slow"])
+                    self.assertEqual(RAMP["slow"], 12)
+                    self.assertNotIn("moderate amount", result["steer"]["prompt"])
 
     def test_style_path_strips_strength_words_and_sets_strength(self):
         self.assertEqual(self.run_sentences("make it a little spooky"), [("spooky", 0.3)])
@@ -129,27 +142,35 @@ class StrengthWordsTests(unittest.TestCase):
         self.assertEqual(self.run_sentences("make it spooky", "make it a little less spooky"), [("spooky", 0.7)])
 
     def test_pace_words_set_the_ramp_and_never_the_strength(self):
-        # Gate 4: "slowly make it winter" must reach full winter, only more slowly (12 chunks instead of 1).
-        for base in (None, CAR_BASE):
-            for text, label in [("slowly make it winter", "winter"), ("gradually make it winter", "winter"),
-                                ("gently make it winter", "winter"), ("little by little make it winter", "winter"),
-                                ("make it winter slowly", "winter"), ("slowly make it nocturnal", "night"),
-                                ("slowly make it spooky", "spooky"), ("make it spooky slowly", "spooky")]:
-                with self.subTest(base=base, text=text):
-                    service = CommandService(base, slow_reader=lambda *a: None,
-                                             semantic_reader=SemanticReader(nocturnal_encode))
-                    result = service.handle(dict(type="final", text=text, t_client=1))
-                    self.assertEqual([(c["label"], c["strength"]) for c in result["state"]["changes"]], [(label, 1.0)])
-                    self.assertEqual(result["steer"]["ramp_chunks"], RAMP["slow"])
-                    self.assertEqual(RAMP["slow"], 12)
-                    self.assertNotIn("moderate amount", result["steer"]["prompt"])
+        self.check_pace([("slowly make it winter", "winter"), ("gradually make it winter", "winter"),
+                         ("gently make it winter", "winter"), ("little by little make it winter", "winter"),
+                         ("make it winter slowly", "winter"),
+                         ("slowly make it spooky", "spooky"), ("make it spooky slowly", "spooky")])
 
     def test_style_strength_change_is_one_undo(self):
-        service = CommandService(slow_reader=lambda *a: None, semantic_reader=SemanticReader(nocturnal_encode))
+        service = self.service()
         service.handle(dict(type="final", text="make it spooky", t_client=1))
         service.handle(dict(type="final", text="make it less spooky", t_client=2))
         undone = service.handle(dict(type="tap", action="undo"))
         self.assertEqual([(c["label"], c["strength"]) for c in undone["state"]["changes"]], [("spooky", 1.0)])
+
+
+@unittest.skipUnless(find_spec("numpy"), "optional vector tests need numpy")
+class StrengthWordsTests(StyleWordsTests):
+    """Strength and pace words on the vector path; the inherited style tests run again with the vector reader."""
+
+    def make_semantic_reader(self):
+        return SemanticReader(nocturnal_encode)
+
+    def test_vector_path_reads_strength_words(self):
+        self.assertEqual(self.run_sentences("make it a little nocturnal"), [("night", 0.3)])
+        self.assertEqual(self.run_sentences("make it a little night"), [("night", 0.3)])  # the dictionary path agrees
+        self.assertEqual(self.run_sentences("make it a lot nocturnal"), [("night", 1.3)])
+        self.assertEqual(self.run_sentences("make it nocturnal", "make it much more nocturnal"), [("night", 1.3)])
+        self.assertEqual(self.run_sentences("make it nocturnal", "make it less nocturnal"), [("night", 0.7)])
+
+    def test_vector_pace_words_set_the_ramp_and_never_the_strength(self):
+        self.check_pace([("slowly make it nocturnal", "night")])
 
 
 if __name__ == "__main__":
