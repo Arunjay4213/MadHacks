@@ -1063,10 +1063,12 @@ def expand_operations(ops: list, snapshot: dict) -> list[dict] | None:
     An operation naming a change id after a base edit or a new scene is invalid (those ids are gone), and undo
     and reset stay with the dictionary.
     A world add clears the earlier season and weather in commands.state (#115); world_first keeps a season said
-    in the same sentence.
+    in the same sentence, and drops the season and weather a base edit copied when the sentence also adds a world
+    ("turn the tree into a lighthouse and make it a desert" after winter has no snow).
     A vehicle added on a road gets LANE_CUE.
     """
     out: list[dict] = []
+    copied: list[dict] = []  # the adds a base edit copied from the scene (compared by identity)
     rebuilt = False  # an edit_base or new_scene came first: the old ids no longer exist
     for op in ops:
         if isinstance(op, dict) and op.get("op") == "edit_base":
@@ -1075,8 +1077,10 @@ def expand_operations(ops: list, snapshot: dict) -> list[dict] | None:
                 return None
             current = scene_after(snapshot, out)["changes"]
             out.append(clean)
-            out += [{"op": "add", "label": c["label"], "kind": c["kind"], "phrase": c["phrase"],
-                     "strength": c["strength"]} for c in current]
+            copies = [{"op": "add", "label": c["label"], "kind": c["kind"], "phrase": c["phrase"],
+                       "strength": c["strength"]} for c in current]
+            out += copies
+            copied += copies
             rebuilt = True
             continue
         clean = validate_operation(op, snapshot, FINAL_MAX_PHRASE)
@@ -1086,7 +1090,8 @@ def expand_operations(ops: list, snapshot: dict) -> list[dict] | None:
             return None
         rebuilt = rebuilt or clean["op"] == "new_scene"
         out.append(with_lane_cue(distinct_label(canonical_change(canonical_world(clean)), snapshot, out)))
-    return world_first(out) if len(out) <= BATCH_LIMIT else None
+    out = world_first(out, copied)
+    return out if len(out) <= BATCH_LIMIT else None
 
 
 def bare_vehicle_operations(ops: list[dict], snapshot: dict, subject: str) -> list[dict] | None:
@@ -1101,13 +1106,17 @@ def bare_vehicle_operations(ops: list[dict], snapshot: dict, subject: str) -> li
     return expand_operations([{"op": "edit_base", "base": subject}, *ops], snapshot)
 
 
-def world_first(ops: list[dict]) -> list[dict]:
+def world_first(ops: list[dict], copied: list[dict] = ()) -> list[dict]:
     """The world adds of a sentence moved before its season and weather adds (each group keeps its order).
     commands.state clears season and weather on a world add (#115), so "take me to a snowy desert" read as
-    winter then desert would lose the winter it asked for. A new_scene or edit_base stays first."""
-    worlds = [o for o in ops if o["op"] == "add" and o["kind"] == "world"]
+    winter then desert would lose the winter it asked for. A new_scene or edit_base stays first.
+    `copied` are the adds a base edit copied from the scene: when the sentence adds a world, its copied season and
+    weather are dropped (the new place brings its own), and a copied world is never moved."""
+    is_copy = lambda o: any(o is c for c in copied)
+    worlds = [o for o in ops if o["op"] == "add" and o["kind"] == "world" and not is_copy(o)]
     if not worlds:
         return ops
+    ops = [o for o in ops if not (is_copy(o) and o["op"] == "add" and o["kind"] in ("season", "weather"))]
     first = next((i for i, o in enumerate(ops) if o["op"] == "add" and o["kind"] in ("season", "weather")), None)
     if first is None or first > ops.index(worlds[0]):
         return ops
