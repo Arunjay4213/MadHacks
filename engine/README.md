@@ -458,7 +458,8 @@ So a new sentence costs about 1.8 s extra, and a pinned or cached sentence costs
 - One retry: a reply that is invalid, has no usable details, or adds an object whose phrase breaks a rule (world words such as "in the snow", or no size or position words) is asked again once, with the reasons and the earlier reply, when the first call took under half the wait (`retries`).
   On the live 3 s wait at about 1.8 s a call this does not happen; it does in offline runs such as the demo prompts regeneration.
   The reply states are named in `Verdict` (accepted, repaired, phrase, plain, empty, blocked, invalid, failed).
-- An object phrase may have up to 200 characters (the nano slow reader keeps 120), so a positioned phrase is valid.
+- An object phrase may have up to 200 characters (the nano slow reader keeps 120), so a positioned phrase is valid; any other phrase (a world sentence from `commands/world.py`, about 250 characters) up to 400 (`FINAL_MAX_PHRASE`).
+  A cached or pinned operation is checked with the same limits plus room for the lane cue (`CACHED_MAX_PHRASE`), so a saved edit replays instead of falling back.
   A vehicle added on a road gets "white dashed lane markings rush toward the viewer" at the end of its phrase; `FORWARD_MOTION` ends with the same cue.
 - A new place (an add of kind world) clears the earlier season and weather in `commands/state.py` (#115), so a desert after "make it winter" has no snow; the time of day stays.
   The engine moves a sentence's world add before its season and weather adds, so "take me to a snowy desert" keeps the snow it asked for.

@@ -129,7 +129,14 @@ POSITION_WORDS = frozenset({"foreground", "background", "midground", "left", "ri
 SIZE_WORDS = frozenset({"large", "small", "big", "huge", "tiny", "giant", "massive", "medium", "tall", "little",
                         "enormous"})
 PHRASE_POSITION_WORDS = POSITION_WORDS - {"shot", "closeup"} | {"near", "next", "beneath", "under", "above"}
-FINAL_MAX_PHRASE = 200  # characters; a positioned phrase is longer than the nano slow reader's 120
+# Characters of a phrase the final reader accepts: a positioned object (asked for under 200) or a world sentence
+# from commands/world.py (Ishaan's measured worlds, about 250) is longer than the nano slow reader's 120.
+FINAL_MAX_PHRASE = 400
+# A new object's phrase stays word for word in every later prompt, so it keeps the tighter limit it is asked for.
+OBJECT_MAX_PHRASE = 200
+# A saved or pinned operation was checked with FINAL_MAX_PHRASE before with_lane_cue added ", " + LANE_CUE, so a
+# cache hit is checked with room for it (the 120-character default refused the pinned racing car).
+CACHED_MAX_PHRASE = FINAL_MAX_PHRASE + len(", " + LANE_CUE)
 
 # Ishaan's tested car prompt (verbatim). A scene with this base starts with it, and every later prompt of that
 # scene keeps its first two sentences (subject, motion and camera) word for word; the engine builds them in.
@@ -844,7 +851,7 @@ class FinalReader:
         """A cached SONNET or PINNED result's operations name change ids; check they still fit this snapshot."""
         if entry.outcome not in (Outcome.SONNET, Outcome.PINNED):
             return entry.result()
-        if all(validate_operation(dict(op), snapshot) == dict(op) for op in entry.operations):
+        if all(validate_operation(dict(op), snapshot, CACHED_MAX_PHRASE) == dict(op) for op in entry.operations):
             return entry.result()
         log.info("final reader: the cached operations for %r no longer fit the scene; dictionary path", _short(key[1]))
         return None
@@ -1015,9 +1022,10 @@ def invalid_operation_reason(ops: list, snapshot: dict) -> str:
             return f"operation {n + 1} is {kind}: undo and reset stay with the dictionary"
         if kind == "add":
             phrase = op.get("phrase")
-            if isinstance(phrase, str) and len(" ".join(phrase.split())) > FINAL_MAX_PHRASE:
+            limit = OBJECT_MAX_PHRASE if op.get("kind") == "extra" else FINAL_MAX_PHRASE
+            if isinstance(phrase, str) and len(" ".join(phrase.split())) > limit:
                 return (f"operation {n + 1} ({op.get('label')!r}): its phrase has {len(phrase)} characters, "
-                        f"the limit is {FINAL_MAX_PHRASE}")
+                        f"the limit is {limit}")
         if validate_operation(op if kind != "edit_base" else {"op": "new_scene", "base": op.get("base")}, snapshot,
                               FINAL_MAX_PHRASE) is None:
             return f"operation {n + 1} is not valid: {_short(json.dumps(op), 160)}"
@@ -1055,6 +1063,8 @@ def expand_operations(ops: list, snapshot: dict) -> list[dict] | None:
             continue
         clean = validate_operation(op, snapshot, FINAL_MAX_PHRASE)
         if clean is None or clean["op"] in ("undo", "reset") or (rebuilt and "id" in clean):
+            return None
+        if clean["op"] == "add" and clean["kind"] == "extra" and len(clean["phrase"]) > OBJECT_MAX_PHRASE:
             return None
         if clean["op"] == "new_scene":
             anchor = anchor_for_base(clean["base"])
