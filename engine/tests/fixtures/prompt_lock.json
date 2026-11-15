@@ -1,0 +1,3813 @@
+{
+ "meadow draft script": {
+  "steps": [
+   {
+    "say": "reset",
+    "steer": null,
+    "state": {
+     "changes": [],
+     "heard": "reset",
+     "keyword": "reset",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree",
+    "likely_prompts_sha": "d8840b9a0c7ad34f"
+   },
+   {
+    "say": "make it winter",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it winter",
+     "keyword": "winter",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+    "likely_prompts_sha": "152c24cc1c3a6b0b"
+   },
+   {
+    "say": "add a red car",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a red car",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "car",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a red car",
+     "keyword": "car",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a red car",
+    "likely_prompts_sha": "6a6de6abfa9d1f04"
+   },
+   {
+    "say": "make it night",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; night time under a full moon; a red car",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "car",
+       "strength": 1.0
+      },
+      {
+       "id": "c3",
+       "label": "night",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it night",
+     "keyword": "night",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; night time under a full moon; a red car",
+    "likely_prompts_sha": "3d075f7982b28235"
+   },
+   {
+    "say": "add a lion",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; night time under a full moon; a red car; a lion",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "car",
+       "strength": 1.0
+      },
+      {
+       "id": "c3",
+       "label": "night",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "lion",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a lion",
+     "keyword": "lion",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; night time under a full moon; a red car; a lion",
+    "likely_prompts_sha": "bf2e9790cbc14bf8"
+   },
+   {
+    "say": "sunny",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "car",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "lion",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "day",
+       "strength": 1.0
+      }
+     ],
+     "heard": "sunny",
+     "keyword": "sunny",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion",
+    "likely_prompts_sha": "e176b3d03cbdacfe"
+   }
+  ],
+  "likely_prompts": [
+   "a wide shot of a meadow with a single oak tree; autumn scenery with orange and red leaves; bright daytime sunlight under a clear blue sky; a red car; a lion",
+   "a wide shot of a meadow with a single oak tree; bright summer scenery with lush green grass; bright daytime sunlight under a clear blue sky; a red car; a lion",
+   "a wide shot of a meadow with a single oak tree; spring scenery with fresh blossoms; bright daytime sunlight under a clear blue sky; a red car; a lion",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dark thunderstorm with lightning; bright daytime sunlight under a clear blue sky; a red car; a lion",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a golden sunset sky; a red car; a lion",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a soft pink sunrise sky; a red car; a lion",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a thick fog in the air; bright daytime sunlight under a clear blue sky; a red car; a lion",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; a calm lake reflecting the sky",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; a cat sitting nearby",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; a crackling campfire",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; a deer grazing nearby",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; a dog standing nearby",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; a flock of birds flying overhead",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; a rainbow across the sky",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; a river running through the scene",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; a small group of people standing in the scene",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; a small wooden boat",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; a small wooden cabin",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; a snowman with a carrot nose and a scarf",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; a stone castle with tall towers in the distance",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; a tall white lighthouse",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; a waterfall cascading down a rocky slope",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; a wooden bridge crossing the scene",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; bright stars scattered across the sky",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; butterflies fluttering through the scene",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; colorful wildflowers everywhere",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; fish swimming in clear water",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; glowing fireflies",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; horses grazing in the scene",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; snow-capped mountains in the distance",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; soft clouds drifting across the sky",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky; a red car; a lion; tall trees with branches moving in the breeze",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; harsh midday sunlight; a red car; a lion",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; night time under a full moon; a red car; a lion",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; steady rain falling; bright daytime sunlight under a clear blue sky; a red car; a lion",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; strong wind blowing through everything; bright daytime sunlight under a clear blue sky; a red car; a lion",
+   "a wide shot of a single oak tree; a red car; a lion; a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Sunny tropical day, clear blue sky, sparkling light on the water; bright daytime sunlight under a clear blue sky",
+   "a wide shot of a single oak tree; a red car; a lion; a dusty road across the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons; bright daytime sunlight under a clear blue sky",
+   "a wide shot of a single oak tree; a red car; a lion; a green meadow with soft grass, under a clear blue sky; bright daytime sunlight under a clear blue sky",
+   "a wide shot of a single oak tree; a red car; a lion; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows; bright daytime sunlight under a clear blue sky",
+   "a wide shot of a single oak tree; a red car; a lion; a narrow road through a dense green pine forest, tall trees on both sides, soft sunlight through the branches; bright daytime sunlight under a clear blue sky",
+   "a wide shot of a single oak tree; a red car; a lion; a snowy mountain road. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road; bright winter sunshine in a clear blue sky, sparkling snow, crisp shadows",
+   "a wide shot of a single oak tree; a red car; a lion; a straight two-lane country road. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows; bright daytime sunlight under a clear blue sky",
+   "a wide shot of a single oak tree; a red car; a lion; a wide city street. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, vivid neon glow, cyberpunk atmosphere; bright daytime sunlight under a clear blue sky"
+  ]
+ },
+ "meadow worlds": {
+  "steps": [
+   {
+    "say": "reset",
+    "steer": null,
+    "state": {
+     "changes": [],
+     "heard": "reset",
+     "keyword": "reset",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree",
+    "likely_prompts_sha": "d8840b9a0c7ad34f"
+   },
+   {
+    "say": "make it winter",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it winter",
+     "keyword": "winter",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+    "likely_prompts_sha": "152c24cc1c3a6b0b"
+   },
+   {
+    "say": "add a red car",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a red car",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "car",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a red car",
+     "keyword": "car",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a red car",
+    "likely_prompts_sha": "6a6de6abfa9d1f04"
+   },
+   {
+    "say": "make it a desert",
+    "steer": {
+     "prompt": "a wide shot of a single oak tree; a red car; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c2",
+       "label": "car",
+       "strength": 1.0
+      },
+      {
+       "id": "c3",
+       "label": "desert",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it a desert",
+     "keyword": "desert",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a single oak tree; a red car; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+    "likely_prompts_sha": "d745e5d500149e16"
+   },
+   {
+    "say": "add a red car racing on a road",
+    "steer": {
+     "prompt": "a wide shot of a single oak tree; a red car racing on a road; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c2",
+       "label": "car",
+       "strength": 1.0
+      },
+      {
+       "id": "c3",
+       "label": "desert",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a red car racing on a road",
+     "keyword": "car",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a single oak tree; a red car racing on a road; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+    "likely_prompts_sha": "615e7d9caf5280f7"
+   },
+   {
+    "say": "undo",
+    "steer": {
+     "prompt": "a wide shot of a single oak tree; a red car; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c2",
+       "label": "car",
+       "strength": 1.0
+      },
+      {
+       "id": "c3",
+       "label": "desert",
+       "strength": 1.0
+      }
+     ],
+     "heard": "undo",
+     "keyword": "undo",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a single oak tree; a red car; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+    "likely_prompts_sha": "d745e5d500149e16"
+   },
+   {
+    "say": "take me to the beach at night",
+    "steer": {
+     "prompt": "a wide shot of a single oak tree; a red car; a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side; night time under a full moon",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c2",
+       "label": "car",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "ocean coast",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "night",
+       "strength": 1.0
+      }
+     ],
+     "heard": "take me to the beach at night",
+     "keyword": "ocean coast",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a single oak tree; a red car; a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side; night time under a full moon",
+    "likely_prompts_sha": "44a75291a240fc79"
+   },
+   {
+    "say": "take me back to the meadow",
+    "steer": {
+     "prompt": "a wide shot of a single oak tree; a red car; a green meadow with soft grass; night time under a full moon",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c2",
+       "label": "car",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "night",
+       "strength": 1.0
+      },
+      {
+       "id": "c6",
+       "label": "meadow",
+       "strength": 1.0
+      }
+     ],
+     "heard": "take me back to the meadow",
+     "keyword": "meadow",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a single oak tree; a red car; a green meadow with soft grass; night time under a full moon",
+    "likely_prompts_sha": "46d5ab936361ff76"
+   },
+   {
+    "say": "go to mars",
+    "steer": {
+     "prompt": "a wide shot of a single oak tree; a red car; a dusty road across the red rocky surface of Mars, craters and red mountains; night time under a full moon",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c2",
+       "label": "car",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "night",
+       "strength": 1.0
+      },
+      {
+       "id": "c7",
+       "label": "mars",
+       "strength": 1.0
+      }
+     ],
+     "heard": "go to mars",
+     "keyword": "mars",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a single oak tree; a red car; a dusty road across the red rocky surface of Mars, craters and red mountains; night time under a full moon",
+    "likely_prompts_sha": "fb743c7ca0f72220"
+   },
+   {
+    "say": "remove the car near the meadow",
+    "steer": {
+     "prompt": "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; night time under a full moon",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c5",
+       "label": "night",
+       "strength": 1.0
+      },
+      {
+       "id": "c7",
+       "label": "mars",
+       "strength": 1.0
+      }
+     ],
+     "heard": "remove the car near the meadow",
+     "keyword": "car",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; night time under a full moon",
+    "likely_prompts_sha": "72c9322e049ea840"
+   },
+   {
+    "say": "remove the forest",
+    "steer": null,
+    "state": {
+     "changes": [
+      {
+       "id": "c5",
+       "label": "night",
+       "strength": 1.0
+      },
+      {
+       "id": "c7",
+       "label": "mars",
+       "strength": 1.0
+      }
+     ],
+     "heard": "remove the forest",
+     "keyword": "forest",
+     "unmatched": true
+    },
+    "committed": "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; night time under a full moon",
+    "likely_prompts_sha": "72c9322e049ea840"
+   },
+   {
+    "say": "make it foggy",
+    "steer": {
+     "prompt": "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c5",
+       "label": "night",
+       "strength": 1.0
+      },
+      {
+       "id": "c7",
+       "label": "mars",
+       "strength": 1.0
+      },
+      {
+       "id": "c8",
+       "label": "fog",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it foggy",
+     "keyword": "foggy",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+    "likely_prompts_sha": "2c42ec6925f579d3"
+   }
+  ],
+  "likely_prompts": [
+   "a wide shot of a single oak tree; a calm lake reflecting the sky; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a car driving forward along a road; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a cat sitting nearby; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side; night time under a full moon",
+   "a wide shot of a single oak tree; a crackling campfire; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a deer grazing nearby; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a dog standing nearby; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons; a thick fog in the air; bright daytime sunlight under a clear blue sky",
+   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; a dark thunderstorm with lightning; night time under a full moon",
+   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; a golden sunset sky",
+   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; a soft pink sunrise sky",
+   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; harsh midday sunlight",
+   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; autumn scenery with orange and red leaves; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; bright summer scenery with lush green grass; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; spring scenery with fresh blossoms; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; steady rain falling; night time under a full moon",
+   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; strong wind blowing through everything; night time under a full moon",
+   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; winter scenery with snow on the ground; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a flock of birds flying overhead; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a green meadow with soft grass; night time under a full moon",
+   "a wide shot of a single oak tree; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt; night time under a full moon",
+   "a wide shot of a single oak tree; a narrow road through a dense green pine forest, tall trees on both sides; night time under a full moon",
+   "a wide shot of a single oak tree; a rainbow across the sky; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a river running through the scene; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a small group of people standing in the scene; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a small wooden boat; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a small wooden cabin; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a snowman with a carrot nose and a scarf; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a snowy mountain road. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling; night time under a full moon",
+   "a wide shot of a single oak tree; a stone castle with tall towers in the distance; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a straight two-lane country road. Green fields and rows of trees line both sides of the road; night time under a full moon",
+   "a wide shot of a single oak tree; a tall white lighthouse; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a waterfall cascading down a rocky slope; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; night time under a full moon",
+   "a wide shot of a single oak tree; a wooden bridge crossing the scene; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; bright stars scattered across the sky; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; butterflies fluttering through the scene; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; colorful wildflowers everywhere; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; fish swimming in clear water; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; glowing fireflies; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; horses grazing in the scene; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; snow-capped mountains in the distance; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; soft clouds drifting across the sky; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; tall trees with branches moving in the breeze; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon"
+  ]
+ },
+ "meadow edits": {
+  "steps": [
+   {
+    "say": "reset",
+    "steer": null,
+    "state": {
+     "changes": [],
+     "heard": "reset",
+     "keyword": "reset",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree",
+    "likely_prompts_sha": "d8840b9a0c7ad34f"
+   },
+   {
+    "say": "make it winter",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it winter",
+     "keyword": "winter",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+    "likely_prompts_sha": "152c24cc1c3a6b0b"
+   },
+   {
+    "say": "a little more snow",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; intense winter scenery with snow on the ground",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.3
+      }
+     ],
+     "heard": "a little more snow",
+     "keyword": "snow",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; intense winter scenery with snow on the ground",
+    "likely_prompts_sha": "c9255dd20214355c"
+   },
+   {
+    "say": "a little less snow",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": "a little less snow",
+     "keyword": "snow",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+    "likely_prompts_sha": "152c24cc1c3a6b0b"
+   },
+   {
+    "say": "make it slowly rain",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; steady rain falling",
+     "ramp_chunks": 12,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "rain",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it slowly rain",
+     "keyword": "rain",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; steady rain falling",
+    "likely_prompts_sha": "63904d74282e30e6"
+   },
+   {
+    "say": "add a dog and remove the rain",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c3",
+       "label": "dog",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a dog and remove the rain",
+     "keyword": "rain",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby",
+    "likely_prompts_sha": "6d49b584e6cd5766"
+   },
+   {
+    "say": "add a dog and a cat",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby; a cat sitting nearby",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c3",
+       "label": "dog",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "cat",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a dog and a cat",
+     "keyword": "cat",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby; a cat sitting nearby",
+    "likely_prompts_sha": "be7b330382d23a96"
+   },
+   {
+    "say": "remove the dog",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a cat sitting nearby",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "cat",
+       "strength": 1.0
+      }
+     ],
+     "heard": "remove the dog",
+     "keyword": "dog",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a cat sitting nearby",
+    "likely_prompts_sha": "1384d09ae7459c46"
+   },
+   {
+    "say": "undo",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby; a cat sitting nearby",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c3",
+       "label": "dog",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "cat",
+       "strength": 1.0
+      }
+     ],
+     "heard": "undo",
+     "keyword": "undo",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby; a cat sitting nearby",
+    "likely_prompts_sha": "be7b330382d23a96"
+   },
+   {
+    "say": "undo the winter",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; a dog standing nearby; a cat sitting nearby",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c3",
+       "label": "dog",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "cat",
+       "strength": 1.0
+      }
+     ],
+     "heard": "undo the winter",
+     "keyword": "undo",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; a dog standing nearby; a cat sitting nearby",
+    "likely_prompts_sha": "5be8da9cea70f7f3"
+   },
+   {
+    "say": "add a glowing unicorn",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; a dog standing nearby; a cat sitting nearby; a glowing unicorn",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c3",
+       "label": "dog",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "cat",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "glowing unicorn",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a glowing unicorn",
+     "keyword": "glowing unicorn",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; a dog standing nearby; a cat sitting nearby; a glowing unicorn",
+    "likely_prompts_sha": "ab5473e14f3457f1"
+   },
+   {
+    "say": "add a bright red car",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; a dog standing nearby; a cat sitting nearby; a glowing unicorn; a bright red car",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c3",
+       "label": "dog",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "cat",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "glowing unicorn",
+       "strength": 1.0
+      },
+      {
+       "id": "c6",
+       "label": "car",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a bright red car",
+     "keyword": "car",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; a dog standing nearby; a cat sitting nearby; a glowing unicorn; a bright red car",
+    "likely_prompts_sha": "a2bec8f906f064ac"
+   },
+   {
+    "say": "make it spooky",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; a dog standing nearby; a cat sitting nearby; a glowing unicorn; a bright red car; the whole scene looks spooky",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c3",
+       "label": "dog",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "cat",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "glowing unicorn",
+       "strength": 1.0
+      },
+      {
+       "id": "c6",
+       "label": "car",
+       "strength": 1.0
+      },
+      {
+       "id": "c7",
+       "label": "spooky",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it spooky",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; a dog standing nearby; a cat sitting nearby; a glowing unicorn; a bright red car; the whole scene looks spooky",
+    "likely_prompts_sha": "68062603792e8333"
+   },
+   {
+    "say": "don't add a dog",
+    "steer": null,
+    "state": {
+     "changes": [
+      {
+       "id": "c3",
+       "label": "dog",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "cat",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "glowing unicorn",
+       "strength": 1.0
+      },
+      {
+       "id": "c6",
+       "label": "car",
+       "strength": 1.0
+      },
+      {
+       "id": "c7",
+       "label": "spooky",
+       "strength": 1.0
+      }
+     ],
+     "heard": "don't add a dog",
+     "keyword": null,
+     "unmatched": true
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; a dog standing nearby; a cat sitting nearby; a glowing unicorn; a bright red car; the whole scene looks spooky",
+    "likely_prompts_sha": "68062603792e8333"
+   },
+   {
+    "say": "turn the tree into a lighthouse",
+    "steer": null,
+    "state": {
+     "changes": [
+      {
+       "id": "c3",
+       "label": "dog",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "cat",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "glowing unicorn",
+       "strength": 1.0
+      },
+      {
+       "id": "c6",
+       "label": "car",
+       "strength": 1.0
+      },
+      {
+       "id": "c7",
+       "label": "spooky",
+       "strength": 1.0
+      }
+     ],
+     "heard": "turn the tree into a lighthouse",
+     "keyword": null,
+     "unmatched": true
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; a dog standing nearby; a cat sitting nearby; a glowing unicorn; a bright red car; the whole scene looks spooky",
+    "likely_prompts_sha": "68062603792e8333"
+   },
+   {
+    "say": "the car drives forward",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; a dog standing nearby; a cat sitting nearby; a glowing unicorn; a bright red car driving forward; the whole scene looks spooky",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c3",
+       "label": "dog",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "cat",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "glowing unicorn",
+       "strength": 1.0
+      },
+      {
+       "id": "c6",
+       "label": "car",
+       "strength": 1.0
+      },
+      {
+       "id": "c7",
+       "label": "spooky",
+       "strength": 1.0
+      }
+     ],
+     "heard": "the car drives forward",
+     "keyword": "car",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; a dog standing nearby; a cat sitting nearby; a glowing unicorn; a bright red car driving forward; the whole scene looks spooky",
+    "likely_prompts_sha": "becf912ffe8d694d"
+   },
+   {
+    "say": "add snow near the river",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby; a cat sitting nearby; a glowing unicorn; a bright red car driving forward; the whole scene looks spooky",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c3",
+       "label": "dog",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "cat",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "glowing unicorn",
+       "strength": 1.0
+      },
+      {
+       "id": "c6",
+       "label": "car",
+       "strength": 1.0
+      },
+      {
+       "id": "c7",
+       "label": "spooky",
+       "strength": 1.0
+      },
+      {
+       "id": "c8",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add snow near the river",
+     "keyword": "snow",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby; a cat sitting nearby; a glowing unicorn; a bright red car driving forward; the whole scene looks spooky",
+    "likely_prompts_sha": "f7a88d578bc0e718"
+   },
+   {
+    "say": "make it nice",
+    "steer": null,
+    "state": {
+     "changes": [
+      {
+       "id": "c3",
+       "label": "dog",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "cat",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "glowing unicorn",
+       "strength": 1.0
+      },
+      {
+       "id": "c6",
+       "label": "car",
+       "strength": 1.0
+      },
+      {
+       "id": "c7",
+       "label": "spooky",
+       "strength": 1.0
+      },
+      {
+       "id": "c8",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it nice",
+     "keyword": null,
+     "unmatched": true
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby; a cat sitting nearby; a glowing unicorn; a bright red car driving forward; the whole scene looks spooky",
+    "likely_prompts_sha": "f7a88d578bc0e718"
+   },
+   {
+    "say": "add a lot of fog",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; an intense thick fog in the air; a dog standing nearby; a cat sitting nearby; a glowing unicorn; a bright red car driving forward; the whole scene looks spooky",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c3",
+       "label": "dog",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "cat",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "glowing unicorn",
+       "strength": 1.0
+      },
+      {
+       "id": "c6",
+       "label": "car",
+       "strength": 1.0
+      },
+      {
+       "id": "c7",
+       "label": "spooky",
+       "strength": 1.0
+      },
+      {
+       "id": "c8",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c9",
+       "label": "fog",
+       "strength": 1.3
+      }
+     ],
+     "heard": "add a lot of fog",
+     "keyword": "fog",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; an intense thick fog in the air; a dog standing nearby; a cat sitting nearby; a glowing unicorn; a bright red car driving forward; the whole scene looks spooky",
+    "likely_prompts_sha": "6185f0ec3104a232"
+   },
+   {
+    "say": "tap:undo",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby; a cat sitting nearby; a glowing unicorn; a bright red car driving forward; the whole scene looks spooky",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c3",
+       "label": "dog",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "cat",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "glowing unicorn",
+       "strength": 1.0
+      },
+      {
+       "id": "c6",
+       "label": "car",
+       "strength": 1.0
+      },
+      {
+       "id": "c7",
+       "label": "spooky",
+       "strength": 1.0
+      },
+      {
+       "id": "c8",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": null,
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby; a cat sitting nearby; a glowing unicorn; a bright red car driving forward; the whole scene looks spooky",
+    "likely_prompts_sha": "f7a88d578bc0e718"
+   },
+   {
+    "say": "tap:remove:c1",
+    "steer": null,
+    "state": {
+     "changes": [
+      {
+       "id": "c3",
+       "label": "dog",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "cat",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "glowing unicorn",
+       "strength": 1.0
+      },
+      {
+       "id": "c6",
+       "label": "car",
+       "strength": 1.0
+      },
+      {
+       "id": "c7",
+       "label": "spooky",
+       "strength": 1.0
+      },
+      {
+       "id": "c8",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": null,
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby; a cat sitting nearby; a glowing unicorn; a bright red car driving forward; the whole scene looks spooky",
+    "likely_prompts_sha": "f7a88d578bc0e718"
+   },
+   {
+    "say": "add a 猫",
+    "steer": null,
+    "state": {
+     "changes": [
+      {
+       "id": "c3",
+       "label": "dog",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "cat",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "glowing unicorn",
+       "strength": 1.0
+      },
+      {
+       "id": "c6",
+       "label": "car",
+       "strength": 1.0
+      },
+      {
+       "id": "c7",
+       "label": "spooky",
+       "strength": 1.0
+      },
+      {
+       "id": "c8",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a 猫",
+     "keyword": null,
+     "unmatched": true
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby; a cat sitting nearby; a glowing unicorn; a bright red car driving forward; the whole scene looks spooky",
+    "likely_prompts_sha": "f7a88d578bc0e718"
+   },
+   {
+    "say": "start over",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [],
+     "heard": "start over",
+     "keyword": "start over",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree",
+    "likely_prompts_sha": "d8840b9a0c7ad34f"
+   }
+  ],
+  "likely_prompts": [
+   "a wide shot of a meadow with a single oak tree",
+   "a wide shot of a meadow with a single oak tree; a calm lake reflecting the sky",
+   "a wide shot of a meadow with a single oak tree; a car driving forward along a road",
+   "a wide shot of a meadow with a single oak tree; a cat sitting nearby",
+   "a wide shot of a meadow with a single oak tree; a crackling campfire",
+   "a wide shot of a meadow with a single oak tree; a dark thunderstorm with lightning",
+   "a wide shot of a meadow with a single oak tree; a deer grazing nearby",
+   "a wide shot of a meadow with a single oak tree; a dog standing nearby",
+   "a wide shot of a meadow with a single oak tree; a flock of birds flying overhead",
+   "a wide shot of a meadow with a single oak tree; a golden sunset sky",
+   "a wide shot of a meadow with a single oak tree; a rainbow across the sky",
+   "a wide shot of a meadow with a single oak tree; a river running through the scene",
+   "a wide shot of a meadow with a single oak tree; a small group of people standing in the scene",
+   "a wide shot of a meadow with a single oak tree; a small wooden boat",
+   "a wide shot of a meadow with a single oak tree; a small wooden cabin",
+   "a wide shot of a meadow with a single oak tree; a snowman with a carrot nose and a scarf",
+   "a wide shot of a meadow with a single oak tree; a soft pink sunrise sky",
+   "a wide shot of a meadow with a single oak tree; a stone castle with tall towers in the distance",
+   "a wide shot of a meadow with a single oak tree; a tall white lighthouse",
+   "a wide shot of a meadow with a single oak tree; a thick fog in the air",
+   "a wide shot of a meadow with a single oak tree; a waterfall cascading down a rocky slope",
+   "a wide shot of a meadow with a single oak tree; a wooden bridge crossing the scene",
+   "a wide shot of a meadow with a single oak tree; autumn scenery with orange and red leaves",
+   "a wide shot of a meadow with a single oak tree; bright daytime sunlight under a clear blue sky",
+   "a wide shot of a meadow with a single oak tree; bright stars scattered across the sky",
+   "a wide shot of a meadow with a single oak tree; bright summer scenery with lush green grass",
+   "a wide shot of a meadow with a single oak tree; butterflies fluttering through the scene",
+   "a wide shot of a meadow with a single oak tree; colorful wildflowers everywhere",
+   "a wide shot of a meadow with a single oak tree; fish swimming in clear water",
+   "a wide shot of a meadow with a single oak tree; glowing fireflies",
+   "a wide shot of a meadow with a single oak tree; harsh midday sunlight",
+   "a wide shot of a meadow with a single oak tree; horses grazing in the scene",
+   "a wide shot of a meadow with a single oak tree; night time under a full moon",
+   "a wide shot of a meadow with a single oak tree; snow-capped mountains in the distance",
+   "a wide shot of a meadow with a single oak tree; soft clouds drifting across the sky",
+   "a wide shot of a meadow with a single oak tree; spring scenery with fresh blossoms",
+   "a wide shot of a meadow with a single oak tree; steady rain falling",
+   "a wide shot of a meadow with a single oak tree; strong wind blowing through everything",
+   "a wide shot of a meadow with a single oak tree; tall trees with branches moving in the breeze",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+   "a wide shot of a single oak tree; a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Sunny tropical day, clear blue sky, sparkling light on the water",
+   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons",
+   "a wide shot of a single oak tree; a green meadow with soft grass, under a clear blue sky",
+   "a wide shot of a single oak tree; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+   "a wide shot of a single oak tree; a narrow road through a dense green pine forest, tall trees on both sides, soft sunlight through the branches",
+   "a wide shot of a single oak tree; a snowy mountain road. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows",
+   "a wide shot of a single oak tree; a straight two-lane country road. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows",
+   "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere"
+  ]
+ },
+ "meadow new scenes": {
+  "steps": [
+   {
+    "say": "reset",
+    "steer": null,
+    "state": {
+     "changes": [],
+     "heard": "reset",
+     "keyword": "reset",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree",
+    "likely_prompts_sha": "d8840b9a0c7ad34f"
+   },
+   {
+    "say": "new scene of a lighthouse on a cliff",
+    "steer": {
+     "prompt": "a lighthouse on a cliff",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [],
+     "heard": "new scene of a lighthouse on a cliff",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a lighthouse on a cliff",
+    "likely_prompts_sha": "47b30c2e57cc0a85"
+   },
+   {
+    "say": "make it winter",
+    "steer": {
+     "prompt": "a lighthouse on a cliff; winter scenery with snow on the ground",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it winter",
+     "keyword": "winter",
+     "unmatched": false
+    },
+    "committed": "a lighthouse on a cliff; winter scenery with snow on the ground",
+    "likely_prompts_sha": "ab5e2a01a2c838eb"
+   },
+   {
+    "say": "make it a desert",
+    "steer": {
+     "prompt": "a lighthouse on a cliff; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c2",
+       "label": "desert",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it a desert",
+     "keyword": "desert",
+     "unmatched": false
+    },
+    "committed": "a lighthouse on a cliff; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+    "likely_prompts_sha": "dc4109791cc9ef48"
+   },
+   {
+    "say": "show me a castle",
+    "steer": {
+     "prompt": "a lighthouse on a cliff; a stone castle with tall towers in the distance; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c2",
+       "label": "desert",
+       "strength": 1.0
+      },
+      {
+       "id": "c3",
+       "label": "castle",
+       "strength": 1.0
+      }
+     ],
+     "heard": "show me a castle",
+     "keyword": "castle",
+     "unmatched": false
+    },
+    "committed": "a lighthouse on a cliff; a stone castle with tall towers in the distance; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+    "likely_prompts_sha": "52fccd00c21e3c49"
+   },
+   {
+    "say": "reset and add a dog",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; a dog standing nearby",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c4",
+       "label": "dog",
+       "strength": 1.0
+      }
+     ],
+     "heard": "reset and add a dog",
+     "keyword": "dog",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; a dog standing nearby",
+    "likely_prompts_sha": "589dbe5d2512e923"
+   },
+   {
+    "say": "start over with a beach",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [],
+     "heard": "start over with a beach",
+     "keyword": "start over",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree",
+    "likely_prompts_sha": "d8840b9a0c7ad34f"
+   }
+  ],
+  "likely_prompts": [
+   "a wide shot of a meadow with a single oak tree",
+   "a wide shot of a meadow with a single oak tree; a calm lake reflecting the sky",
+   "a wide shot of a meadow with a single oak tree; a car driving forward along a road",
+   "a wide shot of a meadow with a single oak tree; a cat sitting nearby",
+   "a wide shot of a meadow with a single oak tree; a crackling campfire",
+   "a wide shot of a meadow with a single oak tree; a dark thunderstorm with lightning",
+   "a wide shot of a meadow with a single oak tree; a deer grazing nearby",
+   "a wide shot of a meadow with a single oak tree; a dog standing nearby",
+   "a wide shot of a meadow with a single oak tree; a flock of birds flying overhead",
+   "a wide shot of a meadow with a single oak tree; a golden sunset sky",
+   "a wide shot of a meadow with a single oak tree; a rainbow across the sky",
+   "a wide shot of a meadow with a single oak tree; a river running through the scene",
+   "a wide shot of a meadow with a single oak tree; a small group of people standing in the scene",
+   "a wide shot of a meadow with a single oak tree; a small wooden boat",
+   "a wide shot of a meadow with a single oak tree; a small wooden cabin",
+   "a wide shot of a meadow with a single oak tree; a snowman with a carrot nose and a scarf",
+   "a wide shot of a meadow with a single oak tree; a soft pink sunrise sky",
+   "a wide shot of a meadow with a single oak tree; a stone castle with tall towers in the distance",
+   "a wide shot of a meadow with a single oak tree; a tall white lighthouse",
+   "a wide shot of a meadow with a single oak tree; a thick fog in the air",
+   "a wide shot of a meadow with a single oak tree; a waterfall cascading down a rocky slope",
+   "a wide shot of a meadow with a single oak tree; a wooden bridge crossing the scene",
+   "a wide shot of a meadow with a single oak tree; autumn scenery with orange and red leaves",
+   "a wide shot of a meadow with a single oak tree; bright daytime sunlight under a clear blue sky",
+   "a wide shot of a meadow with a single oak tree; bright stars scattered across the sky",
+   "a wide shot of a meadow with a single oak tree; bright summer scenery with lush green grass",
+   "a wide shot of a meadow with a single oak tree; butterflies fluttering through the scene",
+   "a wide shot of a meadow with a single oak tree; colorful wildflowers everywhere",
+   "a wide shot of a meadow with a single oak tree; fish swimming in clear water",
+   "a wide shot of a meadow with a single oak tree; glowing fireflies",
+   "a wide shot of a meadow with a single oak tree; harsh midday sunlight",
+   "a wide shot of a meadow with a single oak tree; horses grazing in the scene",
+   "a wide shot of a meadow with a single oak tree; night time under a full moon",
+   "a wide shot of a meadow with a single oak tree; snow-capped mountains in the distance",
+   "a wide shot of a meadow with a single oak tree; soft clouds drifting across the sky",
+   "a wide shot of a meadow with a single oak tree; spring scenery with fresh blossoms",
+   "a wide shot of a meadow with a single oak tree; steady rain falling",
+   "a wide shot of a meadow with a single oak tree; strong wind blowing through everything",
+   "a wide shot of a meadow with a single oak tree; tall trees with branches moving in the breeze",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+   "a wide shot of a single oak tree; a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Sunny tropical day, clear blue sky, sparkling light on the water",
+   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons",
+   "a wide shot of a single oak tree; a green meadow with soft grass, under a clear blue sky",
+   "a wide shot of a single oak tree; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+   "a wide shot of a single oak tree; a narrow road through a dense green pine forest, tall trees on both sides, soft sunlight through the branches",
+   "a wide shot of a single oak tree; a snowy mountain road. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows",
+   "a wide shot of a single oak tree; a straight two-lane country road. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows",
+   "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere"
+  ]
+ },
+ "car chain": {
+  "steps": [
+   {
+    "say": "reset",
+    "steer": null,
+    "state": {
+     "changes": [],
+     "heard": "reset",
+     "keyword": "reset",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree",
+    "likely_prompts_sha": "d8840b9a0c7ad34f"
+   },
+   {
+    "say": "new scene of a red sports car driving along a country road",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [],
+     "heard": "new scene of a red sports car driving along a country road",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "ed69ebeb7e77384e"
+   },
+   {
+    "say": "make it winter",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a snowy mountain road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it winter",
+     "keyword": "winter",
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a snowy mountain road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "fbfc14b3147dbcae"
+   },
+   {
+    "say": "make it a desert",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a long straight desert highway, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c2",
+       "label": "desert",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it a desert",
+     "keyword": "desert",
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a long straight desert highway, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "730c71f0e1f69832"
+   },
+   {
+    "say": "make it night",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a long straight desert highway, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Night time under a full moon. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c2",
+       "label": "desert",
+       "strength": 1.0
+      },
+      {
+       "id": "c3",
+       "label": "night",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it night",
+     "keyword": "night",
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a long straight desert highway, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Night time under a full moon. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "0103d7c1a437be74"
+   },
+   {
+    "say": "add a lion",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a long straight desert highway, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A lion. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Night time under a full moon. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c2",
+       "label": "desert",
+       "strength": 1.0
+      },
+      {
+       "id": "c3",
+       "label": "night",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "lion",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a lion",
+     "keyword": "lion",
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a long straight desert highway, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A lion. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Night time under a full moon. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "dabf8bd5ef156829"
+   },
+   {
+    "say": "remove the lion",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a long straight desert highway, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Night time under a full moon. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c2",
+       "label": "desert",
+       "strength": 1.0
+      },
+      {
+       "id": "c3",
+       "label": "night",
+       "strength": 1.0
+      }
+     ],
+     "heard": "remove the lion",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a long straight desert highway, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Night time under a full moon. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "0103d7c1a437be74"
+   },
+   {
+    "say": "make it autumn",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a long straight desert highway, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside. Autumn scenery with orange and red leaves. Night time under a full moon. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c2",
+       "label": "desert",
+       "strength": 1.0
+      },
+      {
+       "id": "c3",
+       "label": "night",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "autumn",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it autumn",
+     "keyword": "autumn",
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a long straight desert highway, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside. Autumn scenery with orange and red leaves. Night time under a full moon. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "9d766a3bb988fcc9"
+   },
+   {
+    "say": "undo",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a long straight desert highway, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Night time under a full moon. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c2",
+       "label": "desert",
+       "strength": 1.0
+      },
+      {
+       "id": "c3",
+       "label": "night",
+       "strength": 1.0
+      }
+     ],
+     "heard": "undo",
+     "keyword": "undo",
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a long straight desert highway, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Night time under a full moon. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "0103d7c1a437be74"
+   },
+   {
+    "say": "take me to the beach",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a coastal cliff road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Night time under a full moon. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c3",
+       "label": "night",
+       "strength": 1.0
+      },
+      {
+       "id": "c6",
+       "label": "ocean coast",
+       "strength": 1.0
+      }
+     ],
+     "heard": "take me to the beach",
+     "keyword": "ocean coast",
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a coastal cliff road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Night time under a full moon. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "34dc499d16fc6cd5"
+   },
+   {
+    "say": "make it sunny",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a coastal cliff road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Sunny tropical day, clear blue sky, sparkling light on the water. Bright daytime sunlight under a clear blue sky. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c6",
+       "label": "ocean coast",
+       "strength": 1.0
+      },
+      {
+       "id": "c7",
+       "label": "day",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it sunny",
+     "keyword": "sunny",
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a coastal cliff road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Sunny tropical day, clear blue sky, sparkling light on the water. Bright daytime sunlight under a clear blue sky. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "7b56ebfff4defa71"
+   },
+   {
+    "say": "tap:reset",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [],
+     "heard": null,
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree",
+    "likely_prompts_sha": "d8840b9a0c7ad34f"
+   }
+  ],
+  "likely_prompts": [
+   "a wide shot of a meadow with a single oak tree",
+   "a wide shot of a meadow with a single oak tree; a calm lake reflecting the sky",
+   "a wide shot of a meadow with a single oak tree; a car driving forward along a road",
+   "a wide shot of a meadow with a single oak tree; a cat sitting nearby",
+   "a wide shot of a meadow with a single oak tree; a crackling campfire",
+   "a wide shot of a meadow with a single oak tree; a dark thunderstorm with lightning",
+   "a wide shot of a meadow with a single oak tree; a deer grazing nearby",
+   "a wide shot of a meadow with a single oak tree; a dog standing nearby",
+   "a wide shot of a meadow with a single oak tree; a flock of birds flying overhead",
+   "a wide shot of a meadow with a single oak tree; a golden sunset sky",
+   "a wide shot of a meadow with a single oak tree; a rainbow across the sky",
+   "a wide shot of a meadow with a single oak tree; a river running through the scene",
+   "a wide shot of a meadow with a single oak tree; a small group of people standing in the scene",
+   "a wide shot of a meadow with a single oak tree; a small wooden boat",
+   "a wide shot of a meadow with a single oak tree; a small wooden cabin",
+   "a wide shot of a meadow with a single oak tree; a snowman with a carrot nose and a scarf",
+   "a wide shot of a meadow with a single oak tree; a soft pink sunrise sky",
+   "a wide shot of a meadow with a single oak tree; a stone castle with tall towers in the distance",
+   "a wide shot of a meadow with a single oak tree; a tall white lighthouse",
+   "a wide shot of a meadow with a single oak tree; a thick fog in the air",
+   "a wide shot of a meadow with a single oak tree; a waterfall cascading down a rocky slope",
+   "a wide shot of a meadow with a single oak tree; a wooden bridge crossing the scene",
+   "a wide shot of a meadow with a single oak tree; autumn scenery with orange and red leaves",
+   "a wide shot of a meadow with a single oak tree; bright daytime sunlight under a clear blue sky",
+   "a wide shot of a meadow with a single oak tree; bright stars scattered across the sky",
+   "a wide shot of a meadow with a single oak tree; bright summer scenery with lush green grass",
+   "a wide shot of a meadow with a single oak tree; butterflies fluttering through the scene",
+   "a wide shot of a meadow with a single oak tree; colorful wildflowers everywhere",
+   "a wide shot of a meadow with a single oak tree; fish swimming in clear water",
+   "a wide shot of a meadow with a single oak tree; glowing fireflies",
+   "a wide shot of a meadow with a single oak tree; harsh midday sunlight",
+   "a wide shot of a meadow with a single oak tree; horses grazing in the scene",
+   "a wide shot of a meadow with a single oak tree; night time under a full moon",
+   "a wide shot of a meadow with a single oak tree; snow-capped mountains in the distance",
+   "a wide shot of a meadow with a single oak tree; soft clouds drifting across the sky",
+   "a wide shot of a meadow with a single oak tree; spring scenery with fresh blossoms",
+   "a wide shot of a meadow with a single oak tree; steady rain falling",
+   "a wide shot of a meadow with a single oak tree; strong wind blowing through everything",
+   "a wide shot of a meadow with a single oak tree; tall trees with branches moving in the breeze",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+   "a wide shot of a single oak tree; a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Sunny tropical day, clear blue sky, sparkling light on the water",
+   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons",
+   "a wide shot of a single oak tree; a green meadow with soft grass, under a clear blue sky",
+   "a wide shot of a single oak tree; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+   "a wide shot of a single oak tree; a narrow road through a dense green pine forest, tall trees on both sides, soft sunlight through the branches",
+   "a wide shot of a single oak tree; a snowy mountain road. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows",
+   "a wide shot of a single oak tree; a straight two-lane country road. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows",
+   "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere"
+  ]
+ },
+ "partials": {
+  "steps": [
+   {
+    "say": "reset",
+    "steer": null,
+    "state": {
+     "changes": [],
+     "heard": "reset",
+     "keyword": "reset",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree",
+    "likely_prompts_sha": "d8840b9a0c7ad34f"
+   },
+   {
+    "say": "partial:make it win",
+    "steer": null,
+    "state": {
+     "changes": [],
+     "heard": "make it win",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree",
+    "likely_prompts_sha": "d8840b9a0c7ad34f"
+   },
+   {
+    "say": "partial:make it winter",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+     "ramp_chunks": 4,
+     "provisional": true,
+     "cap": 0.4
+    },
+    "state": {
+     "changes": [],
+     "heard": "make it winter",
+     "keyword": "winter",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree",
+    "likely_prompts_sha": "d8840b9a0c7ad34f"
+   },
+   {
+    "say": "final:make it winter",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it winter",
+     "keyword": "winter",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+    "likely_prompts_sha": "152c24cc1c3a6b0b"
+   },
+   {
+    "say": "partial:add a li",
+    "steer": null,
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a li",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+    "likely_prompts_sha": "152c24cc1c3a6b0b"
+   },
+   {
+    "say": "partial:add a lion",
+    "steer": null,
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a lion",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+    "likely_prompts_sha": "152c24cc1c3a6b0b"
+   },
+   {
+    "say": "partial:add a",
+    "steer": null,
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+    "likely_prompts_sha": "152c24cc1c3a6b0b"
+   },
+   {
+    "say": "final:add a lion",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a lion",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "lion",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a lion",
+     "keyword": "lion",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a lion",
+    "likely_prompts_sha": "911091d9165d5f7d"
+   },
+   {
+    "say": "partial:undo",
+    "steer": null,
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "lion",
+       "strength": 1.0
+      }
+     ],
+     "heard": "undo",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a lion",
+    "likely_prompts_sha": "911091d9165d5f7d"
+   },
+   {
+    "say": "partial:make it a desert",
+    "steer": null,
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "lion",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it a desert",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a lion",
+    "likely_prompts_sha": "911091d9165d5f7d"
+   },
+   {
+    "say": "partial:add a dog",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a lion; a dog standing nearby",
+     "ramp_chunks": 4,
+     "provisional": true,
+     "cap": 0.4
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "lion",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a dog",
+     "keyword": "dog",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a lion",
+    "likely_prompts_sha": "911091d9165d5f7d"
+   },
+   {
+    "say": "final:never mind",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": "never mind",
+     "keyword": "never mind",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+    "likely_prompts_sha": "152c24cc1c3a6b0b"
+   }
+  ],
+  "likely_prompts": [
+   "a wide shot of a meadow with a single oak tree; autumn scenery with orange and red leaves",
+   "a wide shot of a meadow with a single oak tree; bright summer scenery with lush green grass",
+   "a wide shot of a meadow with a single oak tree; spring scenery with fresh blossoms",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a calm lake reflecting the sky",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a car driving forward along a road",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a cat sitting nearby",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a crackling campfire",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dark thunderstorm with lightning",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a deer grazing nearby",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a flock of birds flying overhead",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a golden sunset sky",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a rainbow across the sky",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a river running through the scene",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a small group of people standing in the scene",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a small wooden boat",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a small wooden cabin",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a snowman with a carrot nose and a scarf",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a soft pink sunrise sky",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a stone castle with tall towers in the distance",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a tall white lighthouse",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a thick fog in the air",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a waterfall cascading down a rocky slope",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a wooden bridge crossing the scene",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright daytime sunlight under a clear blue sky",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; bright stars scattered across the sky",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; butterflies fluttering through the scene",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; colorful wildflowers everywhere",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; fish swimming in clear water",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; glowing fireflies",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; harsh midday sunlight",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; horses grazing in the scene",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; night time under a full moon",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; snow-capped mountains in the distance",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; soft clouds drifting across the sky",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; steady rain falling",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; strong wind blowing through everything",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; tall trees with branches moving in the breeze",
+   "a wide shot of a single oak tree; a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Sunny tropical day, clear blue sky, sparkling light on the water",
+   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons",
+   "a wide shot of a single oak tree; a green meadow with soft grass, under a clear blue sky",
+   "a wide shot of a single oak tree; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+   "a wide shot of a single oak tree; a narrow road through a dense green pine forest, tall trees on both sides, soft sunlight through the branches",
+   "a wide shot of a single oak tree; a snowy mountain road. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows",
+   "a wide shot of a single oak tree; a straight two-lane country road. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows",
+   "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere"
+  ]
+ },
+ "sonnet meadow": {
+  "steps": [
+   {
+    "say": "tap:reset",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [],
+     "heard": null,
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree",
+    "likely_prompts_sha": "d8840b9a0c7ad34f",
+    "model_calls": []
+   },
+   {
+    "say": "make it winter",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a soft white blanket over the grass, frost-dusted textures, pale cold light, muted silver and blue tones",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it winter",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a soft white blanket over the grass, frost-dusted textures, pale cold light, muted silver and blue tones",
+    "likely_prompts_sha": "ef9106cf4a1faec1",
+    "model_calls": []
+   },
+   {
+    "say": "partial:add a red",
+    "steer": null,
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a red",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a soft white blanket over the grass, frost-dusted textures, pale cold light, muted silver and blue tones",
+    "likely_prompts_sha": "ef9106cf4a1faec1",
+    "model_calls": []
+   },
+   {
+    "say": "add a red car",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; pale frozen ground, crisp white drifts, soft diffuse light, cold clear air, muted grey and white tones",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "red car",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a red car",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; pale frozen ground, crisp white drifts, soft diffuse light, cold clear air, muted grey and white tones",
+    "likely_prompts_sha": "05572fe5ec2c06b6",
+    "model_calls": []
+   },
+   {
+    "say": "make it night",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; night time, dark sky lit by a bright full moon casting cool silvery light; cold silvery glow on the snow, deep blue shadows, crisp frosty air, pale sparkling highlights on the ground",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "red car",
+       "strength": 1.0
+      },
+      {
+       "id": "c3",
+       "label": "night",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it night",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; night time, dark sky lit by a bright full moon casting cool silvery light; cold silvery glow on the snow, deep blue shadows, crisp frosty air, pale sparkling highlights on the ground",
+    "likely_prompts_sha": "5d3925bc7834e69c",
+    "model_calls": []
+   },
+   {
+    "say": "add a lion",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; night time, dark sky lit by a bright full moon casting cool silvery light; crisp powdery ground texture, cold silvery light, frosted grass, deep blue shadows",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "red car",
+       "strength": 1.0
+      },
+      {
+       "id": "c3",
+       "label": "night",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "lion",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a lion",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; night time, dark sky lit by a bright full moon casting cool silvery light; crisp powdery ground texture, cold silvery light, frosted grass, deep blue shadows",
+    "likely_prompts_sha": "e9d1dc9a335b8b42",
+    "model_calls": []
+   },
+   {
+    "say": "sunny",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; bright daytime, clear sunny sky with warm sunlight and crisp shadows; crisp snow-dusted ground glittering under strong sunlight, sharp clear shadows, cold fresh air, bright pale blue sky, soft white and silver tones",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "red car",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "lion",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "day",
+       "strength": 1.0
+      }
+     ],
+     "heard": "sunny",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; bright daytime, clear sunny sky with warm sunlight and crisp shadows; crisp snow-dusted ground glittering under strong sunlight, sharp clear shadows, cold fresh air, bright pale blue sky, soft white and silver tones",
+    "likely_prompts_sha": "943201544dfddcf1",
+    "model_calls": []
+   },
+   {
+    "say": "add jensen huang",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the right of the frame, facing the camera; bright daytime, clear sunny sky with warm sunlight and crisp shadows; crisp snow crust glittering on the ground, frost on bare twigs, cold clear air, long sharp shadows, pale blue and white tones, warm sunlight on soft snowdrifts",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "red car",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "lion",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "day",
+       "strength": 1.0
+      },
+      {
+       "id": "c6",
+       "label": "jensen huang",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add jensen huang",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the right of the frame, facing the camera; bright daytime, clear sunny sky with warm sunlight and crisp shadows; crisp snow crust glittering on the ground, frost on bare twigs, cold clear air, long sharp shadows, pale blue and white tones, warm sunlight on soft snowdrifts",
+    "likely_prompts_sha": "6cb33a269ec4b3c6",
+    "model_calls": []
+   },
+   {
+    "say": "remove jensen huang",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; bright daytime, clear sunny sky with warm sunlight and crisp shadows; crisp snow-dusted ground glittering under strong sunlight, sharp clear shadows, cold fresh air, bright pale blue sky, soft white and silver tones",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "red car",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "lion",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "day",
+       "strength": 1.0
+      }
+     ],
+     "heard": "remove jensen huang",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; bright daytime, clear sunny sky with warm sunlight and crisp shadows; crisp snow-dusted ground glittering under strong sunlight, sharp clear shadows, cold fresh air, bright pale blue sky, soft white and silver tones",
+    "likely_prompts_sha": "943201544dfddcf1",
+    "model_calls": []
+   },
+   {
+    "say": "make it a desert",
+    "steer": {
+     "prompt": "a wide shot of a single oak tree; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows; bright daytime, clear sunny sky with warm sunlight and crisp shadows; rippled golden sand, fine windblown grains, dry cracked earth, pale hazy horizon, warm amber tones, sharp crisp shadows",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c2",
+       "label": "red car",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "lion",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "day",
+       "strength": 1.0
+      },
+      {
+       "id": "c7",
+       "label": "desert",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it a desert",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a single oak tree; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows; bright daytime, clear sunny sky with warm sunlight and crisp shadows; rippled golden sand, fine windblown grains, dry cracked earth, pale hazy horizon, warm amber tones, sharp crisp shadows",
+    "likely_prompts_sha": "1d8245ae3dd780af",
+    "model_calls": []
+   },
+   {
+    "say": "add a red car racing on a road",
+    "steer": {
+     "prompt": "a wide shot of a single oak tree; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a second small red car racing along the road in the next lane at the right of the frame, white dashed lane markings rush toward the viewer; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows; bright daytime, clear sunny sky with warm sunlight and crisp shadows; warm golden sand, dry cracked ground, fine dust in the air, rough red rock textures, hard bright light",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c2",
+       "label": "red car",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "lion",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "day",
+       "strength": 1.0
+      },
+      {
+       "id": "c7",
+       "label": "desert",
+       "strength": 1.0
+      },
+      {
+       "id": "c8",
+       "label": "second red car",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a red car racing on a road",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a single oak tree; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a second small red car racing along the road in the next lane at the right of the frame, white dashed lane markings rush toward the viewer; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows; bright daytime, clear sunny sky with warm sunlight and crisp shadows; warm golden sand, dry cracked ground, fine dust in the air, rough red rock textures, hard bright light",
+    "likely_prompts_sha": "62247b0d4efccf52",
+    "model_calls": []
+   },
+   {
+    "say": "undo",
+    "steer": {
+     "prompt": "a wide shot of a single oak tree; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows; bright daytime, clear sunny sky with warm sunlight and crisp shadows; rippled golden sand, fine windblown grains, dry cracked earth, pale hazy horizon, warm amber tones, sharp crisp shadows",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c2",
+       "label": "red car",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "lion",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "day",
+       "strength": 1.0
+      },
+      {
+       "id": "c7",
+       "label": "desert",
+       "strength": 1.0
+      }
+     ],
+     "heard": "undo",
+     "keyword": "undo",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a single oak tree; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows; bright daytime, clear sunny sky with warm sunlight and crisp shadows; rippled golden sand, fine windblown grains, dry cracked earth, pale hazy horizon, warm amber tones, sharp crisp shadows",
+    "likely_prompts_sha": "1d8245ae3dd780af",
+    "model_calls": []
+   },
+   {
+    "say": "undo",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; bright daytime, clear sunny sky with warm sunlight and crisp shadows; crisp snow-dusted ground glittering under strong sunlight, sharp clear shadows, cold fresh air, bright pale blue sky, soft white and silver tones",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "red car",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "lion",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "day",
+       "strength": 1.0
+      }
+     ],
+     "heard": "undo",
+     "keyword": "undo",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; bright daytime, clear sunny sky with warm sunlight and crisp shadows; crisp snow-dusted ground glittering under strong sunlight, sharp clear shadows, cold fresh air, bright pale blue sky, soft white and silver tones",
+    "likely_prompts_sha": "5fd34606a01530e2",
+    "model_calls": []
+   },
+   {
+    "say": "add a small dog",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a large brown dog standing in the foreground at the right of the frame, facing the camera; bright daytime, clear sunny sky with warm sunlight and crisp shadows; fresh green grass, clear air",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "red car",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "lion",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "day",
+       "strength": 1.0
+      },
+      {
+       "id": "c9",
+       "label": "dog",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a small dog",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a large brown dog standing in the foreground at the right of the frame, facing the camera; bright daytime, clear sunny sky with warm sunlight and crisp shadows; fresh green grass, clear air",
+    "likely_prompts_sha": "d6caf5acfca89a64",
+    "model_calls": [
+     {
+      "scene": {
+       "base": "a wide shot of a meadow with a single oak tree",
+       "changes": [
+        {
+         "id": "c1",
+         "label": "winter",
+         "kind": "season",
+         "phrase": "winter, snow covering the ground and bare branches",
+         "strength": 1.0
+        },
+        {
+         "id": "c2",
+         "label": "red car",
+         "kind": "extra",
+         "phrase": "a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible",
+         "strength": 1.0
+        },
+        {
+         "id": "c4",
+         "label": "lion",
+         "kind": "extra",
+         "phrase": "a large male lion standing in the foreground at the left of the frame, facing the camera",
+         "strength": 1.0
+        },
+        {
+         "id": "c5",
+         "label": "day",
+         "kind": "time",
+         "phrase": "bright daytime, clear sunny sky with warm sunlight and crisp shadows",
+         "strength": 1.0
+        }
+       ]
+      },
+      "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; bright daytime, clear sunny sky with warm sunlight and crisp shadows; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera",
+      "sentence": "add a small dog",
+      "details_max_words": 45
+     }
+    ]
+   },
+   {
+    "say": "add a nude dog",
+    "steer": null,
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "red car",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "lion",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "day",
+       "strength": 1.0
+      },
+      {
+       "id": "c9",
+       "label": "dog",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a nude dog",
+     "keyword": null,
+     "unmatched": true
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; a large brown dog standing in the foreground at the right of the frame, facing the camera; bright daytime, clear sunny sky with warm sunlight and crisp shadows; fresh green grass, clear air",
+    "likely_prompts_sha": "d6caf5acfca89a64",
+    "model_calls": []
+   },
+   {
+    "say": "undo",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; bright daytime, clear sunny sky with warm sunlight and crisp shadows; crisp snow-dusted ground glittering under strong sunlight, sharp clear shadows, cold fresh air, bright pale blue sky, soft white and silver tones",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "red car",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "lion",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "day",
+       "strength": 1.0
+      }
+     ],
+     "heard": "undo",
+     "keyword": "undo",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; bright daytime, clear sunny sky with warm sunlight and crisp shadows; crisp snow-dusted ground glittering under strong sunlight, sharp clear shadows, cold fresh air, bright pale blue sky, soft white and silver tones",
+    "likely_prompts_sha": "5fd34606a01530e2",
+    "model_calls": []
+   },
+   {
+    "say": "make it foggy",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; thick fog; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; bright daytime, clear sunny sky with warm sunlight and crisp shadows; grey fog over the grass, soft diffuse light, damp air, muted colours",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      },
+      {
+       "id": "c2",
+       "label": "red car",
+       "strength": 1.0
+      },
+      {
+       "id": "c4",
+       "label": "lion",
+       "strength": 1.0
+      },
+      {
+       "id": "c5",
+       "label": "day",
+       "strength": 1.0
+      },
+      {
+       "id": "c10",
+       "label": "fog",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it foggy",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; thick fog; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera; bright daytime, clear sunny sky with warm sunlight and crisp shadows; grey fog over the grass, soft diffuse light, damp air, muted colours",
+    "likely_prompts_sha": "985247f0ee7e5186",
+    "model_calls": [
+     {
+      "scene": {
+       "base": "a wide shot of a meadow with a single oak tree",
+       "changes": [
+        {
+         "id": "c1",
+         "label": "winter",
+         "kind": "season",
+         "phrase": "winter, snow covering the ground and bare branches",
+         "strength": 1.0
+        },
+        {
+         "id": "c2",
+         "label": "red car",
+         "kind": "extra",
+         "phrase": "a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible",
+         "strength": 1.0
+        },
+        {
+         "id": "c4",
+         "label": "lion",
+         "kind": "extra",
+         "phrase": "a large male lion standing in the foreground at the left of the frame, facing the camera",
+         "strength": 1.0
+        },
+        {
+         "id": "c5",
+         "label": "day",
+         "kind": "time",
+         "phrase": "bright daytime, clear sunny sky with warm sunlight and crisp shadows",
+         "strength": 1.0
+        }
+       ]
+      },
+      "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; bright daytime, clear sunny sky with warm sunlight and crisp shadows; a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible; a large male lion standing in the foreground at the left of the frame, facing the camera",
+      "sentence": "make it foggy",
+      "details_max_words": 45
+     }
+    ]
+   },
+   {
+    "say": "tap:reset",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [],
+     "heard": null,
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree",
+    "likely_prompts_sha": "d8840b9a0c7ad34f",
+    "model_calls": []
+   }
+  ],
+  "likely_prompts": [
+   "a wide shot of a meadow with a single oak tree",
+   "a wide shot of a meadow with a single oak tree; a calm lake reflecting the sky",
+   "a wide shot of a meadow with a single oak tree; a car driving forward along a road",
+   "a wide shot of a meadow with a single oak tree; a cat sitting nearby",
+   "a wide shot of a meadow with a single oak tree; a crackling campfire",
+   "a wide shot of a meadow with a single oak tree; a dark thunderstorm with lightning",
+   "a wide shot of a meadow with a single oak tree; a deer grazing nearby",
+   "a wide shot of a meadow with a single oak tree; a dog standing nearby",
+   "a wide shot of a meadow with a single oak tree; a flock of birds flying overhead",
+   "a wide shot of a meadow with a single oak tree; a golden sunset sky",
+   "a wide shot of a meadow with a single oak tree; a rainbow across the sky",
+   "a wide shot of a meadow with a single oak tree; a river running through the scene",
+   "a wide shot of a meadow with a single oak tree; a small group of people standing in the scene",
+   "a wide shot of a meadow with a single oak tree; a small wooden boat",
+   "a wide shot of a meadow with a single oak tree; a small wooden cabin",
+   "a wide shot of a meadow with a single oak tree; a snowman with a carrot nose and a scarf",
+   "a wide shot of a meadow with a single oak tree; a soft pink sunrise sky",
+   "a wide shot of a meadow with a single oak tree; a stone castle with tall towers in the distance",
+   "a wide shot of a meadow with a single oak tree; a tall white lighthouse",
+   "a wide shot of a meadow with a single oak tree; a thick fog in the air",
+   "a wide shot of a meadow with a single oak tree; a waterfall cascading down a rocky slope",
+   "a wide shot of a meadow with a single oak tree; a wooden bridge crossing the scene",
+   "a wide shot of a meadow with a single oak tree; autumn scenery with orange and red leaves",
+   "a wide shot of a meadow with a single oak tree; bright daytime sunlight under a clear blue sky",
+   "a wide shot of a meadow with a single oak tree; bright stars scattered across the sky",
+   "a wide shot of a meadow with a single oak tree; bright summer scenery with lush green grass",
+   "a wide shot of a meadow with a single oak tree; butterflies fluttering through the scene",
+   "a wide shot of a meadow with a single oak tree; colorful wildflowers everywhere",
+   "a wide shot of a meadow with a single oak tree; fish swimming in clear water",
+   "a wide shot of a meadow with a single oak tree; glowing fireflies",
+   "a wide shot of a meadow with a single oak tree; harsh midday sunlight",
+   "a wide shot of a meadow with a single oak tree; horses grazing in the scene",
+   "a wide shot of a meadow with a single oak tree; night time under a full moon",
+   "a wide shot of a meadow with a single oak tree; snow-capped mountains in the distance",
+   "a wide shot of a meadow with a single oak tree; soft clouds drifting across the sky",
+   "a wide shot of a meadow with a single oak tree; spring scenery with fresh blossoms",
+   "a wide shot of a meadow with a single oak tree; steady rain falling",
+   "a wide shot of a meadow with a single oak tree; strong wind blowing through everything",
+   "a wide shot of a meadow with a single oak tree; tall trees with branches moving in the breeze",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+   "a wide shot of a single oak tree; a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Sunny tropical day, clear blue sky, sparkling light on the water",
+   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons",
+   "a wide shot of a single oak tree; a green meadow with soft grass, under a clear blue sky",
+   "a wide shot of a single oak tree; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+   "a wide shot of a single oak tree; a narrow road through a dense green pine forest, tall trees on both sides, soft sunlight through the branches",
+   "a wide shot of a single oak tree; a snowy mountain road. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows",
+   "a wide shot of a single oak tree; a straight two-lane country road. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows",
+   "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere"
+  ],
+  "stats": {
+   "state": "on",
+   "reason": null,
+   "prompt_spec": "commands.rewriter",
+   "calls": 2,
+   "cache_hits": 0,
+   "pinned": 19,
+   "pinned_hits": 9,
+   "template_hits": 0,
+   "blocked": 1,
+   "timeouts": 0,
+   "late_dropped": 0,
+   "rejects": 0,
+   "details_rejected": 0,
+   "details_repaired": 1,
+   "retries": 0,
+   "errors": 0,
+   "cache_size": 2,
+   "timeout_s": 5.0,
+   "cache_file": null
+  }
+ },
+ "sonnet car": {
+  "steps": [
+   {
+    "say": "tap:reset",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [],
+     "heard": null,
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree",
+    "likely_prompts_sha": "d8840b9a0c7ad34f",
+    "model_calls": []
+   },
+   {
+    "say": "new scene of a red sports car driving along a country road",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [],
+     "heard": "new scene of a red sports car driving along a country road",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "13309da860a79edd",
+    "model_calls": []
+   },
+   {
+    "say": "add jensen huang",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "jensen huang",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add jensen huang",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt, a large figure standing in the foreground at the left of the frame, facing the camera. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "8482078ee6ad333d",
+    "model_calls": []
+   },
+   {
+    "say": "remove jensen huang",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [],
+     "heard": "remove jensen huang",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "13309da860a79edd",
+    "model_calls": []
+   },
+   {
+    "say": "make it winter",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a snowy mountain road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c2",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it winter",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a snowy mountain road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "9c09c81e0e7473ee",
+    "model_calls": []
+   },
+   {
+    "say": "make it a desert",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a long straight desert highway, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c3",
+       "label": "desert",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it a desert",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a long straight desert highway, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "1ce68f6853313d94",
+    "model_calls": []
+   },
+   {
+    "say": "make it night",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a wide city street at night, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c4",
+       "label": "neon city",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it night",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a wide city street at night, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "155db602c95dce4b",
+    "model_calls": []
+   },
+   {
+    "say": "make it autumn",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a winding country road through an autumn forest, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Trees with bright orange, red and yellow leaves line both sides, fallen leaves scattered across the road and swirling behind the car. Low warm golden afternoon sun, light mist between the trees. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c5",
+       "label": "autumn",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it autumn",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a winding country road through an autumn forest, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Trees with bright orange, red and yellow leaves line both sides, fallen leaves scattered across the road and swirling behind the car. Low warm golden afternoon sun, light mist between the trees. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "ca806134e611c115",
+    "model_calls": []
+   },
+   {
+    "say": "make it sunset",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight open road across rolling grassland, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Golden grass fields and a few lone trees on both sides, long shadows stretching across the road. The sun setting low on the horizon ahead, a glowing orange and pink sky, warm backlight. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c6",
+       "label": "sunset",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it sunset",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight open road across rolling grassland, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Golden grass fields and a few lone trees on both sides, long shadows stretching across the road. The sun setting low on the horizon ahead, a glowing orange and pink sky, warm backlight. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "dd612cba70108fac",
+    "model_calls": []
+   },
+   {
+    "say": "make it rain",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a wet country road in heavy rain, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Rain pours down, puddles and spray on the dark asphalt, water kicked up behind the tyres, green fields and trees blurred by the rain. Dark grey storm clouds, dim diffuse light, glistening reflections on the road. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c7",
+       "label": "rain",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it rain",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a wet country road in heavy rain, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Rain pours down, puddles and spray on the dark asphalt, water kicked up behind the tyres, green fields and trees blurred by the rain. Dark grey storm clouds, dim diffuse light, glistening reflections on the road. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "ae9526f98701e188",
+    "model_calls": []
+   },
+   {
+    "say": "take me to the beach",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a coastal cliff road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Sunny tropical day, clear blue sky, sparkling light on the water. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c8",
+       "label": "ocean coast",
+       "strength": 1.0
+      }
+     ],
+     "heard": "take me to the beach",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a coastal cliff road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Sunny tropical day, clear blue sky, sparkling light on the water. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "db8b2104dc9db7cc",
+    "model_calls": []
+   },
+   {
+    "say": "make it foggy",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a quiet country road in thick fog, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Pale fields and dim trees fade into the fog on both sides. Soft grey diffuse light under a white sky. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c8",
+       "label": "ocean coast",
+       "strength": 1.0
+      },
+      {
+       "id": "c9",
+       "label": "fog",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it foggy",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a quiet country road in thick fog, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Pale fields and dim trees fade into the fog on both sides. Soft grey diffuse light under a white sky. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "2b517f5008bfd219",
+    "model_calls": [
+     {
+      "scene": {
+       "base": "a red sports car",
+       "changes": [
+        {
+         "id": "c8",
+         "label": "ocean coast",
+         "kind": "world",
+         "phrase": "a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Sunny tropical day, clear blue sky, sparkling light on the water.",
+         "strength": 1.0
+        }
+       ]
+      },
+      "prompt": "a red sports car; a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Sunny tropical day, clear blue sky, sparkling light on the water",
+      "sentence": "make it foggy",
+      "details_max_words": 45,
+      "car_template": {
+       "subject": "a red sports car",
+       "road": "a coastal cliff road",
+       "scene": "A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side.",
+       "light": "Sunny tropical day, clear blue sky, sparkling light on the water."
+      }
+     }
+    ]
+   },
+   {
+    "say": "make it country",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [],
+     "heard": "make it country",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "dda4656663d08d3b",
+    "model_calls": []
+   },
+   {
+    "say": "undo",
+    "steer": {
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a quiet country road in thick fog, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Pale fields and dim trees fade into the fog on both sides. Soft grey diffuse light under a white sky. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c8",
+       "label": "ocean coast",
+       "strength": 1.0
+      },
+      {
+       "id": "c9",
+       "label": "fog",
+       "strength": 1.0
+      }
+     ],
+     "heard": "undo",
+     "keyword": "undo",
+     "unmatched": false
+    },
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a quiet country road in thick fog, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Pale fields and dim trees fade into the fog on both sides. Soft grey diffuse light under a white sky. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "2b517f5008bfd219",
+    "model_calls": []
+   },
+   {
+    "say": "add a dog",
+    "steer": {
+     "prompt": "a red sports car; a dog standing nearby; a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side; thick fog",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c8",
+       "label": "ocean coast",
+       "strength": 1.0
+      },
+      {
+       "id": "c9",
+       "label": "fog",
+       "strength": 1.0
+      },
+      {
+       "id": "c10",
+       "label": "dog",
+       "strength": 1.0
+      }
+     ],
+     "heard": "add a dog",
+     "keyword": "dog",
+     "unmatched": false
+    },
+    "committed": "a red sports car; a dog standing nearby; a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side; thick fog",
+    "likely_prompts_sha": "1863e2cb52475471",
+    "model_calls": [
+     {
+      "scene": {
+       "base": "a red sports car",
+       "changes": [
+        {
+         "id": "c8",
+         "label": "ocean coast",
+         "kind": "world",
+         "phrase": "a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Sunny tropical day, clear blue sky, sparkling light on the water.",
+         "strength": 1.0
+        },
+        {
+         "id": "c9",
+         "label": "fog",
+         "kind": "weather",
+         "phrase": "thick fog",
+         "strength": 1.0
+        }
+       ]
+      },
+      "prompt": "a red sports car; a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side; thick fog",
+      "sentence": "add a dog",
+      "details_max_words": 45,
+      "car_template": {
+       "subject": "a red sports car",
+       "road": "a quiet country road in thick fog",
+       "scene": "Pale fields and dim trees fade into the fog on both sides.",
+       "light": "Soft grey diffuse light under a white sky."
+      }
+     }
+    ]
+   },
+   {
+    "say": "tap:reset",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [],
+     "heard": null,
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree",
+    "likely_prompts_sha": "d8840b9a0c7ad34f",
+    "model_calls": []
+   }
+  ],
+  "likely_prompts": [
+   "a wide shot of a meadow with a single oak tree",
+   "a wide shot of a meadow with a single oak tree; a calm lake reflecting the sky",
+   "a wide shot of a meadow with a single oak tree; a car driving forward along a road",
+   "a wide shot of a meadow with a single oak tree; a cat sitting nearby",
+   "a wide shot of a meadow with a single oak tree; a crackling campfire",
+   "a wide shot of a meadow with a single oak tree; a dark thunderstorm with lightning",
+   "a wide shot of a meadow with a single oak tree; a deer grazing nearby",
+   "a wide shot of a meadow with a single oak tree; a dog standing nearby",
+   "a wide shot of a meadow with a single oak tree; a flock of birds flying overhead",
+   "a wide shot of a meadow with a single oak tree; a golden sunset sky",
+   "a wide shot of a meadow with a single oak tree; a rainbow across the sky",
+   "a wide shot of a meadow with a single oak tree; a river running through the scene",
+   "a wide shot of a meadow with a single oak tree; a small group of people standing in the scene",
+   "a wide shot of a meadow with a single oak tree; a small wooden boat",
+   "a wide shot of a meadow with a single oak tree; a small wooden cabin",
+   "a wide shot of a meadow with a single oak tree; a snowman with a carrot nose and a scarf",
+   "a wide shot of a meadow with a single oak tree; a soft pink sunrise sky",
+   "a wide shot of a meadow with a single oak tree; a stone castle with tall towers in the distance",
+   "a wide shot of a meadow with a single oak tree; a tall white lighthouse",
+   "a wide shot of a meadow with a single oak tree; a thick fog in the air",
+   "a wide shot of a meadow with a single oak tree; a waterfall cascading down a rocky slope",
+   "a wide shot of a meadow with a single oak tree; a wooden bridge crossing the scene",
+   "a wide shot of a meadow with a single oak tree; autumn scenery with orange and red leaves",
+   "a wide shot of a meadow with a single oak tree; bright daytime sunlight under a clear blue sky",
+   "a wide shot of a meadow with a single oak tree; bright stars scattered across the sky",
+   "a wide shot of a meadow with a single oak tree; bright summer scenery with lush green grass",
+   "a wide shot of a meadow with a single oak tree; butterflies fluttering through the scene",
+   "a wide shot of a meadow with a single oak tree; colorful wildflowers everywhere",
+   "a wide shot of a meadow with a single oak tree; fish swimming in clear water",
+   "a wide shot of a meadow with a single oak tree; glowing fireflies",
+   "a wide shot of a meadow with a single oak tree; harsh midday sunlight",
+   "a wide shot of a meadow with a single oak tree; horses grazing in the scene",
+   "a wide shot of a meadow with a single oak tree; night time under a full moon",
+   "a wide shot of a meadow with a single oak tree; snow-capped mountains in the distance",
+   "a wide shot of a meadow with a single oak tree; soft clouds drifting across the sky",
+   "a wide shot of a meadow with a single oak tree; spring scenery with fresh blossoms",
+   "a wide shot of a meadow with a single oak tree; steady rain falling",
+   "a wide shot of a meadow with a single oak tree; strong wind blowing through everything",
+   "a wide shot of a meadow with a single oak tree; tall trees with branches moving in the breeze",
+   "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
+   "a wide shot of a single oak tree; a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Sunny tropical day, clear blue sky, sparkling light on the water",
+   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons",
+   "a wide shot of a single oak tree; a green meadow with soft grass, under a clear blue sky",
+   "a wide shot of a single oak tree; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+   "a wide shot of a single oak tree; a narrow road through a dense green pine forest, tall trees on both sides, soft sunlight through the branches",
+   "a wide shot of a single oak tree; a snowy mountain road. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows",
+   "a wide shot of a single oak tree; a straight two-lane country road. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows",
+   "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere"
+  ],
+  "stats": {
+   "state": "on",
+   "reason": null,
+   "prompt_spec": "commands.rewriter",
+   "calls": 2,
+   "cache_hits": 0,
+   "pinned": 19,
+   "pinned_hits": 10,
+   "template_hits": 1,
+   "blocked": 0,
+   "timeouts": 0,
+   "late_dropped": 0,
+   "rejects": 0,
+   "details_rejected": 0,
+   "details_repaired": 0,
+   "retries": 0,
+   "errors": 1,
+   "cache_size": 2,
+   "timeout_s": 5.0,
+   "cache_file": null
+  }
+ },
+ "sonnet control": {
+  "steps": [
+   {
+    "say": "tap:reset",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [],
+     "heard": null,
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree",
+    "likely_prompts_sha": "d8840b9a0c7ad34f",
+    "model_calls": []
+   },
+   {
+    "say": "make it winter",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a soft white blanket over the grass, frost-dusted textures, pale cold light, muted silver and blue tones",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c1",
+       "label": "winter",
+       "strength": 1.0
+      }
+     ],
+     "heard": "make it winter",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a soft white blanket over the grass, frost-dusted textures, pale cold light, muted silver and blue tones",
+    "likely_prompts_sha": "ef9106cf4a1faec1",
+    "model_calls": []
+   },
+   {
+    "say": "undo",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [],
+     "heard": "undo",
+     "keyword": "undo",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree",
+    "likely_prompts_sha": "d8840b9a0c7ad34f",
+    "model_calls": []
+   },
+   {
+    "say": "reset",
+    "steer": null,
+    "state": {
+     "changes": [],
+     "heard": "reset",
+     "keyword": "reset",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree",
+    "likely_prompts_sha": "d8840b9a0c7ad34f",
+    "model_calls": []
+   },
+   {
+    "say": "make it winter and undo",
+    "steer": null,
+    "state": {
+     "changes": [],
+     "heard": "make it winter and undo",
+     "keyword": "undo",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree",
+    "likely_prompts_sha": "d8840b9a0c7ad34f",
+    "model_calls": [
+     {
+      "scene": {
+       "base": "a wide shot of a meadow with a single oak tree",
+       "changes": []
+      },
+      "prompt": "a wide shot of a meadow with a single oak tree",
+      "sentence": "make it winter and undo",
+      "details_max_words": 45
+     }
+    ]
+   },
+   {
+    "say": "reset and add a dog",
+    "steer": {
+     "prompt": "a wide shot of a meadow with a single oak tree; a dog standing nearby",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [
+      {
+       "id": "c2",
+       "label": "dog",
+       "strength": 1.0
+      }
+     ],
+     "heard": "reset and add a dog",
+     "keyword": "dog",
+     "unmatched": false
+    },
+    "committed": "a wide shot of a meadow with a single oak tree; a dog standing nearby",
+    "likely_prompts_sha": "589dbe5d2512e923",
+    "model_calls": [
+     {
+      "scene": {
+       "base": "a wide shot of a meadow with a single oak tree",
+       "changes": []
+      },
+      "prompt": "a wide shot of a meadow with a single oak tree",
+      "sentence": "reset and add a dog",
+      "details_max_words": 45
+     }
+    ]
+   },
+   {
+    "say": "start over with a beach",
+    "steer": {
+     "prompt": "a wide shot of a sandy beach; white sand, gentle waves, bright sun, clear blue sky",
+     "ramp_chunks": 1,
+     "provisional": false,
+     "cap": 1.0
+    },
+    "state": {
+     "changes": [],
+     "heard": "start over with a beach",
+     "keyword": null,
+     "unmatched": false
+    },
+    "committed": "a wide shot of a sandy beach; white sand, gentle waves, bright sun, clear blue sky",
+    "likely_prompts_sha": "46f4fd5eda3dc997",
+    "model_calls": [
+     {
+      "scene": {
+       "base": "a wide shot of a meadow with a single oak tree",
+       "changes": [
+        {
+         "id": "c2",
+         "label": "dog",
+         "kind": "extra",
+         "phrase": "a dog standing nearby",
+         "strength": 1.0
+        }
+       ]
+      },
+      "prompt": "a wide shot of a meadow with a single oak tree; a dog standing nearby",
+      "sentence": "start over with a beach",
+      "details_max_words": 45
+     }
+    ]
+   }
+  ],
+  "likely_prompts": [
+   "a wide shot of a sandy beach; a calm lake reflecting the sky",
+   "a wide shot of a sandy beach; a car driving forward along a road",
+   "a wide shot of a sandy beach; a cat sitting nearby",
+   "a wide shot of a sandy beach; a crackling campfire",
+   "a wide shot of a sandy beach; a dark thunderstorm with lightning",
+   "a wide shot of a sandy beach; a deer grazing nearby",
+   "a wide shot of a sandy beach; a dog standing nearby",
+   "a wide shot of a sandy beach; a flock of birds flying overhead",
+   "a wide shot of a sandy beach; a golden sunset sky",
+   "a wide shot of a sandy beach; a rainbow across the sky",
+   "a wide shot of a sandy beach; a river running through the scene",
+   "a wide shot of a sandy beach; a small group of people standing in the scene",
+   "a wide shot of a sandy beach; a small wooden boat",
+   "a wide shot of a sandy beach; a small wooden cabin",
+   "a wide shot of a sandy beach; a snowman with a carrot nose and a scarf",
+   "a wide shot of a sandy beach; a soft pink sunrise sky",
+   "a wide shot of a sandy beach; a stone castle with tall towers in the distance",
+   "a wide shot of a sandy beach; a tall white lighthouse",
+   "a wide shot of a sandy beach; a thick fog in the air",
+   "a wide shot of a sandy beach; a waterfall cascading down a rocky slope",
+   "a wide shot of a sandy beach; a wooden bridge crossing the scene",
+   "a wide shot of a sandy beach; autumn scenery with orange and red leaves",
+   "a wide shot of a sandy beach; bright daytime sunlight under a clear blue sky",
+   "a wide shot of a sandy beach; bright stars scattered across the sky",
+   "a wide shot of a sandy beach; bright summer scenery with lush green grass",
+   "a wide shot of a sandy beach; butterflies fluttering through the scene",
+   "a wide shot of a sandy beach; colorful wildflowers everywhere",
+   "a wide shot of a sandy beach; fish swimming in clear water",
+   "a wide shot of a sandy beach; glowing fireflies",
+   "a wide shot of a sandy beach; harsh midday sunlight",
+   "a wide shot of a sandy beach; horses grazing in the scene",
+   "a wide shot of a sandy beach; night time under a full moon",
+   "a wide shot of a sandy beach; snow-capped mountains in the distance",
+   "a wide shot of a sandy beach; soft clouds drifting across the sky",
+   "a wide shot of a sandy beach; spring scenery with fresh blossoms",
+   "a wide shot of a sandy beach; steady rain falling",
+   "a wide shot of a sandy beach; strong wind blowing through everything",
+   "a wide shot of a sandy beach; tall trees with branches moving in the breeze",
+   "a wide shot of a sandy beach; white sand, gentle waves, bright sun, clear blue sky",
+   "a wide shot of a sandy beach; winter scenery with snow on the ground"
+  ],
+  "stats": {
+   "state": "on",
+   "reason": null,
+   "prompt_spec": "commands.rewriter",
+   "calls": 3,
+   "cache_hits": 0,
+   "pinned": 19,
+   "pinned_hits": 1,
+   "template_hits": 0,
+   "blocked": 0,
+   "timeouts": 0,
+   "late_dropped": 0,
+   "rejects": 0,
+   "details_rejected": 0,
+   "details_repaired": 0,
+   "retries": 0,
+   "errors": 2,
+   "cache_size": 3,
+   "timeout_s": 5.0,
+   "cache_file": null
+  }
+ },
+ "system_prompt": "You read one spoken sentence that edits a video scene, and reply with one JSON object only:\n{\"blocked\": <true or false>, \"operations\": [<operation>, ...], \"details\": \"<text>\"}\n\nThe scene is a base sentence plus a list of changes. Each change has an id, a label (a short name shown on a\nchip), a kind, a phrase (the words added to the video prompt) and a strength (0 to 1.3, normal 1.0).\nKinds: world (the place: desert, neon city, Mars, ...), season (winter, autumn, ...), weather (rain, fog, sunny, ...), time (night, day, sunset, ...), extra (any object, animal, person or effect). Adding a world, season, weather or time replaces the old one of that kind.\n\nOperations, applied in order (a sentence with several edits gives several operations, at most 6):\n{\"op\": \"add\", \"label\": \"<1 or 2 words, lowercase>\", \"kind\": \"<world|season|weather|time|extra>\", \"phrase\": \"<short visual description>\", \"strength\": 1.0}\n{\"op\": \"remove\", \"id\": \"<id of an existing change>\"}\n{\"op\": \"set_strength\", \"id\": \"<id of an existing change>\", \"strength\": <0 to 1.3>}\n{\"op\": \"edit_base\", \"base\": \"<the base sentence rewritten, changing only what the user asked>\"}\n{\"op\": \"new_scene\", \"base\": \"<one sentence describing the whole new scene>\"}\n\nRules for operations:\n- Write phrases as concrete visual descriptions. A season, weather or time phrase is under 12 words.\n- A new object, animal or person (kind extra) gets a phrase of at most 25 words (under 200 characters) with\n  explicit size and position words that a video model obeys: where it is in the frame and, when it helps, next\n  to what. The first object added to a scene is the main one: never \"small\", it takes the centre and is large,\n  for example \"a red car parked beside the oak tree in the centre of the frame, facing the camera, large and\n  clearly visible\". A later object takes a free place, for example \"a large male lion standing in the\n  foreground at the left of the frame, facing the camera\" when the centre is taken. The engine keeps\n  that phrase word for word, right after the subject, in every later prompt, also after a change of place,\n  season or time, so it must not name a place, ground, season, weather or time of day (\"in the snow\", \"on the\n  sand\", \"at night\" are wrong): only the object, its size, its position and what it does.\n- If an add names a kind the scene already has, its phrase describes a second one with a clear position. A\n  colour, type or size the user names ALWAYS wins: \"add a red car racing on a road\" when the scene has a red car\n  gives \"a second small red car racing in the next lane at the right of the frame\", differing only by position.\n  A second one always gets its own label (\"second red car\"): an add with the label of an existing change\n  replaces that change.\n  Only when the user names no attribute (\"add a car\"), give the second one another colour or type.\n- A vehicle on a road (\"add a red car racing on a road\") gets this cue at the end of its phrase: \"white dashed lane markings rush toward the viewer\".\n- A PLACE or setting (\"take me to the desert\", \"make it a desert\", \"go to Mars\", \"switch to a\n  neon city\") is ONE add of kind world: label = the place in 1 to 3 words, phrase = a short description of that\n  place. It replaces the old world and KEEPS every object: a red car added before stays in the desert.\n  A new place brings its own season and weather: the earlier season and weather changes are cleared, so a\n  desert after \"make it winter\" has no snow. Add a season or weather again only if the user says it in the same\n  sentence (\"a snowy desert\"). The time of day stays.\n  Known places, use exactly these labels when one fits: country road, desert, forest, mars, meadow, neon city, ocean coast, snowy mountain road.\n- Seasons, weather and times of day use the keyword table's labels and kinds, so a sentence gives the same\n  change however it is read: label (kind): words that mean it.\n  winter (season): snow, snowy, wintry, wintertime, snowfall, snow fall, snowing, snowstorm, snow storm, blizzard, frost, frosty, frozen, icy\n  autumn (season): fall, leaves, fall leaves, autumn leaves, autumnal, fall season\n  spring (season): springtime, spring time, spring season\n  summer (season): summertime, summer time, summer season\n  rain (weather): rainy, raining, rainfall, rain fall, drizzle, drizzling, downpour, pouring rain, rain shower, rain showers\n  fog (weather): foggy, mist, misty, haze, hazy, mists\n  storm (weather): stormy, thunder, lightning, thunderstorm, thunderstorms, thunder storm, thunder storms, storm clouds\n  wind (weather): windy, breeze, breezy, gust, gusts, gusty, strong winds\n  night (time): nighttime, night time, dark, darkness, moon, moonlight, moonlit, moon lit, midnight, starry night, full moon\n  day (time): daytime, day time, daylight, day light, morning, sunny, sunshine, sunlight, bright, bright day, day time sunlight\n  sunset (time): dusk, evening, sundown, sun down, sun set, golden hour\n  sunrise (time): dawn, daybreak, day break, sun rise, early morning\n  noon (time): midday, mid day, afternoon, mid afternoon, midafternoon\n  \"sunny\" is the time change day: it replaces night. Use one of these labels whenever the words fit.\n- A BASE EDIT turns something the base sentence names into something else and KEEPS every change (\"turn the\n  tree into a lighthouse\"): use edit_base. The engine keeps the changes; never copy them yourself.\n- A NEW SCENE only when the user asks for one in so many words (\"new scene of a beach\", \"start over with a\n  beach\"): use new_scene, which clears every change. Its base is the user's words for the scene, as said.\n- edit_base and new_scene come before any other operation of the sentence.\n- To remove or weaken something, use the id of the matching change. \"a little\" means strength 0.3, \"a lot\" or\n  \"very\" means 1.3.\n- If the sentence is vague, not about the picture, or asks to undo or reset, reply with an empty operations list.\n\nSet \"blocked\" to true, with no operations, if the sentence asks for sexual, violent (gore, killing, injury) or\nhateful content. Otherwise \"blocked\" is false.\n\nThe user message is JSON: {\"scene\": <the scene before the sentence>, \"prompt\": <its current video prompt>,\n\"sentence\": <what the user said>, \"details_max_words\": <the most words \"details\" may have>}. If it also has\n\"rejected\", your earlier reply to the same sentence was not usable for the reasons given: reply again, fixed.\n\nFor the \"details\" field, follow the rules below. Where they speak of the scene or the description, that is the\nNEW scene, after your operations. Any reply format they name is only the shape of that one field: you always\nreply with the one JSON object above, {\"blocked\", \"operations\", \"details\"}.\n\nYou enrich a scene description for a text-to-video model.\nReply with JSON only: {\"details\": \"...\"} with about 40 to 50 words on one line.\nWrite ONLY extra world, light, texture and atmosphere detail for the scene as described.\nThe input is either the scene text, or JSON {\"scene\": ..., \"command\": ...}. The scene text is authoritative:\nthe command is context only and never permission to add, remove or change anything the scene does not already say.\nRules:\n- Do not repeat, reword or contradict the description; it is kept word for word in front of your details.\n- Do not mention the camera or framing, and no camera movement.\n- Do not mention any subject, person, animal or vehicle, and no motion of any kind.\n- Add no new objects, actors or events.\n- Keep the time of day, season and weather exactly as described; never add a time of day or weather that is not described.\n- You cannot see the video: never mention earlier frames or what happened before or after.\n- No negations.\nIf nothing can be added safely, reply {\"details\": \"\"}.\n\nLimits the engine checks on \"details\" (a clause that breaks one is cut; a reply with nothing left is rejected):\n- Write 3 to 5 short clauses separated by commas, the most important first, at most \"details_max_words\" words\n  in all. Only the ground, surfaces, textures, light, air and colours of the place.\n- Never name or describe an object, animal, person or vehicle of the scene again, and never say where anything\n  is: no position or framing words (background, behind, beside, center, centre, closeup, distance, distant, foreground, front, left, middle, midground, right, shot).\n- Never these words, they are objects: alpine peaks, alps, automobile, automobiles, beacon, bird, birds, blossom, blossoms, boat, boats, bon fire, bonfire, bridge, bridges, brook, brooks, butter flies, butter fly, butterflies, butterfly, cabin, cabins, camp fire, campfire, canine, canines, canoe, canoes, car, cars, cascade, cascades, castle, castles, cat, cats, citadel, citadels, cloud, cloud cover, clouds, cloudy, constellation, constellations, cottage, cottages, creek, creeks, crowd, crowds, deer, doe, dog, dogs, eagle, eagles, fawn, feline, felines, fire, fire flies, fire fly, fireflies, firefly, fish, fishes, flame, flames, flock, flock of birds, flower, flowers, foot bridge, footbridge, forest, fortress, fortresses, group of people, horse, horses, hound, hounds, house, houses, human, humans, hut, huts, kitten, kittens, lagoon, lagoons, lake, lakes, light house, light houses, lighthouse, lighthouses, lightning bug, lightning bugs, motor car, motorcar, mountain, mountain range, mountains, oak, oak tree, oak trees, oaks, overcast, peak, peaks, pedestrian, pedestrians, people, person, pine, pine tree, pine trees, pines, pond, ponds, ponies, pony, puppies, puppy, rain bow, rainbow, rainbows, river, rivers, row boat, rowboat, sail boat, sailboat, salmon, sedan, sedans, snow man, snow men, snowman, snowmen, sparrow, sparrows, sports car, stag, stallion, stallions, star, star light, starlight, starry sky, stars, stream, streams, tree, trees, trout, vehicle, vehicles, water fall, water falls, waterfall, waterfalls, waterway, waterways, wild flower, wild flowers, wildflower, wildflowers, woodland, woods.\n- A season, weather or time word only for a label the NEW scene has after your operations. The words of each\n  label are in the keyword table above; note that haze, mist, wind, breeze, frost, icy, moon, moonlight, stars,\n  sunlight, sunshine, morning, evening and dusk are on it, so \"heat haze\" needs fog and \"moonlight\" needs night.\n- Never these words (motion, camera, time order, negation): camera, cameras, pan, pans, panning, zoom, zooming, dolly, tracking, aerial, drone, tilt, crane, handheld, orbit, cut, cuts, frame, frames, framing, drive, drives, driving, move, moves, moving, run, runs, running, walk, walks, walking, fly, flies, flying, reverse, reversing, backward, backwards, toward, towards, away, approach, approaching, enter, entering, leave, leaves, leaving, arrive, arriving, appear, appears, emerge, emerging, speeding, racing, explode, explosion, crash, suddenly, transform, becomes, previous, previously, earlier, again, still, now, before, after, anymore, remain, remains, continue, continues, no, not, never, without, none, nothing.\n- Road words (asphalt, blur, freeway, highway, highways, lane, lanes, motorway, pavement, road, roads, roadside, street, streets, tire, tires, track, tracks, tyre, tyres) only when the scene has a road.\n\n\nVehicle scenes. When the NEW scene, after your operations, has a vehicle as its main subject (its base names a car,\ntruck, van, bus, motorcycle, jeep or taxi), the engine writes the video prompt from a fixed template:\n  \"<Subject>, seen from directly behind with its rear lights facing the camera, drives fast along <road>, moving\n  forward away from the camera. The camera follows directly behind the car ... rushes toward the viewer. <scene>\n  <light> Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.\"\nThe engine writes the subject and camera sentences itself. For such a scene, reply with three more fields and\nleave \"details\" empty: {\"blocked\": ..., \"operations\": [...], \"details\": \"\", \"road\": \"...\", \"scene\": \"...\", \"light\": \"...\"}\n- \"road\": a noun phrase for the road of the new scene, starting with \"a\", at most 14 words, no period.\n- \"scene\": ONE sentence (at most 40 words) about what lines both sides of the road: landscape, buildings, weather\n  you can see. Never the camera, the shot or the frame. The scene's objects (kind extra) are added by the engine\n  from their phrases, word for word: do not describe them again.\n- \"light\": ONE short sentence (at most 20 words) about the light and the sky.\n- The world of the new scene: its place, season, weather and time of day. A change of place replaces the road,\n  the scene and the light together. If \"car_template\" in the user message gives the current road, scene and\n  light, keep what the sentence does not change.\n- For a new scene of a vehicle, use new_scene with the base being only the vehicle (\"a blue pickup truck\") and an\n  add of kind world for its place.\nMeasured examples (road | scene | light):\n- country: a straight two-lane country road | Green fields and rows of trees line both sides of the road under a clear blue summer sky. | Bright midday sunshine, crisp shadows.\n- winter: a snowy mountain road | Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. | Cold blue overcast winter light, soft diffuse shadows.\n- desert: a long straight desert highway | Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. | Hot afternoon sun in a cloudless pale blue sky, strong hard shadows.\n- neon city: a wide city street at night | Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. | Dark night sky, vivid neon glow, cyberpunk atmosphere.\n- ocean coast: a coastal cliff road | A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. | Sunny tropical day, clear blue sky, sparkling light on the water.\n- sunset: a straight open road across rolling grassland | Golden grass fields and a few lone trees on both sides, long shadows stretching across the road. | The sun setting low on the horizon ahead, a glowing orange and pink sky, warm backlight.\n- autumn: a winding country road through an autumn forest | Trees with bright orange, red and yellow leaves line both sides, fallen leaves scattered across the road and swirling behind the car. | Low warm golden afternoon sun, light mist between the trees.\n- rain: a wet country road in heavy rain | Rain pours down, puddles and spray on the dark asphalt, water kicked up behind the tyres, green fields and trees blurred by the rain. | Dark grey storm clouds, dim diffuse light, glistening reflections on the road.\n"
+}
