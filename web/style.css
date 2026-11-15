@@ -184,7 +184,9 @@ kbd { font: 12px var(--mono); }
 }
 .frame {
   position: relative;
-  width: min(910px, calc(100vw - 120px), calc((100vh - 404px) * 1.75)); /* fits 1280x720 with the type box open */
+  /* 328 px of height is the rest of the column; the type box adds 76 px only while it is open (below).
+     The 240 px floor keeps the video on short screens, which may then scroll. */
+  width: min(910px, calc(100vw - 120px), max(240px, calc((100vh - 328px) * 1.75)));
   aspect-ratio: 672 / 384;
   display: flex;
   align-items: center;
@@ -461,6 +463,18 @@ kbd { font: 12px var(--mono); }
 .fs .ptt svg { width: 22px; height: 22px; }
 
 /* ---------- phone width: stacked, full-width video, the page may scroll ---------- */
+@media (min-width: 701px) {
+  :root:not(.fs) .window:has(.type[data-open="true"]) .frame {
+    width: min(910px, calc(100vw - 120px), max(240px, calc((100vh - 404px) * 1.75)));
+  }
+}
+
+/* Short screens (a landscape phone, a small laptop window): the page scrolls instead of squeezing. */
+@media (max-height: 560px) {
+  body { overflow: auto; }
+  .window { height: auto; min-height: 100%; }
+}
+
 @media (max-width: 700px) {
   body { padding: 0; overflow: auto; }
   .window { height: auto; min-height: 100%; border: 0; border-radius: 0; box-shadow: none; }

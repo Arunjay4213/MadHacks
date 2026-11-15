@@ -35,8 +35,9 @@ The page is branded "Mirage", the product name (decided by the lead on 2026-11-1
   - a final the server understood: a green tick; one it did not: an amber "!" and "· Didn't catch that". Partial words never get the tick.
   With reduced motion on, the bars are static and the level meter does not run.
 - The controls row: Undo and Reset on the left, the big Hold to talk mic in the centre (its outer ring grows with your voice while held), Keyboard and Full screen on the right. Every button has a tooltip with its shortcut; the mic's says "Hold to talk (`) · Wispr: Ctrl".
-- The type box, hidden until you click Keyboard (or start typing): then it fades in under the controls with a send button, and stays open after a send. Keyboard again, or Esc while it is empty, hides it. Hidden, it is still focused (never `display: none`), so Wispr Flow (Ctrl) always types into it; dictation shows on the voice line and does not open the box.
+- The type box, hidden until you click Keyboard (or start typing): then it fades in under the controls with a send button, and stays open after a send. Keyboard again, or Esc while it is empty, hides it. The video gives up the box's height only while it is open. Hidden, it is still focused (never `display: none`), so Wispr Flow (Ctrl) always types into it; dictation shows on the voice line and does not open the box.
 - Full screen: the video fills the screen; the voice line and the controls float at the bottom on a white card; the header is hidden; the type box stays focused there too, so Wispr Flow (Ctrl) still types into it and its words show on the card, and Keyboard opens the box on the card.
+- Short screens (under 560 px tall, e.g. a landscape phone): the video keeps at least 240 px and the page scrolls.
 - Phone width: everything stacks, the video goes full width, the chips scroll sideways and the page may scroll.
 
 ## Controls and keys
