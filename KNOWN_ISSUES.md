@@ -49,5 +49,7 @@ Options: pick one page for the demo and keep the other as a fallback, and pick o
 - **A new sentence takes about 2.5 s.**
   Known and pinned sentences take about 0.6 s; a new one waits about 2 s for the Sonnet rewrite.
   In progress: Ishaan's latency plan (median 566 to 300 ms), faster end of speech on the page, and compiled model steps.
-  Done: a sentence that names one of the measured car worlds on a car scene skips Sonnet (`FinalReader._measured` in `engine/final_reader.py`, counted in `template_hits`).
+  Done, with limits: a sentence that names exactly one measured car world and nothing else skips Sonnet (`FinalReader._measured` in `engine/final_reader.py`, counted in `template_hits`), and so does a sentence that starts a new car scene in a measured world.
+  It applies only while the car scene has no added objects: after "add a lion", "make it winter" goes to Sonnet (`car_template.plan`, `has_objects`).
+  It also goes to Sonnet when the measured operations do not apply to the scene.
   Not done: skipping Sonnet for any other sentence the dictionary fully understood (objects, weather and time on any scene, and worlds on a scene without the car).
