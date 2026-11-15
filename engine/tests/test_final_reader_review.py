@@ -84,3 +84,30 @@ def test_the_pinned_racing_car_of_the_demo_file_is_used():
     for before, sentence in meadow:
         assert svc.handle(final(sentence))["steer"]["prompt"] == pinned[(before, sentence)].prompt, sentence
     assert chat.calls == [] and "add a red car racing on a road" in [s for _, s in meadow]
+
+
+def test_a_base_edit_with_a_new_place_drops_the_copied_snow():
+    # Greptile on PR #120 (final_reader.py:1049): the base edit copied winter, and world_first moved the desert
+    # before the copy, so the desert kept its snow.
+    sentence = "turn the tree into a lighthouse and make it a desert"
+    _, _, svc = service({
+        "make it winter": reply([WINTER]),
+        sentence: reply([{"op": "edit_base", "base": "a wide shot of a single lighthouse"},
+                         {"op": "add", "label": "desert", "kind": "world", "phrase": "a desert", "strength": 1.0}]),
+    })
+    svc.handle(final("make it winter"))
+    out = svc.handle(final(sentence))
+    assert [c["label"] for c in out["state"]["changes"]] == ["desert"]
+    assert "snow" not in out["steer"]["prompt"]
+
+
+def test_a_season_said_with_the_place_and_a_base_edit_stays():
+    sentence = "turn the tree into a lighthouse and take me to a snowy desert"
+    _, _, svc = service({
+        "make it winter": reply([WINTER]),
+        sentence: reply([{"op": "edit_base", "base": "a wide shot of a single lighthouse"}, WINTER,
+                         {"op": "add", "label": "desert", "kind": "world", "phrase": "a desert", "strength": 1.0}]),
+    })
+    svc.handle(final("make it winter"))
+    out = svc.handle(final(sentence))
+    assert sorted(c["label"] for c in out["state"]["changes"]) == ["desert", "winter"]
