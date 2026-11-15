@@ -319,45 +319,45 @@ document.addEventListener('keydown', (e) => {
 });
 // ---------- live mic ----------
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-const transcriber = makeTranscriber(send);
-let rec = null;
+let rec = null; // the current recognizer; an older one may still be ending
 let listening = null; // what the user asked for: 'toggle' | 'ptt' | null
 let startedAt = 0;
-let startWhenEnded = false; // pressed again while the previous recognizer was still ending
+let startWhenEnded = false; // only if the browser refused a second recognizer while the old one ended
 
 function startListening(mode) {
   if (!Recognition || listening) return;
   listening = mode;
   renderMic();
-  // The previous recognizer is still ending (its last words not sent yet): start the new one only
-  // after it has flushed, so a quick re-press never loses the held sentence or orphans a recognizer.
-  if (rec) startWhenEnded = true;
-  else begin();
+  begin(); // at once, even if the previous press is still ending: words said now are recorded
 }
 
+// Each recognizer has its own transcriber, so a quick re-press records the new words at once while
+// the previous recognizer still sends its own sentence when it ends; the two never mix.
 function begin() {
   const r = new Recognition();
+  const t = makeTranscriber(send);
+  const previous = rec;
   rec = r;
   r.continuous = true;
   r.interimResults = true;
   r.lang = 'en-US';
-  transcriber.start({ hold: listening === 'ptt' }); // push-to-talk: one command per press
+  t.start({ hold: listening === 'ptt' }); // push-to-talk: one command per press
   startedAt = performance.now();
-  r.onresult = (e) => rec === r && transcriber.handle(Array.from(e.results, (x) => ({ transcript: x[0].transcript, isFinal: x.isFinal })));
+  r.onresult = (e) => t.handle(Array.from(e.results, (x) => ({ transcript: x[0].transcript, isFinal: x.isFinal })));
   r.onerror = (e) => {
     const text = micErrorText(e.error);
-    if (!text) return;
+    if (!text || rec !== r) return;
     showError(text);
     listening = null; // a real failure: do not restart into it
     startWhenEnded = false;
   };
   r.onend = () => {
-    if (rec !== r) return; // an older recognizer: it no longer owns the page's state
-    transcriber.flush(); // leftover interim text becomes one final, once
+    t.flush(); // this recognizer's leftover words become one final, once
+    if (rec !== r) return; // an older recognizer: the page's state belongs to the newer one
     rec = null;
     if (startWhenEnded) {
       startWhenEnded = false;
-      if (listening) return begin(); // the queued re-press
+      if (listening) return begin(); // the fallback: start the press the browser refused earlier
     }
     // Chrome ends recognition by itself after a pause; keep listening while the mic toggle is on,
     // unless it ended at once (then restarting would just spin).
@@ -365,13 +365,20 @@ function begin() {
     listening = null;
     renderMic();
   };
-  r.start();
+  try {
+    r.start();
+  } catch {
+    // The browser refuses a second recognizer while the previous one is still ending: start this
+    // press as soon as that one has flushed.
+    rec = previous;
+    startWhenEnded = true;
+  }
 }
 
 function stopListening(mode) {
   if (listening !== mode) return;
   listening = null; // so onend does not restart
-  startWhenEnded = false; // released before the queued start began: nothing to start
+  startWhenEnded = false;
   renderMic();
   rec?.stop(); // onend flushes the last words
 }
