@@ -17,6 +17,7 @@ With --final-reader sonnet, FinalReadingService wraps CommandService: every FINA
 and undo work as for any other edit, and the steer's prompt becomes the final reader's rich prompt.
 """
 
+import enum
 import logging
 
 log = logging.getLogger("engine.reader")
@@ -63,12 +64,17 @@ class FinalReadingService:
         if isinstance(msg, dict) and msg.get("type") == "final" and isinstance(msg.get("text"), str) \
                 and isinstance(msg.get("t_client"), int) and not isinstance(msg.get("t_client"), bool):
             snapshot = self._svc.snapshot()
-            if _is_undo_or_reset(msg["text"], snapshot):  # the dictionary knows these; no call
+            kind = sentence_kind(msg["text"], snapshot)
+            if kind is SentenceKind.CONTROL:  # the dictionary knows these and they add nothing; no call
                 return self._mapped(self._svc.handle(msg))
-            result = self._final_reader(msg["text"], snapshot)
+            result = self._final_reader(msg["text"], snapshot)  # the content check, for every other sentence
             if result is not None and result.get("blocked"):
                 log.info("final reader: %r blocked, no steer", msg["text"][:100])
                 return self._mapped(self._svc.apply_final(msg["text"], [], None))
+            if kind is SentenceKind.MIXED:
+                # Not blocked. The final reader leaves undo and reset to the dictionary, so its operations would
+                # drop them: the dictionary reads the whole sentence, as it would without this wrapper.
+                return self._mapped(self._svc.handle(msg))
             if result is not None:
                 # prompt None: the service steers to the composed prompt and _mapped gives the rich one. Passing
                 # the rich prompt would make an undo back to this state steer to the composed prompt (another
@@ -97,7 +103,23 @@ class FinalReadingService:
         return out
 
 
-def _is_undo_or_reset(text: str, snapshot: dict) -> bool:
-    from commands.reader import read
-    op = read(text, snapshot)["op"]
+class SentenceKind(enum.Enum):
+    """What a final sentence asks for, which decides whether it may skip the final reader's content check."""
+    CONTROL = "control"  # every clause is undo or reset: the dictionary alone, no call (nothing new enters)
+    MIXED = "mixed"      # undo or reset plus other clauses: content check first, then the dictionary
+    EDIT = "edit"        # no undo or reset: the final reader decides the operations
+
+
+def sentence_kind(text: str, snapshot: dict) -> SentenceKind:
+    """Classify each clause the way CommandService splits the sentence, so a clause like "add ..." after
+    "reset and" is seen and cannot ride past the content check on the reset."""
+    from commands.reader import read, split_commands
+    clauses = split_commands(text) or [text]
+    control = [_is_undo_or_reset(read(clause, snapshot)["op"]) for clause in clauses]
+    if all(control):
+        return SentenceKind.CONTROL
+    return SentenceKind.MIXED if any(control) else SentenceKind.EDIT
+
+
+def _is_undo_or_reset(op) -> bool:
     return op is not None and op["op"] in ("undo", "reset")
