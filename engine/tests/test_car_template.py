@@ -195,7 +195,7 @@ def test_routes_for_real_sentences():
 
 def test_the_meadow_chain_is_unchanged():
     pinned = load_pinned(DEFAULT_DEMO_PROMPTS)
-    meadow = list(pinned)[:7]  # the meadow chain, in the file's order
+    meadow = [k for k in list(pinned)[:9] if "jensen" not in k[1]]  # the jensen add and remove undo themselves
     assert [s for _, s in meadow] == ["make it winter", "add a red car", "make it night", "add a lion", "sunny",
                                       "make it a desert", "add a red car racing on a road"]
     reader = FinalReader(FinalReaderState.ON, chat=NoChat(), spec=prompt_spec(), pinned=pinned)
