@@ -1,7 +1,8 @@
 """World (setting) support: "make it a desert" replaces the world, never the subject (issue #74).
 
 The world is one change of kind "world" (a singleton, like season), so ids, undo, chips and compound
-sentences work unchanged. Phrases are Ishaan's exact tested template sentences (board #6885673339).
+sentences work unchanged. Phrases are Ishaan's exact tested sentences (board #6885673339, and #6886548029 for
+the four measured road | scene | light worlds).
 Pure stdlib. Imports only dictionary.py, so reader.py can import this module without a cycle.
 """
 
@@ -24,19 +25,31 @@ _TABLE = [
                       (" under a clear blue summer sky", {"time": "day", "weather": "clear", "season": "summer"}),
                       (", bright sunshine", {"time": "day", "weather": "clear"})],
      ["country road", "countryside", "fields", "farmland", "the start", "the country"]),
-    ("desert", [("a long straight desert highway between red sandstone mesas and sand dunes", {}),
-                (", heat haze", {"weather": "haze", "season": "summer"}),
-                (", orange sunset sky", _SUN)],
+    # desert, snowy mountain road (Ishaan's "winter"), neon city and ocean coast are his measured road | scene | light
+    # worlds (board #6886548029), word for word, as "{road}. {scene} {light}", so this path matches the engine's.
+    ("desert", [("a long straight desert highway", {}),
+                (". Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the "
+                 "roadside", {}),
+                (", heat haze shimmering above the asphalt", {"weather": "haze", "season": "summer"}),
+                (". Hot afternoon sun in a cloudless pale blue sky, strong hard shadows", {"time": "day", "weather": "clear"})],
      ["desert", "desert highway", "sand dunes", "dunes", "mesas"]),
-    ("snowy mountain road", [("a snowy mountain road between pine forests covered in thick white snow", {}),
-                             (", snow falling", {"weather": "snow", "season": "winter"}),
-                             (", cold blue overcast light", {"time": "day", "weather": "overcast"})],
+    ("snowy mountain road", [("a snowy mountain road", {}),
+                             (". Pine forests covered in thick white snow line both sides, high snowbanks along the edges "
+                              "of the road", {}),
+                             (", snowflakes falling", {"weather": "snow", "season": "winter"}),
+                             (". Cold blue overcast winter light, soft diffuse shadows", {"time": "day", "weather": "overcast"})],
      ["snowy mountains", "snowy mountain road", "mountain road", "the mountains"]),
-    ("neon city", [("a wet city street", {}), (" at night", _N), (" in the rain", {"weather": "rain"}),
-                   (", tall skyscrapers with glowing neon signs on both sides, reflections on the asphalt", {})],
+    ("neon city", [("a wide city street", {}), (" at night", _N),
+                   (". Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet "
+                    "asphalt reflects the colourful lights", {}),
+                   (", light rain falling", {"weather": "rain"}),
+                   (". Dark night sky", _N), (", vivid neon glow, cyberpunk atmosphere", {})],
      ["neon city", "city", "city street", "cyberpunk city", "downtown"]),
-    ("ocean coast", [("a coastal cliff road beside a bright turquoise ocean with waves and palm trees", {}),
-                     (", sunny tropical day", {"time": "day", "weather": "clear", "season": "summer"})],
+    ("ocean coast", [("a coastal cliff road", {}),
+                     (". A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and "
+                      "green hills on the other side", {}),
+                     (". Sunny tropical day, clear blue sky, sparkling light on the water",
+                      {"time": "day", "weather": "clear", "season": "summer"})],
      ["ocean", "coast", "coastal road", "beach", "seaside", "sea", "tropical coast", "cliffs"]),
     ("mars", [("a dusty road across the red rocky surface of Mars, craters and red mountains", {}),
               (", a pale pink sky with two small moons", _D)],
@@ -132,7 +145,7 @@ def world_with_overrides(world_change: dict | None, changes: list) -> str | None
     """The active world's phrase with conflicting BUILT-IN sky/time/weather segments removed.
 
     A segment is dropped only when an explicit change of the same kind (time, weather, season) names a
-    different label: "desert" + "night" loses "orange sunset sky" but keeps "heat haze". Other changes and
+    different label: "desert" + "night" loses the afternoon sun but keeps the heat haze. Other changes and
     the scene state are untouched. Unknown (fallback) world phrases are returned literally. None if no world.
     """
     if world_change is None:

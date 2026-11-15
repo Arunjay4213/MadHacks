@@ -71,7 +71,7 @@ Repeating the current world still clears a later season.
 
 The known places are in `world.py`: country road, desert, snowy mountain road, neon city, ocean coast (also "beach" and "sea"), Mars, forest and meadow.
 The first six are Ishaan's tested sentences, word for word; forest was added at the lead's request, and meadow lets "take me back to the meadow" return to the oak scene.
-A later season, weather or time change removes the matching built-in part of the world sentence (for example the desert's sunset sky after "make it night").
+A later season, weather or time change removes the matching built-in part of the world sentence (for example the desert's afternoon sun after "make it night").
 An arbitrary custom base that mixes an unknown world with subjects is rejected rather than edited by unsafe text surgery.
 
 ## Multiple commands per sentence
