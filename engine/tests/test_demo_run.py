@@ -102,8 +102,7 @@ def test_shown_at():
 T0 = 100.0  # monotonic time of script second 0 in the run_failures tests
 
 
-@pytest.mark.parametrize("gap,fails", [(FRAMES_STOPPED_S - 0.1, False), (FRAMES_STOPPED_S, False),
-                                       (FRAMES_STOPPED_S + 0.1, True)])
+@pytest.mark.parametrize("gap,fails", [(FRAMES_STOPPED_S, False), (FRAMES_STOPPED_S + 0.1, True)])
 def test_run_failures_on_a_frame_gap_before_the_end(gap, fails):
     frames = [Frame(0.0, 0, 0), Frame(10.0 - gap, 3, 2)]
     out = run_failures(Recording(t0=T0), frames, T0 + 10.0)

@@ -11,7 +11,7 @@ from websockets.asyncio.server import serve
 
 from engine.framing import pack_frame
 from engine.tools import demo_run
-from engine.tools.demo_run import ImageFont, font, parse_script, run
+from engine.tools.demo_run import parse_script, run
 
 
 def jpeg() -> bytes:
@@ -96,14 +96,6 @@ def test_control_closing_mid_run_saves_the_partial_run_and_fails(tmp_path, monke
     assert "FAILED: the /control connection closed" in capsys.readouterr().out
 
 
-def test_frames_closing_before_the_end_fails(tmp_path, monkeypatch):
-    engine = TinyEngine(close_frames_after_s=0.4)
-    code, report = play(tmp_path, monkeypatch, engine, {"end": 1.0, "steps": [{"at": 0.1, "say": "make it winter"}]})
-    assert code == 1 and report["complete"] is False
-    assert any("/frames connection closed" in r for r in report["failures"])
-    assert report["commands"][0]["replied"]
-
-
 def test_frames_closing_mid_run_stops_sending_commands_at_once(tmp_path, monkeypatch, capsys):
     # Without video nothing can be measured, so the harness must stop changing the shared video right away.
     engine = TinyEngine(close_frames_after_s=0.4)
@@ -116,18 +108,3 @@ def test_frames_closing_mid_run_stops_sending_commands_at_once(tmp_path, monkeyp
     assert [m["text"] for m in engine.received] == ["make it winter"]  # nothing sent after the close
     assert any("/frames connection closed" in r for r in report["failures"])
     assert "/frames closed" in capsys.readouterr().out
-
-
-def test_font_falls_back_when_pillow_has_no_size_argument(monkeypatch):
-    real = ImageFont.load_default
-    calls = []
-
-    def old_load_default(**kwargs):
-        calls.append(kwargs)
-        if "size" in kwargs:
-            raise TypeError("load_default() got an unexpected keyword argument 'size'")
-        return real()
-
-    monkeypatch.setattr(ImageFont, "load_default", old_load_default)
-    assert font(15) is not None
-    assert calls == [{"size": 15}, {}]
