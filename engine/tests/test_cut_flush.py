@@ -410,18 +410,26 @@ def test_an_interrupt_before_the_backend_starts_the_chunk_is_late_and_the_cut_is
     r = runs(interrupt="on")
     e, prompt = r.e, PROMPTS[1]
     _steer_cut_ready(r, prompt)
-    generate = e.backend.generate_chunk
+    generate, interrupt = e.backend.generate_chunk, e.backend.interrupt
     armed, kept, recs = [True], [], []
+    interrupted = threading.Event()
+
+    def noted_interrupt():
+        interrupt()
+        interrupted.set()
 
     def steer_first(c):
         # The engine has marked this chunk CONTINUATION (in take_cond) but the backend has not started it: the
-        # window where the real backend drops interrupt(). Steer now and start the call only once it is asked.
+        # window where the real backend drops interrupt(). Steer now and start the call only once interrupt() has
+        # returned: the engine marks STOPPING just before it calls interrupt(), so the state alone is too early.
         if armed[0] and r.taken is not None and r.taken[1] is None:
             armed[0] = False
             kept.append(r.taken[0])
             recs.append(e.handle_target({**WINTER, "prompt": prompt}, time.monotonic_ns()))
-            assert wait(lambda: e._inflight is InFlight.STOPPING)
+            assert interrupted.wait(5) and e._inflight is InFlight.STOPPING
         return generate(c)
+
+    e.backend.interrupt = noted_interrupt
 
     e.backend.generate_chunk = steer_first
     assert wait(lambda: recs and recs[0].stage is CommandStage.SHOWN)
