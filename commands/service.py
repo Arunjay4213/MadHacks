@@ -1,7 +1,6 @@
 """CommandService: contract 1 in, contract 2 out, plus the contract-4 state fields. See PLAN.md section 6."""
 
 import copy
-import dataclasses
 import enum
 import threading
 import time
@@ -21,13 +20,6 @@ class Applied(enum.Enum):
     CHANGED = "changed"      # the scene changed: steer to the new composed prompt
     UNCHANGED = "unchanged"  # valid, but the scene is the same (a repeated add, undo with no history)
     REJECTED = "rejected"    # invalid or not understood: nothing applied, the words show as unmatched
-
-
-@dataclasses.dataclass(frozen=True)
-class Guess:
-    """A provisional move in flight, from a partial: the keyword's label and the prompt steered to (capped)."""
-    label: str
-    prompt: str
 
 
 def _has_non_latin_letters(text: str) -> bool:
@@ -68,7 +60,7 @@ class CommandService:
         self._semantic_thread: threading.Thread | None = None
         self._lock = threading.Lock()
         self._committed = compose(self._state.snapshot())
-        self._guess: Guess | None = None  # the provisional move in flight, if any
+        self._guess_label: str | None = None  # label of the provisional move in flight; None: no guess in flight
         self._heard = None
         self._keyword = None
         self._unmatched = False
@@ -173,14 +165,14 @@ class CommandService:
         word = spot(text)
         self._keyword = word
         label = KEYWORDS[word]["label"] if word else None
-        if self._guess is not None and label == self._guess.label:
+        if self._guess_label is not None and label == self._guess_label:
             return None
         prompt = self._hypothesis(KEYWORDS[word]) if word else self._committed
         if prompt == self._committed:  # word dropped by a revision, or already in the scene: move back if guessing
-            had_guess = self._guess is not None
-            self._guess = None
+            had_guess = self._guess_label is not None
+            self._guess_label = None
             return self._steer(self._committed, RAMP["default"]) if had_guess else None
-        self._guess = Guess(label, prompt)
+        self._guess_label = label
         return self._steer(prompt, RAMP["provisional"], provisional=True)
 
     def _final(self, text: str):
@@ -270,8 +262,8 @@ class CommandService:
 
     def _commit(self, applied: Applied, ramp: int):
         """After a final or a tap: steer to the new state, or roll back a guess in flight."""
-        had_guess = self._guess is not None
-        self._guess = None
+        had_guess = self._guess_label is not None
+        self._guess_label = None
         if applied is Applied.CHANGED:
             self._committed = compose(self._state.snapshot())
             return self._steer(self._committed, ramp)
