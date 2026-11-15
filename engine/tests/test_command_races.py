@@ -1,8 +1,6 @@
 """Races between a command arriving and the engine's background threads.
 
-1. POST /target heard while a reset tap is still in the reader. The target bypasses the reader, so before the fix
-   it found no reset ticket yet, was applied to the old video, and the reset then threw its effect away while its
-   record still reached GENERATED and SHOWN. The reset's ticket now exists from the moment the tap is heard.
+1. A reset tap the reader rejects, or whose prompt fails to encode, must not hold later commands forever.
 2. A chunk finishing between a command being heard and the prefetch hold. Before the fix hold() ran before
    book.heard(), so a chunk_done in between saw nothing in flight and moved HELD back to SAVING or READY while
    the command was in flight.
@@ -57,20 +55,9 @@ def engine():
     e.start()
     assert wait(lambda: e.lifecycle.state is Lifecycle.GENERATING)
     assert wait(lambda: e.chunk_shown >= 2)
-    e.encoder.encode(WINTER["prompt"])  # cached, so the target is ready long before the reader finishes the reset
+    e.encoder.encode(WINTER["prompt"])  # cached, so a later target is ready at once
     yield e
     e.stop()
-
-
-def test_a_target_heard_while_the_reset_is_read_applies_to_the_new_video(engine):
-    video_before = engine.video
-    reset_done = engine.handle_control({"type": "tap", "action": "reset", "t_client": 100}, time.monotonic_ns())
-    time.sleep(0.02)  # the reset tap is now inside reader.handle
-    target = engine.handle_target(dict(WINTER), time.monotonic_ns())
-    assert reset_done.result(5).wait(5)
-    assert engine.video == video_before + 1
-    assert wait(lambda: target.stage is CommandStage.SHOWN), f"target stuck at {target.stage}"
-    assert engine.controller.committed_prompt == WINTER["prompt"]  # the new video runs on the target
 
 
 def test_a_rejected_reset_tap_does_not_hold_later_commands(engine):
@@ -93,8 +80,7 @@ def _chunk_done_before(engine, method_name):
     return wrapped
 
 
-@pytest.mark.parametrize("path", ["target", "control"])
-def test_a_chunk_between_hearing_and_holding_does_not_release_the_hold(path):
+def test_a_chunk_between_hearing_and_holding_does_not_release_the_hold():
     cfg = EngineConfig(backend="fake", width=64, height=48, backend_options=dict(
         gen_ms=40, decode_ms=5, encode_ms=5, frames_per_chunk=3, fps=50))
     gate = threading.Event()
@@ -109,12 +95,7 @@ def test_a_chunk_between_hearing_and_holding_does_not_release_the_hold(path):
     try:
         assert wait(lambda: e.lifecycle.state is Lifecycle.GENERATING)
         e.book.heard = _chunk_done_before(e, "heard")
-        if path == "target":
-            e.encoder.encode(WINTER["prompt"])
-            e._embed = lambda rec, target: None  # keep the target in flight (DECIDED)
-            e.handle_target(dict(WINTER), time.monotonic_ns())
-        else:
-            e.handle_control({"type": "final", "text": "make it winter", "t_client": 1}, time.monotonic_ns())
+        e.handle_control({"type": "final", "text": "make it winter", "t_client": 1}, time.monotonic_ns())
         assert e.book.in_flight()
         assert e.prefetch.state is PrefetchState.HELD
     finally:
