@@ -58,6 +58,7 @@ The output folder gets:
 `--compare DIR1 DIR2 ... --out OUT` writes `OUT/compare.jpg`: one row per run at the same time marks (every 4 s; `--every 2` for every sheet frame), labelled with each run's `--label` and its delay range.
 
 It works on localhost and through the tunnel (`--url https://<address>`, which uses wss).
+If the engine connection drops during a run, the harness stops waiting at once, saves what it received so far, and exits with code 1 (PR #153, PR #161).
 A run against a URL that is not localhost changes the shared live video for every viewer, so the harness prints a warning and waits 5 s before it starts (`--yes` skips the wait).
 
 ## The live engine on the GPU machine
@@ -440,7 +441,8 @@ So a new sentence costs about 1.8 s extra, and a pinned or cached sentence costs
   `{"op": "edit_base", "base": ...}` is a base edit ("turn the tree into a lighthouse"): the engine expands it into `new_scene` plus one `add` per existing change, applied as one batch, so the changes stay and one undo reverts it.
   `commands/state.py` has no operation that rewrites only the base, so this expansion stays.
   `new_scene` is only for an explicit new scene ("new scene of a beach", "start over with a beach") and clears the changes.
-  Undo and reset are left to the keyword table.
+  A sentence made only of undo and reset clauses ("undo", "reset", "undo that and start over") skips the final reader and goes to the keyword table.
+  Any other sentence, including a compound such as "reset and add a dog", goes through the content check and the final reader first (PR #147), so a blocked word in any clause blocks the whole sentence.
 - The prompt is SUBJECT + OBJECTS + WORLD + STYLE: SUBJECT is the base sentence (with forward-driving words for a vehicle), OBJECTS are the phrases of the extra changes word for word, so a lion stays the same lion in every later prompt, WORLD is the model's `details` (about 50 words: the ground of the place, two or three things on both sides, then the light; a place replaces the world), STYLE is a fixed sentence, which says "motion blur on the road" only when the subject is a vehicle.
   A colour, type or size the user names always wins over making a second car look different.
   This is the engine's stand-in (`PromptSpec` "engine stand-in"); when `commands.rewriter` imports, its `SYSTEM_PROMPT` and `validate_rewrite` are used instead with no code change.
