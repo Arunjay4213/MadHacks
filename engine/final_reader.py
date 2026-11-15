@@ -581,16 +581,61 @@ def retry_fits(elapsed_s: float, timeout_s: float) -> bool:
 
 _VEHICLE_RX = re.compile(r"\b(?:car|cars|sports car|truck|van|bus|jeep|suv|taxi|motorcycle|motorbike|vehicle)\b")
 _DRIVING_RX = re.compile(r"\b(?:drives?|driving|races?|racing|speeds?|speeding|cruis(?:es|ing)|zooms?|zooming)\b")
+# A clause about the camera ("The camera zooms in on the car", "..., the camera zooming in"): its verbs are the
+# camera's, not the vehicle's.
+_CAMERA_CLAUSE_RX = re.compile(r"\b(?:the\s+)?camera\b[^.!?,;]*")
+# The measured shot's three parts, free of its speed words ("make it slow" writes "drives slowly" and "at the same
+# slow speed"): the rear view, the forward motion and the following camera with any one vehicle word ("A dark red
+# sedan ... behind the car" was drawn forward live).
+_REAR_WORDS = car_template.REAR.split(",")[1].strip().lower()  # "seen from directly behind with its rear lights ..."
+_FORWARD_WORDS = car_template.FORWARD.strip(" ,.").lower()  # "moving forward away from the camera"
+_FOLLOW_RX = re.compile(re.escape(car_template.CAMERA.split(" in a smooth")[0].lower()).replace(r"the\ car",
+                                                                                               r"the\ [a-z-]+"))
+_SIDE_RX = re.compile(r"\bside[ -]view\b|\bfrom the side\b|\bside[ -]on\b|\bside profile\b")
 
 
-def drives_without_template(prompt: str, sentence: str = "") -> bool:
-    """True when `prompt` has a vehicle that drives but not the car template's forward motion (car_template.FORWARD,
-    "moving forward away from the camera"), and the user did not ask for a "side view" in so many words. Only the
-    template's shot is drawn forward by the video model; other driving wording reversed the car or left the road."""
+class DriveShot(enum.Enum):
+    """How a prompt shows a driving vehicle (drive_shot)."""
+    NONE = "none"            # no vehicle drives (none at all, or parked ones, or only the camera moves)
+    TEMPLATE = "template"    # the measured shot: its rear view, forward motion and following camera (above)
+    SIDE_VIEW = "side_view"  # the side view, allowed when the user says "side view" and kept on later edits
+    FORWARD = "forward"      # the template's forward motion with another camera: a view change the user asked for
+    OTHER = "other"          # any other driving shot: reversed the car or left the road on the GPU
+
+
+def drive_shot(prompt) -> DriveShot:
+    """Which DriveShot `prompt` is. A sentence drives when, outside its camera clauses, it names a vehicle and a
+    driving verb."""
+    if not isinstance(prompt, str):
+        return DriveShot.NONE
+    sentences = [_CAMERA_CLAUSE_RX.sub("", s.lower()) for s in re.split(r"(?<=[.!?])\s+", prompt)]
+    if not any(_VEHICLE_RX.search(s) and _DRIVING_RX.search(s) for s in sentences):
+        return DriveShot.NONE
     low = prompt.lower()
-    if "side view" in sentence.lower():
+    if _REAR_WORDS in low and _FORWARD_WORDS in low and _FOLLOW_RX.search(low):
+        return DriveShot.TEMPLATE
+    if _SIDE_RX.search(low):
+        return DriveShot.SIDE_VIEW
+    if _FORWARD_WORDS in low:
+        return DriveShot.FORWARD
+    return DriveShot.OTHER
+
+
+def drives_without_template(prompt: str, sentence: str = "", before: str = "") -> bool:
+    """True when `prompt` (the new prompt for `sentence` on the prompt `before`) has a driving vehicle in a shot the
+    user did not ask for. The car template's measured shot is always allowed; a side view only when the sentence
+    says "side view" or `before` is already that side view; the template's forward motion with another camera only
+    when the sentence asks for another view (car_template.asks_view_change) or `before` already has that camera.
+    Only the template's shot is drawn forward by the video model; other driving wording reversed the car or left
+    the road (live, 2026-11-15)."""
+    shot, was = drive_shot(prompt), drive_shot(before)
+    if shot in (DriveShot.NONE, DriveShot.TEMPLATE):
         return False
-    return bool(_VEHICLE_RX.search(low) and _DRIVING_RX.search(low)) and car_template.FORWARD.strip(" ,.").lower() not in low
+    if shot is DriveShot.SIDE_VIEW:
+        return not ("side view" in sentence.lower() or was is DriveShot.SIDE_VIEW)
+    if shot is DriveShot.FORWARD:
+        return not (car_template.asks_view_change(sentence) or was is DriveShot.FORWARD)
+    return True
 
 
 def check_reply(reply, user: dict) -> Attempt:
@@ -608,7 +653,7 @@ def check_reply(reply, user: dict) -> Attempt:
     if prompt == " ".join(str(user.get("prompt") or "").split()):
         why = "the prompt is the one on screen, so nothing would change" + (f" ({problems[0]})" if problems else "")
         return Attempt(Verdict.UNCHANGED, Entry(Outcome.FALLBACK), (why,))
-    if drives_without_template(prompt, user.get("sentence") or ""):
+    if drives_without_template(prompt, user.get("sentence") or "", str(user.get("prompt") or "")):
         return Attempt(Verdict.NOT_FORWARD, Entry(Outcome.FALLBACK),
                        ("a driving vehicle must use the car template's first sentence and camera sentence word for "
                         f"word (seen from directly behind ...{car_template.FORWARD}); any other driving shot reverses",))
