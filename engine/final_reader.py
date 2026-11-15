@@ -418,6 +418,18 @@ Rules for operations:
 - Pace words (slowly, gradually, gently, little by little, suddenly) set how fast a change appears, never its
   strength. Strength stays 1.0 unless the sentence has a strength word (a little, a lot, more, less, slightly,
   very).
+- A place after near, by, beside, next to, in front of or behind ("add snow near the river") only says where the
+  new thing goes. Never add that place as its own change: add only what the sentence asks for ("add snow near the
+  river" is one add, winter).
+- The video model cannot guess what happens to the scene's objects when the place changes; the prompt must say it.
+  So when a sentence changes the place (an add of kind world, or a base edit), also re-add every object of kind
+  extra whose phrase no longer fits the new place, with its SAME label and a phrase that says where it is, what it
+  stands or drives on, and which way it faces ("a red car parked on the road in the centre of the frame, facing
+  the camera"). Never name the place itself in an object's phrase: the place's own phrase holds the road, the sand
+  and the water. A thing that cannot stay where it was (a car in the sea or on sand) gets a plausible spot (a car
+  on the road). Remove an object only when the user asks for it.
+- Removing a place ("remove the forest") removes only its change of kind world. Objects stay, even ones that
+  look like part of that place: trees the user added stay when the forest goes.
 - If the sentence is vague, not about the picture, or asks to undo or reset, reply with an empty operations list.
 
 Set "blocked" to true, with no operations, if the sentence asks for sexual, violent (gore, killing, injury) or
@@ -810,11 +822,11 @@ class FinalReader:
         return entry.result()
 
     def _or_person(self, entry: Entry, text: str, snapshot: dict) -> Entry:
-        """`entry`, or for a FALLBACK on a sentence that adds a named person (engine/people.py), the engine's own add
+        """`entry`, or for a FALLBACK on a sentence that adds or removes a named person (engine/people.py), the engine's own add or remove
         with the plain prompt (or the car template): the dictionary would label the chip with the description."""
         if entry.outcome is not Outcome.FALLBACK:
             return entry
-        add = people.person_add(text, snapshot)
+        add = people.person_add(text, snapshot) or people.person_remove(text, snapshot)
         if add is None:
             return entry
         from commands.composer import compose
@@ -828,9 +840,9 @@ class FinalReader:
             else:
                 prompt = self._plain(after, compose(after))
         except (ValueError, TypeError, KeyError) as exc:
-            log.warning("final reader: the engine's add of %r does not apply (%r)", add["label"], exc)
+            log.warning("final reader: the engine's %s for %r does not apply (%r)", add["op"], _short(text), exc)
             return entry
-        log.info("final reader: %r -> the engine's add of %r (no usable reply)", _short(text), add["label"])
+        log.info("final reader: %r -> the engine's %s (no usable reply)", _short(text), add["op"])
         return Entry(Outcome.PERSON, tuple(ops), prompt)
 
     def fallback_prompt(self, before: dict, after: dict) -> str | None:
