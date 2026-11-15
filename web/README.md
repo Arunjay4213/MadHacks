@@ -23,17 +23,14 @@ Its wire format follows `contracts/README.md`.
 
 ## What the page shows
 
-The layout is the big-screen design from PR #104.
+The layout is the "Halo" design: one centred column on a static gradient background.
 
-- The video, large and centred, drawn at the size the engine sends (672x384 for the live model) and scaled up at its own aspect ratio.
-- A status pill at the top left: "Connecting…", "Connected" or "Reconnecting…", and a "MOCK server" banner when the server is the fake one.
-- The delay badge at the top right: the time from your command to the first frame of the chunk it applies to, with the server's stage stamps in its tooltip.
-  It shows a dash until a command has been measured, and an unmatched command is never measured.
-- The words line under the video: "heard" with the full sentence, then "→ understood: <keyword>" or "→ not understood" (PR #84).
-  Partial speech never shows as understood.
-- The chips: one per change the server holds, each with a × to remove it.
-- The dock at the bottom: the text box, Mic, Hold to talk, Undo, Reset and Full screen, with their keys shown.
-- A notice on the video for a lost connection or a stalled stream.
+- Header: the Halo logo and wordmark on the left; on the right a status pill ("Live", "Reconnecting…" or "Offline", with a green, amber or grey dot) and a delay pill ("0.9 s delay": the time from your command to the first frame of the chunk it applies to; amber over 1.5 s, red over 3 s; the server's stage stamps on hover). It shows "— delay" until a command has been measured, and an unmatched command is never measured. A "Mock server" badge shows when the server is the fake one.
+- The video box, centred, at the engine's 672x384 shape, never cropped or stretched. Inside it: the chips at the top left (one per change the server holds, each with a × to remove it) and the Full screen button at the top right. A notice on the video says when the connection is lost or the stream stalls.
+- The heard caption under the video: the sentence (keyword highlighted), then "Understood · applying now", "Listening…" while you are still speaking or typing, or "Not understood". Partial speech never shows as understood. It fades out 4 s after the last update.
+- The command bar pinned near the bottom: the text box, the amber Hold to talk button, then Mic (Wispr), Undo and Reset, with key hints underneath.
+- Full screen: the video fills the screen; the caption and the bar float over the bottom; the status and delay pills stay at the top right; the header and hints are hidden.
+- Phone width: the video goes full width, the chips scroll sideways, the hints are hidden and the page may scroll.
 
 ## Controls and keys
 
@@ -47,7 +44,7 @@ The layout is the big-screen design from PR #104.
 | Undo | Steps back one change. |
 | × on a chip | Removes that change only. |
 | Reset, or Option+R / Alt+R | Goes back to the starting scene and starts a new video. |
-| Full screen (Esc leaves) | Full screen for the demo; use Chrome's View, Enter Full Screen if the browser blocks it. |
+| Full screen (top right of the video; Esc leaves) | Full screen for the demo; use Chrome's View, Enter Full Screen if the browser blocks it. |
 
 Speech while disconnected is dropped, never replayed.
 
