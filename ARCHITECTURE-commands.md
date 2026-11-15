@@ -85,7 +85,7 @@ This runs when the final reader gives None, for CONTROL and MIXED sentences, and
 
 `reader.read(clause, snapshot)` decides in this order: place command (`world_op`), negation or transform (none), move or position (none), undo ("undo the X" is a remove), reset, new scene, the keyword pick, remove (`resolve`), an unknown object after an add verb (`_pass_through`), "show me" as a new scene, a motion edit of an existing object, an add with the user's own description, a strength change of an existing change, and finally a plain dictionary add.
 
-`composer.compose(snapshot)` writes the prompt: a road scene (`world.is_road_scene`) is the commands-side car template (`world.car_prompt`), with an active winter shown as the snowy mountain road (`road_scene_world`); a scene with a world change is the base with its world replaced (`compose_base`) and the built-in sky segments that clash with a time, weather or season change removed (`world_with_overrides`); any other scene is the base, then the season, weather and time phrases, then the objects.
+`composer.compose(snapshot)` writes the prompt: a road scene (`world.is_road_scene`) is the commands-side car template (`world.car_prompt`), with an active winter shown as the snowy mountain road (`road_scene_world`); a scene with a world change is the base with its world replaced (`compose_base`), in the world's road form when the base or an object is a vehicle and its landscape form otherwise (`world.Form`, #259), worded for its strength, and the built-in sky segments that clash with a time, weather or season change removed (`world_with_overrides`); any other scene is the base, then the season, weather and time phrases, then the objects.
 
 ## Where each rule is decided
 

@@ -153,10 +153,10 @@ class WorldChangeTest(unittest.TestCase):
         self.assertIn("snow on the ground", service.committed_prompt)
         self.assertFalse(send(service, "make it a desert")["state"]["unmatched"])
         self.assertNotIn("snow", service.committed_prompt)
-        self.assertIn("desert highway", service.committed_prompt)
+        self.assertIn("open desert", service.committed_prompt)
         send(service, "undo")
         self.assertIn("snow on the ground", service.committed_prompt)
-        self.assertIn("desert highway", service.committed_prompt)
+        self.assertIn("open desert", service.committed_prompt)
 
     def test_a_new_world_clears_weather_but_keeps_time_of_day(self):
         service = CommandService()

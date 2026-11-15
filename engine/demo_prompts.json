@@ -325,10 +325,10 @@
         "strength": 1.0
       }
     ],
-    "prompt": "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; glossy wet pavement, shimmering magenta and cyan reflections, glass facades, humid glowing air",
-    "canonical": "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+    "prompt": "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; glossy wet pavement, glowing pink and blue signage, reflective glass facades",
+    "canonical": "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
     "source": "claude-sonnet-5-5",
-    "generated_at": "2026-11-15T03:48:56+00:00"
+    "generated_at": "2026-11-15T04:51:37+00:00"
   },
   {
     "sentence": "make it rain",
@@ -803,10 +803,10 @@
         "strength": 1.0
       }
     ],
-    "prompt": "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; dark night under a deep starry sky with soft moonlight; wet glossy pavement mirroring vivid pink and blue neon glow, dark deep night sky above, shimmering colourful reflections on glass towers",
-    "canonical": "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; dark night under a deep starry sky with soft moonlight",
+    "prompt": "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; dark night under a deep starry sky with soft moonlight; wet reflective pavement, glowing signage casting colourful light on glass facades, dark deep sky overhead, saturated pink and blue glow, polished surfaces mirroring the lights",
+    "canonical": "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; dark night under a deep starry sky with soft moonlight",
     "source": "claude-sonnet-5-5",
-    "generated_at": "2026-11-15T03:49:01+00:00"
+    "generated_at": "2026-11-15T04:51:38+00:00"
   },
   {
     "sentence": "slowly make it night",
@@ -1203,10 +1203,10 @@
         "strength": 1.0
       }
     ],
-    "prompt": "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; wet reflective pavement mirroring vivid pink and blue light, glass towers with glowing signage",
-    "canonical": "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+    "prompt": "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; wet asphalt reflecting vivid pink and blue light, glass and steel surfaces glowing with neon color, humid air with a faint glow, smooth slick textures",
+    "canonical": "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
     "source": "claude-sonnet-5-5",
-    "generated_at": "2026-11-15T03:49:03+00:00"
+    "generated_at": "2026-11-15T04:51:40+00:00"
   },
   {
     "sentence": "make it wintery",
@@ -1765,8 +1765,23 @@
     "generated_at": "2026-11-15T03:49:17+00:00"
   },
   {
-    "sentence": "new scene of a red sports car driving along a country road",
+    "sentence": "a little more snow",
     "prompt_before": "a red sports car; a snowy mountain road",
+    "operations": [
+      {
+        "op": "set_strength",
+        "id": "c14",
+        "strength": 1.3
+      }
+    ],
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a snowy mountain road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Pine forests buried under heavy white snow line both sides, deep snowdrifts and tall snowbanks along the edges of the road, thick snowflakes falling steadily. Cold blue overcast winter light, soft diffuse shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; an intense snowy mountain road",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T04:51:41+00:00"
+  },
+  {
+    "sentence": "new scene of a red sports car driving along a country road",
+    "prompt_before": "a red sports car; an intense snowy mountain road",
     "operations": [
       {
         "op": "new_scene",
@@ -1775,8 +1790,8 @@
     ],
     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
     "canonical": "a red sports car",
-    "source": "engine car template",
-    "generated_at": "2026-11-15T03:49:08+00:00"
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T04:51:41+00:00"
   },
   {
     "sentence": "winter",
@@ -2147,5 +2162,39 @@
     "canonical": "a red sports car; a wet country road in heavy rain",
     "source": "engine car template",
     "generated_at": "2026-11-15T03:49:12+00:00"
+  },
+  {
+    "sentence": "make it a desert",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "desert",
+        "kind": "world",
+        "phrase": "a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows.",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a single oak tree; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows; dry cracked earth, sparse dry scrub, warm ochre and pale gold tones, hazy dry air",
+    "canonical": "a wide shot of a single oak tree; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T04:51:43+00:00"
+  },
+  {
+    "sentence": "take me to the beach",
+    "prompt_before": "a wide shot of a meadow with a single oak tree",
+    "operations": [
+      {
+        "op": "add",
+        "label": "ocean coast",
+        "kind": "world",
+        "phrase": "a coastal highway on a cliff top. Grey asphalt with white lane markings runs straight ahead, a low stone wall along the edge of the road, a bright turquoise ocean with white waves far below the cliff on the left side, palm trees and green hills on the right side. Sunny tropical day, clear blue sky, sparkling light on the water.",
+        "strength": 1.0
+      }
+    ],
+    "prompt": "a wide shot of a single oak tree; a wide sandy beach. A bright turquoise ocean with white waves rolling onto pale golden sand, palm trees along the shore. Sunny tropical day, clear blue sky, sparkling light on the water; fine pale sand dotted with small shells, glistening wet shoreline, soft sea spray in the air, clear turquoise water, gentle ripples of foam, warm natural colours",
+    "canonical": "a wide shot of a single oak tree; a wide sandy beach. A bright turquoise ocean with white waves rolling onto pale golden sand, palm trees along the shore. Sunny tropical day, clear blue sky, sparkling light on the water",
+    "source": "claude-sonnet-5-5",
+    "generated_at": "2026-11-15T04:51:45+00:00"
   }
 ]

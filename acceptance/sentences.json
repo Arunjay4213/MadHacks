@@ -529,6 +529,35 @@
         {"say": "add a dog", "chips": ["dog"]},
         {"say": "remove the dog near jensen", "chips": ["jensen huang"], "no_chips": ["dog"]}
       ]
+    },
+    {
+      "name": "meadow-desert-has-no-road",
+      "note": "Bug fixed on 2026-11-15 (#259): the desert on the meadow was the car's desert highway, a road on a scene with no vehicle.",
+      "start": "meadow",
+      "live": true,
+      "steps": [
+        {"say": "make it a desert", "chips": ["desert"], "has": ["desert", "sand"], "lacks": ["highway", "road", "asphalt"], "visible": ["Is the ground sand or desert?", {"q": "Is there a road?", "expect": "no"}]}
+      ]
+    },
+    {
+      "name": "meadow-beach-has-no-road",
+      "note": "Bug fixed on 2026-11-15 (#259): the beach on the meadow was a cliff-top highway, and the details then described sand.",
+      "start": "meadow",
+      "live": true,
+      "steps": [
+        {"say": "take me to the beach", "chips": ["ocean"], "has": ["beach", "sand", "ocean"], "lacks": ["highway", "road", "asphalt", "cliff"], "visible": ["Is there a sandy beach?", "Is the sea or ocean visible?", {"q": "Is there a road?", "expect": "no"}]}
+      ]
+    },
+    {
+      "name": "car-a-little-more-snow",
+      "note": "Bug fixed on 2026-11-15 (#259): more snow on the car in winter kept the snowy mountain road but gave the same prompt as before (the world's strength was not in the composed prompt, so the engine reused the old rich prompt).",
+      "start": "car",
+      "live": true,
+      "xfail": {"dictionary": "bug: with Sonnet down the car template ignores a world's strength, so more snow on the snowy road draws the same road (the chip still moves)"},
+      "steps": [
+        {"say": "make it winter", "chips": ["winter"], "has": ["snowy mountain road"]},
+        {"say": "a little more snow", "chips": ["winter"], "strength": {"winter": "up"}, "has": ["snowy mountain road", "heavy"], "lacks": ["green fields"], "visible": ["Is there a red car seen from behind?", "Is the road covered in snow?", "Is snow falling?"]}
+      ]
     }
   ]
 }

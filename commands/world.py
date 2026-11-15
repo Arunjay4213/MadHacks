@@ -6,6 +6,7 @@ the four measured road | scene | light worlds).
 Pure stdlib. Imports only dictionary.py, so reader.py can import this module without a cycle.
 """
 
+import enum
 import re
 
 from .dictionary import KEYWORD_RX, KEYWORDS, normalize
@@ -77,6 +78,46 @@ _TABLE = [
     ("meadow", [("a green meadow with soft grass", {}), (", under a clear blue sky", {"time": "day", "weather": "clear"})],
      ["meadow", "the meadow", "grassland"]),
 ]
+# The same places without a road, for a scene that has none (the meadow): with the road form, "make it a desert" and
+# "take me to the beach" on the oak scene drew a highway across the meadow (pinning run, 2026-11-15). Each keeps its
+# road form's scene and light words and tags, minus the road, so the same changes override the same built-in sky.
+# A world missing here (meadow) has no road, so both forms are the same.
+_LANDSCAPE = {
+    "country road": [("open countryside", {}), (". Green fields and rows of trees", {}),
+                     (" under a clear blue summer sky", {"time": "day", "weather": "clear", "season": "summer"}),
+                     (". Bright midday sunshine, crisp shadows", {"time": "day", "weather": "clear"})],
+    "desert": [("a vast open desert", {}),
+               (". Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground", {}),
+               (", heat haze shimmering above the sand", {"weather": "haze", "season": "summer"}),
+               (". Hot afternoon sun in a cloudless pale blue sky, strong hard shadows", {"time": "day", "weather": "clear"})],
+    "snowy mountain road": [("snowy mountains", {}),
+                            (". Pine forests covered in thick white snow, deep snowdrifts on the ground", {}),
+                            (", snowflakes falling", {"weather": "snow", "season": "winter"}),
+                            (". Cold blue overcast winter light, soft diffuse shadows",
+                             {"time": "day", "weather": "overcast", "season": "winter"})],
+    "neon city": [("a big city", {}), (" at night", _N),
+                  (". Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet "
+                   "pavement reflects the colourful lights", {}),
+                  (", light rain falling", {"weather": "rain"}),
+                  (". Dark night sky", _N), (", vivid neon glow, cyberpunk atmosphere", {})],
+    "ocean coast": [("a wide sandy beach", {}),
+                    (". A bright turquoise ocean with white waves rolling onto pale golden sand, palm trees along the "
+                     "shore", {}),
+                    (". Sunny tropical day, clear blue sky, sparkling light on the water",
+                     {"time": "day", "weather": "clear", "season": "summer"})],
+    "mars": [("the red rocky surface of Mars, craters and red mountains", {}),
+             (", a pale pink sky with two small moons", _D)],
+    "forest": [("a dense green pine forest, tall trees all around", {}),
+               (", soft sunlight through the branches", {"time": "day", "weather": "clear"})],
+}
+
+
+class Form(enum.Enum):
+    """How a known world is written. The state always keeps the road form's phrase (the world's identity)."""
+    ROAD = "road"            # a vehicle scene: the road comes first (the car template reads it as "{road}. ...")
+    LANDSCAPE = "landscape"  # a scene with no road: the same place, no road invented
+
+
 # A sunlit time change says the weather too: "sunny" and "make it day" (the dictionary's "bright daytime sunlight under a
 # clear blue sky") conflict with a built-in overcast light, rain or falling snow, unless a weather change says otherwise.
 _SUNLIT = frozenset({"clear", "haze"})
@@ -87,6 +128,7 @@ _IMPLIED = {"day": {"weather": _SUNLIT}, "noon": {"weather": _SUNLIT}}
 _LIGHT_WORDING = {("snowy mountain road", "day"):
                   ("winter", "bright winter sunshine in a clear blue sky, sparkling snow, crisp shadows")}
 _SEGMENTS = {label: segments for label, segments, _ in _TABLE}
+_FORMS = {Form.ROAD: _SEGMENTS, Form.LANDSCAPE: {**_SEGMENTS, **_LANDSCAPE}}
 _PHRASES = {"".join(text for text, _ in segments) + ".": label for label, segments, _ in _TABLE}
 WORLDS: dict[str, dict] = {}
 for _label, _segments, _aliases in _TABLE:
@@ -165,20 +207,21 @@ def world_phrase(snapshot: dict) -> str:
     return worlds[-1]["phrase"] if worlds else DEFAULT_WORLD["phrase"]
 
 
-def world_with_overrides(world_change: dict | None, changes: list) -> str | None:
-    """The active world's phrase with conflicting BUILT-IN sky/time/weather segments removed.
+def world_with_overrides(world_change: dict | None, changes: list, form: Form = Form.ROAD) -> str | None:
+    """The active world's phrase, in `form`, with conflicting BUILT-IN sky/time/weather segments removed.
 
     A segment is dropped when an explicit change of the same kind (time, weather, season) names a different
     label: "desert" + "night" loses the afternoon sun but keeps the heat haze. A sunlit time (day, noon) also
     drops built-in weather that is not sunlit, unless an explicit weather change says the weather: "snowy
     mountain road" + "sunny" loses the overcast light and the falling snow but keeps the snowy road and forest.
+    Form.LANDSCAPE gives a known world's landscape (_LANDSCAPE: the place with no road) for a scene with no road.
     Other changes and the scene state are untouched. Unknown (fallback) world phrases are returned literally.
     None if no world.
     """
     if world_change is None:
         return None
     phrase = world_change["phrase"]
-    segments = _SEGMENTS.get(_PHRASES.get(phrase))
+    segments = _FORMS[form].get(_PHRASES.get(phrase))
     if segments is None:
         return phrase
     active = [c for c in changes if c.get("kind") in ("time", "weather", "season") and c.get("strength", 1.0) > 0]

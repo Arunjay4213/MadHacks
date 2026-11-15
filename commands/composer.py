@@ -3,8 +3,8 @@
 import re
 
 from .state import KINDS
-from .world import (car_prompt, change_wording, compose_base, is_road_scene, road_scene_subject, road_scene_world,
-                    world_with_overrides)
+from .world import (Form, car_prompt, change_wording, compose_base, is_road_scene, road_scene_subject,
+                    road_scene_world, world_with_overrides)
 
 _ARTICLE_RX = re.compile(r"^(a|an|the)\s+(.+)$", re.IGNORECASE | re.DOTALL)
 
@@ -54,9 +54,18 @@ def compose(snapshot):
     worlds = [c for c in changes if c['kind'] == 'world' and c['strength'] > 0]  # zero strength: no effect
     extras, modifiers = _phrases(changes, worlds[-1] if worlds else None)
     if worlds:
-        world = world_with_overrides(worlds[-1], changes)
+        # A known world has a road only when the scene has a vehicle: a vehicle base ("a red sports car", drawn by the
+        # engine's car template, which reads the road form) or a vehicle object, which needs a road to stand or drive
+        # on (a car on sand or in the sea is wrong). Without one, the world is its landscape: "make it a desert" and
+        # "take me to the beach" on the meadow add no highway.
+        vehicle = any(_VEHICLE_RX.search(text) for text in (base, *extras))
+        form = Form.ROAD if vehicle else Form.LANDSCAPE
+        world = world_with_overrides(worlds[-1], changes, form)
         base = compose_base(base, world).partition(world)[0].rstrip(' ;,')
-        return '; '.join([with_road(base, extras, world), *extras, world.rstrip('.'), *modifiers])
+        # The world's strength is worded like any change's, so "a little more snow" on the car in winter (the winter
+        # world at 1.3) is a different prompt, and so a different key for the engine's rich prompt, from winter at 1.0.
+        shown = strength_phrase(world.rstrip('.'), worlds[-1]['strength'])
+        return '; '.join([with_road(base, extras, world), *extras, shown, *modifiers])
     return '; '.join([with_road(base, extras), *modifiers, *extras])
 
 

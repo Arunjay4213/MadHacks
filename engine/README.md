@@ -585,6 +585,8 @@ Inside a chain a removal ("remove the dog", "stop the rain") goes back to the sc
 Each entry is keyed like the cache, by `prompt_before` (the composed prompt of the scene before) and `sentence`, and also has `canonical` (the composed prompt it rewrote), `operations`, `prompt`, `model`, `fingerprint` and `generated_at`.
 Entries are hand-editable: fix a bad `prompt` in place, and keep `prompt_before` and `sentence` unchanged so a loader still matches it.
 `--demo-prompts PATH` (default `engine/demo_prompts.json`; `none` turns it off) loads it at start-up as pinned entries: they are never called or regenerated, never written to `--final-cache`, valid for any fingerprint, and checked before the cache.
+Issue #259 (136 entries): the three "make it a neon city" entries on the meadow were asked again for the landscape form of the city, "a little more snow" on the car in winter was added after the car winter chain (with heavier snow in the scene sentence), and "make it a desert" and "take me to the beach" from the meadow were added at the end.
+`python -m engine.tools.pin_drift` lists the entries whose composed prompts changed under new code (run it after a change to `commands/composer.py` or `commands/world.py`); `--regen`, with the Foundry key, asks those and any new entries again with the real Sonnet final reader and writes the file.
 The file is a list of entries, or `{"base", "entries"}`; the loader replays the entries in order from the base and skips, with a log line, an entry whose `prompt_before` does not match the replayed scene or whose operations do not apply.
 
 ## Lifecycle states
