@@ -90,6 +90,24 @@ class RemoveWorldKeepsObjectsTest(unittest.TestCase):
             r = s.handle({"type": "final", "text": spoken, "t_client": 2})
             self.assertEqual(labels(r), ["forest"], spoken)
 
+    def test_any_world_named_as_a_location_keeps_the_world(self):
+        # "meadow", "desert" and the rest share no dictionary alias with an object, unlike "forest".
+        for world in ["meadow", "desert", "mars", "neon city", "ocean coast", "country road"]:
+            for spoken in [f"remove the car near the {world}", f"remove the car in the {world}"]:
+                s = svc()
+                for t in [f"make it a {world}", "add a car"]:
+                    s.handle({"type": "final", "text": t, "t_client": 1})
+                r = s.handle({"type": "final", "text": spoken, "t_client": 2})
+                self.assertEqual(labels(r), [world], spoken)
+
+    def test_naming_the_world_first_still_removes_it(self):
+        for world in ["meadow", "desert", "neon city"]:
+            s = svc()
+            for t in [f"make it a {world}", "add a car"]:
+                s.handle({"type": "final", "text": t, "t_client": 1})
+            r = s.handle({"type": "final", "text": f"remove the {world}", "t_client": 2})
+            self.assertEqual(labels(r), ["car"], world)
+
 
 class AccentedPaceTest(unittest.TestCase):
     CAFE = {"op": "add", "label": "café", "kind": "extra", "phrase": "a small café", "strength": 1.0}
