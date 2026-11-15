@@ -86,8 +86,9 @@ def test_pinned_entries_survive_a_fingerprint_change_and_win_over_the_disk_cache
     assert r("make it winter", SceneState(DEFAULT_BASE).snapshot())["prompt"] == pinned_prompt("make it winter")
     # a disk cache entry for the same key, with the right fingerprint, does not replace the pinned one
     disk = CacheFile(cache, fingerprint(r.system_prompt, "fake-sonnet"))
-    from engine.final_reader import Entry, Outcome
-    disk.save({(before, "make it winter"): Entry(Outcome.SONNET, tuple(OPS["make it winter"]), "disk words")})
+    from engine.final_reader import Entry, Outcome, scene_record
+    disk.save({(before, "make it winter"): Entry(Outcome.SONNET, tuple(OPS["make it winter"]), "disk words",
+                                                 scene_record(SceneState(DEFAULT_BASE).snapshot()))})
     r2 = load("sonnet", chat=CountingChat(), cache_path=str(cache), demo_prompts=str(demo))
     assert r2("make it winter", SceneState(DEFAULT_BASE).snapshot())["prompt"] == pinned_prompt("make it winter")
     # pinned entries are never written into the disk cache

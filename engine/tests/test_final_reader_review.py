@@ -111,3 +111,61 @@ def test_a_season_said_with_the_place_and_a_base_edit_stays():
     svc.handle(final("make it winter"))
     out = svc.handle(final(sentence))
     assert sorted(c["label"] for c in out["state"]["changes"]) == ["desert", "winter"]
+
+
+LION = {"op": "add", "label": "lion", "kind": "extra",
+        "phrase": "a large male lion standing in the foreground at the left of the frame, facing the camera", "strength": 1.0}
+
+
+def test_a_pinned_removal_removes_the_change_it_names_not_the_one_with_its_old_id(tmp_path):
+    # Greptile on PR #105 (final_reader.py:424): the file adds winter (c1) then a lion (c2) and pins "no more snow"
+    # as remove c1. Live, the lion came first (c1), the prompt is the same (compose sorts by kind), and the pinned
+    # removal took the lion away. The pinned entry is now used only on its own scene, with ids mapped.
+    from commands.composer import compose
+    from commands.state import SceneState
+    from engine.final_reader import load_pinned
+    s = SceneState()
+    entries = []
+    for sentence, ops in [("make it winter", [WINTER]), ("add a lion", [LION]),
+                          ("no more snow", [{"op": "remove", "id": "c1"}])]:
+        entries.append({"sentence": sentence, "prompt_before": compose(s.snapshot()), "operations": ops,
+                        "prompt": f"PINNED {sentence}"})
+        for op in ops:
+            s.apply(op)
+    path = tmp_path / "demo.json"
+    path.write_text(json.dumps(entries))
+    chat = ReplayChat({"no more snow": reply([{"op": "remove", "id": "c2"}], "green grass")})
+    reader = FinalReader(FinalReaderState.ON, chat=chat, spec=prompt_spec(), pinned=load_pinned(path))
+    live = CommandService(semantic_reader=lambda *a: None)
+    live.apply_final("add a lion", [LION], None)      # lion is c1
+    live.apply_final("make it winter", [WINTER], None)  # winter is c2
+    assert compose(live.snapshot()) == entries[2]["prompt_before"]
+    res = reader("no more snow", live.snapshot())
+    assert res["operations"] == [{"op": "remove", "id": "c2"}]
+    out = live.apply_final("no more snow", res["operations"], None)
+    assert [c["label"] for c in out["state"]["changes"]] == ["lion"]
+    # in the file's own order the pinned entry is used, with its own ids
+    same = SceneState()
+    same.apply(WINTER)
+    same.apply(LION)
+    assert reader("no more snow", same.snapshot()) == {"operations": [{"op": "remove", "id": "c1"}],
+                                                       "prompt": "PINNED no more snow"}
+
+
+def test_a_cached_base_edit_does_not_bring_back_a_removed_chip():
+    # Greptile on PR #87 (final_reader.py:307): a zero-strength chip is not in the composed prompt, so the key of a
+    # cached base edit stayed the same after the chip was removed, and the saved adds brought it back.
+    sentence = "turn the tree into a lighthouse"
+    chat, reader, svc = service({
+        "add a lion": reply([LION]),
+        sentence: reply([{"op": "edit_base", "base": "a wide shot of a single lighthouse"}]),
+    })
+    svc.handle(final("add a lion"))
+    lion = svc.state_fields()["changes"][0]["id"]
+    svc._svc.apply_final("weaken the lion", [{"op": "set_strength", "id": lion, "strength": 0}], None)
+    assert "lighthouse" in svc.handle(final(sentence))["steer"]["prompt"]
+    svc.handle({"type": "tap", "action": "undo"})
+    svc.handle({"type": "tap", "action": "remove", "id": lion})
+    out = svc.handle(final(sentence))
+    assert [c["label"] for c in out["state"]["changes"]] == []
+    assert sum(1 for c in chat.calls if c["sentence"] == sentence) == 2
