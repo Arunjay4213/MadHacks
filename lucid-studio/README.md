@@ -132,3 +132,6 @@ Unsubmitted drafts remain unconfirmed until finalized or cleared, including long
 thinking pauses. An edit cancels any older automatic retry of a pending paste.
 Custom send-only adapters serialize successful scene edits and capture spatial
 pins when submitted, so a slow response cannot erase changes or lose placement.
+
+The CPU integration also sends a final immediately after Reset and verifies its
+new correlated frame, covering the engine-owned #103 race fix.

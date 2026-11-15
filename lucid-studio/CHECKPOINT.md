@@ -51,7 +51,6 @@ from main to serve `/studio/`; no frontend build artifacts are committed.
 A non-default original prompt must be supplied as `initialPrompt` because contract 4
 has no base-prompt field. Spatial edits remain simulator-only for the shared socket.
 
-Local fake-engine reset followed immediately by a final can acknowledge state but
-leave `applies_from_chunk` null. Reported to Arunjay on board #6885926316; no backend
-edit made. The UI keeps “—” rather than inventing a delay. The integration test waits
-for Reset to be scheduled before sending its next final.
+The earlier Reset/immediate-final race was reported on board #6885926316 and
+fixed by the engine owner in #103. Production integration now submits a final
+immediately after Reset and verifies that its correlated frame and delay arrive.
