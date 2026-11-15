@@ -465,3 +465,29 @@ export function makeSpeechEndpointer(send, {
     },
   };
 }
+
+// The type box under the controls is hidden until the Keyboard button opens it, while #command keeps
+// focus the whole time (Wispr Flow pastes into it). Typed characters open it so people can see what
+// they type; dictated bursts and whole inserts (Wispr Flow) leave it hidden.
+export const TYPE_REVEAL_MS = 80; // a first keystroke waits this long in case it starts a dictated burst
+export const typeBoxAttrs = (open) => ({ 'aria-expanded': String(open), 'data-open': String(open) });
+export function makeTypeBox(render) {
+  let open = false;
+  const set = (value) => {
+    if (value === open) return;
+    open = value;
+    render(typeBoxAttrs(open));
+  };
+  return {
+    get open() {
+      return open;
+    },
+    toggle: () => set(!open),
+    show: () => set(true),
+    hide: () => set(false),
+    // What an input event of this kind (makeInputClassifier) means for a hidden box.
+    afterInput: (kind) => (open ? null : kind === 'typing' ? 'reveal-soon' : 'cancel-reveal'),
+    // Esc hides an open box, but only when it holds nothing (never throws away a draft).
+    closesOnKey: (key, value) => open && key === 'Escape' && value.trim() === '',
+  };
+}

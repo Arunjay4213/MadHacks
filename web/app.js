@@ -4,12 +4,13 @@ import {
   backoffMs, makeFrameGate, makeLatencyTracker, makeTranscriber,
   changesKey, commandKey, makeInputClassifier, wordsLabels, makeHeardTracker, PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
   wsBaseUrl, fitSize, videoNotice, formatStamps, isResetShortcut, makeOrderedFinals, makeSpeechEndpointer,
+  makeTypeBox, TYPE_REVEAL_MS,
 } from './lib.js';
 
 const $ = (id) => document.getElementById(id);
 const el = {
   video: $('video'), connection: $('connection'), banner: $('mode-banner'), words: $('words'),
-  changes: $('changes'), form: $('command-form'), command: $('command'), mic: $('mic'),
+  changes: $('changes'), form: $('command-form'), command: $('command'), keyboard: $('keyboard'),
   ptt: $('ptt'), undo: $('undo'), latency: $('latency'), timing: $('timing'), error: $('error'),
   notice: $('video-notice'), reset: $('reset'), frame: $('frame'), fullscreen: $('fullscreen'),
   pttRing: $('ptt-ring'),
@@ -135,7 +136,7 @@ function onServer(raw) {
 }
 
 // The voice line: the words in orange quotes, and before them what is happening. Voice bars while speech
-// comes in (from the mic level while push-to-talk is held, a wave for Wispr or the toggle mic), nothing
+// comes in (from the mic level while push-to-talk is held, a wave for Wispr Flow dictation), nothing
 // while typing, a green tick once the server understood the final, an amber "!" when it did not.
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -190,7 +191,7 @@ function renderVoice({ state, text = '', tail = '', mode = null }) {
 // Where words that are still coming in come from: our mic (bars), dictation into the box (wave), or typing.
 function partialMode() {
   if (listening === 'ptt') return 'level';
-  if (listening || rec) return 'wave'; // the toggle mic, or a press still finishing
+  if (rec) return 'wave'; // a press still finishing
   return boxKind === 'burst' ? 'wave' : null;
 }
 
@@ -370,6 +371,7 @@ el.command.addEventListener('input', (e) => {
   if (DEBUG) console.info(`[web] input ${e.inputType} chars=${e.data?.length ?? '-'} -> ${kind}`);
   if (kind === 'whole') return sendFinalFromBox();
   boxKind = kind; // dictated text gets the voice wave on the voice line, typing gets no bars
+  revealIfTyping(kind);
   const text = el.command.value.trim();
   if (!text) {
     heardTracker.clearPartials(); // draft deleted: it is no longer pending
@@ -382,7 +384,29 @@ el.command.addEventListener('input', (e) => {
 });
 el.form.addEventListener('submit', (e) => {
   e.preventDefault();
-  sendFinalFromBox();
+  sendFinalFromBox(); // the box stays open after a send
+});
+
+// The type box is hidden until the Keyboard button opens it; #command keeps focus either way.
+const typeBox = makeTypeBox((attrs) => {
+  el.form.dataset.open = attrs['data-open'];
+  el.keyboard.setAttribute('aria-expanded', attrs['aria-expanded']);
+  refocus();
+});
+el.keyboard.addEventListener('click', () => typeBox.toggle());
+// Typed characters open a hidden box so people see what they type. A first keystroke waits briefly:
+// Wispr Flow dictation arrives as a burst (or one paste) and should stay on the voice line only.
+let revealTimer = 0;
+function revealIfTyping(kind) {
+  const next = typeBox.afterInput(kind);
+  if (next === 'reveal-soon' && !revealTimer) revealTimer = setTimeout(() => { revealTimer = 0; typeBox.show(); }, TYPE_REVEAL_MS);
+  if (next === 'cancel-reveal') {
+    clearTimeout(revealTimer);
+    revealTimer = 0;
+  }
+}
+document.addEventListener('keydown', (e) => {
+  if (typeBox.closesOnKey(e.key, el.command.value)) typeBox.hide();
 });
 // Keep the box focused at all times so a Wispr Flow paste always lands in it.
 const refocus = () => setTimeout(() => document.activeElement !== el.command && el.command.focus(), 0);
@@ -423,8 +447,7 @@ const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const isControlOpen = () => control?.readyState === WebSocket.OPEN;
 const ordered = makeOrderedFinals(send, isControlOpen);
 let rec = null; // the current recognizer; an older one may still be ending
-let listening = null; // what the user asked for: 'toggle' | 'ptt' | null
-let startedAt = 0;
+let listening = null; // 'ptt' while push-to-talk is held, else null
 let startWhenEnded = false; // only if the browser refused a second recognizer while the old one ended
 
 function startListening(mode) {
@@ -449,7 +472,6 @@ function begin() {
   r.interimResults = true;
   r.lang = 'en-US';
   t.start({ hold: listening === 'ptt' }); // push-to-talk: one command per press
-  startedAt = performance.now();
   r.onresult = (e) => t.handle(Array.from(e.results, (x) => ({ transcript: x[0].transcript, isFinal: x.isFinal })));
   r.onerror = (e) => {
     const text = micErrorText(e.error);
@@ -468,9 +490,6 @@ function begin() {
       startWhenEnded = false;
       if (listening) return begin(); // the fallback: start the press the browser refused earlier
     }
-    // Chrome ends recognition by itself after a pause; keep listening while the mic toggle is on,
-    // unless it ended at once (then restarting would just spin).
-    if (listening === 'toggle' && performance.now() - startedAt > 500) return begin();
     listening = null;
     renderMic();
     endUnsent(); // the press ended with no words sent
@@ -496,7 +515,6 @@ function stopListening(mode) {
 }
 
 function renderMic() {
-  el.mic.setAttribute('aria-pressed', String(listening === 'toggle'));
   el.ptt.setAttribute('aria-pressed', String(listening === 'ptt'));
   if (listening === 'ptt') startLevel();
   else stopLevel();
@@ -569,14 +587,11 @@ const micUnavailable = !Recognition
 const keyLabel = { Backquote: '`' }[PUSH_TO_TALK_CODE] ?? PUSH_TO_TALK_CODE;
 
 if (micUnavailable) {
-  for (const b of [el.mic, el.ptt]) {
-    b.disabled = true;
-    b.title = micUnavailable;
-  }
+  el.ptt.disabled = true;
+  el.ptt.title = micUnavailable;
 } else {
   el.ptt.title = `Hold to talk (${keyLabel}) · Wispr: Ctrl`;
   el.ptt.setAttribute('aria-label', el.ptt.title);
-  el.mic.addEventListener('click', () => (listening === 'toggle' ? stopListening('toggle') : startListening('toggle')));
   el.ptt.addEventListener('pointerdown', (e) => {
     el.ptt.setPointerCapture(e.pointerId);
     startListening('ptt');
