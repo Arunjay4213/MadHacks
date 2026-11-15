@@ -5,17 +5,15 @@ commands.service.CommandService, so a change to its private fields fails here, n
 """
 
 import json
-import sys
 import threading
 import time
-import types
 
 import httpx
 import pytest
 
 from commands.service import CommandService
 from commands.state import SceneState
-from engine.final_reader import (FORWARD_MOTION, STANDIN, STYLE, VEHICLE_STYLE, CacheFile, FinalReader,
+from engine.final_reader import (FORWARD_MOTION, CacheFile, FinalReader,
                                  FinalReaderState, expand_operations, fingerprint, load, prompt_spec, scene_after)
 from engine.foundry import FoundryMessages
 from engine.reader import FinalReadingService, load_reader
@@ -61,18 +59,19 @@ def snap(*ops, base="a wide shot of a red car driving along a road"):
     return s.snapshot()
 
 
-def test_operations_and_the_standin_prompt():
+def test_operations_and_the_prompt():
     chat = FakeChat({"make it winter": "```json\n" + reply([WINTER], "a snowy mountain road between pine forests, "
                                                                      "snow falling, cold blue light") + "\n```"})
-    r = reader(chat, spec=STANDIN)
+    r = reader(chat)
     out = r("make it winter", snap())
     assert out["operations"] == [WINTER]
-    assert out["prompt"] == ("A wide shot of a red car driving along a road, " + FORWARD_MOTION + ", a snowy mountain road between pine forests, snow "
-                             "falling, cold blue light. " + VEHICLE_STYLE)
+    # the clause that names a road and the forests (objects) is cut; the rest follows the composed prefix
+    assert out["prompt"] == ("a wide shot of a red car driving along a road, " + FORWARD_MOTION + "; snow on the ground; "
+                             "snow falling, cold blue light")
     system, user = chat.calls[0]
-    assert "edit_base" in system and "WORLD" in system
+    assert "edit_base" in system and '"details"' in system
     assert user == {"scene": {"base": "a wide shot of a red car driving along a road", "changes": []},
-                    "prompt": "a wide shot of a red car driving along a road", "sentence": "make it winter", "details_max_words": 50}
+                    "prompt": "a wide shot of a red car driving along a road", "sentence": "make it winter", "details_max_words": 45}
     assert r("make it winter", snap()) == out and len(chat.calls) == 1  # cached by (prompt before, sentence)
     s = r.stats()
     assert (s["state"], s["calls"], s["cache_hits"], s["p50_ms"] is not None) == ("on", 1, 1, True)
@@ -107,9 +106,10 @@ def test_invalid_replies_fall_back():
 def test_rejected_details_keep_the_edit_with_the_short_prompt():
     # The user said "make it winter" and the model understood it; only its wording was too long. Winter still
     # happens, with the composed prompt, rather than the sentence being thrown away.
-    r = reader(FakeChat({"make it winter": reply([WINTER], "x " * 200)}), spec=STANDIN)
+    r = reader(FakeChat({"make it winter": reply([WINTER], "x " * 200)}))
     out = r("make it winter", snap())
-    assert out == {"operations": [WINTER], "prompt": "a wide shot of a red car driving along a road; snow on the ground"}
+    assert out == {"operations": [WINTER],
+                   "prompt": "a wide shot of a red car driving along a road, " + FORWARD_MOTION + "; snow on the ground"}
     assert r.stats()["details_rejected"] == 1 and r.stats()["rejects"] == 0
 
 
@@ -181,15 +181,15 @@ def test_cached_operations_must_still_fit_the_scene():
     assert len(chat.calls) == 1
 
 
-def test_prompt_spec_prefers_commands_rewriter(monkeypatch):
-    assert prompt_spec(lambda: (_ for _ in ()).throw(ModuleNotFoundError("no"))).name == "engine stand-in"
+def test_prompt_spec_uses_commands_rewriter(monkeypatch):
+    from commands import rewriter
     seen = []
 
     def validate_rewrite(p, r):
         seen.append(r)
         return f"{p}; {r['details']}"
-    rules = types.SimpleNamespace(SYSTEM_PROMPT="his prompt", validate_rewrite=validate_rewrite)
-    monkeypatch.setitem(sys.modules, "commands.rewriter", rules)
+    monkeypatch.setattr(rewriter, "SYSTEM_PROMPT", "his prompt")
+    monkeypatch.setattr(rewriter, "validate_rewrite", validate_rewrite)
     spec = prompt_spec()
     assert spec.name == "commands.rewriter" and spec.details_instructions == "his prompt"
     chat = FakeChat({"make it winter": reply([WINTER], "snow")})
@@ -270,10 +270,10 @@ def test_wrapper_end_to_end_with_the_real_service():
                                                  "a snowy meadow around a white lighthouse, a lion nearby"),
         "make them fight with weapons": reply(blocked=True),
     })
-    svc = FinalReadingService(service(), reader(chat, spec=STANDIN))
+    svc = FinalReadingService(service(), reader(chat))
     winter = svc.handle(final("make it winter"))
-    assert winter["steer"]["prompt"].startswith("A wide shot of a meadow with a single oak tree, a snowy meadow")
-    assert winter["steer"]["prompt"].endswith(" " + STYLE) and "road" not in winter["steer"]["prompt"]
+    assert winter["steer"]["prompt"] == oak + "; snow on the ground; a snowy meadow, cold blue light"
+    assert "road" not in winter["steer"]["prompt"]
     assert [c["label"] for c in winter["state"]["changes"]] == ["winter"]
     lion = svc.handle(final("add a lion"))
     assert [c["label"] for c in lion["state"]["changes"]] == ["winter", "lion"]
@@ -302,30 +302,14 @@ def test_engine_reports_the_final_reader():
     e.stop()
 
 
-def test_standin_subject_gets_forward_motion_for_vehicles_only():
-    from engine.final_reader import FORWARD_MOTION, standin_validate
-    car = standin_validate("a red sports car on a road; winter", {"details": "a snowy mountain road."})
-    assert FORWARD_MOTION in car and car.index(FORWARD_MOTION) < car.index("a snowy mountain road")
-    meadow = standin_validate("a wide shot of a meadow with a single oak tree", {"details": "green grass."})
-    assert FORWARD_MOTION not in meadow
-    told = standin_validate("a red car driving away from the camera", {"details": "a desert highway."})
-    assert told.count("away from the camera") == 1
-
-
-def test_road_motion_blur_only_for_a_vehicle_subject():
-    # A meadow with a lion has no road: the style must not ask for motion blur on one.
-    meadow = standin_validate_of("a wide shot of a meadow with a single oak tree; a lion", "a snowy meadow.")
-    assert meadow.endswith("a snowy meadow. Cinematic, highly detailed, realistic, sharp focus.")
-    assert "motion blur" not in meadow
-    car = standin_validate_of("a red sports car on a road", "a desert highway.")
-    assert car.endswith("sharp focus, motion blur on the road.")
-    # "carpet" or "caravan" is not a car
-    assert "motion blur" not in standin_validate_of("a wide shot of a red carpet", "a hall.")
-
-
-def standin_validate_of(prompt, details):
-    from engine.final_reader import standin_validate
-    return standin_validate(prompt, {"details": details})
+def test_forward_motion_for_vehicles_only():
+    from engine.final_reader import with_forward_motion
+    car = with_forward_motion("a red sports car on a road")
+    assert car == "a red sports car on a road, " + FORWARD_MOTION
+    assert with_forward_motion("a wide shot of a meadow with a single oak tree") == "a wide shot of a meadow with a single oak tree"
+    told = "a red car driving away from the camera"
+    assert with_forward_motion(told) == told
+    assert with_forward_motion("a wide shot of a red carpet") == "a wide shot of a red carpet"  # "carpet" is not a car
 
 
 def test_a_named_colour_wins_over_making_a_duplicate_look_different():
@@ -337,12 +321,12 @@ def test_a_named_colour_wins_over_making_a_duplicate_look_different():
     chat = FakeChat({"add a red car racing on a road": reply(
         [second], "a country road through green fields, a second red car racing alongside it in the next lane, "
                   "bright sunshine")})
-    r = reader(chat, spec=STANDIN)
+    r = reader(chat)
     out = r("add a red car racing on a road", snap(red, base="a wide shot of a meadow with a single oak tree"))
     system = " ".join(chat.calls[0][0].split())
     assert "A colour, type or size the user names ALWAYS wins" in system
     assert "a second small red car racing in the next lane at the right of the frame" in system
-    assert "second red car" in out["prompt"]
+    assert "second small red car" in out["prompt"]
     other_colours = {"blue", "green car", "black", "white", "yellow", "silver", "grey", "orange", "purple"}
     new_car = out["prompt"].split("second", 1)[1].split(",")[0]
     assert not any(c in new_car for c in other_colours) and "red" in new_car

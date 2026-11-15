@@ -189,9 +189,9 @@ def test_a_positioned_lion_keeps_its_exact_phrase_right_after_the_subject():
     })
     svc = FinalReadingService(CommandService(semantic_reader=lambda *a: None),
                               FinalReader(FinalReaderState.ON, chat=chat))
-    subject = "A wide shot of a meadow with a single oak tree, "
+    subject = "a wide shot of a meadow with a single oak tree; "
     for sentence in ["add a lion", "sunny"]:
         prompt = svc.handle(final(sentence))["steer"]["prompt"]
-        assert prompt.startswith(subject + lion_phrase + ", "), prompt
+        assert prompt.startswith(subject + lion_phrase + "; "), prompt
         assert prompt.count("lion") == 1
     assert "size and position words" in chat.calls[0][0]

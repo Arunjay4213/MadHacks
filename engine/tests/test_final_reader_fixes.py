@@ -9,8 +9,7 @@ import logging
 
 from commands.composer import compose
 from commands.service import CommandService
-from engine.final_reader import (FORWARD_MOTION, LANE_CUE, STANDIN, VEHICLE_STYLE, FinalReader, FinalReaderState,
-                                 prompt_spec, standin_validate)
+from engine.final_reader import FORWARD_MOTION, LANE_CUE, FinalReader, FinalReaderState, prompt_spec
 
 WINTER = {"op": "add", "label": "winter", "kind": "season",
           "phrase": "deep winter, snow covering the ground, frost on bare branches", "strength": 1.0}
@@ -198,10 +197,6 @@ def test_no_road_words_in_a_scene_without_a_road():
         low = r["prompt"].lower()
         assert not any(w in low for w in ("road", "tyre", "motion blur", "lane")), r["prompt"]
     assert results[-1]["prompt"].endswith("pale silver light on the grass")
-    # the stand-in says "motion blur on the road" only for a vehicle on a road
-    assert VEHICLE_STYLE not in standin_validate("a red car parked in a meadow", {"details": "green grass."})
-    assert VEHICLE_STYLE in standin_validate("a red car driving along a road", {"details": "green fields."})
-    assert STANDIN.name == "engine stand-in"
 
 
 def test_a_second_red_car_gets_its_own_label_and_the_first_one_stays():
