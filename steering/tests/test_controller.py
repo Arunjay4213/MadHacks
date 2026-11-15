@@ -49,6 +49,9 @@ def _run(s: Steerer, n: int) -> list[torch.Tensor]:
         {"prompt": "x", "ramp_chunks": 0},
         {"prompt": "x", "ramp_chunks": True},                                # a bool is not a count
         {"prompt": "x", "ramp_chunks": 4, "provisional": "yes"},
+        {"prompt": "x", "ramp_chunks": 4, "provisional": True, "cap": True},     # a bool is not a number
+        {"prompt": "x", "ramp_chunks": 4, "provisional": True, "cap": "0.4"},    # a string is not a number
+        {"prompt": "x", "ramp_chunks": 4, "provisional": True, "cap": 1.5},      # above 1
         {"prompt": "x", "ramp_chunks": 4, "provisional": True, "cap": float("nan")},
         {"prompt": "x", "ramp_chunks": 4, "provisional": False, "cap": 0.4},  # a final must go to full
     ],
@@ -504,6 +507,9 @@ def _smsg(prompt: str, strength: float, without: str = "meadow", **kw) -> dict:
         {"strength": 0.0, "without_prompt": "meadow"},
         {"strength": 1.31, "without_prompt": "meadow"},
         {"strength": float("nan"), "without_prompt": "meadow"},
+        {"strength": True, "without_prompt": "meadow"},      # a bool is not a number
+        {"strength": 0.3, "without_prompt": ""},             # the prompt to blend from must be non-empty
+        {"strength": 0.3, "without_prompt": 3},              # and a string
     ],
 )
 def test_bad_strength_raises_and_changes_nothing(extra):
