@@ -137,6 +137,14 @@ class ReanchorPolicy:
         with self._lock:
             return self._pending is not None
 
+    def fires_next_chunk(self) -> bool:
+        """True when the next next_chunk call will return a steer anchor for sure: a pending sudden steer
+        (ramp 1, the live final) whose gap is already met. The engine may then stop the chunk in flight."""
+        with self._lock:
+            p = self._pending
+            return (p is not None and p.seen == 0 and p.ramp == 1
+                    and self._since + 1 >= self._cfg.min_gap_chunks)
+
     def on_target(self, msg: Mapping[str, Any], result: Mapping[str, Any]) -> None:
         """Schedule (or cancel) a steer anchor for an applied contract-2 message.
 

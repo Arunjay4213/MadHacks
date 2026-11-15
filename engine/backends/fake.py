@@ -62,6 +62,10 @@ class SharedDevice:
                 self._jobs -= 1
 
 
+class ChunkInterrupted(RuntimeError):
+    chunk_interrupted = True
+
+
 def load(width: int, height: int, steps: int, device: str = "cpu", decode_device: str = "cpu", **options):
     return FakeBackend(width, height, steps, **options)
 
@@ -90,13 +94,20 @@ class FakeBackend:
     def __init__(self, width: int, height: int, steps: int, gen_ms: float = 170, decode_ms: float = 60,
                  encode_ms: float = 80, frames_per_chunk: int = 4, first_chunk_frames: int = 1, fps: int = 16,
                  fail_on_chunk: int = -1, fail_count: int = 1, fail_in: str = "generate",
-                 shared_device: bool = False, short_on_chunks: str | int | None = None):
+                 shared_device: bool = False, short_on_chunks: str | int | None = None, cut_gen_ms: float = -1,
+                 passes: int = 3):
         self.width, self.height, self.steps = int(width), int(height), int(steps)
         self.fps = int(fps)
         self.frames_per_chunk = int(frames_per_chunk)
         self.first_chunk_frames = int(first_chunk_frames)
         self.gen_s, self.decode_s, self.encode_s = float(gen_ms) / 1e3, float(decode_ms) / 1e3, float(encode_ms) / 1e3
         self.device = SharedDevice() if shared_device else None
+        # A re-anchor chunk takes cut_gen_ms (-1: gen_ms), like the real model's 5-pass cut; a chunk runs in
+        # `passes` equal parts, and interrupt() stops a non-anchor chunk between parts (ChunkInterrupted).
+        self.cut_gen_s = self.gen_s if float(cut_gen_ms) < 0 else float(cut_gen_ms) / 1e3
+        self.passes = max(1, int(passes))
+        self._interrupt = threading.Event()
+        self.interrupted_chunks = 0
         self._chunks_generated = 0       # counts every generate_chunk call; not cleared by reset
         self._chunks_since_reset = 0     # the "frame cache": restarts the motion after reset
         self._frame_phase = 0            # decoder state: frames decoded since reset
@@ -156,8 +167,19 @@ class FakeBackend:
             self.failures_left -= 1
             raise RuntimeError(f"fake backend: injected {where} failure at chunk {chunk}")
 
+    def interrupt(self) -> None:
+        self._interrupt.set()
+
     def generate_chunk(self, cond: torch.Tensor) -> dict:
-        self._work(self.gen_s)
+        self._interrupt.clear()
+        cut = self._anchor_next is not None
+        total = self.cut_gen_s if cut else self.gen_s
+        for i in range(self.passes):
+            if i > 0 and not cut and self._chunks_since_reset > 0 and self._interrupt.is_set():
+                self._interrupt.clear()
+                self.interrupted_chunks += 1
+                raise ChunkInterrupted("fake chunk stopped for a steer cut")
+            self._work(total / self.passes)
         self._maybe_fail("generate", self._chunks_generated)
         short = self._chunks_since_reset > 0 and self._chunks_generated in self.short_on_chunks
         if self._chunks_since_reset == 0:

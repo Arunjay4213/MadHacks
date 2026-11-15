@@ -637,3 +637,18 @@ def test_two_thread_hammer() -> None:
     assert anchors
     nums = [n for n, _ in anchors]
     assert all(b - a >= cfg.min_gap_chunks for a, b in zip(nums, nums[1:]))
+
+
+def test_fires_next_chunk_only_for_a_sudden_steer_past_the_gap():
+    from steering.reanchor import ReanchorConfig, ReanchorPolicy
+    p = ReanchorPolicy(ReanchorConfig(min_gap_chunks=2, refresh_every_chunks=None))
+    applied = {"applied": True, "kind": "final"}
+    p.next_chunk(1.0, False)
+    p.on_target({"ramp_chunks": 1, "provisional": False, "cap": 1.0}, applied)
+    assert p.fires_next_chunk()
+    assert p.next_chunk(1.0, False) is not None
+    p.on_target({"ramp_chunks": 1, "provisional": False, "cap": 1.0}, applied)
+    assert not p.fires_next_chunk()  # the gap since that anchor is not met yet
+    p.on_target({"ramp_chunks": 4, "provisional": False, "cap": 1.0}, applied)
+    p.next_chunk(1.0, False)
+    assert not p.fires_next_chunk()  # a ramp: it fires at the end of the ramp, not on the next chunk

@@ -99,6 +99,13 @@ class VaeType(str, enum.Enum):
     TAEHV = "taehv"  # tiny decoder shipped by the official demo (demo_utils/taehv.py)
 
 
+class ChunkInterrupted(RuntimeError):
+    """generate_chunk stopped at a pass boundary because interrupt() was called (a steer cut is next).
+    Nothing of the chunk is kept: no chunk index, frame index, history or clean-anchor change."""
+
+    chunk_interrupted = True
+
+
 class GenState(enum.Enum):
     EMPTY = "empty"  # no frame generated since load() or reset(); next call starts a new video
     STREAMING = "streaming"  # frame cache holds past frames; next call continues the video
@@ -445,6 +452,8 @@ class Backend:
         cut_fade_refresh: bool = True,
         refresh_noise: str = "fixed",
         refresh_anchor_t: Optional[int] = None,
+        steer_cut_steps: Optional[str] = None,
+        defer_context: bool = False,
     ) -> None:
         """Generation state: lock, stream, RNG, caches, counters, automatic rebase settings.
         Split out of __init__ so tests can build a Backend around a stub generator."""
@@ -473,6 +482,24 @@ class Backend:
         # The 0-1000 level (unwarped, like the config's steps) the clean anchor is noised to on a
         # refresh, instead of the strength's anchor step; None: the anchor step.
         self.refresh_anchor_t = None if refresh_anchor_t is None else int(refresh_anchor_t)
+        # A steer cut (keep-0 rebase from pure noise, not a refresh) denoises with these 0-1000 levels
+        # instead of the 4-step first-frame schedule: "1000,500" is the distilled 2-step schedule, so
+        # the cut chunk costs 3 passes instead of 5. None: the first-frame schedule (as before).
+        self.steer_cut_steps = None
+        if steer_cut_steps not in (None, "", "first"):
+            levels = [int(x) for x in str(steer_cut_steps).replace(";", ",").split(",") if x.strip()]
+            if not levels or levels[0] != 1000 or any(not 0 < t <= 1000 for t in levels) or levels != sorted(levels, reverse=True):
+                raise ValueError(f"steer_cut_steps must be decreasing 0-1000 levels starting at 1000, got {steer_cut_steps!r}")
+            self.steer_cut_steps = _timestep_list(self.scheduler, levels, self._warp)
+        # Defer each chunk's context pass (writing its clean frame into the frame KV cache) to the start
+        # of the next generate_chunk, so the latents reach the decoder one pass earlier; the deferred
+        # pass is skipped when the next chunk rebases (every re-anchor), which clears that cache anyway.
+        # Only without the automatic rebase modes, whose decision needs the cache state of the last chunk.
+        self.defer_context = bool(defer_context) and not steer_rebase and refresh_every <= 0
+        self._pending_context: Optional[tuple] = None  # (denoised, cond, current_start) of the last chunk
+        self.context_passes_skipped = 0
+        self._interrupt = threading.Event()  # interrupt(): stop the chunk in flight at the next pass boundary
+        self.interrupted_chunks = 0
         if int(cut_fade_frames) < 0:
             raise ValueError(f"cut_fade_frames must be >= 0, got {cut_fade_frames}")
         # Dissolve from the last shown frame over this many frames after a re-anchor cut (0 = off);
@@ -568,6 +595,7 @@ class Backend:
             with torch.cuda.device(self.device), torch.cuda.stream(self._gen_stream):
                 self._clear_frame_cache()
             self._reset_crossattn_cache()
+            self._pending_context = None
             self._last_cond = None
             self.frame_index = 0
             self.chunk_index = 0
@@ -712,6 +740,15 @@ class Backend:
             # `cond` may have been written on another thread's stream (the steerer's blend).
             self._gen_stream.wait_stream(torch.cuda.default_stream(self.device))
             pending = self._pending_reanchor
+            self._interrupt.clear()  # a late interrupt() of the previous chunk is moot
+            can_stop = pending is None and rebase is None and self.state is GenState.STREAMING
+            if self._pending_context is not None:
+                ctx, self._pending_context = self._pending_context, None
+                if pending is not None or rebase is not None:
+                    self.context_passes_skipped += 1  # the rebase clears the frame cache: not needed
+                else:
+                    self._context_pass(*ctx)  # the text cache still holds that chunk's cond
+                    self._check_interrupt(can_stop)  # its frame is in the cache; the cut drops it anyway
             if pending is not None:
                 self._pending_reanchor = None
                 if rebase is None:
@@ -758,6 +795,8 @@ class Backend:
                 keep = self._rebase(plan, cond_dict)
                 if keep == 0:
                     schedule = self.first_chunk_steps  # a hard cut: this is a first frame again
+                    if self.steer_cut_steps is not None and not from_clean and not plan.anchor_step:
+                        schedule = self.steer_cut_steps  # a steer from pure noise: the short schedule
                     start = ChunkStart.FIRST_FRAME  # and the decoder restarts for it
                     fade = self.cut_fade_frames > 0 and (self.cut_fade_refresh or not plan.from_clean)
                 n = plan.anchor_step
@@ -791,6 +830,8 @@ class Backend:
             current_start = self.frame_index * self.frame_seq_length
 
             for i, t in enumerate(schedule):
+                if i > 0:
+                    self._check_interrupt(can_stop)
                 timestep = torch.ones([1, f], device=self.device, dtype=torch.int64) * t
                 _, denoised = self.generator(
                     noisy_image_or_video=noisy,
@@ -808,15 +849,11 @@ class Backend:
                         nxt * torch.ones([f], device=self.device, dtype=torch.long),
                     ).unflatten(0, denoised.shape[:2])
 
-            # Write the clean frame into the frame KV cache (official step 3.3).
-            self.generator(
-                noisy_image_or_video=denoised,
-                conditional_dict=cond_dict,
-                timestep=torch.ones([1, f], device=self.device, dtype=torch.int64) * self.context_noise,
-                kv_cache=self.kv_cache,
-                crossattn_cache=self.crossattn_cache,
-                current_start=current_start,
-            )
+            # Write the clean frame into the frame KV cache (official step 3.3), now or deferred.
+            if self.defer_context:
+                self._pending_context = (denoised, cond, current_start)
+            else:
+                self._context_pass(denoised, cond, current_start)
             if f == 1:
                 self._history.append(denoised)  # a reference, for a later rebase
             if self.chunk_index == self._clean_capture_chunk:
@@ -833,6 +870,31 @@ class Backend:
             self.chunk_index += 1
             self.state = GenState.STREAMING
             return out
+
+    def interrupt(self) -> None:
+        """Any thread: stop the generate_chunk in flight at its next pass boundary with ChunkInterrupted.
+        Only for a chunk that is not itself a rebase, and only worth it when the next chunk is a keep-0 cut
+        (a steer re-anchor), which does not need anything the stopped chunk would have written. A call
+        that comes too late for the chunk in flight is dropped when the next chunk starts."""
+        self._interrupt.set()
+
+    def _check_interrupt(self, can_stop: bool) -> None:
+        if can_stop and self._interrupt.is_set():
+            self._interrupt.clear()
+            self.interrupted_chunks += 1
+            raise ChunkInterrupted("chunk stopped for a steer cut")
+
+    def _context_pass(self, denoised: torch.Tensor, cond: torch.Tensor, current_start: int) -> None:
+        """Write a clean frame into the frame KV cache under `cond` (caller holds the lock and the stream)."""
+        f = denoised.shape[1]
+        self.generator(
+            noisy_image_or_video=denoised,
+            conditional_dict={"prompt_embeds": cond},
+            timestep=torch.ones([1, f], device=self.device, dtype=torch.int64) * self.context_noise,
+            kv_cache=self.kv_cache,
+            crossattn_cache=self.crossattn_cache,
+            current_start=current_start,
+        )
 
     def decode_chunk(self, latents: ChunkLatents) -> np.ndarray:
         return self.decoder.decode(latents)
@@ -870,7 +932,7 @@ def load(width: int, height: int, steps: Optional[int] = None, device: str = "cu
              "steer_rebase": flag, "steer_keep": int, "steer_memory_noise": int, "steer_anchor_step": int,
              "steer_min_gap": int, "steer_fire_on_change": flag, "refresh_every": int, "refresh_keep": int,
              "refresh_memory_noise": int, "clean_anchor_after": int, "cut_fade_frames": int,
-             "cut_fade_refresh": flag, "refresh_noise": str,
+             "cut_fade_refresh": flag, "refresh_noise": str, "defer_context": flag,
              "refresh_anchor_t": lambda v: None if str(v).lower() == "none" else int(v)}
     options = {k: types[k](v) if k in types else v for k, v in options.items()}
     steps = int(steps) if steps is not None and int(steps) > 0 else None  # 0 or None: distilled schedule

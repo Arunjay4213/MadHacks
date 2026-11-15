@@ -89,6 +89,8 @@ class EngineConfig:
     recovery_limit: int = 3         # this many crashes within recovery_window_s -> FAILED
     recovery_window_s: float = 60.0
     short_chunk: str = "crossfade"  # "fill", "hold" or "crossfade": see ShortChunkMode
+    flush_on_cut: bool = False      # PROPOSAL: a steer cut's frames replace the old frames still waiting to be sent
+    interrupt_on_steer: bool = False  # PROPOSAL: a steer that re-anchors next stops the chunk in flight
 
 
 class ShortChunkMode(enum.Enum):
@@ -432,6 +434,9 @@ class Engine:
         self.short_chunks = 0                       # short chunks found inside a video (padded unless FILL)
         self.last_short_chunk: dict | None = None   # {"chunk", "frames" decoded, "pad_ms"} of the latest one
         self.client_counts: Callable[[], dict] = lambda: {}
+        # LATENCY PROBE (temporary): per-chunk monotonic_ns stamps and the chunk being generated now
+        self._lat_chunks: dict[int, dict] = {}
+        self._gen_busy: tuple[int, int] | None = None
 
     # --- lifecycle -------------------------------------------------------------------------
 
@@ -662,17 +667,38 @@ class Engine:
                 self._do_reset()
                 last_cond = None
             t_wait = time.perf_counter()
+            w0 = time.monotonic_ns()
             self._gate.wait(self._lead_limit, self._stop, self._crashed)
             idle_ms = (time.perf_counter() - t_wait) * 1e3
             if self._stop.is_set() or self._crashed.is_set():
                 break
             cond, progress, anchor = self.book.take_cond(self._take_cond, chunk)
+            lat = self._lat_chunks.setdefault(chunk, {})
+            lat.update(wait0=w0, cond=time.monotonic_ns(), ahead=self._gate.ahead, limit=self._lead_limit(),
+                       dq=self._decode_queue.qsize(), pq=self._playout_queue.qsize(),
+                       anchor=None if anchor is None else f"{anchor.reason}:{anchor.strength}")
+            self._lat_chunks.pop(chunk - 300, None)
+            self._gen_busy = (chunk, lat["cond"])
             if cond is not last_cond:
                 log.debug("chunk %d: conditioning changed (progress %.2f)", chunk, progress)
             last_cond = cond
+            self._gen_anchor = anchor
             t0 = time.perf_counter()
-            latents = self._generate(cond, anchor)
+            try:
+                latents = self._generate(cond, anchor)
+            except Exception as exc:
+                if not getattr(exc, "chunk_interrupted", False):
+                    raise
+                self._gen_busy = None
+                last_cond = None
+                log.info("chunk %d: stopped after %.0f ms for a steer cut; the cut takes its number",
+                         chunk, (time.perf_counter() - t0) * 1e3)
+                continue  # the same chunk number again, now with the steer's cond and anchor
+            if hasattr(backend, "sync_generation"):
+                backend.sync_generation()  # LATENCY PROBE: real end of the GPU work
             gen_ms = (time.perf_counter() - t0) * 1e3
+            lat["gen_end"] = time.monotonic_ns()
+            self._gen_busy = None
             self.book.chunk_generated(chunk)
             if self.prefetch.chunk_done(idle_ms, self.book.in_flight, self.encoder.work_ms):
                 self.encoder.wake()
@@ -692,6 +718,7 @@ class Engine:
             if not self._put(self._decode_queue, (latents, meta), f"decode is behind, generation blocked at chunk {chunk}",
                              self._crashed):
                 break
+            lat["put"] = time.monotonic_ns()
             chunk += 1
 
     def _put(self, q: queue.Queue, item, blocked_msg: str, abort: threading.Event | None = None) -> bool:
@@ -796,9 +823,12 @@ class Engine:
                 try:
                     if self._crashed.is_set():
                         continue  # the video is broken; recovery drops it
+                    lat = self._lat_chunks.setdefault(meta.chunk, {})
+                    lat["dec0"] = time.monotonic_ns()
                     t0 = time.perf_counter()
                     frames = np.asarray(backend.decode_chunk(latents))
                     t1 = time.perf_counter()
+                    lat["dec1"] = time.monotonic_ns()
                     decoded = len(frames)
                     shape = chunk_shape(decoded, backend.frames_per_chunk,
                                         last_frame is None or last_video != meta.video)
@@ -809,11 +839,25 @@ class Engine:
                     t2 = time.perf_counter()
                     jpegs = [encode_jpeg(f, quality) for f in frames]
                     t3 = time.perf_counter()
+                    lat["jpg"] = time.monotonic_ns()
+                    lat["pq_at_put"] = self._playout_queue.qsize()
+                    lat["nframes"] = len(jpegs)
                     meta.decode_ms, meta.jpeg_ms, meta.frames = (t1 - t0) * 1e3, (t3 - t2) * 1e3, len(jpegs)
                     anchor = f", re-anchor {meta.anchor.reason} {meta.anchor.strength:.2f}" if meta.anchor else ""
                     log.info("chunk %d: gen %.0f ms, decode %.0f ms, jpeg %.0f ms, %d frames, decode queue %d%s",
                              meta.chunk, meta.gen_ms, meta.decode_ms, meta.jpeg_ms, meta.frames,
                              self._decode_queue.qsize(), anchor)
+                    if self.config.flush_on_cut and meta.anchor is not None and meta.anchor.reason == "steer":
+                        dropped = 0
+                        while True:
+                            try:
+                                self._playout_queue.get_nowait()
+                                dropped += 1
+                            except queue.Empty:
+                                break
+                        if dropped:
+                            self._gate.sent(dropped)
+                            log.info("chunk %d: steer cut, %d old frames dropped from the playout queue", meta.chunk, dropped)
                     if not jpegs:
                         log.warning("chunk %d decoded to 0 frames", meta.chunk)
                         self._gate.add(-meta.est_frames)
@@ -888,6 +932,7 @@ class Engine:
             log.info("recovery: video resumed %.0f ms after the crash (chunk %d, video %d)", ms, meta.chunk, meta.video)
         self._gate.add(meta.frames - meta.est_frames)  # correct the estimate made at generation time
         self.book.chunk_shown(meta.chunk)
+        self._lat_shown(meta.chunk)
         with self._stats_lock:
             self.chunk_shown = meta.chunk
             self.decode_ms.add(meta.decode_ms)
@@ -899,6 +944,22 @@ class Engine:
                      "lead limit %d frames, stalls %d, decode blocked %d, clients %s",
                      meta.chunk, s["gen_ms"]["avg"], s["decode_ms"]["avg"], s["jpeg_ms"]["avg"], s["fps"],
                      self._lead_limit(), s["stalls"], s["decode_blocked"], s["clients"])
+
+    def _lat_shown(self, chunk: int) -> None:
+        """LATENCY PROBE: one 'LAT {json}' line per command whose applies_from_chunk was just shown."""
+        import json as _json
+        c = self._lat_chunks.get(chunk, {})
+        c["sent0"] = time.monotonic_ns()
+        prev = self._lat_chunks.get(chunk - 1, {})
+        for rec in list(self.book._records):
+            lat = getattr(rec, "lat", None)
+            if lat is None or lat.get("logged") or rec.applies_from_chunk != chunk:
+                continue
+            lat["logged"] = True
+            out = {"seq": rec.seq, "text": rec.text, "t_client": rec.t_client, "heard": rec.stamps_ns["heard"],
+                   "chunk": chunk, "lat": {k: v for k, v in lat.items() if k != "logged"},
+                   "c": dict(c), "prev": {k: prev.get(k) for k in ("cond", "gen_end", "put")}}
+            log.info("LAT %s", _json.dumps(out))
 
     def state_message(self, chunk: int, progress: float) -> dict:
         """One contract 4 message: the reader's state fields plus what the engine measures."""
@@ -934,8 +995,10 @@ class Engine:
     def _read(self, msg: dict, rec: CommandRecord, reply: Callable[[dict], None]) -> threading.Event | None:
         """Reader worker thread: reader.handle, then steer, or reset for a reset tap."""
         is_reset = msg["type"] == "tap" and msg.get("action") == "reset"
+        rec.lat = {"read0": time.monotonic_ns()}  # LATENCY PROBE
         try:
             result = self.reader.handle(msg)
+            rec.lat["read1"] = time.monotonic_ns()
             steer = result.get("steer")
             if steer is not None:
                 check_target(steer)
@@ -989,7 +1052,12 @@ class Engine:
 
     def _embed(self, rec: CommandRecord, target: dict) -> None:
         """Encode every prompt the target names, then apply it on the steer worker thread."""
+        if not hasattr(rec, "lat"):
+            rec.lat = {}
+        rec.lat["enc0"] = time.monotonic_ns()
         futures = [self.encoder.request(p) for p in (target["prompt"], target.get("without_prompt")) if p]
+        rec.lat["enc_hit"] = all(f.done() for f in futures)
+        rec.lat["prompt"] = target["prompt"][:80]
         remaining = [len(futures)]
         lock = threading.Lock()
 
@@ -998,6 +1066,7 @@ class Engine:
                 remaining[0] -= 1
                 last = remaining[0] == 0
             if last:
+                rec.lat["enc1"] = time.monotonic_ns()
                 self._steer_pool.submit(self._on_embedding, rec, target, futures)
 
         for fut in futures:
@@ -1013,8 +1082,20 @@ class Engine:
                 self.book.drop(rec, f"encoding failed: {exc!r}")
                 return
         self._wait_for_reset(rec)
+        rec.lat["steer0"] = time.monotonic_ns()
         try:
             result = self.book.embedded(rec, lambda: self._apply_target(target))
+            busy = self._gen_busy
+            if (self.config.interrupt_on_steer and result is not None and result.get("applied") and busy is not None
+                    and getattr(self, "_gen_anchor", None) is None and self.policy is not None
+                    and self.policy.fires_next_chunk() and callable(getattr(self.backend, "interrupt", None))):
+                self.backend.interrupt()
+                rec.lat["interrupt"] = True
+            rec.lat.update(emb=time.monotonic_ns(), busy=None if busy is None else list(busy), ahead=self._gate.ahead,
+                           dq=self._decode_queue.qsize(), pq=self._playout_queue.qsize(),
+                           gen=self.chunk_generated, shown=self.chunk_shown,
+                           policy_since=None if self.policy is None else self.policy.chunks_since_anchor,
+                           result=None if result is None else {k: result.get(k) for k in ("applied", "kind", "reason")})
         except ValueError as exc:
             self.book.drop(rec, f"controller refused: {exc}")
             return

@@ -323,6 +323,8 @@ def parse_args(argv=None) -> argparse.Namespace:
                    help="folder for the mp4 of every video (one file per reset); none turns the recorder off")
     p.add_argument("--record-max-gb", type=float, default=20.0,
                    help="delete the oldest recordings when the folder holds more than this")
+    p.add_argument("--flush-on-cut", action="store_true", help="PROPOSAL: drop old queued frames at a steer cut")
+    p.add_argument("--interrupt-on-steer", action="store_true", help="PROPOSAL: stop the chunk in flight for a steer cut")
     p.add_argument("--log-level", default="info")
     return p.parse_args(argv)
 
@@ -358,7 +360,8 @@ def main(argv=None) -> None:
                           short_chunk=args.short_chunk,
                           demo_prompts=None if args.demo_prompts.lower() == "none" else args.demo_prompts,
                           record_dir=None if args.record_dir.lower() == "none" else args.record_dir,
-                          record_max_bytes=int(args.record_max_gb * 1e9))
+                          record_max_bytes=int(args.record_max_gb * 1e9),
+                          flush_on_cut=args.flush_on_cut, interrupt_on_steer=args.interrupt_on_steer)
     app = build_app(config, studio_dir=Path(args.studio_dir))
     app.state.engine.on_fatal = _exit_for_supervisor
     uvicorn.run(app, host=args.host, port=args.port, log_level=args.log_level, timeout_graceful_shutdown=2)
