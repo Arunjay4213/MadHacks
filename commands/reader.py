@@ -431,7 +431,8 @@ def style_fallback(text: str, snapshot: dict | None = None):
     t = _norm(text)
     if is_blocked(t) or KEYWORD_RX.search(t):
         return None
-    m = _STYLE_RX.match(t)
+    # Pace words set the ramp (the service reads them with _pace), never the look or the strength.
+    m = _STYLE_RX.match(" ".join(_SUDDEN_RX.sub(" ", _SLOW_RX.sub(" ", t)).split()))
     if not m:
         return None
     like, spoken = m.group("like"), _FILLER_TAIL_RX.sub("", m.group("what")).strip()

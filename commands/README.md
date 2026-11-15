@@ -115,6 +115,7 @@ A sentence is limited to 16 operations, and nested batches are rejected.
 - The vector matcher and the style fallback ("make it spooky") read strength words with the same `reader.strength_for` as the dictionary.
   "make it a little nocturnal" adds night at 0.3, and "make it much more nocturnal" with night present raises it.
   The style fallback never keeps a strength word in the chip: "make it a little spooky" adds spooky at 0.3, and "make it less spooky" with spooky present lowers it.
+- Pace words ("slowly", "gradually", "gently", "little by little", "suddenly") set only the ramp, never the strength: "slowly make it winter" gives winter at 1.0 over 12 chunks, on every path, including the style fallback ("slowly make it spooky").
 
 ## Local vector embeddings
 

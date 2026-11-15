@@ -5,7 +5,9 @@ from unittest.mock import patch
 from commands.semantic import configured_reader
 
 from commands.semantic import SemanticReader, SimilarityIndex
+from commands.reader import RAMP
 from commands.service import CommandService
+from commands.world import CAR_BASE
 
 
 def encode(texts):
@@ -125,6 +127,22 @@ class StrengthWordsTests(unittest.TestCase):
         self.assertEqual(self.run_sentences("make it spooky", "make it more spooky"), [("spooky", 1.3)])
         self.assertEqual(self.run_sentences("make it spooky", "make it less spooky"), [("spooky", 0.7)])
         self.assertEqual(self.run_sentences("make it spooky", "make it a little less spooky"), [("spooky", 0.7)])
+
+    def test_pace_words_set_the_ramp_and_never_the_strength(self):
+        # Gate 4: "slowly make it winter" must reach full winter, only more slowly (12 chunks instead of 1).
+        for base in (None, CAR_BASE):
+            for text, label in [("slowly make it winter", "winter"), ("gradually make it winter", "winter"),
+                                ("gently make it winter", "winter"), ("little by little make it winter", "winter"),
+                                ("make it winter slowly", "winter"), ("slowly make it nocturnal", "night"),
+                                ("slowly make it spooky", "spooky"), ("make it spooky slowly", "spooky")]:
+                with self.subTest(base=base, text=text):
+                    service = CommandService(base, slow_reader=lambda *a: None,
+                                             semantic_reader=SemanticReader(nocturnal_encode))
+                    result = service.handle(dict(type="final", text=text, t_client=1))
+                    self.assertEqual([(c["label"], c["strength"]) for c in result["state"]["changes"]], [(label, 1.0)])
+                    self.assertEqual(result["steer"]["ramp_chunks"], RAMP["slow"])
+                    self.assertEqual(RAMP["slow"], 12)
+                    self.assertNotIn("moderate amount", result["steer"]["prompt"])
 
     def test_style_strength_change_is_one_undo(self):
         service = CommandService(slow_reader=lambda *a: None, semantic_reader=SemanticReader(nocturnal_encode))
