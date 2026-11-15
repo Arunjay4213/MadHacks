@@ -481,6 +481,11 @@ def test_a_chip_whose_words_left_the_prompt_is_dropped():
     attempt = check_reply(json.loads(reply(kept, ["winter", "rain", "zoom out", "jensen huang"])),
                           {**user, "person_chip": "jensen huang"})
     assert attempt.entry.operations[0]["chips"] == ["winter", "rain", "zoom out", "jensen huang"]
+    # Greptile on #286: a longer label keeps the aliases of the thing inside it ("light fog" shown as "a thin mist").
+    attempt = check_reply(json.loads(reply("A meadow under a thin mist at night.", ["light fog", "night"])),
+                          {"prompt": "a meadow; a light fog drifts low; night", "chips": ["light fog", "night"],
+                           "sentence": "make it night"})
+    assert attempt.entry.operations[0]["chips"] == ["light fog", "night"]
 
 
 def test_the_final_reader_waits_3_5_s_by_default():

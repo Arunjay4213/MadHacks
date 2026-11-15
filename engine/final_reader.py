@@ -499,18 +499,22 @@ def reply_chips(chips, person_chip: str | None = None) -> list[str]:
     return out[:16]
 
 
-# Words of a chip label that say nothing about what is drawn ("second dog", "the city"): never the evidence for a chip.
-_CHIP_FILLER = frozenset("a an the of in on at to and with some more less second third another".split())
+# Words of a chip label that say nothing about what is drawn ("second dog", "the city", "light fog"): never the evidence
+# for a chip.
+_CHIP_FILLER = frozenset("""a an the of in on at to and with some more less second third another light heavy thick thin
+    little bit lot very""".split())
 
 
 def _chip_terms(label: str) -> set[str]:
-    """The words that show `label`'s thing is in a prompt: its own content words, and for a keyword table label
-    ("winter") every alias ("snow", "snowy", "frost", ...)."""
+    """The words that show `label`'s thing is in a prompt: its own content words, and for every keyword table entry
+    named inside it ("winter", the "fog" of "light fog") all that entry's aliases ("snow", "frost", ...; "mist",
+    "haze", ...)."""
     from commands.dictionary import KEYWORDS, normalize
-    terms = {w for w in normalize(label).split() if w not in _CHIP_FILLER}
-    entry = KEYWORDS.get(normalize(label))
-    if entry is not None:
-        terms |= {k for k, e in KEYWORDS.items() if e["label"] == entry["label"]}
+    words = normalize(label).split()
+    terms = {w for w in words if w not in _CHIP_FILLER}
+    labels = {KEYWORDS[" ".join(words[i:j])]["label"] for i in range(len(words)) for j in range(i + 1, len(words) + 1)
+              if " ".join(words[i:j]) in KEYWORDS and " ".join(words[i:j]) not in _CHIP_FILLER}
+    terms |= {k for k, e in KEYWORDS.items() if e["label"] in labels}
     return terms
 
 
