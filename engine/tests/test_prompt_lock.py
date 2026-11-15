@@ -1,15 +1,16 @@
 """Behaviour lock for the sentence-to-prompt path: commands/ and engine/reader.py, final_reader.py, car_template.py.
 
 Each chain sends contract 1 messages, in order, through the reader the engine builds, and records what comes back
-for every message: the steer (contract 2), the state fields (contract 4), the committed prompt, and at the end of
-the chain the likely prompts. The Sonnet chains also record every payload sent to the model, and the system prompt
-(which is part of the disk cache fingerprint). The recording is engine/tests/fixtures/prompt_lock.json.
+for every message: the steer (contract 2), the state fields (contract 4), the committed prompt and a hash of the
+likely prompts, and at the end of the chain the likely prompts in full. The Sonnet chains also record every payload
+sent to the model, and the system prompt (which is part of the disk cache fingerprint). The recording is engine/tests/fixtures/prompt_lock.json.
 
 A refactor must leave the recording unchanged. Regenerate it only for an intended behaviour change:
 
     python -m engine.tests.test_prompt_lock --write
 """
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -111,8 +112,10 @@ def _run(svc, steps, chat=None):
     out = []
     for step in steps:
         result = svc.handle(_message(step))
+        # A hash per step, so the prompts the engine encodes ahead (rich ones included) are checked on every scene.
+        likely = hashlib.sha256(json.dumps(sorted(svc.likely_prompts())).encode()).hexdigest()[:16]
         record = {"say": step, "steer": result["steer"], "state": result["state"],
-                  "committed": svc.committed_prompt}
+                  "committed": svc.committed_prompt, "likely_prompts_sha": likely}
         if chat is not None:
             record["model_calls"] = chat.calls[:]
             chat.calls.clear()
