@@ -19,14 +19,14 @@ The light check (check_reply): blocked; understood false or an empty prompt is n
 MAX_PROMPT_WORDS words and commands.state.MAX_FREE_PROMPT_CHARS characters; on a car scene (the prompt on screen is
 the car template) that is not a new scene, the new prompt is still the car template with a drivable road
 (car_template.template_problems). A reply that fails is asked again once, with the reasons, when the first call took
-under half the wait; otherwise the dictionary reads the sentence (the fallback).
+under RETRY_SHARE (3/7) of the wait; otherwise the dictionary reads the sentence (the fallback).
 
 Content block: a small word list (BLOCKED_WORDS) is checked first, with no call at all; the model also flags
 sexual, violent or hateful requests with "blocked": true in the same reply.
 
 Determinism: the cache is keyed by (composed prompt of the scene before, sentence_key(sentence)); for a free scene the
 composed prompt is its own prompt. A result is chosen once: a Sonnet result, a block or a "not understood" is saved to
-a JSON file (written atomically) and never regenerated, also across restarts. A timeout (final_timeout_s, 3.0 s by
+a JSON file (written atomically) and never regenerated, also across restarts. A timeout (final_timeout_s, 3.5 s by
 default), a failed call or a reply that fails the check gives the fallback, final for that key for the life of the
 process on a composed scene (a late answer is dropped, late_dropped), and not saved to disk, so a passing outage does
 not disable a sentence for good. On a free scene a fallback is not kept: the dictionary cannot edit that scene, so
@@ -61,11 +61,17 @@ log = logging.getLogger("engine.final_reader")
 # Thinking off at effort low. Adaptive thinking at effort medium graded a little better on a short test prompt, but on
 # the real system prompt the regression sweep (2026-11-15, 209 chains) measured p50 2.16 s against 1.65 s, 14 timeouts
 # against 5 at the 3 s wait, and replies that began with reasoning prose instead of JSON.
-DEFAULT_TIMEOUT_S = 3.0
+# The wait is 3.5 s: on a long chain (about 300 tokens of prompt) the sweep measured a median call of 1.98 s, and 2 of 3
+# runs of "make it slow" timed out at 3.0 s (#285). The lead rejected 5.5 s as too slow on screen.
+DEFAULT_TIMEOUT_S = 3.5
 DEFAULT_EFFORT = "low"              # output_config.effort
 DEFAULT_THINKING = "between_tools"  # thinking.type: between_tools is thinking off
 DEFAULT_MAX_TOKENS = 1024
 HTTP_TIMEOUT_S = 10.0        # a call may finish after the wait; its answer is then dropped
+# A retry starts only when the first call took at most this share of the wait, so a second call as long as the first
+# still fits with room to spare: 1.5 s of the live 3.5 s, as it was with half of 3.0 s. With half of 3.5 s (1.75 s),
+# retries after 1.6 s first calls ran past the wait (#285).
+RETRY_SHARE = 3 / 7
 WORKERS = 4
 DEFAULT_CACHE_FILE = "~/.cache/madhacks/final_reader.json"
 DEFAULT_DEMO_PROMPTS = str(Path(__file__).resolve().parent / "demo_prompts.json")
@@ -202,12 +208,13 @@ Rules:
 - Return the complete new prompt, never a diff. Keep everything the sentence does not change word for word (the
   subject, the objects, their positions, the camera, the light), so the picture does not jump. Change only what the
   sentence asks, and make that change clearly visible.
-- Stay within about {asked_words} words also when the scene has grown: describe the older things more briefly (keep each
-  of them, in fewer words) instead of growing the prompt. The thing the sentence adds or changes is always written in
-  full.
+- The prompt is at most {asked_words} words, also when the scene has grown: describe the older things more briefly
+  (keep each of them, in fewer words) instead of growing the prompt. The thing the sentence adds or changes is always
+  written in full. When the prompt on screen is already longer than {asked_words} words, the new prompt is shorter
+  than it: compress the oldest details first (a long reply is slow, and a late reply is lost).
 - Camera: keep the camera wording as it is unless the user asks for another camera, framing or view (zoom in or out,
-  a wider or closer shot, side view, aerial or drone view, front view, low angle, pan); then rewrite the camera
-  wording to match ("zoom out": a wide establishing shot from further away, the subject smaller in the frame).
+  a wider or closer shot, side view, aerial or drone view, front view, low angle, pan), or a vehicle starts driving
+  (the camera then follows it, below); then rewrite the camera wording to match ("zoom out": a wide establishing shot from further away, the subject smaller in the frame).
 - No sounds, no story or time order ("now", "again", "still", "no longer").
 - A video model cannot draw "no": it draws every noun it reads. A request to remove or not have something becomes a
   positive description of what is there instead, with the thing's word left out: "no clouds" -> "a clear, cloudless
@@ -221,6 +228,11 @@ Rules:
   infer what happens to them, so for every object say where it is, what it stands or drives on, and which way it
   faces, in words that fit the new place. A thing that cannot stay where it was gets a plausible spot: an animal
   stands on the ground beside the road.
+- A new place or setting named in any words ("city background", "in the city", "middle of the city", "at the
+  beach") replaces the old place in the same way; "keep everything word for word" does not keep the old place. The
+  landscape of the old place (the meadow, the oak tree, the grass) goes unless the user mentions it. The subject the
+  user is talking about (the car) becomes the main subject, placed in the new place with a direction and camera that
+  suit it: a car in a city drives along a street, with the camera behind it unless the user asks otherwise.
 - A sentence that describes a whole new scene, a place together with its own main subject or action ("I now want a
   city at night with a car driving on the road", "show me a harbour with fishing boats", "a mountain village with
   people skating on a frozen lake"), starts a new scene: "new_scene" is true, the prompt describes only what the
@@ -232,9 +244,14 @@ Rules:
   "add snow near the river" adds snow and no river.
 - Ground, plants and climate ("arid", "no grass", "dry", "lush", "cut the grass", "kill the tree's leaves") change the
   ground, the plants and the place in the prompt. Nothing stops a later change of place: the prompt is free text.
-- Objects get explicit size and position words. The first object is large and in the centre ("a red car parked beside
-  the oak tree in the centre of the frame, facing the camera, large and clearly visible"); a later one takes a free
-  place ("a large male lion standing in the foreground at the left of the frame, facing the camera").
+- Objects get explicit size and position words. The first object is large and in the centre ("a large brown horse
+  standing beside the oak tree in the centre of the frame, facing the camera, large and clearly visible"); a later one
+  takes a free place ("a large male lion standing in the foreground at the left of the frame, facing the camera").
+- A car or other vehicle the user adds or names drives by default, on a road; it is parked only when the user says
+  parked or stopped. When a vehicle drives, the road runs through the whole frame along its direction of travel, and
+  the camera follows the vehicle in a smooth tracking shot at its speed and keeps it centred (the car template's
+  camera), unless the user asks for a static or other camera. A driving vehicle is never "facing the camera" unless
+  the user asks to see its front.
 - Counts agree everywhere in the prompt. "add another tree" rewrites the scene with the new number ("a wide shot of
   a meadow with two oak trees, one in the centre and a second, taller one in the foreground at the left"), never
   "a single oak tree" next to "a second tree": the model then draws one.
@@ -251,7 +268,11 @@ Rules:
   rear wheels both in view, its nose pointing to the left edge of the frame".
 - Seasons, weather and time of day are written visibly ("thick white snow covering the whole ground", "a dark night
   sky with a full moon"). "sunny" replaces night. More or less of something ("a little more snow") rewrites it with
-  visibly more or less of it.
+  visibly more or less of it. Amount words set how much: "some fog" is a light, thin fog, "a little" is faint, "a
+  lot" or "heavy" is thick; never write "thick" for "some".
+- A new weather keeps the current season unless the user asks to remove it: "make it rain" on a snowy night keeps
+  the snow on the ground and the night, with rain falling over it. Only what falls from the sky is replaced: snow
+  falling replaces rain falling.
 - A named person: when the sentence holds their visual description (the engine puts it there for people it
   knows), write that description; for any other real person describe their usual look (hair, glasses, clothes),
   never the name. "person_chip" is their chip.
@@ -261,8 +282,9 @@ Rules:
 
 The chips: one short label (1 to 3 words, lower case, at most {max_label} characters) for each thing the user added
 or changed that is still in the picture (objects, place, season, weather, time, camera), in the order they were
-added. Keep the current chips that still apply, with the same labels; drop a chip when its thing is gone. A new scene
-starts with the chips of what the user named.
+added. Keep the current chips that still apply, with the same labels; drop a chip when its thing is gone. The chips
+match the prompt: a chip whose words are no longer in the new prompt is dropped. A new scene starts with the chips of
+what the user named.
 
 "understood" is false, with an empty prompt, only when the sentence is not about the picture at all, asks for nothing
 to change ("don't add a lion", "never mind", "leave it"), or asks to undo or reset: then nothing changes on screen. A short or loose sentence about the picture ("zoom out", "more trees",
@@ -477,6 +499,38 @@ def reply_chips(chips, person_chip: str | None = None) -> list[str]:
     return out[:16]
 
 
+# Words of a chip label that say nothing about what is drawn ("second dog", "the city"): never the evidence for a chip.
+_CHIP_FILLER = frozenset("a an the of in on at to and with some more less second third another".split())
+
+
+def _chip_terms(label: str) -> set[str]:
+    """The words that show `label`'s thing is in a prompt: its own content words, and for a keyword table label
+    ("winter") every alias ("snow", "snowy", "frost", ...)."""
+    from commands.dictionary import KEYWORDS, normalize
+    terms = {w for w in normalize(label).split() if w not in _CHIP_FILLER}
+    entry = KEYWORDS.get(normalize(label))
+    if entry is not None:
+        terms |= {k for k, e in KEYWORDS.items() if e["label"] == entry["label"]}
+    return terms
+
+
+def _says(prompt: str, term: str) -> bool:
+    return re.search(rf"(?<![a-z]){re.escape(term)}(?:s|es)?(?![a-z])", prompt.lower()) is not None
+
+
+def chips_in_prompt(chips: list[str], before: str, after: str, keep: str | None = None) -> tuple[list[str], list[str]]:
+    """(the chips to show, the chips dropped). A chip is dropped when its words left the prompt: some term of it is
+    in the prompt on screen `before` and none is in the new prompt `after` ("winter" after a rain reply that took all
+    the snow out). A chip with no words in either prompt ("zoom out", "slow motion") cannot be judged and stays, and
+    so does `keep` (the named person's chip, whose name is never in the prompt)."""
+    shown, dropped = [], []
+    for chip in chips:
+        terms = _chip_terms(chip)
+        left = chip != keep and terms and any(_says(before, t) for t in terms) and not any(_says(after, t) for t in terms)
+        (dropped if left else shown).append(chip)
+    return shown, dropped
+
+
 def _fits(text: str) -> bool:
     return len(text.split()) <= MAX_PROMPT_WORDS and len(text) <= MAX_FREE_PROMPT_CHARS
 
@@ -502,6 +556,11 @@ def fit_prompt(prompt: str) -> tuple[str, tuple[str, ...]]:
                   f"cut {len(cut)} sentences from the end",)
 
 
+def retry_fits(elapsed_s: float, timeout_s: float) -> bool:
+    """True when the first call (`elapsed_s`) took at most RETRY_SHARE of the wait: a retry then fits."""
+    return elapsed_s <= timeout_s * RETRY_SHARE + 1e-9
+
+
 def check_reply(reply, user: dict) -> Attempt:
     """The light check of one parsed reply for the user message `user` (the dictionary it was sent). It repairs what
     it can instead of refusing a reasonable sentence: only a reply that is not an object falls back."""
@@ -519,7 +578,11 @@ def check_reply(reply, user: dict) -> Attempt:
         return Attempt(Verdict.UNCHANGED, Entry(Outcome.FALLBACK), (why,))
     if user.get("car_scene") and reply.get("new_scene") is not True:
         problems += tuple(car_template.template_problems(prompt, view_change=bool(user.get("view_change"))))
-    op = {"op": "free_scene", "prompt": prompt, "chips": reply_chips(reply.get("chips"), user.get("person_chip"))}
+    chips, dropped = chips_in_prompt(reply_chips(reply.get("chips"), user.get("person_chip")),
+                                     str(user.get("prompt") or ""), prompt, user.get("person_chip"))
+    if dropped:
+        log.info("final reader: chips %s dropped: their words left the prompt", dropped)
+    op = {"op": "free_scene", "prompt": prompt, "chips": chips}
     return Attempt(Verdict.REPAIRED if problems else Verdict.ACCEPTED, Entry(Outcome.SONNET, (op,), prompt), problems)
 
 
@@ -860,8 +923,8 @@ class FinalReader:
 
     def _call(self, text: str, snapshot: dict, current: str, pending: Pending | None = None) -> Entry:
         """Worker thread: one Sonnet call, checked, and one retry with the reasons when the reply fails the light
-        check and the first call took less than half the wait (so on the live 3 s wait at about 2 s a call, the
-        retry happens only in offline runs). Never raises."""
+        check and a second call as long as the first still fits in the wait (retry_fits: on the live 3.5 s wait, a
+        first call under 1.5 s). Never raises."""
         t0 = time.perf_counter()
         first = self._attempt(text, snapshot, current, None)
         best = first
@@ -869,7 +932,7 @@ class FinalReader:
             pending.usable = first.entry  # a retry that runs past the wait must not lose this edit
         if first.verdict in RETRY_VERDICTS:
             elapsed = time.perf_counter() - t0
-            if elapsed < self.timeout_s / 2:
+            if retry_fits(elapsed, self.timeout_s):
                 with self._lock:
                     self.retries += 1
                 log.warning("final reader: asking again for %r: %s", _short(text), "; ".join(first.reasons)[:400])

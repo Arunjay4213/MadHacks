@@ -88,6 +88,7 @@ Add an object to `cases`:
 - `understood` (default true): false means the user should see the words as not understood and nothing should change.
 - `chips` must be on screen, `no_chips` must not; "car" matches the chip "red car", and "horse" matches "horses".
 - `has` and `lacks`: words that must or must not be in the prompt the video model gets (case does not matter).
+- `has_any`: at least one of these words must be in the prompt (`["street", "road"]`).
 - `slow`: true when a pace word must make the change gradual.
 - `strength`: `{"winter": "up"}` or `"down"` against the step before, or `"low"`, `"full"`, `"high"` against 1.
 - `visible`: yes/no questions about the frame, for Layer B; a plain string expects yes.

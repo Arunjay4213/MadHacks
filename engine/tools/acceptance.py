@@ -35,8 +35,8 @@ CAR_SENTENCE = "new scene of a red sports car driving along a country road"
 # A start scene is the sentences said after a reset tap. The meadow is the engine's starting scene.
 STARTS = {"meadow": [], "car": [CAR_SENTENCE]}
 
-STEP_KEYS = {"say", "tap", "chip", "understood", "chips", "no_chips", "has", "lacks", "slow", "strength", "visible",
-             "look_after_s", "note", "known_failure"}
+STEP_KEYS = {"say", "tap", "chip", "understood", "chips", "no_chips", "has", "has_any", "lacks", "slow",
+             "strength", "visible", "look_after_s", "note", "known_failure"}
 CASE_KEYS = {"name", "start", "modes", "xfail", "note", "steps", "live"}
 TAPS = ("undo", "reset", "remove")
 # "up" and "down" compare a chip's strength with the step before; "low" (< 1), "full" (>= 1) and "high" (> 1)
@@ -94,7 +94,7 @@ def check_case(case: dict) -> None:
             raise CaseError(f"{w}: 'tap' must be one of {TAPS}")
         if step.get("tap") == "remove" and not step.get("chip"):
             raise CaseError(f"{w}: a remove tap names the 'chip' whose x is tapped")
-        for key in ("chips", "no_chips", "has", "lacks"):
+        for key in ("chips", "no_chips", "has", "has_any", "lacks"):
             if not isinstance(step.get(key, []), list):
                 raise CaseError(f"{w}: '{key}' must be a list")
         for label, way in step.get("strength", {}).items():
@@ -130,8 +130,8 @@ class MissingReply(RuntimeError):
 
 
 class RetryRefused(RuntimeError):
-    """The second attempt for a sentence. Live, a call takes about 1.8 s of the 3 s wait, so the reader never asks
-    again (it does only when the first call took under half the wait); refusing it here keeps the replay the same."""
+    """The second attempt for a sentence. Live, a call takes about 1.8 s of the 3.5 s wait, so the reader never asks
+    again (it does only when the first call took under 1.5 s); refusing it here keeps the replay the same."""
 
 
 def chip_key(user: dict) -> str:
@@ -185,7 +185,7 @@ def load_replies(path: Path = REPLIES_FILE) -> dict[tuple[str, str, str], str]:
 
 def build_service(mode: Mode, chat=None, timeout_s: float | None = None):
     """The live reader stack for `mode`; `chat` replaces the Sonnet client (a ReplayChat, or a recorder).
-    `timeout_s` replaces the reader's 3 s wait (the recorder waits for the real call to finish)."""
+    `timeout_s` replaces the reader's 3.5 s wait (the recorder waits for the real call to finish)."""
     wait = {} if timeout_s is None else {"timeout_s": timeout_s}
     from commands.service import CommandService
     from engine.final_reader import load
@@ -258,6 +258,8 @@ def check_step(step: dict, out: dict, before: StepResult | None, prompt: str) ->
     for p in step.get("has", []):
         if p.lower() not in low:
             r.problems.append(f"prompt lacks {p!r}")
+    if step.get("has_any") and not any(p.lower() in low for p in step["has_any"]):
+        r.problems.append(f"prompt has none of {step['has_any']!r}")
     for p in step.get("lacks", []):
         if p.lower() in low:
             r.problems.append(f"prompt has {p!r}")
