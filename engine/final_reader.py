@@ -671,6 +671,9 @@ class FinalReader:
         self._pinned: dict[tuple[str, str], Entry] = dict(pinned or {})  # checked before the cache
         self.pinned_hits = 0
         self.template_hits = 0  # measured car worlds composed by the engine, no call
+        # composed prompt of a vehicle scene -> the template prompt last given for it, so the next model call on
+        # that scene is told its current road, scene and light (after "make it foggy", the fog stays)
+        self._given_vehicle: dict[str, str] = {}
         self._pool = concurrent.futures.ThreadPoolExecutor(max_workers=WORKERS, thread_name_prefix="final-reader")
         self.calls = 0
         self.cache_hits = 0
@@ -724,12 +727,15 @@ class FinalReader:
                 if entry is not None:
                     self.cache_hits += 1
         if entry is not None:
-            return self._from_cache(key, entry, snapshot)
+            result = self._from_cache(key, entry, snapshot)
+            if result is not None:
+                self._given(entry, snapshot)
+            return result
         measured = self._measured(text, snapshot)
         if measured is not None:
             with self._lock:
                 self.template_hits += 1
-            return measured.result()
+            return self._given(measured, snapshot)
         with self._lock:
             self.calls += 1
         fut = self._pool.submit(self._call, text, snapshot)
@@ -752,7 +758,7 @@ class FinalReader:
                      _short(text), self.timeout_s)
         if snapshot_of_cache is not None and self._file is not None:
             self._file.save(snapshot_of_cache)
-        return entry.result()
+        return self._given(entry, snapshot)
 
     def stats(self) -> dict:
         with self._lock:
@@ -774,6 +780,27 @@ class FinalReader:
         with self._lock:
             self.late_dropped += 1
         log.info("final reader: a late answer was dropped")
+
+    def _given(self, entry: Entry, snapshot: dict) -> dict | None:
+        """entry.result(), remembering the prompt of a vehicle scene for the scene it leads to."""
+        if entry.prompt is not None and entry.outcome in (Outcome.SONNET, Outcome.PINNED, Outcome.TEMPLATE):
+            from commands.composer import compose
+            try:
+                after = scene_after(snapshot, list(entry.operations))
+                if car_template.vehicle_subject(after["base"]) is not None:
+                    with self._lock:
+                        self._given_vehicle[compose(after)] = entry.prompt
+            except (ValueError, TypeError, KeyError):
+                pass  # only a hint for the next call
+        return entry.result()
+
+    def _current_vehicle_world(self, snapshot: dict, subject: str) -> "car_template.World | None":
+        """The road, scene and light of the prompt last given for this vehicle scene, else its measured world."""
+        from commands.composer import compose
+        with self._lock:
+            given = self._given_vehicle.get(compose(snapshot))
+        return (car_template.parse_world(given, subject, car_template.scene_objects(snapshot))
+                or car_template.current_world(snapshot))
 
     def _measured(self, text: str, snapshot: dict) -> Entry | None:
         """A TEMPLATE entry when `text` is a measured car world for `snapshot` (car_template.Route.MEASURED), else
@@ -853,7 +880,7 @@ class FinalReader:
                 "details_max_words": details_budget(self.spec, snapshot)}
         plan = car_template.plan(text, snapshot)
         if plan.route is not car_template.Route.PLAIN:
-            world = None if plan.new_scene else car_template.current_world(snapshot)
+            world = None if plan.new_scene else self._current_vehicle_world(snapshot, plan.subject)
             user["car_template"] = {"subject": plan.subject, **({"road": world.road, "scene": world.scene,
                                                                  "light": world.light} if world else {})}
         messages = [{"role": "user", "content": json.dumps(user)}]
@@ -953,10 +980,19 @@ class FinalReader:
         except (ValueError, TypeError, KeyError) as exc:
             return Attempt(Verdict.INVALID, Entry(Outcome.FALLBACK), (f"the new scene does not compose: {exc!r}",))
         problems = car_template.field_problems(reply)
-        prompt = None if problems else car_template.model_prompt(subject, reply)
-        if prompt is None:
+        world = None if problems else car_template.model_world(reply)
+        after = scene_after(snapshot, ops)
+        objects = car_template.scene_objects(after)
+        prompt = None if world is None else car_template.world_prompt(subject, world, objects)
+        if prompt is None or not car_template.check_prompt(prompt, subject, objects):
             return Attempt(Verdict.INVALID, Entry(Outcome.FALLBACK),
                            tuple(problems) or ("road, scene and light do not make the template",))
+        known = {(c["label"], c["phrase"]) for c in snapshot["changes"]}
+        added = [c for c in after["changes"] if c["kind"] == "extra" and (c["label"], c["phrase"]) not in known]
+        main = next((c for c in after["changes"] if c["kind"] == "extra"), None)
+        phrase = [p for c in added for p in phrase_problems(c, main=c is main)]
+        if phrase:  # usable, but a new object's phrase breaks a rule: asked again once when there is time
+            return Attempt(Verdict.PHRASE, Entry(Outcome.SONNET, tuple(ops), prompt), tuple(phrase))
         return Attempt(Verdict.ACCEPTED, Entry(Outcome.SONNET, tuple(ops), prompt))
 
 

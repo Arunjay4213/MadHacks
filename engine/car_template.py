@@ -5,7 +5,11 @@ the world ("..., desert" gave green fields), but this full-sentence template doe
 it kept the car seen from behind in 10 of 10 runs:
 
     {Subject}, seen from directly behind with its rear lights facing the camera, drives fast along {road}, moving
-    forward away from the camera. {CAMERA} {scene} {light} {STYLE}
+    forward away from the camera. {CAMERA} {objects} {scene} {light} {STYLE}
+
+{CAMERA} names the subject's vehicle word ("the car" for a car, which is Ishaan's sentence exactly; "the
+motorcycle" for a motorcycle). {objects} are the phrases of the scene's objects, one sentence each, word for word,
+so a lion added on a car scene stays in the prompt (none in Ishaan's measured prompts).
 
 The subject sentence (apart from its road) and the camera sentence are the same, word for word, in every prompt
 of a vehicle scene. A change of world swaps road, scene and light together.
@@ -216,13 +220,30 @@ def measured_operations(p: Plan, snapshot: dict) -> list[dict]:
     return [*({"op": "remove", "id": c["id"]} for c in snapshot["changes"] if c["kind"] == "time"), add]
 
 
-def compose_prompt(subject: str, road: str, scene: str, light: str) -> str:
-    """The template, with the subject capitalised."""
-    return f"{subject[:1].upper()}{subject[1:]}{_REAR}{road}{_FORWARD} {CAMERA} {scene} {light} {STYLE}"
+def camera_sentence(subject: str) -> str:
+    """CAMERA for the subject's vehicle word: Ishaan's sentence exactly for a car."""
+    noun = subject.split()[-1]
+    return CAMERA.replace("behind the car", f"behind the {noun}").replace("keeping the car", f"keeping the {noun}")
 
 
-def world_prompt(subject: str, world: World) -> str:
-    return compose_prompt(subject, world.road, world.scene, world.light)
+def _object_sentences(objects) -> str:
+    return " ".join(f"{o[:1].upper()}{o[1:].rstrip(' .,;')}." for o in objects)
+
+
+def compose_prompt(subject: str, world: World, objects=()) -> str:
+    """The template, with the subject capitalised and one sentence per object phrase after the camera sentence."""
+    middle = " ".join(p for p in (_object_sentences(objects), world.scene, world.light) if p)
+    return (f"{subject[:1].upper()}{subject[1:]}{_REAR}{world.road}{_FORWARD} {camera_sentence(subject)} "
+            f"{middle} {STYLE}")
+
+
+def world_prompt(subject: str, world: World, objects=()) -> str:
+    return compose_prompt(subject, world, objects)
+
+
+def scene_objects(snapshot: dict) -> list[str]:
+    """The phrases of the scene's objects that are on, in the order they were added."""
+    return [c["phrase"] for c in snapshot["changes"] if c["kind"] == "extra" and c["strength"] > 0]
 
 
 def current_world(snapshot: dict) -> World | None:
@@ -276,27 +297,29 @@ def field_problems(reply: dict) -> list[str]:
     return out
 
 
-def model_prompt(subject: str, reply: dict) -> str | None:
-    """The template with the model's fields, or None when field_problems finds any. The result is checked with
-    check_prompt, so the subject and camera sentences are always the engine's, word for word."""
+def model_world(reply: dict) -> World | None:
+    """The model's road, scene and light as a World (name "model"), or None when field_problems finds any."""
     if field_problems(reply):
         return None
-    road, scene, light = (" ".join(reply[k].split()) for k in ("road", "scene", "light"))
-    prompt = compose_prompt(subject, road, scene, light)
-    return prompt if check_prompt(prompt, subject) else None
+    return World("model", *(" ".join(reply[k].split()) for k in ("road", "scene", "light")))
 
 
-def check_prompt(prompt: str, subject: str) -> bool:
+def check_prompt(prompt: str, subject: str, objects=()) -> bool:
     """True when `prompt` is the template for `subject`: the subject sentence (any road), the camera sentence
-    word for word as the second sentence, then exactly one scene and one light sentence and the style."""
+    word for word as the second sentence, the object sentences word for word, then exactly one scene and one
+    light sentence and the style."""
     head = f"{subject[:1].upper()}{subject[1:]}{_REAR}"
     if not prompt.startswith(head) or not prompt.endswith(" " + STYLE):
         return False
     first, sep, rest = prompt[len(head):].partition(_FORWARD + " ")
-    if not sep or re.search(r"[.!?]", first) or not rest.startswith(CAMERA + " "):
+    camera = camera_sentence(subject)
+    if not sep or re.search(r"[.!?]", first) or not rest.startswith(camera + " "):
         return False
-    middle = rest[len(CAMERA) + 1:-len(STYLE) - 1]
-    return _sentence_count(middle) == 2
+    middle = rest[len(camera) + 1:-len(STYLE) - 1]
+    said = _object_sentences(objects)
+    if said and not middle.startswith(said + " "):
+        return False
+    return _sentence_count(middle[len(said):]) == 2
 
 
 INSTRUCTIONS = """
@@ -309,7 +332,8 @@ The engine writes the subject and camera sentences itself. For such a scene, rep
 leave "details" empty: {"blocked": ..., "operations": [...], "details": "", "road": "...", "scene": "...", "light": "..."}
 - "road": a noun phrase for the road of the new scene, starting with "a", at most 14 words, no period.
 - "scene": ONE sentence (at most 40 words) about what lines both sides of the road: landscape, buildings, weather
-  you can see. It may name the scene's objects. Never the camera, the shot or the frame.
+  you can see. Never the camera, the shot or the frame. The scene's objects (kind extra) are added by the engine
+  from their phrases, word for word: do not describe them again.
 - "light": ONE short sentence (at most 20 words) about the light and the sky.
 - The world of the new scene: its place, season, weather and time of day. A change of place replaces the road,
   the scene and the light together. If "car_template" in the user message gives the current road, scene and
@@ -324,3 +348,15 @@ Measured examples (road | scene | light):
 def instructions() -> str:
     return INSTRUCTIONS.replace("{examples}", "\n".join(
         f"- {w.name}: {w.road} | {w.scene} | {w.light}" for w in WORLDS.values()))
+
+
+def parse_world(prompt, subject: str, objects=()) -> World | None:
+    """The road, scene and light of a template prompt for `subject` and `objects` (name "given"), or None when
+    `prompt` is not one (check_prompt)."""
+    if not isinstance(prompt, str) or not check_prompt(prompt, subject, objects):
+        return None
+    head = f"{subject[:1].upper()}{subject[1:]}{_REAR}"
+    road, _, rest = prompt[len(head):].partition(_FORWARD + " ")
+    middle = rest[len(camera_sentence(subject)) + 1:-len(STYLE) - 1][len(_object_sentences(objects)):].strip()
+    scene, light = re.split(r"(?<=[.!?])\s+", middle)
+    return World("given", road, scene, light)
