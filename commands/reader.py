@@ -341,6 +341,10 @@ def read(text: str, snapshot: dict) -> dict:
                     phrase = _additional(phrase, entry, keyword, snapshot)
                 return out({"op": "add", **entry, "phrase": phrase, "strength": strength}, keyword)
     if existing:
+        if entry["kind"] != "extra":
+            # Weather, season and time cover the whole scene, so a place ("snow near the river") adds nothing to read.
+            location = _PREP_RX.search(rest)
+            rest = rest[:location.start()] if location else rest
         if _unread_words(rest):
             # "make the dog black": a change to an object the table cannot write. Keeping the strength would change
             # nothing and still look understood; unmatched shows the user the words were not used.
@@ -354,13 +358,13 @@ _LEAD = r"^(?:(?:also|then|please|now|and)\s+)*(?:(?:slowly|gradually|gently|sud
 _COLOURS = {"black", "white", "red", "orange", "yellow", "green", "blue", "purple", "pink", "grey", "gray", "brown",
             "golden", "gold", "silver"}
 _EDIT_VERBS = {"make", "turn", "set", "keep", "change", "let", "have", "get", "go", "now", "please", "it", "its", "it's",
-               "just", "only", "even", "again", "back", "still", "ok", "okay", "so"}
+               "just", "only", "even", "again", "back", "still", "ok", "okay", "so", "add", "put", "bring", "include"}
 
 
 def _unread_words(rest: str) -> bool:
     """True when `rest` (the sentence without the object's own words) holds a word that is not filler, an edit
-    verb, or a strength, more or less word: a description the keyword table does not apply."""
-    for rx in (_LOW_RX, _HIGH_RX, _MORE_RX, _LESS_RX):
+    verb, a pace word, or a strength, more or less word: a description the keyword table does not apply."""
+    for rx in (_LOW_RX, _HIGH_RX, _MORE_RX, _LESS_RX, _SLOW_RX, _SUDDEN_RX):
         rest = rx.sub(" ", rest)
     filler = (_STOP - _COLOURS) | _EDIT_VERBS
     return any(w not in filler for w in re.findall(r"[a-z']+", rest))
