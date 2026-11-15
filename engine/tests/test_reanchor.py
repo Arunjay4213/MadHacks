@@ -94,12 +94,16 @@ def test_refresh_source_option_reaches_the_backend():
         e.stop()
 
 
-def test_reset_restarts_the_refresh_count(engine_on):
-    e = engine_on
-    assert wait(lambda: e.chunk_generated >= 20)
-    done = e.reset(time.monotonic_ns()).result(5)
-    assert done.wait(5)
-    assert e.policy.chunks_since_anchor < 20  # counting restarted at the reset
+def test_reset_restarts_the_refresh_count():
+    # Refresh off: a refresh also restarts the count, so with it on a refresh could hide a reset that does not.
+    e = start("on", {"refresh_every_chunks": "none"})
+    try:
+        assert wait(lambda: e.policy.chunks_since_anchor >= 40)  # well above the threshold asserted below
+        done = e.reset(time.monotonic_ns()).result(5)
+        assert done.wait(5)
+        assert e.policy.chunks_since_anchor < 20  # counting restarted at the reset
+    finally:
+        e.stop()
 
 
 class NoReanchorBackend(FakeBackend):

@@ -251,7 +251,8 @@ def test_reanchor_applies_on_the_next_chunk_only(no_cuda):
         b.generate_chunk(a)  # applied once: the next chunk is a normal one
         assert [c["t"] for c in b.generator.calls[n0:]] == [[int(t)] for t in b.denoising_steps] + [[0]]
     rebases = b.rebases
-    b.reanchor(0.0)  # zero strength cancels: no cut
+    b.reanchor(0.5)  # queued ...
+    b.reanchor(0.0)  # ... and cancelled by zero strength: no cut
     b.generate_chunk(a)
     assert b.rebases == rebases
 
