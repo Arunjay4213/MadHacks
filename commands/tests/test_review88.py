@@ -132,6 +132,17 @@ class RemoveWorldKeepsObjectsTest(unittest.TestCase):
         r = s.handle({"type": "final", "text": "remove the automobile near the meadow", "t_client": 2})
         self.assertEqual(labels(r), ["meadow"])
 
+    def test_custom_world_with_a_preposition_in_its_name(self):
+        for world in ["city on mars", "temple in the jungle"]:
+            for spoken, left in [(f"remove the {world}", ["car"]),
+                                 (f"remove the car near the {world}", [world]),
+                                 (f"remove the dragon near the {world}", [world, "car"])]:
+                s = svc()
+                for t in [f"take me to a {world}", "add a car"]:
+                    s.handle({"type": "final", "text": t, "t_client": 1})
+                r = s.handle({"type": "final", "text": spoken, "t_client": 2})
+                self.assertEqual(labels(r), left, spoken)
+
 
 class AccentedPaceTest(unittest.TestCase):
     CAFE = {"op": "add", "label": "café", "kind": "extra", "phrase": "a small café", "strength": 1.0}
