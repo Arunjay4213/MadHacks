@@ -1,7 +1,7 @@
 // DOM wiring. Logic lives in lib.js. Element ids are listed in PLAN.md.
 import {
   PROTOCOL, finalizeDelay, partialMsg, finalMsg, tapMsg, parseFrame, parseServerMessage,
-  splitKeyword, backoffMs, makeFrameGate, makeLatencyTracker, makeTranscriber,
+  backoffMs, makeFrameGate, makeLatencyTracker, makeTranscriber,
   changesKey, commandKey, makeInputClassifier, wordsLabels, makeHeardTracker, PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
   wsBaseUrl, fitSize, videoNotice, formatStamps, isResetShortcut, makeOrderedFinals, makeSpeechEndpointer,
 } from './lib.js';
@@ -12,6 +12,7 @@ const el = {
   changes: $('changes'), form: $('command-form'), command: $('command'), mic: $('mic'),
   ptt: $('ptt'), undo: $('undo'), latency: $('latency'), timing: $('timing'), error: $('error'),
   notice: $('video-notice'), reset: $('reset'), frame: $('frame'), fullscreen: $('fullscreen'),
+  pttRing: $('ptt-ring'),
 };
 const ctx = el.video.getContext('2d');
 // Same origin by default; `?server=host:port` points the page at another server (e.g. the engine on :8000).
@@ -57,13 +58,24 @@ function send(msg) {
   return true;
 }
 
-// Status pill: Live when connected; Reconnecting… while retrying (Connecting… before the first
-// connection); Offline once several retries in a row have failed. The notice over the video says more.
+// Status capsule: the delay while connected ("Live" until a command is measured); Reconnecting… while
+// retrying (Connecting… before the first connection); Offline once several retries in a row have
+// failed. The notice under the header says more.
 const OFFLINE_AFTER = 5; // failed attempts in a row (about 8 s with the backoff)
+let connState = 'connecting';
+let delayMs = null;
+function renderStatus() {
+  el.connection.dataset.state = connState;
+  const text = connState === 'open'
+    ? delayMs === null ? 'Live' : `${(delayMs / 1000).toFixed(1)} s`
+    : connState === 'offline' ? 'Offline' : link.everConnected ? 'Reconnecting…' : 'Connecting…';
+  el.latency.textContent = text;
+  el.latency.setAttribute('aria-label', connState === 'open' && delayMs !== null ? `Live, ${text} from command to video` : text);
+  el.latency.dataset.level = delayMs === null ? '' : delayMs > 3000 ? 'bad' : delayMs > 1500 ? 'slow' : 'ok';
+}
 function setConnected(open) {
-  const offline = !open && attempt >= OFFLINE_AFTER;
-  el.connection.dataset.state = open ? 'open' : offline ? 'offline' : 'connecting';
-  el.connection.textContent = open ? 'Live' : offline ? 'Offline' : link.everConnected ? 'Reconnecting…' : 'Connecting…';
+  connState = open ? 'open' : attempt >= OFFLINE_AFTER ? 'offline' : 'connecting';
+  renderStatus();
   el.changes.dataset.stale = String(!open);
   el.undo.disabled = !open;
   el.reset.disabled = !open;
@@ -115,48 +127,111 @@ function onServer(raw) {
   if (m.heard !== undefined && commandKey(m) !== shownCommand) {
     shownCommand = commandKey(m);
     const status = heardTracker.classify(m.heard, m.t_client);
-    if (status === 'pending') renderLocalWords(m.heard, 'partial'); // still being said or typed
-    else renderWords({ ...m, confirmed: status === 'confirmed' });
+    // Our own words still being said or typed: the line already shows them (newer than this echo).
+    if (status !== 'pending') renderWords({ ...m, confirmed: status === 'confirmed' });
   }
   latency.onServer(m);
 }
 
-// The caption: line 1 is the sentence (keyword highlighted), line 2 says what happened to it. It fades
-// out a few seconds after the last update so it never sits over the picture for long.
-const CAPTION_MS = 4000;
-let captionTimer = 0;
-function showCaption(sentenceNodes, labels, { unmatched = false } = {}) {
-  const text = document.createElement('p');
-  text.className = 'caption-text';
-  text.append(...sentenceNodes);
-  const status = document.createElement('p');
-  status.className = 'caption-status';
-  // Same meaning as wordsLabels (lib.js), worded for the caption.
-  if (labels.label !== 'heard') [status.dataset.state, status.textContent] = ['partial', 'Listening…'];
-  else if (unmatched) [status.dataset.state, status.textContent] = ['unmatched', 'Not understood'];
-  else if (labels.understood) [status.dataset.state, status.textContent] = ['understood', 'Understood · applying now'];
-  el.words.replaceChildren(text, ...(status.textContent ? [status] : []));
-  el.words.classList.add('visible');
-  clearTimeout(captionTimer);
-  captionTimer = setTimeout(() => el.words.classList.remove('visible'), CAPTION_MS);
+// The voice line: the words in orange quotes, and before them what is happening. Voice bars while speech
+// comes in (from the mic level while push-to-talk is held, a wave for Wispr or the toggle mic), nothing
+// while typing, a green tick once the server understood the final, an amber "!" when it did not.
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const bars = document.createElement('span');
+bars.className = 'bars wave';
+bars.setAttribute('aria-hidden', 'true');
+for (let i = 0; i < 5; i++) bars.append(document.createElement('span'));
+let settled = null; // the last finished line, shown again when a draft or a press ends with no words
+let lastPartial = '';
+let boxKind = 'typing'; // how the text box's words arrived: 'typing', or 'burst' (dictated)
+
+function statusIcon(kind) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('class', 'voice-icon');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.innerHTML = kind === 'tick'
+    ? '<circle cx="8" cy="8" r="8" fill="#34C759"/><path d="M4.6 8.3l2.2 2.2 4.6-4.8" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'
+    : '<circle cx="8" cy="8" r="8" fill="#D97706"/><path d="M8 4.2v4.6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="11.6" r="1.05" fill="#fff"/>';
+  return svg;
+}
+
+function span(className, text) {
+  const s = document.createElement('span');
+  s.className = className;
+  if (text) s.textContent = text;
+  return s;
+}
+
+// state: 'empty' | 'speaking' | 'typing' | 'sent' | 'understood' | 'unmatched' | 'plain'
+function renderVoice({ state, text = '', tail = '', mode = null }) {
+  el.words.dataset.state = state;
+  const parts = [];
+  if (mode) {
+    bars.classList.toggle('wave', !(mode === 'level' && level.analyser)); // the level loop drives the bars
+    parts.push(bars);
+  }
+  if (state === 'understood') parts.push(statusIcon('tick'));
+  if (state === 'unmatched') parts.push(statusIcon('alert'));
+  const words = span('voice-text', state === 'empty' ? 'Say something' : text);
+  if (tail) words.append(span('voice-tail', tail));
+  const body = span('voice-body');
+  body.append(span('voice-quote', '“'), words);
+  if (state === 'speaking') body.append(span('voice-caret'));
+  body.append(span('voice-quote', '”'));
+  for (const q of body.querySelectorAll('.voice-quote')) q.setAttribute('aria-hidden', 'true');
+  parts.push(body);
+  if (state === 'unmatched') parts.push(span('voice-note', ' · Didn’t catch that'));
+  el.words.replaceChildren(...parts);
+}
+
+// Where words that are still coming in come from: our mic (bars), dictation into the box (wave), or typing.
+function partialMode() {
+  if (listening === 'ptt') return 'level';
+  if (listening || rec) return 'wave'; // the toggle mic, or a press still finishing
+  return boxKind === 'burst' ? 'wave' : null;
+}
+
+// Words still coming in. The words two updates agree on are settled; the rest is grey, then a caret.
+function showPartial(text) {
+  const mode = partialMode();
+  if (!mode) {
+    lastPartial = '';
+    return renderVoice({ state: 'typing', text });
+  }
+  const a = lastPartial.split(' ');
+  const b = text.split(' ');
+  let n = 0;
+  while (n < a.length - 1 && n < b.length - 1 && a[n] === b[n]) n++;
+  lastPartial = text;
+  const done = b.slice(0, n).join(' ');
+  renderVoice({ state: 'speaking', text: done ? `${done} ` : '', tail: b.slice(n).join(' '), mode });
+}
+
+function showSettled() {
+  lastPartial = '';
+  if (!settled?.heard) return renderVoice({ state: 'empty' });
+  const { heard, keyword, unmatched, confirmed } = settled;
+  // Same meaning as wordsLabels (lib.js): a tick only for a final the server understood.
+  const state = unmatched ? 'unmatched' : wordsLabels({ keyword, unmatched, confirmed }).understood ? 'understood' : 'plain';
+  renderVoice({ state, text: heard });
+}
+
+// A press or a draft that ended without sending anything shows the last finished line again.
+function endUnsent() {
+  if (el.words.dataset.state === 'speaking' || el.words.dataset.state === 'typing') showSettled();
 }
 
 function renderLocalWords(text, kind) {
-  showCaption([document.createTextNode(text)], wordsLabels({ local: true }));
-  el.words.dataset.unmatched = 'false';
-  el.words.dataset.kind = kind;
+  if (kind === 'partial') return showPartial(text);
+  lastPartial = '';
+  renderVoice({ state: 'sent', text }); // final, until the server says whether it understood
 }
 
-function renderWords({ heard, keyword, unmatched, kind, confirmed }) {
-  const sentence = splitKeyword(heard, keyword).map((p) => {
-    if (!p.mark) return document.createTextNode(p.text);
-    const mark = document.createElement('mark');
-    mark.textContent = p.text;
-    return mark;
-  });
-  showCaption(sentence, wordsLabels({ keyword, unmatched, confirmed }), { unmatched });
-  el.words.dataset.unmatched = String(Boolean(unmatched));
-  el.words.dataset.kind = kind || 'server';
+function renderWords({ heard, keyword, unmatched, confirmed }) {
+  settled = { heard, keyword, unmatched, confirmed };
+  showSettled();
 }
 
 // Chips are keyed by id: a chip that stays keeps its element (so a click on its × is never lost),
@@ -181,10 +256,15 @@ function renderChanges(changes) {
   }
 }
 
+// Chip colours rotate in the order changes first appear; a change brought back by Undo keeps its colour.
+const CHIP_COLORS = ['blue', 'red', 'amber'];
+const chipColors = new Map(); // change id -> colour
 function makeChip(c) {
   const li = document.createElement('li');
   li.className = 'chip';
   li.dataset.id = c.id;
+  if (!chipColors.has(c.id)) chipColors.set(c.id, CHIP_COLORS[chipColors.size % CHIP_COLORS.length]);
+  li.dataset.color = chipColors.get(c.id);
   const label = document.createElement('span');
   label.className = 'chip-label';
   const x = document.createElement('button');
@@ -257,11 +337,11 @@ function connectFrames() {
   };
 }
 
-// Delay pill: command -> first new frame on screen, in seconds; amber over 1.5 s, red over 3 s. The
-// server's own stage stamps show on hover; the exact definition is in the tooltip.
+// Delay: command -> first new frame on screen, in seconds, shown in the status capsule. The server's
+// own stage stamps show on hover; the exact definition is in the tooltip.
 function showDelay(ms) {
-  el.latency.textContent = ms === null ? '— delay' : `${(ms / 1000).toFixed(1)} s delay`;
-  el.latency.dataset.level = ms === null ? '' : ms > 3000 ? 'bad' : ms > 1500 ? 'slow' : 'ok';
+  delayMs = ms;
+  renderStatus();
 }
 function renderLatency({ ms, stamps }) {
   showDelay(ms);
@@ -288,8 +368,12 @@ el.command.addEventListener('input', (e) => {
   const kind = inputs.classify(e.inputType, e.data, performance.now());
   if (DEBUG) console.info(`[web] input ${e.inputType} chars=${e.data?.length ?? '-'} -> ${kind}`);
   if (kind === 'whole') return sendFinalFromBox();
+  boxKind = kind; // dictated text gets the voice wave on the voice line, typing gets no bars
   const text = el.command.value.trim();
-  if (!text) return heardTracker.clearPartials(); // draft deleted: it is no longer pending
+  if (!text) {
+    heardTracker.clearPartials(); // draft deleted: it is no longer pending
+    return endUnsent();
+  }
   send(partialMsg(text));
   // Sent after a pause, unless it still looks unfinished ("a car,"): then only Enter sends it.
   const delay = finalizeDelay(kind, text);
@@ -320,7 +404,7 @@ document.addEventListener('fullscreenchange', () => {
   document.documentElement.classList.toggle('fs', Boolean(document.fullscreenElement)); // full-screen layout (style.css)
   const label = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
   el.fullscreen.setAttribute('aria-label', label); // icon-only button: keep the icon, change the label
-  el.fullscreen.title = document.fullscreenElement ? 'Exit full screen (Esc)' : 'Full screen for the demo (Esc leaves)';
+  el.fullscreen.title = document.fullscreenElement ? 'Exit full screen (Esc)' : 'Full screen';
   refocus();
 });
 // Back to the starting scene (the scene reset is undoable; the picture restarts cleanly).
@@ -344,8 +428,9 @@ let startWhenEnded = false; // only if the browser refused a second recognizer w
 function startListening(mode) {
   if (!Recognition || listening) return;
   listening = mode;
-  renderMic();
   begin(); // at once, even if the previous press is still ending: words said now are recorded
+  renderMic(); // after begin(): the level meter opens its own mic stream only once recognition has started
+  showPartial(''); // bars and a caret until the first words
 }
 
 // Each recognizer has its own transcriber, so a quick re-press records the new words at once while
@@ -386,6 +471,7 @@ function begin() {
     if (listening === 'toggle' && performance.now() - startedAt > 500) return begin();
     listening = null;
     renderMic();
+    endUnsent(); // the press ended with no words sent
   };
   try {
     r.start();
@@ -410,6 +496,65 @@ function stopListening(mode) {
 function renderMic() {
   el.mic.setAttribute('aria-pressed', String(listening === 'toggle'));
   el.ptt.setAttribute('aria-pressed', String(listening === 'ptt'));
+  if (listening === 'ptt') startLevel();
+  else stopLevel();
+}
+
+// Mic level for the voice bars and the ring around the mic, only while push-to-talk is held: a
+// separate, short-lived stream next to Chrome's speech recognition, read by an AnalyserNode once per
+// animation frame. It never touches recognition; if it fails, the bars keep their wave.
+const level = { on: false, token: 0, audio: null, stream: null, source: null, analyser: null, data: null, raf: 0 };
+const BANDS = [[2, 4], [4, 7], [7, 11], [11, 16], [16, 24]]; // FFT bins, about 375 Hz to 4.5 kHz at 48 kHz
+
+function startLevel() {
+  if (level.on || reducedMotion.matches || !navigator.mediaDevices?.getUserMedia) return;
+  level.on = true;
+  const token = ++level.token;
+  try {
+    level.audio ||= new AudioContext();
+    level.audio.resume();
+  } catch {
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+    if (token !== level.token) return stream.getTracks().forEach((t) => t.stop()); // released meanwhile
+    level.stream = stream;
+    level.source = level.audio.createMediaStreamSource(stream);
+    level.analyser = level.audio.createAnalyser();
+    level.analyser.fftSize = 256;
+    level.analyser.smoothingTimeConstant = 0.5;
+    level.source.connect(level.analyser);
+    level.data = new Uint8Array(level.analyser.frequencyBinCount);
+    bars.classList.remove('wave');
+    level.raf = requestAnimationFrame(drawLevel);
+  }).catch(() => {}); // no level (refused, no device): the bars keep their wave
+}
+
+function drawLevel() {
+  level.analyser.getByteFrequencyData(level.data);
+  let total = 0;
+  BANDS.forEach(([from, to], i) => {
+    let sum = 0;
+    for (let k = from; k < to; k++) sum += level.data[k];
+    const v = Math.min(1, (sum / (to - from) / 255) * 1.6);
+    total += v;
+    bars.children[i].style.setProperty('--h', (0.3 + 0.7 * v).toFixed(3));
+  });
+  el.pttRing.style.setProperty('--ring', (1 + (0.3 * total) / BANDS.length).toFixed(3));
+  level.raf = requestAnimationFrame(drawLevel);
+}
+
+function stopLevel() {
+  if (!level.on) return;
+  level.on = false;
+  level.token++;
+  cancelAnimationFrame(level.raf);
+  level.source?.disconnect();
+  level.stream?.getTracks().forEach((t) => t.stop());
+  level.stream = level.source = level.analyser = level.data = null;
+  for (const b of bars.children) b.style.removeProperty('--h');
+  el.pttRing.style.removeProperty('--ring');
+  bars.classList.add('wave'); // a press still finishing shows the wave until its final lands
 }
 
 const micUnavailable = !Recognition
@@ -425,7 +570,8 @@ if (micUnavailable) {
     b.title = micUnavailable;
   }
 } else {
-  el.ptt.title = `Hold to talk (or hold the ${keyLabel} key)`;
+  el.ptt.title = `Hold to talk (${keyLabel})`;
+  el.ptt.setAttribute('aria-label', el.ptt.title);
   el.mic.addEventListener('click', () => (listening === 'toggle' ? stopListening('toggle') : startListening('toggle')));
   el.ptt.addEventListener('pointerdown', (e) => {
     el.ptt.setPointerCapture(e.pointerId);
@@ -445,6 +591,7 @@ if (micUnavailable) {
 
 setConnected(false);
 showDelay(null);
+showSettled();
 el.timing.textContent = 'voice → video: measured after your first command';
 connectControl();
 connectFrames();

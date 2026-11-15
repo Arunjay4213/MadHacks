@@ -9,16 +9,20 @@ Owner: `@anirudhaugile` (Ani), since the lead's swap on 2026-11-14. Started by `
 | `video` | `<canvas>` | draws decoded JPEG frames, newest only |
 | `frame` | any | the box the video fits into; app.js sets the canvas's CSS size to the fitted frame so its rounded corners sit on the picture |
 | `fullscreen` | `<button>` | toggles full screen; refocuses the text box; if the browser refuses, the error says to use View → Enter Full Screen |
-| `connection` | any | `textContent` = status; `data-state` = `connecting` / `open` / `closed` |
+| `connection` | any, holds `latency` and `timing` | the status capsule; `data-state` = `connecting` / `open` / `offline` |
 | `mode-banner` | any | shown only while server messages say `fake: true` (the fake server); hidden otherwise, including before the first message, so a real engine that is still loading is never labelled MOCK. |
-| `words` | any, `aria-live="polite"` | children replaced: a `.words-label` ("hearing…" while local, "heard" from the server), the full sentence in `.words-text` with one `<mark>` around the keyword, and `.words-understood` ("→ understood: <keyword>" or "→ not understood"); `data-unmatched="true"` when no operation; `data-kind` = `partial` / `final` / `server` |
+| `words` | any, `aria-live="polite"` | the voice line: children replaced with voice bars (`.bars`, `.wave` unless the mic level drives them), a tick or "!" icon, the words in quotes (`.voice-text`, the not-yet-final words in `.voice-tail`, then `.voice-caret`) and, when unmatched, `.voice-note`; `data-state` = `empty` / `speaking` / `typing` / `sent` / `understood` / `unmatched` / `plain` |
 | `changes` | any (list container) | children replaced from server state; `data-stale="true"` while disconnected |
 | `command-form` | `<form>` | submit is `preventDefault`ed (no reload); submit sends `final` |
 | `command` | `<input type="text">` | kept focused; input events send messages; cleared after `final` |
 | `mic` | `<button>` | toggle listening; `aria-pressed`; `disabled` + `title` if no speech API |
 | `ptt` | `<button>` | push-to-talk while pointer held; `aria-pressed` while held. The backtick key also works as push-to-talk. |
+| `ptt-ring` | any | the ring around `ptt`; `--ring` (scale) follows the mic level while push-to-talk is held |
+| `send` | `<button type="submit">` | submits `command-form` |
+| `reset` | `<button>` | sends the `reset` tap; `disabled` while disconnected |
+| `video-notice` | any | `textContent` = connecting / connection lost / paused, `hidden` while the video is live |
 | `undo` | `<button>` | sends undo; `disabled` while disconnected |
-| `latency` | any | `textContent` = `"— "` (unavailable) or `"<n> ms"` |
+| `latency` | any | `textContent` = `"0.9 s"` (the delay) or `"Live"` while connected and unmeasured, otherwise `"Connecting…"` / `"Reconnecting…"` / `"Offline"` |
 | `timing` | any | `textContent` = what the number measures, plus server stamps if any |
 | `error` | any, `role="alert"` | `textContent` = last error, `hidden` when none |
 
