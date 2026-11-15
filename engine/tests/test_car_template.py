@@ -69,7 +69,7 @@ def test_the_new_car_scene_is_the_template_word_for_word():
         "road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, "
         "realistic, sharp focus, motion blur on the road.")
     assert svc._svc.snapshot()["base"] == "a red sports car"
-    assert [c["label"] for c in out["state"]["changes"]] == ["country"]
+    assert out["state"]["changes"] == []  # the country start world is the bare vehicle scene
     assert chat.calls == [] and reader.stats()["template_hits"] == 1
 
 
@@ -81,7 +81,7 @@ def test_each_world_swaps_road_scene_and_light_and_keeps_subject_and_camera():
         assert not out["state"]["unmatched"], sentence
         assert out["steer"]["prompt"] == (f"{HEAD}{world.road}, moving forward away from the camera. {CAMERA} "
                                           f"{world.scene} {world.light} {STYLE}"), sentence
-        assert [c["label"] for c in out["state"]["changes"]] == [name], sentence
+        assert [c["label"] for c in out["state"]["changes"]] == ([] if name == "country" else [name]), sentence
     assert reader.stats()["calls"] == 0 and reader.stats()["template_hits"] == len(CHAIN)
     # an undo goes back to the earlier scene and its same words
     out = svc.handle({"type": "tap", "action": "undo"})
@@ -145,7 +145,7 @@ def test_no_measured_world_asks_the_model_and_the_engine_enforces_the_template()
     assert any('"scene" must be one sentence' in r for r in retry["rejected"])
     assert any('"light" must be one sentence' in r for r in retry["rejected"])
     assert "Vehicle scenes." in system and ct.WORLDS["winter"].scene in system
-    assert [c["label"] for c in out["state"]["changes"]] == ["country", "fog"]
+    assert [c["label"] for c in out["state"]["changes"]] == ["fog"]
 
 
 def test_a_reply_without_the_fields_is_not_used():
@@ -253,3 +253,23 @@ def test_the_camera_sentence_names_the_vehicle():
     assert "The camera follows directly behind the motorcycle in a smooth" in prompt
     assert "keeping the motorcycle centred" in prompt and " car" not in prompt
     assert ct.camera_sentence("a red sports car") == CAMERA  # Ishaan's sentence, exactly, for a car
+
+
+def test_weakening_an_object_on_a_car_scene_changes_its_sentence():
+    # Greptile on PR #141: the object sentence ignored strength, so a weakened lion read the same.
+    snap = SceneState("a red sports car").snapshot()
+    snap["changes"] = [{"id": "c1", "label": "lion", "kind": "extra", "phrase": "a large lion at the left", "strength": 0.3}]
+    assert ct.scene_objects(snap) == ["a subtle hint of a large lion at the left"]
+    snap["changes"][0]["strength"] = 1.3
+    assert ct.scene_objects(snap) == ["intense a large lion at the left"]
+
+
+def test_removing_a_world_chip_goes_back_to_the_country_template():
+    # Greptile on PR #141: the start world was a chip; removing it left the bare vehicle state with no template.
+    _, svc = service(NoChat())
+    start = svc.handle(final(NEW_SCENE))["steer"]["prompt"]
+    winter = svc.handle(final("make it winter"))
+    out = svc.handle({"type": "tap", "action": "remove", "id": winter["state"]["changes"][0]["id"]})
+    assert out["steer"]["prompt"] == start == ct.world_prompt("a red sports car", ct.WORLDS["country"])
+    svc.handle(final("make it winter"))
+    assert svc.handle(final("take me back to the countryside"))["steer"]["prompt"] == start

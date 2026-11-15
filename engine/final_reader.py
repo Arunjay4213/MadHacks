@@ -818,6 +818,8 @@ class FinalReader:
         from commands.composer import compose
         try:
             ops = expand_operations(car_template.measured_operations(plan, snapshot), snapshot)
+            if ops == []:
+                return None  # already that world: nothing to change, the model reads it
             if ops is None:
                 raise ValueError("the operations are not valid for this scene")
             compose(scene_after(snapshot, ops))
