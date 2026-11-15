@@ -304,12 +304,12 @@
         "op": "add",
         "label": "ocean coast",
         "kind": "world",
-        "phrase": "a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Sunny tropical day, clear blue sky, sparkling light on the water.",
+        "phrase": "a coastal highway on a cliff top. Grey asphalt with white lane markings runs straight ahead, a low stone wall along the edge of the road, a bright turquoise ocean with white waves far below the cliff on the left side, palm trees and green hills on the right side. Sunny tropical day, clear blue sky, sparkling light on the water.",
         "strength": 1.0
       }
     ],
-    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a coastal cliff road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Sunny tropical day, clear blue sky, sparkling light on the water. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
-    "canonical": "a red sports car; a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side. Sunny tropical day, clear blue sky, sparkling light on the water",
+    "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a coastal highway on a cliff top, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Grey asphalt with white lane markings runs straight ahead, a low stone wall along the edge of the road, a bright turquoise ocean with white waves far below the cliff on the left side, palm trees and green hills on the right side. Sunny tropical day, clear blue sky, sparkling light on the water. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "canonical": "a red sports car; a coastal highway on a cliff top. Grey asphalt with white lane markings runs straight ahead, a low stone wall along the edge of the road, a bright turquoise ocean with white waves far below the cliff on the left side, palm trees and green hills on the right side. Sunny tropical day, clear blue sky, sparkling light on the water",
     "source": "engine car template",
     "generated_at": "2026-11-15T01:24:17+00:00"
   },

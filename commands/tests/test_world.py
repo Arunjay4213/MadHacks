@@ -19,8 +19,8 @@ MEASURED = {
     "neon city": ("a wide city street at night",
                   "Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling.",
                   "Dark night sky, vivid neon glow, cyberpunk atmosphere."),
-    "ocean coast": ("a coastal cliff road",
-                    "A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side.",
+    "ocean coast": ("a coastal highway on a cliff top",
+                    "Grey asphalt with white lane markings runs straight ahead, a low stone wall along the edge of the road, a bright turquoise ocean with white waves far below the cliff on the left side, palm trees and green hills on the right side.",
                     "Sunny tropical day, clear blue sky, sparkling light on the water."),
 }
 ISHAAN = {  # exact tested strings, board #6885673339, and the measured worlds as "{road}. {scene} {light}"
@@ -143,8 +143,9 @@ class OverridesTest(unittest.TestCase):
                          "along the edges of the road.")
         coast = change("ocean coast", "world", ISHAAN["ocean coast"])
         self.assertEqual(world_with_overrides(coast, [coast, change("rain", "weather")]),
-                         "a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one "
-                         "side, palm trees and green hills on the other side.")
+                         "a coastal highway on a cliff top. Grey asphalt with white lane markings runs straight ahead, a low stone "
+                         "wall along the edge of the road, a bright turquoise ocean with white waves far below the cliff on "
+                         "the left side, palm trees and green hills on the right side.")
 
     def test_sunlit_time_drops_builtin_weather_that_is_not_sunlit(self):
         snowy = change("snowy mountain road", "world", ISHAAN["snowy mountain road"])

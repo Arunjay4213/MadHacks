@@ -55,9 +55,14 @@ _TABLE = [
                    (", light rain falling", {"weather": "rain"}),
                    (". Dark night sky", _N), (", vivid neon glow, cyberpunk atmosphere", {})],
      ["neon city", "city", "city street", "cyberpunk city", "downtown"]),
-    ("ocean coast", [("a coastal cliff road", {}),
-                     (". A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and "
-                      "green hills on the other side", {}),
+    # Ishaan's measured sentence was "a coastal cliff road. A bright turquoise ocean with white waves breaking on the
+    # rocks below on one side, ...". In the live acceptance runs (2026-11-15) the car drove on the water and a parked
+    # car was crumpled on the rocks; with the road named as asphalt with lane markings and the ocean far below, the
+    # road and the car held in a /target probe on the live GPU.
+    ("ocean coast", [("a coastal highway on a cliff top", {}),
+                     (". Grey asphalt with white lane markings runs straight ahead, a low stone wall along the edge of "
+                      "the road, a bright turquoise ocean with white waves far below the cliff on the left side, palm "
+                      "trees and green hills on the right side", {}),
                      (". Sunny tropical day, clear blue sky, sparkling light on the water",
                       {"time": "day", "weather": "clear", "season": "summer"})],
      ["ocean", "coast", "coastal road", "beach", "seaside", "sea", "tropical coast", "cliffs"]),
