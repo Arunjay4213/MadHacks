@@ -345,6 +345,10 @@ leave "details" empty: {"blocked": ..., "operations": [...], "details": "", "roa
 - The world of the new scene: its place, season, weather and time of day. A change of place replaces the road,
   the scene and the light together. If "car_template" in the user message gives the current road, scene and
   light, keep what the sentence does not change.
+- More or less of the current world ("a little more snow", "a lot more snow", "less rain" on the snowy road or in
+  the rain): ONE set_strength on that world change (never a new add: it would replace the world), the same road,
+  and "scene" and "light" rewritten with visibly more or less of it ("heavy snow falling thickly, deep snowdrifts"
+  for more; "a light dusting of snow" for less). The engine draws only what road, scene and light say.
 - For a new scene of a vehicle, use new_scene with the base being only the vehicle ("a blue pickup truck") and an
   add of kind world for its place.
 Measured examples (road | scene | light):

@@ -414,7 +414,8 @@ Rules for operations:
   beach"): use new_scene, which clears every change. Its base is the user's words for the scene, as said.
 - edit_base and new_scene come before any other operation of the sentence.
 - To remove or weaken something, use the id of the matching change. "a little" means strength 0.3, "a lot" or
-  "very" means 1.3.
+  "very" means 1.3. "More" or "a little more" of an existing change raises it (set_strength 1.3), "less" or "a
+  little less" lowers it (0.7).
 - Pace words (slowly, gradually, gently, little by little, suddenly) set how fast a change appears, never its
   strength. Strength stays 1.0 unless the sentence has a strength word (a little, a lot, more, less, slightly,
   very).

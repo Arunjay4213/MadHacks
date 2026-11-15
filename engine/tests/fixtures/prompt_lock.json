@@ -11,7 +11,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "33448f6a26a2b143"
+    "likely_prompts_sha": "8438448d29aa85ca"
    },
    {
     "say": "make it winter",
@@ -34,7 +34,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-    "likely_prompts_sha": "d2bc268fc223295f"
+    "likely_prompts_sha": "bb5cfaa4799ccb75"
    },
    {
     "say": "add a red car",
@@ -234,7 +234,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "33448f6a26a2b143"
+    "likely_prompts_sha": "8438448d29aa85ca"
    },
    {
     "say": "make it winter",
@@ -257,7 +257,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-    "likely_prompts_sha": "d2bc268fc223295f"
+    "likely_prompts_sha": "bb5cfaa4799ccb75"
    },
    {
     "say": "add a red car",
@@ -473,7 +473,7 @@
    {
     "say": "remove the car near the meadow",
     "steer": {
-     "prompt": "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; night time under a full moon",
+     "prompt": "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains; night time under a full moon",
      "ramp_chunks": 1,
      "provisional": false,
      "cap": 1.0
@@ -495,8 +495,8 @@
      "keyword": "car",
      "unmatched": false
     },
-    "committed": "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; night time under a full moon",
-    "likely_prompts_sha": "d6fcf8fdfc49d2c1"
+    "committed": "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains; night time under a full moon",
+    "likely_prompts_sha": "d0dc0c68d361408f"
    },
    {
     "say": "remove the forest",
@@ -518,13 +518,13 @@
      "keyword": "forest",
      "unmatched": true
     },
-    "committed": "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; night time under a full moon",
-    "likely_prompts_sha": "d6fcf8fdfc49d2c1"
+    "committed": "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains; night time under a full moon",
+    "likely_prompts_sha": "d0dc0c68d361408f"
    },
    {
     "say": "make it foggy",
     "steer": {
-     "prompt": "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+     "prompt": "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
      "ramp_chunks": 1,
      "provisional": false,
      "cap": 1.0
@@ -551,56 +551,56 @@
      "keyword": "foggy",
      "unmatched": false
     },
-    "committed": "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-    "likely_prompts_sha": "a973278033422be3"
+    "committed": "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+    "likely_prompts_sha": "2060ad3f6200aa81"
    }
   ],
   "likely_prompts": [
-   "a wide shot of a single oak tree; a calm lake reflecting the sky; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; night time under a full moon",
+   "a wide shot of a single oak tree; a calm lake reflecting the sky; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
    "a wide shot of a single oak tree; a car driving forward along a road; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; a cat sitting nearby; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; a coastal highway on a cliff top. Grey asphalt with white lane markings runs straight ahead, a low stone wall along the edge of the road, a bright turquoise ocean with white waves far below the cliff on the left side, palm trees and green hills on the right side; night time under a full moon",
-   "a wide shot of a single oak tree; a crackling campfire; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; a deer grazing nearby; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; a dog standing nearby; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons; a thick fog in the air; bright daytime sunlight under a clear blue sky",
-   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; a dark thunderstorm with lightning; night time under a full moon",
-   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; a golden sunset sky",
-   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; a soft pink sunrise sky",
-   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; harsh midday sunlight",
-   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; autumn scenery with orange and red leaves; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; bright summer scenery with lush green grass; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; spring scenery with fresh blossoms; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; steady rain falling; night time under a full moon",
-   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; strong wind blowing through everything; night time under a full moon",
-   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains; winter scenery with snow on the ground; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; a flock of birds flying overhead; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a cat sitting nearby; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a crackling campfire; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a deer grazing nearby; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a dense green pine forest, tall trees all around; night time under a full moon",
+   "a wide shot of a single oak tree; a dog standing nearby; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a flock of birds flying overhead; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
    "a wide shot of a single oak tree; a green meadow with soft grass; night time under a full moon",
-   "a wide shot of a single oak tree; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt; night time under a full moon",
-   "a wide shot of a single oak tree; a narrow road through a dense green pine forest, tall trees on both sides; night time under a full moon",
-   "a wide shot of a single oak tree; a rainbow across the sky; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; a river running through the scene; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; a small group of people standing in the scene; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; a small wooden boat; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; a small wooden cabin; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; a snowman with a carrot nose and a scarf; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; a snowy mountain road. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling; night time under a full moon",
-   "a wide shot of a single oak tree; a stone castle with tall towers in the distance; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; a straight two-lane country road. Green fields and rows of trees line both sides of the road; night time under a full moon",
-   "a wide shot of a single oak tree; a tall white lighthouse; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; a waterfall cascading down a rocky slope; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere; night time under a full moon",
-   "a wide shot of a single oak tree; a wooden bridge crossing the scene; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; bright stars scattered across the sky; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; butterflies fluttering through the scene; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; colorful wildflowers everywhere; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; fish swimming in clear water; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; glowing fireflies; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; horses grazing in the scene; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; snow-capped mountains in the distance; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; soft clouds drifting across the sky; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
-   "a wide shot of a single oak tree; tall trees with branches moving in the breeze; a dusty road across the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon"
+   "a wide shot of a single oak tree; a rainbow across the sky; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a river running through the scene; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a small group of people standing in the scene; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a small wooden boat; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a small wooden cabin; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a snowman with a carrot nose and a scarf; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a stone castle with tall towers in the distance; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a tall white lighthouse; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand; night time under a full moon",
+   "a wide shot of a single oak tree; a waterfall cascading down a rocky slope; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; a wide sandy beach. A bright turquoise ocean with white waves rolling onto pale golden sand, palm trees along the shore; night time under a full moon",
+   "a wide shot of a single oak tree; a wooden bridge crossing the scene; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; bright stars scattered across the sky; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; butterflies fluttering through the scene; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; colorful wildflowers everywhere; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; fish swimming in clear water; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; glowing fireflies; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; horses grazing in the scene; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; open countryside. Green fields and rows of trees; night time under a full moon",
+   "a wide shot of a single oak tree; snow-capped mountains in the distance; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; snowy mountains. Pine forests covered in thick white snow, deep snowdrifts on the ground, snowflakes falling; night time under a full moon",
+   "a wide shot of a single oak tree; soft clouds drifting across the sky; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; tall trees with branches moving in the breeze; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons; a thick fog in the air; bright daytime sunlight under a clear blue sky",
+   "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains; a dark thunderstorm with lightning; night time under a full moon",
+   "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; a golden sunset sky",
+   "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; a soft pink sunrise sky",
+   "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; harsh midday sunlight",
+   "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains; autumn scenery with orange and red leaves; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains; bright summer scenery with lush green grass; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains; spring scenery with fresh blossoms; a thick fog in the air; night time under a full moon",
+   "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains; steady rain falling; night time under a full moon",
+   "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains; strong wind blowing through everything; night time under a full moon",
+   "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains; winter scenery with snow on the ground; a thick fog in the air; night time under a full moon"
   ]
  },
  "meadow edits": {
@@ -615,7 +615,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "33448f6a26a2b143"
+    "likely_prompts_sha": "8438448d29aa85ca"
    },
    {
     "say": "make it winter",
@@ -638,7 +638,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-    "likely_prompts_sha": "d2bc268fc223295f"
+    "likely_prompts_sha": "bb5cfaa4799ccb75"
    },
    {
     "say": "a little more snow",
@@ -661,7 +661,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; intense winter scenery with snow on the ground",
-    "likely_prompts_sha": "f0d62753d7e3d37b"
+    "likely_prompts_sha": "1efc1a781474afb7"
    },
    {
     "say": "a little less snow",
@@ -684,7 +684,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-    "likely_prompts_sha": "d2bc268fc223295f"
+    "likely_prompts_sha": "bb5cfaa4799ccb75"
    },
    {
     "say": "make it slowly rain",
@@ -712,7 +712,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; steady rain falling",
-    "likely_prompts_sha": "dc9c993bfdac73d5"
+    "likely_prompts_sha": "49f7eaa8074f4008"
    },
    {
     "say": "add a dog and remove the rain",
@@ -740,7 +740,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby",
-    "likely_prompts_sha": "043aa59e76fa1e6b"
+    "likely_prompts_sha": "06348f02185a64a2"
    },
    {
     "say": "add a dog and a cat",
@@ -773,7 +773,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby; a cat sitting nearby",
-    "likely_prompts_sha": "46a6ae13fbc11741"
+    "likely_prompts_sha": "047cc25cdb2bd3f0"
    },
    {
     "say": "remove the dog",
@@ -801,7 +801,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a cat sitting nearby",
-    "likely_prompts_sha": "ee6e15f6939d6ba8"
+    "likely_prompts_sha": "67c3d01740b43756"
    },
    {
     "say": "undo",
@@ -834,7 +834,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a dog standing nearby; a cat sitting nearby",
-    "likely_prompts_sha": "46a6ae13fbc11741"
+    "likely_prompts_sha": "047cc25cdb2bd3f0"
    },
    {
     "say": "undo the winter",
@@ -862,7 +862,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; a dog standing nearby; a cat sitting nearby",
-    "likely_prompts_sha": "d83dd8174d0f1f3f"
+    "likely_prompts_sha": "a9ae54f77609c951"
    },
    {
     "say": "add a glowing unicorn",
@@ -895,7 +895,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; a dog standing nearby; a cat sitting nearby; a glowing unicorn",
-    "likely_prompts_sha": "c6ef7bd96af42867"
+    "likely_prompts_sha": "1af9a187149e3726"
    },
    {
     "say": "add a bright red car",
@@ -1390,7 +1390,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "33448f6a26a2b143"
+    "likely_prompts_sha": "8438448d29aa85ca"
    }
   ],
   "likely_prompts": [
@@ -1434,14 +1434,14 @@
    "a wide shot of a meadow with a single oak tree; strong wind blowing through everything",
    "a wide shot of a meadow with a single oak tree; tall trees with branches moving in the breeze",
    "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-   "a wide shot of a single oak tree; a coastal highway on a cliff top. Grey asphalt with white lane markings runs straight ahead, a low stone wall along the edge of the road, a bright turquoise ocean with white waves far below the cliff on the left side, palm trees and green hills on the right side. Sunny tropical day, clear blue sky, sparkling light on the water",
-   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons",
+   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+   "a wide shot of a single oak tree; a dense green pine forest, tall trees all around, soft sunlight through the branches",
    "a wide shot of a single oak tree; a green meadow with soft grass, under a clear blue sky",
-   "a wide shot of a single oak tree; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
-   "a wide shot of a single oak tree; a narrow road through a dense green pine forest, tall trees on both sides, soft sunlight through the branches",
-   "a wide shot of a single oak tree; a snowy mountain road. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows",
-   "a wide shot of a single oak tree; a straight two-lane country road. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows",
-   "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere"
+   "a wide shot of a single oak tree; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+   "a wide shot of a single oak tree; a wide sandy beach. A bright turquoise ocean with white waves rolling onto pale golden sand, palm trees along the shore. Sunny tropical day, clear blue sky, sparkling light on the water",
+   "a wide shot of a single oak tree; open countryside. Green fields and rows of trees under a clear blue summer sky. Bright midday sunshine, crisp shadows",
+   "a wide shot of a single oak tree; snowy mountains. Pine forests covered in thick white snow, deep snowdrifts on the ground, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows",
+   "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons"
   ]
  },
  "meadow new scenes": {
@@ -1456,7 +1456,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "33448f6a26a2b143"
+    "likely_prompts_sha": "8438448d29aa85ca"
    },
    {
     "say": "new scene of a lighthouse on a cliff",
@@ -1473,7 +1473,7 @@
      "unmatched": false
     },
     "committed": "a lighthouse on a cliff",
-    "likely_prompts_sha": "c4ea4ec0e7e0c28c"
+    "likely_prompts_sha": "bde05519238165d5"
    },
    {
     "say": "make it winter",
@@ -1496,12 +1496,12 @@
      "unmatched": false
     },
     "committed": "a lighthouse on a cliff; winter scenery with snow on the ground",
-    "likely_prompts_sha": "89047f31420bdcf6"
+    "likely_prompts_sha": "1afcd97ec2d45c0b"
    },
    {
     "say": "make it a desert",
     "steer": {
-     "prompt": "a lighthouse on a cliff; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+     "prompt": "a lighthouse on a cliff; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
      "ramp_chunks": 1,
      "provisional": false,
      "cap": 1.0
@@ -1518,13 +1518,13 @@
      "keyword": "desert",
      "unmatched": false
     },
-    "committed": "a lighthouse on a cliff; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
-    "likely_prompts_sha": "7377de94885878cd"
+    "committed": "a lighthouse on a cliff; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+    "likely_prompts_sha": "2013fe56e07d5ac5"
    },
    {
     "say": "show me a castle",
     "steer": {
-     "prompt": "a lighthouse on a cliff; a stone castle with tall towers in the distance; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+     "prompt": "a lighthouse on a cliff; a stone castle with tall towers in the distance; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
      "ramp_chunks": 1,
      "provisional": false,
      "cap": 1.0
@@ -1546,8 +1546,8 @@
      "keyword": "castle",
      "unmatched": false
     },
-    "committed": "a lighthouse on a cliff; a stone castle with tall towers in the distance; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
-    "likely_prompts_sha": "dc09ea22df741233"
+    "committed": "a lighthouse on a cliff; a stone castle with tall towers in the distance; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+    "likely_prompts_sha": "c2e42c8e36afd71a"
    },
    {
     "say": "reset and add a dog",
@@ -1570,7 +1570,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; a dog standing nearby",
-    "likely_prompts_sha": "2f073024c3d21d78"
+    "likely_prompts_sha": "2283fce1bef2fd27"
    },
    {
     "say": "start over with a beach",
@@ -1587,7 +1587,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "33448f6a26a2b143"
+    "likely_prompts_sha": "8438448d29aa85ca"
    }
   ],
   "likely_prompts": [
@@ -1631,14 +1631,14 @@
    "a wide shot of a meadow with a single oak tree; strong wind blowing through everything",
    "a wide shot of a meadow with a single oak tree; tall trees with branches moving in the breeze",
    "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-   "a wide shot of a single oak tree; a coastal highway on a cliff top. Grey asphalt with white lane markings runs straight ahead, a low stone wall along the edge of the road, a bright turquoise ocean with white waves far below the cliff on the left side, palm trees and green hills on the right side. Sunny tropical day, clear blue sky, sparkling light on the water",
-   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons",
+   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+   "a wide shot of a single oak tree; a dense green pine forest, tall trees all around, soft sunlight through the branches",
    "a wide shot of a single oak tree; a green meadow with soft grass, under a clear blue sky",
-   "a wide shot of a single oak tree; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
-   "a wide shot of a single oak tree; a narrow road through a dense green pine forest, tall trees on both sides, soft sunlight through the branches",
-   "a wide shot of a single oak tree; a snowy mountain road. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows",
-   "a wide shot of a single oak tree; a straight two-lane country road. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows",
-   "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere"
+   "a wide shot of a single oak tree; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+   "a wide shot of a single oak tree; a wide sandy beach. A bright turquoise ocean with white waves rolling onto pale golden sand, palm trees along the shore. Sunny tropical day, clear blue sky, sparkling light on the water",
+   "a wide shot of a single oak tree; open countryside. Green fields and rows of trees under a clear blue summer sky. Bright midday sunshine, crisp shadows",
+   "a wide shot of a single oak tree; snowy mountains. Pine forests covered in thick white snow, deep snowdrifts on the ground, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows",
+   "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons"
   ]
  },
  "car chain": {
@@ -1653,7 +1653,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "33448f6a26a2b143"
+    "likely_prompts_sha": "8438448d29aa85ca"
    },
    {
     "say": "new scene of a red sports car driving along a country road",
@@ -1939,7 +1939,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "33448f6a26a2b143"
+    "likely_prompts_sha": "8438448d29aa85ca"
    }
   ],
   "likely_prompts": [
@@ -1983,14 +1983,14 @@
    "a wide shot of a meadow with a single oak tree; strong wind blowing through everything",
    "a wide shot of a meadow with a single oak tree; tall trees with branches moving in the breeze",
    "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-   "a wide shot of a single oak tree; a coastal highway on a cliff top. Grey asphalt with white lane markings runs straight ahead, a low stone wall along the edge of the road, a bright turquoise ocean with white waves far below the cliff on the left side, palm trees and green hills on the right side. Sunny tropical day, clear blue sky, sparkling light on the water",
-   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons",
+   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+   "a wide shot of a single oak tree; a dense green pine forest, tall trees all around, soft sunlight through the branches",
    "a wide shot of a single oak tree; a green meadow with soft grass, under a clear blue sky",
-   "a wide shot of a single oak tree; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
-   "a wide shot of a single oak tree; a narrow road through a dense green pine forest, tall trees on both sides, soft sunlight through the branches",
-   "a wide shot of a single oak tree; a snowy mountain road. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows",
-   "a wide shot of a single oak tree; a straight two-lane country road. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows",
-   "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere"
+   "a wide shot of a single oak tree; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+   "a wide shot of a single oak tree; a wide sandy beach. A bright turquoise ocean with white waves rolling onto pale golden sand, palm trees along the shore. Sunny tropical day, clear blue sky, sparkling light on the water",
+   "a wide shot of a single oak tree; open countryside. Green fields and rows of trees under a clear blue summer sky. Bright midday sunshine, crisp shadows",
+   "a wide shot of a single oak tree; snowy mountains. Pine forests covered in thick white snow, deep snowdrifts on the ground, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows",
+   "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons"
   ]
  },
  "partials": {
@@ -2005,7 +2005,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "33448f6a26a2b143"
+    "likely_prompts_sha": "8438448d29aa85ca"
    },
    {
     "say": "partial:make it win",
@@ -2017,7 +2017,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "33448f6a26a2b143"
+    "likely_prompts_sha": "8438448d29aa85ca"
    },
    {
     "say": "partial:make it winter",
@@ -2034,7 +2034,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "33448f6a26a2b143"
+    "likely_prompts_sha": "8438448d29aa85ca"
    },
    {
     "say": "final:make it winter",
@@ -2057,7 +2057,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-    "likely_prompts_sha": "d2bc268fc223295f"
+    "likely_prompts_sha": "bb5cfaa4799ccb75"
    },
    {
     "say": "partial:add a li",
@@ -2075,7 +2075,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-    "likely_prompts_sha": "d2bc268fc223295f"
+    "likely_prompts_sha": "bb5cfaa4799ccb75"
    },
    {
     "say": "partial:add a lion",
@@ -2093,7 +2093,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-    "likely_prompts_sha": "d2bc268fc223295f"
+    "likely_prompts_sha": "bb5cfaa4799ccb75"
    },
    {
     "say": "partial:add a",
@@ -2111,7 +2111,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-    "likely_prompts_sha": "d2bc268fc223295f"
+    "likely_prompts_sha": "bb5cfaa4799ccb75"
    },
    {
     "say": "final:add a lion",
@@ -2139,7 +2139,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a lion",
-    "likely_prompts_sha": "75ba513637ac6a7c"
+    "likely_prompts_sha": "4ac6399d06f5aa4b"
    },
    {
     "say": "partial:undo",
@@ -2162,7 +2162,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a lion",
-    "likely_prompts_sha": "75ba513637ac6a7c"
+    "likely_prompts_sha": "4ac6399d06f5aa4b"
    },
    {
     "say": "partial:make it a desert",
@@ -2185,7 +2185,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a lion",
-    "likely_prompts_sha": "75ba513637ac6a7c"
+    "likely_prompts_sha": "4ac6399d06f5aa4b"
    },
    {
     "say": "partial:add a dog",
@@ -2213,7 +2213,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; a lion",
-    "likely_prompts_sha": "75ba513637ac6a7c"
+    "likely_prompts_sha": "4ac6399d06f5aa4b"
    },
    {
     "say": "final:never mind",
@@ -2236,7 +2236,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-    "likely_prompts_sha": "d2bc268fc223295f"
+    "likely_prompts_sha": "bb5cfaa4799ccb75"
    }
   ],
   "likely_prompts": [
@@ -2279,14 +2279,14 @@
    "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; steady rain falling",
    "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; strong wind blowing through everything",
    "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground; tall trees with branches moving in the breeze",
-   "a wide shot of a single oak tree; a coastal highway on a cliff top. Grey asphalt with white lane markings runs straight ahead, a low stone wall along the edge of the road, a bright turquoise ocean with white waves far below the cliff on the left side, palm trees and green hills on the right side. Sunny tropical day, clear blue sky, sparkling light on the water",
-   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons",
+   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+   "a wide shot of a single oak tree; a dense green pine forest, tall trees all around, soft sunlight through the branches",
    "a wide shot of a single oak tree; a green meadow with soft grass, under a clear blue sky",
-   "a wide shot of a single oak tree; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
-   "a wide shot of a single oak tree; a narrow road through a dense green pine forest, tall trees on both sides, soft sunlight through the branches",
-   "a wide shot of a single oak tree; a snowy mountain road. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows",
-   "a wide shot of a single oak tree; a straight two-lane country road. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows",
-   "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere"
+   "a wide shot of a single oak tree; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+   "a wide shot of a single oak tree; a wide sandy beach. A bright turquoise ocean with white waves rolling onto pale golden sand, palm trees along the shore. Sunny tropical day, clear blue sky, sparkling light on the water",
+   "a wide shot of a single oak tree; open countryside. Green fields and rows of trees under a clear blue summer sky. Bright midday sunshine, crisp shadows",
+   "a wide shot of a single oak tree; snowy mountains. Pine forests covered in thick white snow, deep snowdrifts on the ground, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows",
+   "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons"
   ]
  },
  "sonnet meadow": {
@@ -2306,7 +2306,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "33448f6a26a2b143",
+    "likely_prompts_sha": "8438448d29aa85ca",
     "model_calls": []
    },
    {
@@ -2330,7 +2330,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a soft white blanket over the grass, frost-dusted textures, pale cold light, muted silver and blue tones",
-    "likely_prompts_sha": "c9f3d59a0c3fed8a",
+    "likely_prompts_sha": "1e8efd791f372e1e",
     "model_calls": []
    },
    {
@@ -2349,7 +2349,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a soft white blanket over the grass, frost-dusted textures, pale cold light, muted silver and blue tones",
-    "likely_prompts_sha": "c9f3d59a0c3fed8a",
+    "likely_prompts_sha": "1e8efd791f372e1e",
     "model_calls": []
    },
    {
@@ -2996,7 +2996,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "33448f6a26a2b143",
+    "likely_prompts_sha": "8438448d29aa85ca",
     "model_calls": []
    }
   ],
@@ -3041,14 +3041,14 @@
    "a wide shot of a meadow with a single oak tree; strong wind blowing through everything",
    "a wide shot of a meadow with a single oak tree; tall trees with branches moving in the breeze",
    "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-   "a wide shot of a single oak tree; a coastal highway on a cliff top. Grey asphalt with white lane markings runs straight ahead, a low stone wall along the edge of the road, a bright turquoise ocean with white waves far below the cliff on the left side, palm trees and green hills on the right side. Sunny tropical day, clear blue sky, sparkling light on the water",
-   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons",
+   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+   "a wide shot of a single oak tree; a dense green pine forest, tall trees all around, soft sunlight through the branches",
    "a wide shot of a single oak tree; a green meadow with soft grass, under a clear blue sky",
-   "a wide shot of a single oak tree; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
-   "a wide shot of a single oak tree; a narrow road through a dense green pine forest, tall trees on both sides, soft sunlight through the branches",
-   "a wide shot of a single oak tree; a snowy mountain road. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows",
-   "a wide shot of a single oak tree; a straight two-lane country road. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows",
-   "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere"
+   "a wide shot of a single oak tree; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+   "a wide shot of a single oak tree; a wide sandy beach. A bright turquoise ocean with white waves rolling onto pale golden sand, palm trees along the shore. Sunny tropical day, clear blue sky, sparkling light on the water",
+   "a wide shot of a single oak tree; open countryside. Green fields and rows of trees under a clear blue summer sky. Bright midday sunshine, crisp shadows",
+   "a wide shot of a single oak tree; snowy mountains. Pine forests covered in thick white snow, deep snowdrifts on the ground, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows",
+   "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons"
   ],
   "stats": {
    "state": "on",
@@ -3056,7 +3056,7 @@
    "prompt_spec": "commands.rewriter",
    "calls": 2,
    "cache_hits": 0,
-   "pinned": 133,
+   "pinned": 136,
    "pinned_hits": 9,
    "template_hits": 0,
    "blocked": 1,
@@ -3089,7 +3089,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "33448f6a26a2b143",
+    "likely_prompts_sha": "8438448d29aa85ca",
     "model_calls": []
    },
    {
@@ -3500,7 +3500,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "33448f6a26a2b143",
+    "likely_prompts_sha": "8438448d29aa85ca",
     "model_calls": []
    }
   ],
@@ -3545,14 +3545,14 @@
    "a wide shot of a meadow with a single oak tree; strong wind blowing through everything",
    "a wide shot of a meadow with a single oak tree; tall trees with branches moving in the breeze",
    "a wide shot of a meadow with a single oak tree; winter scenery with snow on the ground",
-   "a wide shot of a single oak tree; a coastal highway on a cliff top. Grey asphalt with white lane markings runs straight ahead, a low stone wall along the edge of the road, a bright turquoise ocean with white waves far below the cliff on the left side, palm trees and green hills on the right side. Sunny tropical day, clear blue sky, sparkling light on the water",
-   "a wide shot of a single oak tree; a dusty road across the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons",
+   "a wide shot of a single oak tree; a big city at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet pavement reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere",
+   "a wide shot of a single oak tree; a dense green pine forest, tall trees all around, soft sunlight through the branches",
    "a wide shot of a single oak tree; a green meadow with soft grass, under a clear blue sky",
-   "a wide shot of a single oak tree; a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
-   "a wide shot of a single oak tree; a narrow road through a dense green pine forest, tall trees on both sides, soft sunlight through the branches",
-   "a wide shot of a single oak tree; a snowy mountain road. Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows",
-   "a wide shot of a single oak tree; a straight two-lane country road. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows",
-   "a wide shot of a single oak tree; a wide city street at night. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. Dark night sky, vivid neon glow, cyberpunk atmosphere"
+   "a wide shot of a single oak tree; a vast open desert. Red sandstone mesas and golden sand dunes stretch to the horizon, dry scrub on the cracked ground, heat haze shimmering above the sand. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows",
+   "a wide shot of a single oak tree; a wide sandy beach. A bright turquoise ocean with white waves rolling onto pale golden sand, palm trees along the shore. Sunny tropical day, clear blue sky, sparkling light on the water",
+   "a wide shot of a single oak tree; open countryside. Green fields and rows of trees under a clear blue summer sky. Bright midday sunshine, crisp shadows",
+   "a wide shot of a single oak tree; snowy mountains. Pine forests covered in thick white snow, deep snowdrifts on the ground, snowflakes falling. Cold blue overcast winter light, soft diffuse shadows",
+   "a wide shot of a single oak tree; the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons"
   ],
   "stats": {
    "state": "on",
@@ -3560,7 +3560,7 @@
    "prompt_spec": "commands.rewriter",
    "calls": 2,
    "cache_hits": 0,
-   "pinned": 133,
+   "pinned": 136,
    "pinned_hits": 10,
    "template_hits": 1,
    "blocked": 0,
@@ -3593,7 +3593,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "33448f6a26a2b143",
+    "likely_prompts_sha": "8438448d29aa85ca",
     "model_calls": []
    },
    {
@@ -3617,7 +3617,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; winter, snow covering the ground and bare branches; a soft white blanket over the grass, frost-dusted textures, pale cold light, muted silver and blue tones",
-    "likely_prompts_sha": "c9f3d59a0c3fed8a",
+    "likely_prompts_sha": "1e8efd791f372e1e",
     "model_calls": []
    },
    {
@@ -3635,7 +3635,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "33448f6a26a2b143",
+    "likely_prompts_sha": "8438448d29aa85ca",
     "model_calls": []
    },
    {
@@ -3648,7 +3648,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "33448f6a26a2b143",
+    "likely_prompts_sha": "8438448d29aa85ca",
     "model_calls": []
    },
    {
@@ -3661,7 +3661,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree",
-    "likely_prompts_sha": "33448f6a26a2b143",
+    "likely_prompts_sha": "8438448d29aa85ca",
     "model_calls": [
      {
       "scene": {
@@ -3695,7 +3695,7 @@
      "unmatched": false
     },
     "committed": "a wide shot of a meadow with a single oak tree; a dog standing nearby",
-    "likely_prompts_sha": "2f073024c3d21d78",
+    "likely_prompts_sha": "2283fce1bef2fd27",
     "model_calls": [
      {
       "scene": {
@@ -3793,7 +3793,7 @@
    "prompt_spec": "commands.rewriter",
    "calls": 3,
    "cache_hits": 0,
-   "pinned": 133,
+   "pinned": 136,
    "pinned_hits": 1,
    "template_hits": 0,
    "blocked": 0,
@@ -3809,5 +3809,5 @@
    "cache_file": null
   }
  },
- "system_prompt": "You read one spoken sentence that edits a video scene, and reply with one JSON object only:\n{\"blocked\": <true or false>, \"operations\": [<operation>, ...], \"details\": \"<text>\"}\n\nThe scene is a base sentence plus a list of changes. Each change has an id, a label (a short name shown on a\nchip), a kind, a phrase (the words added to the video prompt) and a strength (0 to 1.3, normal 1.0).\nKinds: world (the place: desert, neon city, Mars, ...), season (winter, autumn, ...), weather (rain, fog, sunny, ...), time (night, day, sunset, ...), extra (any object, animal, person or effect). Adding a world, season, weather or time replaces the old one of that kind.\n\nOperations, applied in order (a sentence with several edits gives several operations, at most 6):\n{\"op\": \"add\", \"label\": \"<1 or 2 words, lowercase>\", \"kind\": \"<world|season|weather|time|extra>\", \"phrase\": \"<short visual description>\", \"strength\": 1.0}\n{\"op\": \"remove\", \"id\": \"<id of an existing change>\"}\n{\"op\": \"set_strength\", \"id\": \"<id of an existing change>\", \"strength\": <0 to 1.3>}\n{\"op\": \"edit_base\", \"base\": \"<the base sentence rewritten, changing only what the user asked>\"}\n{\"op\": \"new_scene\", \"base\": \"<one sentence describing the whole new scene>\"}\n\nRules for operations:\n- Write phrases as concrete visual descriptions. A season, weather or time phrase is under 12 words.\n- A new object, animal or person (kind extra) gets a phrase of at most 25 words (under 200 characters) with\n  explicit size and position words that a video model obeys: where it is in the frame and, when it helps, next\n  to what. The first object added to a scene is the main one: never \"small\", it takes the centre and is large,\n  for example \"a red car parked beside the oak tree in the centre of the frame, facing the camera, large and\n  clearly visible\". A later object takes a free place, for example \"a large male lion standing in the\n  foreground at the left of the frame, facing the camera\" when the centre is taken. The engine keeps\n  that phrase word for word, right after the subject, in every later prompt, also after a change of place,\n  season or time, so it must not name a place, ground, season, weather or time of day (\"in the snow\", \"on the\n  sand\", \"at night\" are wrong): only the object, its size, its position and what it does.\n- If an add names a kind the scene already has, its phrase describes a second one with a clear position. A\n  colour, type or size the user names ALWAYS wins: \"add a red car racing on a road\" when the scene has a red car\n  gives \"a second small red car racing in the next lane at the right of the frame\", differing only by position.\n  A second one always gets its own label (\"second red car\"): an add with the label of an existing change\n  replaces that change.\n  Only when the user names no attribute (\"add a car\"), give the second one another colour or type.\n- A vehicle on a road (\"add a red car racing on a road\") gets this cue at the end of its phrase: \"white dashed lane markings rush toward the viewer\".\n- A PLACE or setting (\"take me to the desert\", \"make it a desert\", \"go to Mars\", \"switch to a\n  neon city\") is ONE add of kind world: label = the place in 1 to 3 words, phrase = a short description of that\n  place. It replaces the old world and KEEPS every object: a red car added before stays in the desert.\n  A new place brings its own season and weather: the earlier season and weather changes are cleared, so a\n  desert after \"make it winter\" has no snow. Add a season or weather again only if the user says it in the same\n  sentence (\"a snowy desert\"). The time of day stays.\n  Known places, use exactly these labels when one fits: country road, desert, forest, mars, meadow, neon city, ocean coast, snowy mountain road.\n- Seasons, weather and times of day use the keyword table's labels and kinds, so a sentence gives the same\n  change however it is read: label (kind): words that mean it.\n  winter (season): snow, snowy, wintry, wintertime, snowfall, snow fall, snowing, snowstorm, snow storm, blizzard, frost, frosty, frozen, icy\n  autumn (season): fall, leaves, fall leaves, autumn leaves, autumnal, fall season\n  spring (season): springtime, spring time, spring season\n  summer (season): summertime, summer time, summer season\n  rain (weather): rainy, raining, rainfall, rain fall, drizzle, drizzling, downpour, pouring rain, rain shower, rain showers\n  fog (weather): foggy, mist, misty, haze, hazy, mists\n  storm (weather): stormy, thunder, lightning, thunderstorm, thunderstorms, thunder storm, thunder storms, storm clouds\n  wind (weather): windy, breeze, breezy, gust, gusts, gusty, strong winds\n  night (time): nighttime, night time, dark, darkness, moon, moonlight, moonlit, moon lit, midnight, starry night, full moon\n  day (time): daytime, day time, daylight, day light, morning, sunny, sunshine, sunlight, bright, bright day, day time sunlight\n  sunset (time): dusk, evening, sundown, sun down, sun set, golden hour\n  sunrise (time): dawn, daybreak, day break, sun rise, early morning\n  noon (time): midday, mid day, afternoon, mid afternoon, midafternoon\n  \"sunny\" is the time change day: it replaces night. Use one of these labels whenever the words fit.\n- A BASE EDIT turns something the base sentence names into something else and KEEPS every change (\"turn the\n  tree into a lighthouse\"): use edit_base. The engine keeps the changes; never copy them yourself.\n- A NEW SCENE only when the user asks for one in so many words (\"new scene of a beach\", \"start over with a\n  beach\"): use new_scene, which clears every change. Its base is the user's words for the scene, as said.\n- edit_base and new_scene come before any other operation of the sentence.\n- To remove or weaken something, use the id of the matching change. \"a little\" means strength 0.3, \"a lot\" or\n  \"very\" means 1.3.\n- Pace words (slowly, gradually, gently, little by little, suddenly) set how fast a change appears, never its\n  strength. Strength stays 1.0 unless the sentence has a strength word (a little, a lot, more, less, slightly,\n  very).\n- A place after near, by, beside, next to, in front of or behind (\"add snow near the river\") only says where the\n  new thing goes. Never add that place as its own change: add only what the sentence asks for (\"add snow near the\n  river\" is one add, winter).\n- The video model cannot guess what happens to the scene's objects when the place changes; the prompt must say it.\n  So when a sentence changes the place (an add of kind world, or a base edit), also re-add every object of kind\n  extra whose phrase no longer fits the new place, with its SAME label and a phrase that says where it is, what it\n  stands or drives on, and which way it faces (\"a red car parked on the road in the centre of the frame, facing\n  the camera\"). Never name the place itself in an object's phrase: the place's own phrase holds the road, the sand\n  and the water. A thing that cannot stay where it was (a car in the sea or on sand) gets a plausible spot (a car\n  on the road). Remove an object only when the user asks for it.\n- Removing a place (\"remove the forest\") removes only its change of kind world. Objects stay, even ones that\n  look like part of that place: trees the user added stay when the forest goes.\n- If the sentence is vague, not about the picture, or asks to undo or reset, reply with an empty operations list.\n\nSet \"blocked\" to true, with no operations, if the sentence asks for sexual, violent (gore, killing, injury) or\nhateful content. Otherwise \"blocked\" is false.\n\nThe user message is JSON: {\"scene\": <the scene before the sentence>, \"prompt\": <its current video prompt>,\n\"sentence\": <what the user said>, \"details_max_words\": <the most words \"details\" may have>}. If it also has\n\"rejected\", your earlier reply to the same sentence was not usable for the reasons given: reply again, fixed.\n\nFor the \"details\" field, follow the rules below. Where they speak of the scene or the description, that is the\nNEW scene, after your operations. Any reply format they name is only the shape of that one field: you always\nreply with the one JSON object above, {\"blocked\", \"operations\", \"details\"}.\n\nYou enrich a scene description for a text-to-video model.\nReply with JSON only: {\"details\": \"...\"} with about 40 to 50 words on one line.\nWrite ONLY extra world, light, texture and atmosphere detail for the scene as described.\nThe input is either the scene text, or JSON {\"scene\": ..., \"command\": ...}. The scene text is authoritative:\nthe command is context only and never permission to add, remove or change anything the scene does not already say.\nRules:\n- Do not repeat, reword or contradict the description; it is kept word for word in front of your details.\n- Do not mention the camera or framing, and no camera movement.\n- Do not mention any subject, person, animal or vehicle, and no motion of any kind.\n- Add no new objects, actors or events.\n- Keep the time of day, season and weather exactly as described; never add a time of day or weather that is not described.\n- You cannot see the video: never mention earlier frames or what happened before or after.\n- No negations.\nIf nothing can be added safely, reply {\"details\": \"\"}.\n\nLimits the engine checks on \"details\" (a clause that breaks one is cut; a reply with nothing left is rejected):\n- Write 3 to 5 short clauses separated by commas, the most important first, at most \"details_max_words\" words\n  in all. Only the ground, surfaces, textures, light, air and colours of the place.\n- Never name or describe an object, animal, person or vehicle of the scene again, and never say where anything\n  is: no position or framing words (background, behind, beside, center, centre, closeup, distance, distant, foreground, front, left, middle, midground, right, shot).\n- Never these words, they are objects: alpine peaks, alps, automobile, automobiles, beacon, bird, birds, blossom, blossoms, boat, boats, bon fire, bonfire, bridge, bridges, brook, brooks, butter flies, butter fly, butterflies, butterfly, cabin, cabins, camp fire, campfire, canine, canines, canoe, canoes, car, cars, cascade, cascades, castle, castles, cat, cats, citadel, citadels, cloud, cloud cover, clouds, cloudy, constellation, constellations, cottage, cottages, creek, creeks, crowd, crowds, deer, doe, dog, dogs, eagle, eagles, fawn, feline, felines, fire, fire flies, fire fly, fireflies, firefly, fish, fishes, flame, flames, flock, flock of birds, flower, flowers, foot bridge, footbridge, forest, fortress, fortresses, group of people, horse, horses, hound, hounds, house, houses, human, humans, hut, huts, kitten, kittens, lagoon, lagoons, lake, lakes, light house, light houses, lighthouse, lighthouses, lightning bug, lightning bugs, motor car, motorcar, mountain, mountain range, mountains, oak, oak tree, oak trees, oaks, overcast, peak, peaks, pedestrian, pedestrians, people, person, pine, pine tree, pine trees, pines, pond, ponds, ponies, pony, puppies, puppy, rain bow, rainbow, rainbows, river, rivers, row boat, rowboat, sail boat, sailboat, salmon, sedan, sedans, snow man, snow men, snowman, snowmen, sparrow, sparrows, sports car, stag, stallion, stallions, star, star light, starlight, starry sky, stars, stream, streams, tree, trees, trout, vehicle, vehicles, water fall, water falls, waterfall, waterfalls, waterway, waterways, wild flower, wild flowers, wildflower, wildflowers, woodland, woods.\n- A season, weather or time word only for a label the NEW scene has after your operations. The words of each\n  label are in the keyword table above; note that haze, mist, wind, breeze, frost, icy, moon, moonlight, stars,\n  sunlight, sunshine, morning, evening and dusk are on it, so \"heat haze\" needs fog and \"moonlight\" needs night.\n- Never these words (motion, camera, time order, negation): camera, cameras, pan, pans, panning, zoom, zooming, dolly, tracking, aerial, drone, tilt, crane, handheld, orbit, cut, cuts, frame, frames, framing, drive, drives, driving, move, moves, moving, run, runs, running, walk, walks, walking, fly, flies, flying, reverse, reversing, backward, backwards, toward, towards, away, approach, approaching, enter, entering, leave, leaves, leaving, arrive, arriving, appear, appears, emerge, emerging, speeding, racing, explode, explosion, crash, suddenly, transform, becomes, previous, previously, earlier, again, still, now, before, after, anymore, remain, remains, continue, continues, no, not, never, without, none, nothing.\n- Road words (asphalt, blur, freeway, highway, highways, lane, lanes, motorway, pavement, road, roads, roadside, street, streets, tire, tires, track, tracks, tyre, tyres) only when the scene has a road.\n\n\nVehicle scenes. When the NEW scene, after your operations, has a vehicle as its main subject (its base names a car,\ntruck, van, bus, motorcycle, jeep or taxi), the engine writes the video prompt from a fixed template:\n  \"<Subject>, seen from directly behind with its rear lights facing the camera, drives fast along <road>, moving\n  forward away from the camera. The camera follows directly behind the car ... rushes toward the viewer. <scene>\n  <light> Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.\"\nThe engine writes the subject and camera sentences itself. For such a scene, reply with three more fields and\nleave \"details\" empty: {\"blocked\": ..., \"operations\": [...], \"details\": \"\", \"road\": \"...\", \"scene\": \"...\", \"light\": \"...\"}\n- \"road\": a noun phrase for the road of the new scene, starting with \"a\", at most 14 words, no period. It always\n  names the paved road the vehicle drives on (road, highway, street, lane, bridge): the video model draws the vehicle\n  on whatever this says. For a beach it is a road beside the beach (\"a beachfront road with pale sand and waves\n  beside it\"), never sand or water.\n- \"take me to X\", \"go to X\", \"drive to X\", \"turn it into X\" on a vehicle scene: the vehicle keeps driving, now on a\n  road in X. The vehicle goes only when the user says so (\"remove the car\", \"just the beach, no car\"): then reply\n  with ONE new_scene whose base describes X itself (\"a wide sandy beach with gentle turquoise waves\") and no add\n  of kind world (a base that names a place cannot take another place).\n- \"scene\": ONE sentence (at most 40 words) about what lines both sides of the road: landscape, buildings, weather\n  you can see. Never the camera, the shot or the frame. The scene's objects (kind extra) are added by the engine\n  from their phrases, word for word: do not describe them again.\n- \"light\": ONE short sentence (at most 20 words) about the light and the sky.\n- The world of the new scene: its place, season, weather and time of day. A change of place replaces the road,\n  the scene and the light together. If \"car_template\" in the user message gives the current road, scene and\n  light, keep what the sentence does not change.\n- For a new scene of a vehicle, use new_scene with the base being only the vehicle (\"a blue pickup truck\") and an\n  add of kind world for its place.\nMeasured examples (road | scene | light):\n- country: a straight two-lane country road | Green fields and rows of trees line both sides of the road under a clear blue summer sky. | Bright midday sunshine, crisp shadows.\n- winter: a snowy mountain road | Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. | Cold blue overcast winter light, soft diffuse shadows.\n- desert: a long straight desert highway | Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. | Hot afternoon sun in a cloudless pale blue sky, strong hard shadows.\n- neon city: a wide city street at night | Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. | Dark night sky, vivid neon glow, cyberpunk atmosphere.\n- ocean coast: a coastal highway on a cliff top | Grey asphalt with white lane markings runs straight ahead, a low stone wall along the edge of the road, a bright turquoise ocean with white waves far below the cliff on the left side, palm trees and green hills on the right side. | Sunny tropical day, clear blue sky, sparkling light on the water.\n- sunset: a straight open road across rolling grassland | Golden grass fields and a few lone trees on both sides, long shadows stretching across the road. | The sun setting low on the horizon ahead, a glowing orange and pink sky, warm backlight.\n- autumn: a winding country road through an autumn forest | Trees with bright orange, red and yellow leaves line both sides, fallen leaves scattered across the road and swirling behind the car. | Low warm golden afternoon sun, light mist between the trees.\n- rain: a wet country road in heavy rain | Rain pours down, puddles and spray on the dark asphalt, water kicked up behind the tyres, green fields and trees blurred by the rain. | Dark grey storm clouds, dim diffuse light, glistening reflections on the road.\n"
+ "system_prompt": "You read one spoken sentence that edits a video scene, and reply with one JSON object only:\n{\"blocked\": <true or false>, \"operations\": [<operation>, ...], \"details\": \"<text>\"}\n\nThe scene is a base sentence plus a list of changes. Each change has an id, a label (a short name shown on a\nchip), a kind, a phrase (the words added to the video prompt) and a strength (0 to 1.3, normal 1.0).\nKinds: world (the place: desert, neon city, Mars, ...), season (winter, autumn, ...), weather (rain, fog, sunny, ...), time (night, day, sunset, ...), extra (any object, animal, person or effect). Adding a world, season, weather or time replaces the old one of that kind.\n\nOperations, applied in order (a sentence with several edits gives several operations, at most 6):\n{\"op\": \"add\", \"label\": \"<1 or 2 words, lowercase>\", \"kind\": \"<world|season|weather|time|extra>\", \"phrase\": \"<short visual description>\", \"strength\": 1.0}\n{\"op\": \"remove\", \"id\": \"<id of an existing change>\"}\n{\"op\": \"set_strength\", \"id\": \"<id of an existing change>\", \"strength\": <0 to 1.3>}\n{\"op\": \"edit_base\", \"base\": \"<the base sentence rewritten, changing only what the user asked>\"}\n{\"op\": \"new_scene\", \"base\": \"<one sentence describing the whole new scene>\"}\n\nRules for operations:\n- Write phrases as concrete visual descriptions. A season, weather or time phrase is under 12 words.\n- A new object, animal or person (kind extra) gets a phrase of at most 25 words (under 200 characters) with\n  explicit size and position words that a video model obeys: where it is in the frame and, when it helps, next\n  to what. The first object added to a scene is the main one: never \"small\", it takes the centre and is large,\n  for example \"a red car parked beside the oak tree in the centre of the frame, facing the camera, large and\n  clearly visible\". A later object takes a free place, for example \"a large male lion standing in the\n  foreground at the left of the frame, facing the camera\" when the centre is taken. The engine keeps\n  that phrase word for word, right after the subject, in every later prompt, also after a change of place,\n  season or time, so it must not name a place, ground, season, weather or time of day (\"in the snow\", \"on the\n  sand\", \"at night\" are wrong): only the object, its size, its position and what it does.\n- If an add names a kind the scene already has, its phrase describes a second one with a clear position. A\n  colour, type or size the user names ALWAYS wins: \"add a red car racing on a road\" when the scene has a red car\n  gives \"a second small red car racing in the next lane at the right of the frame\", differing only by position.\n  A second one always gets its own label (\"second red car\"): an add with the label of an existing change\n  replaces that change.\n  Only when the user names no attribute (\"add a car\"), give the second one another colour or type.\n- A vehicle on a road (\"add a red car racing on a road\") gets this cue at the end of its phrase: \"white dashed lane markings rush toward the viewer\".\n- A PLACE or setting (\"take me to the desert\", \"make it a desert\", \"go to Mars\", \"switch to a\n  neon city\") is ONE add of kind world: label = the place in 1 to 3 words, phrase = a short description of that\n  place. It replaces the old world and KEEPS every object: a red car added before stays in the desert.\n  A new place brings its own season and weather: the earlier season and weather changes are cleared, so a\n  desert after \"make it winter\" has no snow. Add a season or weather again only if the user says it in the same\n  sentence (\"a snowy desert\"). The time of day stays.\n  Known places, use exactly these labels when one fits: country road, desert, forest, mars, meadow, neon city, ocean coast, snowy mountain road.\n- Seasons, weather and times of day use the keyword table's labels and kinds, so a sentence gives the same\n  change however it is read: label (kind): words that mean it.\n  winter (season): snow, snowy, wintry, wintertime, snowfall, snow fall, snowing, snowstorm, snow storm, blizzard, frost, frosty, frozen, icy\n  autumn (season): fall, leaves, fall leaves, autumn leaves, autumnal, fall season\n  spring (season): springtime, spring time, spring season\n  summer (season): summertime, summer time, summer season\n  rain (weather): rainy, raining, rainfall, rain fall, drizzle, drizzling, downpour, pouring rain, rain shower, rain showers\n  fog (weather): foggy, mist, misty, haze, hazy, mists\n  storm (weather): stormy, thunder, lightning, thunderstorm, thunderstorms, thunder storm, thunder storms, storm clouds\n  wind (weather): windy, breeze, breezy, gust, gusts, gusty, strong winds\n  night (time): nighttime, night time, dark, darkness, moon, moonlight, moonlit, moon lit, midnight, starry night, full moon\n  day (time): daytime, day time, daylight, day light, morning, sunny, sunshine, sunlight, bright, bright day, day time sunlight\n  sunset (time): dusk, evening, sundown, sun down, sun set, golden hour\n  sunrise (time): dawn, daybreak, day break, sun rise, early morning\n  noon (time): midday, mid day, afternoon, mid afternoon, midafternoon\n  \"sunny\" is the time change day: it replaces night. Use one of these labels whenever the words fit.\n- A BASE EDIT turns something the base sentence names into something else and KEEPS every change (\"turn the\n  tree into a lighthouse\"): use edit_base. The engine keeps the changes; never copy them yourself.\n- A NEW SCENE only when the user asks for one in so many words (\"new scene of a beach\", \"start over with a\n  beach\"): use new_scene, which clears every change. Its base is the user's words for the scene, as said.\n- edit_base and new_scene come before any other operation of the sentence.\n- To remove or weaken something, use the id of the matching change. \"a little\" means strength 0.3, \"a lot\" or\n  \"very\" means 1.3. \"More\" or \"a little more\" of an existing change raises it (set_strength 1.3), \"less\" or \"a\n  little less\" lowers it (0.7).\n- Pace words (slowly, gradually, gently, little by little, suddenly) set how fast a change appears, never its\n  strength. Strength stays 1.0 unless the sentence has a strength word (a little, a lot, more, less, slightly,\n  very).\n- A place after near, by, beside, next to, in front of or behind (\"add snow near the river\") only says where the\n  new thing goes. Never add that place as its own change: add only what the sentence asks for (\"add snow near the\n  river\" is one add, winter).\n- The video model cannot guess what happens to the scene's objects when the place changes; the prompt must say it.\n  So when a sentence changes the place (an add of kind world, or a base edit), also re-add every object of kind\n  extra whose phrase no longer fits the new place, with its SAME label and a phrase that says where it is, what it\n  stands or drives on, and which way it faces (\"a red car parked on the road in the centre of the frame, facing\n  the camera\"). Never name the place itself in an object's phrase: the place's own phrase holds the road, the sand\n  and the water. A thing that cannot stay where it was (a car in the sea or on sand) gets a plausible spot (a car\n  on the road). Remove an object only when the user asks for it.\n- Removing a place (\"remove the forest\") removes only its change of kind world. Objects stay, even ones that\n  look like part of that place: trees the user added stay when the forest goes.\n- If the sentence is vague, not about the picture, or asks to undo or reset, reply with an empty operations list.\n\nSet \"blocked\" to true, with no operations, if the sentence asks for sexual, violent (gore, killing, injury) or\nhateful content. Otherwise \"blocked\" is false.\n\nThe user message is JSON: {\"scene\": <the scene before the sentence>, \"prompt\": <its current video prompt>,\n\"sentence\": <what the user said>, \"details_max_words\": <the most words \"details\" may have>}. If it also has\n\"rejected\", your earlier reply to the same sentence was not usable for the reasons given: reply again, fixed.\n\nFor the \"details\" field, follow the rules below. Where they speak of the scene or the description, that is the\nNEW scene, after your operations. Any reply format they name is only the shape of that one field: you always\nreply with the one JSON object above, {\"blocked\", \"operations\", \"details\"}.\n\nYou enrich a scene description for a text-to-video model.\nReply with JSON only: {\"details\": \"...\"} with about 40 to 50 words on one line.\nWrite ONLY extra world, light, texture and atmosphere detail for the scene as described.\nThe input is either the scene text, or JSON {\"scene\": ..., \"command\": ...}. The scene text is authoritative:\nthe command is context only and never permission to add, remove or change anything the scene does not already say.\nRules:\n- Do not repeat, reword or contradict the description; it is kept word for word in front of your details.\n- Do not mention the camera or framing, and no camera movement.\n- Do not mention any subject, person, animal or vehicle, and no motion of any kind.\n- Add no new objects, actors or events.\n- Keep the time of day, season and weather exactly as described; never add a time of day or weather that is not described.\n- You cannot see the video: never mention earlier frames or what happened before or after.\n- No negations.\nIf nothing can be added safely, reply {\"details\": \"\"}.\n\nLimits the engine checks on \"details\" (a clause that breaks one is cut; a reply with nothing left is rejected):\n- Write 3 to 5 short clauses separated by commas, the most important first, at most \"details_max_words\" words\n  in all. Only the ground, surfaces, textures, light, air and colours of the place.\n- Never name or describe an object, animal, person or vehicle of the scene again, and never say where anything\n  is: no position or framing words (background, behind, beside, center, centre, closeup, distance, distant, foreground, front, left, middle, midground, right, shot).\n- Never these words, they are objects: alpine peaks, alps, automobile, automobiles, beacon, bird, birds, blossom, blossoms, boat, boats, bon fire, bonfire, bridge, bridges, brook, brooks, butter flies, butter fly, butterflies, butterfly, cabin, cabins, camp fire, campfire, canine, canines, canoe, canoes, car, cars, cascade, cascades, castle, castles, cat, cats, citadel, citadels, cloud, cloud cover, clouds, cloudy, constellation, constellations, cottage, cottages, creek, creeks, crowd, crowds, deer, doe, dog, dogs, eagle, eagles, fawn, feline, felines, fire, fire flies, fire fly, fireflies, firefly, fish, fishes, flame, flames, flock, flock of birds, flower, flowers, foot bridge, footbridge, forest, fortress, fortresses, group of people, horse, horses, hound, hounds, house, houses, human, humans, hut, huts, kitten, kittens, lagoon, lagoons, lake, lakes, light house, light houses, lighthouse, lighthouses, lightning bug, lightning bugs, motor car, motorcar, mountain, mountain range, mountains, oak, oak tree, oak trees, oaks, overcast, peak, peaks, pedestrian, pedestrians, people, person, pine, pine tree, pine trees, pines, pond, ponds, ponies, pony, puppies, puppy, rain bow, rainbow, rainbows, river, rivers, row boat, rowboat, sail boat, sailboat, salmon, sedan, sedans, snow man, snow men, snowman, snowmen, sparrow, sparrows, sports car, stag, stallion, stallions, star, star light, starlight, starry sky, stars, stream, streams, tree, trees, trout, vehicle, vehicles, water fall, water falls, waterfall, waterfalls, waterway, waterways, wild flower, wild flowers, wildflower, wildflowers, woodland, woods.\n- A season, weather or time word only for a label the NEW scene has after your operations. The words of each\n  label are in the keyword table above; note that haze, mist, wind, breeze, frost, icy, moon, moonlight, stars,\n  sunlight, sunshine, morning, evening and dusk are on it, so \"heat haze\" needs fog and \"moonlight\" needs night.\n- Never these words (motion, camera, time order, negation): camera, cameras, pan, pans, panning, zoom, zooming, dolly, tracking, aerial, drone, tilt, crane, handheld, orbit, cut, cuts, frame, frames, framing, drive, drives, driving, move, moves, moving, run, runs, running, walk, walks, walking, fly, flies, flying, reverse, reversing, backward, backwards, toward, towards, away, approach, approaching, enter, entering, leave, leaves, leaving, arrive, arriving, appear, appears, emerge, emerging, speeding, racing, explode, explosion, crash, suddenly, transform, becomes, previous, previously, earlier, again, still, now, before, after, anymore, remain, remains, continue, continues, no, not, never, without, none, nothing.\n- Road words (asphalt, blur, freeway, highway, highways, lane, lanes, motorway, pavement, road, roads, roadside, street, streets, tire, tires, track, tracks, tyre, tyres) only when the scene has a road.\n\n\nVehicle scenes. When the NEW scene, after your operations, has a vehicle as its main subject (its base names a car,\ntruck, van, bus, motorcycle, jeep or taxi), the engine writes the video prompt from a fixed template:\n  \"<Subject>, seen from directly behind with its rear lights facing the camera, drives fast along <road>, moving\n  forward away from the camera. The camera follows directly behind the car ... rushes toward the viewer. <scene>\n  <light> Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.\"\nThe engine writes the subject and camera sentences itself. For such a scene, reply with three more fields and\nleave \"details\" empty: {\"blocked\": ..., \"operations\": [...], \"details\": \"\", \"road\": \"...\", \"scene\": \"...\", \"light\": \"...\"}\n- \"road\": a noun phrase for the road of the new scene, starting with \"a\", at most 14 words, no period. It always\n  names the paved road the vehicle drives on (road, highway, street, lane, bridge): the video model draws the vehicle\n  on whatever this says. For a beach it is a road beside the beach (\"a beachfront road with pale sand and waves\n  beside it\"), never sand or water.\n- \"take me to X\", \"go to X\", \"drive to X\", \"turn it into X\" on a vehicle scene: the vehicle keeps driving, now on a\n  road in X. The vehicle goes only when the user says so (\"remove the car\", \"just the beach, no car\"): then reply\n  with ONE new_scene whose base describes X itself (\"a wide sandy beach with gentle turquoise waves\") and no add\n  of kind world (a base that names a place cannot take another place).\n- \"scene\": ONE sentence (at most 40 words) about what lines both sides of the road: landscape, buildings, weather\n  you can see. Never the camera, the shot or the frame. The scene's objects (kind extra) are added by the engine\n  from their phrases, word for word: do not describe them again.\n- \"light\": ONE short sentence (at most 20 words) about the light and the sky.\n- The world of the new scene: its place, season, weather and time of day. A change of place replaces the road,\n  the scene and the light together. If \"car_template\" in the user message gives the current road, scene and\n  light, keep what the sentence does not change.\n- More or less of the current world (\"a little more snow\", \"a lot more snow\", \"less rain\" on the snowy road or in\n  the rain): ONE set_strength on that world change (never a new add: it would replace the world), the same road,\n  and \"scene\" and \"light\" rewritten with visibly more or less of it (\"heavy snow falling thickly, deep snowdrifts\"\n  for more; \"a light dusting of snow\" for less). The engine draws only what road, scene and light say.\n- For a new scene of a vehicle, use new_scene with the base being only the vehicle (\"a blue pickup truck\") and an\n  add of kind world for its place.\nMeasured examples (road | scene | light):\n- country: a straight two-lane country road | Green fields and rows of trees line both sides of the road under a clear blue summer sky. | Bright midday sunshine, crisp shadows.\n- winter: a snowy mountain road | Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling. | Cold blue overcast winter light, soft diffuse shadows.\n- desert: a long straight desert highway | Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. | Hot afternoon sun in a cloudless pale blue sky, strong hard shadows.\n- neon city: a wide city street at night | Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling. | Dark night sky, vivid neon glow, cyberpunk atmosphere.\n- ocean coast: a coastal highway on a cliff top | Grey asphalt with white lane markings runs straight ahead, a low stone wall along the edge of the road, a bright turquoise ocean with white waves far below the cliff on the left side, palm trees and green hills on the right side. | Sunny tropical day, clear blue sky, sparkling light on the water.\n- sunset: a straight open road across rolling grassland | Golden grass fields and a few lone trees on both sides, long shadows stretching across the road. | The sun setting low on the horizon ahead, a glowing orange and pink sky, warm backlight.\n- autumn: a winding country road through an autumn forest | Trees with bright orange, red and yellow leaves line both sides, fallen leaves scattered across the road and swirling behind the car. | Low warm golden afternoon sun, light mist between the trees.\n- rain: a wet country road in heavy rain | Rain pours down, puddles and spray on the dark asphalt, water kicked up behind the tyres, green fields and trees blurred by the rain. | Dark grey storm clouds, dim diffuse light, glistening reflections on the road.\n"
 }
