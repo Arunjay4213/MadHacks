@@ -45,7 +45,7 @@ def world(name, strength=1.0):
     return dict(kind="world", label=WORLDS[name]["label"], phrase=WORLDS[name]["phrase"], strength=strength)
 
 
-ROAD_WORDS = ("road", "highway", "asphalt", "lane")
+ROAD_WORDS = ("road", "highway", "asphalt", "lane", "street", "pavement")
 
 
 class WorldFormTests(unittest.TestCase):

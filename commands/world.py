@@ -96,8 +96,8 @@ _LANDSCAPE = {
                             (". Cold blue overcast winter light, soft diffuse shadows",
                              {"time": "day", "weather": "overcast", "season": "winter"})],
     "neon city": [("a big city", {}), (" at night", _N),
-                  (". Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, the wet "
-                   "pavement reflects the colourful lights", {}),
+                  (". Tall skyscrapers covered in glowing pink, blue and purple neon signs rise all around, puddles on "
+                   "the ground reflect the colourful lights", {}),
                   (", light rain falling", {"weather": "rain"}),
                   (". Dark night sky", _N), (", vivid neon glow, cyberpunk atmosphere", {})],
     "ocean coast": [("a wide sandy beach", {}),
