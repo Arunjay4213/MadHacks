@@ -15,9 +15,9 @@ The subject sentence (apart from its road) and the camera sentence are the same,
 of a vehicle scene. A change of world swaps road, scene and light together.
 
 Scene state: a vehicle scene has a bare vehicle subject as its base ("a red sports car") and its world as one change
-of kind world (label "desert", "winter", ...). commands.world.compose_base raises ValueError for a base that names
-its own place plus a world change ("a red sports car driving along a country road" + desert), so the engine never
-keeps the place in the base.
+of kind world (label "desert", "winter", ...). The engine never keeps the place in the base, so a change of world
+never has to edit the base. (On the dictionary path, commands/world.py reads a car base that names a known road,
+"a red sports car driving along a country road", as a road scene of its own.)
 
 Routes (Route) for one final sentence:
 - MEASURED: the sentence names exactly one of the measured worlds (WORLDS) and nothing else, on a vehicle scene
@@ -31,6 +31,9 @@ Routes (Route) for one final sentence:
 import dataclasses
 import enum
 import re
+
+from commands import world as commands_world
+from commands.composer import strength_phrase
 
 CAMERA = ("The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping "
           "the car centred in the frame while the white dashed centre line rushes toward the viewer.")
@@ -47,28 +50,22 @@ class World:
     light: str  # one sentence
 
 
+def _measured(name: str, label: str) -> World:
+    """A measured world from commands/world.py, the one copy of Ishaan's text: its phrase is "{road}. {scene} {light}"."""
+    road, _, rest = commands_world.WORLDS[label]["phrase"].partition(". ")
+    scene, light = re.split(r"(?<=\.)\s+", rest)
+    return World(name, road, scene, light)
+
+
 # Ishaan's measured worlds (board, 2026-11-14), character for character. "country" is his earlier tested car
-# prompt's world, the start of the demo chain.
+# prompt's world, the start of the demo chain. The five that commands/ also uses come from commands/world.py; the
+# other three are only used here.
 WORLDS = {w.name: w for w in [
-    World("country", "a straight two-lane country road",
-          "Green fields and rows of trees line both sides of the road under a clear blue summer sky.",
-          "Bright midday sunshine, crisp shadows."),
-    World("winter", "a snowy mountain road",
-          "Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, "
-          "snowflakes falling.",
-          "Cold blue overcast winter light, soft diffuse shadows."),
-    World("desert", "a long straight desert highway",
-          "Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the "
-          "roadside, heat haze shimmering above the asphalt.",
-          "Hot afternoon sun in a cloudless pale blue sky, strong hard shadows."),
-    World("neon city", "a wide city street at night",
-          "Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt "
-          "reflects the colourful lights, light rain falling.",
-          "Dark night sky, vivid neon glow, cyberpunk atmosphere."),
-    World("ocean coast", "a coastal cliff road",
-          "A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green "
-          "hills on the other side.",
-          "Sunny tropical day, clear blue sky, sparkling light on the water."),
+    _measured("country", "country road"),
+    _measured("winter", "snowy mountain road"),
+    _measured("desert", "desert"),
+    _measured("neon city", "neon city"),
+    _measured("ocean coast", "ocean coast"),
     World("sunset", "a straight open road across rolling grassland",
           "Golden grass fields and a few lone trees on both sides, long shadows stretching across the road.",
           "The sun setting low on the horizon ahead, a glowing orange and pink sky, warm backlight."),
@@ -251,15 +248,9 @@ def world_prompt(subject: str, world: World, objects=()) -> str:
 
 def scene_objects(snapshot: dict) -> list[str]:
     """The phrases of the scene's objects that are on, in the order they were added, with commands.composer's
-    strength wording (a subtle hint of, a moderate amount of, intense), so weakening a chip changes the prompt."""
-    out = []
-    for c in snapshot["changes"]:
-        if c["kind"] != "extra" or c["strength"] <= 0:
-            continue
-        s, phrase = c["strength"], c["phrase"]
-        out.append(f"a subtle hint of {phrase}" if s < 0.5 else f"a moderate amount of {phrase}" if s < 1
-                   else f"intense {phrase}" if s > 1 else phrase)
-    return out
+    strength wording (strength_phrase), so weakening a chip changes the prompt."""
+    return [strength_phrase(c["phrase"], c["strength"]) for c in snapshot["changes"]
+            if c["kind"] == "extra" and c["strength"] > 0]
 
 
 def current_world(snapshot: dict) -> World | None:

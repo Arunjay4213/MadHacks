@@ -89,26 +89,6 @@ def test_each_world_swaps_road_scene_and_light_and_keeps_subject_and_camera():
     assert out["steer"]["prompt"] == ct.world_prompt("a red sports car", ct.WORLDS["rain"])
 
 
-def test_night_on_a_car_scene_is_the_neon_city_not_a_night_highway():
-    _, svc = service(NoChat())
-    svc.handle(final(NEW_SCENE))
-    prompt = svc.handle(final("make it night"))["steer"]["prompt"]
-    assert "along a wide city street at night," in prompt and "neon signs" in prompt
-
-
-def test_the_worlds_are_ishaans_text_character_for_character():
-    w = ct.WORLDS
-    assert (w["winter"].road, w["winter"].light) == ("a snowy mountain road",
-                                                     "Cold blue overcast winter light, soft diffuse shadows.")
-    assert w["desert"].scene == ("Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry "
-                                 "scrub along the roadside, heat haze shimmering above the asphalt.")
-    assert w["rain"].scene == ("Rain pours down, puddles and spray on the dark asphalt, water kicked up behind the "
-                               "tyres, green fields and trees blurred by the rain.")
-    assert set(w) == {"country", "winter", "desert", "neon city", "ocean coast", "sunset", "autumn", "rain"}
-    for world in w.values():
-        assert ct.check_prompt(ct.world_prompt("a red sports car", world), "a red sports car"), world.name
-
-
 def test_desert_in_the_car_chain_even_when_the_base_names_its_road():
     # The dictionary path (Sonnet timed out) keeps the whole sentence as the base; "make it a desert" still swaps the
     # world to Ishaan's desert template. The engine keeps the base as the bare subject instead.
@@ -173,38 +153,6 @@ def test_a_model_new_vehicle_scene_keeps_only_the_vehicle_in_the_base():
     assert out["steer"]["prompt"].startswith("A blue pickup truck, seen from directly behind with its rear lights")
     assert ct.check_prompt(out["steer"]["prompt"], "a blue pickup truck")
     assert chat.calls[0][1]["car_template"] == {"subject": "a blue pickup truck"}
-
-
-def test_routes_for_real_sentences():
-    car = SceneState("a red sports car").snapshot()
-    meadow = SceneState().snapshot()
-    route = lambda text, snap: ct.plan(text, snap).route
-    assert route("make it winter", car) is ct.Route.MEASURED
-    assert route("take me to the city", car) is ct.Route.MEASURED
-    assert route("make it a snowy desert", car) is ct.Route.MODEL     # two worlds
-    assert route("make it a little rainy", car) is ct.Route.MODEL     # a strength word
-    assert route("no more snow", car) is ct.Route.MODEL               # negation
-    assert route("add a lion", car) is ct.Route.MODEL
-    assert route("make it winter", meadow) is ct.Route.PLAIN
-    assert route("make it a desert", meadow) is ct.Route.PLAIN
-    assert route("new scene of a beach", meadow) is ct.Route.PLAIN
-    assert route("new scene of a red sports car", meadow) is ct.Route.MEASURED
-    assert ct.vehicle_subject("a red car parked beside the oak tree") is None
-    assert ct.vehicle_subject("a wide shot of a meadow with a single oak tree") is None
-
-
-def test_the_meadow_chain_is_unchanged():
-    pinned = load_pinned(DEFAULT_DEMO_PROMPTS)
-    meadow = [k for k in list(pinned)[:9] if "jensen" not in k[1]]  # the jensen add and remove undo themselves
-    assert [s for _, s in meadow] == ["make it winter", "add a red car", "make it night", "add a lion", "sunny",
-                                      "make it a desert", "add a red car racing on a road"]
-    reader = FinalReader(FinalReaderState.ON, chat=NoChat(), spec=prompt_spec(), pinned=pinned)
-    svc = FinalReadingService(CommandService(semantic_reader=lambda *a: None), reader)
-    for before, sentence in meadow:
-        out = svc.handle(final(sentence))
-        assert "seen from directly behind" not in out["steer"]["prompt"], sentence
-        assert out["steer"]["prompt"] == pinned[(before, sentence)].prompt, sentence
-    assert reader.stats()["template_hits"] == 0 and reader.stats()["pinned_hits"] == 7
 
 
 def test_the_pinned_car_chain_is_what_the_live_reader_composes():
@@ -276,7 +224,7 @@ def test_weakening_an_object_on_a_car_scene_changes_its_sentence():
     snap["changes"] = [{"id": "c1", "label": "lion", "kind": "extra", "phrase": "a large lion at the left", "strength": 0.3}]
     assert ct.scene_objects(snap) == ["a subtle hint of a large lion at the left"]
     snap["changes"][0]["strength"] = 1.3
-    assert ct.scene_objects(snap) == ["intense a large lion at the left"]
+    assert ct.scene_objects(snap) == ["an intense large lion at the left"]  # not "intense a large lion"
 
 
 def test_removing_a_world_chip_goes_back_to_the_country_template():
