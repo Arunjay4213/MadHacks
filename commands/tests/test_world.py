@@ -1,11 +1,15 @@
 import unittest
 
 from commands.state import DEFAULT_BASE, KINDS
-from commands.world import (DEFAULT_WORLD, STYLE, SUBJECT, WORLDS, compose_base, world_op, world_phrase,
-                            world_with_overrides)
+from commands.world import (CAMERA, CAR_BASE, DEFAULT_WORLD, STYLE, WORLDS, car_prompt, compose_base, is_road_scene,
+                            world_op, world_phrase, world_with_overrides)
 
 # Ishaan's measured worlds as road | scene | light, copied from board #6886548029 ("winter" is our snowy mountain road).
 MEASURED = {
+    # Not on the board: the world of Ishaan's earlier tested car prompt (engine CAR_PROMPT), our start world.
+    "country road": ("a straight two-lane country road",
+                     "Green fields and rows of trees line both sides of the road under a clear blue summer sky.",
+                     "Bright midday sunshine, crisp shadows."),
     "snowy mountain road": ("a snowy mountain road",
                             "Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling.",
                             "Cold blue overcast winter light, soft diffuse shadows."),
@@ -20,7 +24,6 @@ MEASURED = {
                     "Sunny tropical day, clear blue sky, sparkling light on the water."),
 }
 ISHAAN = {  # exact tested strings, board #6885673339, and the measured worlds as "{road}. {scene} {light}"
-    "country road": "a two-lane country road through green fields and trees under a clear blue summer sky, bright sunshine.",
     "mars": "a dusty road across the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons.",
     **{place: f"{road}. {scene} {light}" for place, (road, scene, light) in MEASURED.items()},
 }
@@ -37,14 +40,31 @@ class TableTest(unittest.TestCase):
         self.assertEqual({k: v for k, v in by_label.items() if k in ISHAAN}, ISHAAN)
         self.assertEqual(set(by_label) - set(ISHAAN), {"forest", "meadow"})  # added per lead / oak default
         self.assertEqual(DEFAULT_WORLD["phrase"], ISHAAN["country road"])
-        self.assertTrue(SUBJECT.startswith("A red sports car") and SUBJECT.endswith(", "))
-        self.assertTrue(STYLE.startswith(" Cinematic") and STYLE.endswith("."))
-        self.assertEqual(SUBJECT + ISHAAN["desert"] + STYLE,
-                         "A red sports car driving fast along a road, seen from behind in a smooth tracking shot, the car in the "
-                         "centre of the frame, a long straight desert highway. Red sandstone mesas and golden sand dunes stretch "
-                         "to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot "
-                         "afternoon sun in a cloudless pale blue sky, strong hard shadows. Cinematic, highly detailed, realistic, "
-                         "sharp focus, motion blur on the road.")
+        # Ishaan's template, word for word (board #6886548029).
+        self.assertEqual(car_prompt(ISHAAN["desert"]),
+                         "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast "
+                         "along a long straight desert highway, moving forward away from the camera. The camera follows "
+                         "directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred "
+                         "in the frame while the white dashed centre line rushes toward the viewer. Red sandstone mesas and "
+                         "golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze "
+                         "shimmering above the asphalt. Hot afternoon sun in a cloudless pale blue sky, strong hard shadows. "
+                         "Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.")
+        self.assertEqual(CAR_BASE, car_prompt(ISHAAN["country road"]))
+
+    def test_car_template_puts_objects_after_the_camera_and_modifiers_after_the_light(self):
+        road, scene, light = MEASURED["desert"]
+        self.assertEqual(car_prompt(ISHAAN["desert"], ["a dog running beside the car"], ["a subtle hint of fog"]),
+                         f"A red sports car, seen from directly behind with its rear lights facing the camera, drives fast "
+                         f"along {road}, moving forward away from the camera. {CAMERA} A dog running beside the car. "
+                         f"{scene} {light} A subtle hint of fog. {STYLE}")
+        self.assertEqual(car_prompt("the old harbour."), car_prompt("the old harbour").replace("..", "."))
+        self.assertIn("drives fast along the old harbour, moving forward", car_prompt("the old harbour."))
+
+    def test_road_scenes_are_the_template_bases(self):
+        self.assertTrue(is_road_scene(CAR_BASE))
+        self.assertTrue(is_road_scene(car_prompt(ISHAAN["mars"])))
+        for base in [DEFAULT_BASE, "a red sports car driving along a country road", CAR_BASE + " "]:
+            self.assertFalse(is_road_scene(base), base)
 
     def test_no_night_highway_world(self):  # Ishaan: a plain night highway turns to orange streaks
         self.assertNotIn("night highway", WORLDS)
@@ -136,11 +156,6 @@ class OverridesTest(unittest.TestCase):
 class ComposeBaseTest(unittest.TestCase):
     def test_default_oak_base_becomes_subject_plus_world(self):
         self.assertEqual(compose_base(DEFAULT_BASE, ISHAAN["desert"]), "a wide shot of a single oak tree; " + ISHAAN["desert"])
-
-    def test_template_base_swaps_only_the_world(self):
-        start = SUBJECT + ISHAAN["country road"] + STYLE
-        self.assertEqual(compose_base(start, ISHAAN["mars"]), SUBJECT + ISHAAN["mars"] + STYLE)
-        self.assertEqual(compose_base(SUBJECT + STYLE, ISHAAN["mars"]), SUBJECT + ISHAAN["mars"] + STYLE)
 
     def test_subject_only_or_generic_base_appends(self):
         self.assertEqual(compose_base("a red car driving along a road", ISHAAN["desert"]),
