@@ -379,26 +379,44 @@ class StubTaehv:
         return vals.reshape(1, -1, 1, 1, 1).expand(1, len(vals), 3, 2, 2).clone()
 
 
-def make_decoder(monkeypatch, pad="hold"):
+class StubWan:
+    """Wan VAE wrapper stand-in: model(z, *cache) -> (pixels, cache), 4 frames per latent, value = latent mean."""
+
+    def __init__(self):
+        self.caches_in = []
+
+    def __call__(self, z, *cache):
+        self.caches_in.append(float(sum(c.sum() for c in cache)))
+        vals = z[0].float().mean(dim=(1, 2, 3)).repeat_interleave(4)
+        pixels = vals.reshape(1, -1, 1, 1, 1).expand(1, len(vals), 3, 2, 2).clone() * 2 - 1  # Wan gives [-1, 1]
+        return pixels, [c + 1 for c in cache]  # the cache "remembers" every chunk since the last restart
+
+
+def make_decoder(monkeypatch, pad="hold", fade=0, vae=cf.VaeType.TAEHV):
     monkeypatch.setattr(torch.Tensor, "record_stream", lambda self, s: None, raising=False)
     d = cf._Decoder.__new__(cf._Decoder)
-    d.vae_type = cf.VaeType.TAEHV
+    d.vae_type = vae
     d.device = torch.device("cpu")
     d.dtype = torch.float32
     d.first_frame_pad = cf.FirstFramePad(pad)
     d.frames_per_chunk = 4
+    d.cut_fade_frames = fade
     d.restarts = 0
     d.stream = _Null()
     d.stream.wait_event = lambda e: None
-    d.model = StubTaehv()
+    if vae is cf.VaeType.WAN:
+        d.model = StubWan()
+        d._zero_cache_shapes = [(1, 1, 1, 1, 1)]
+    else:
+        d.model = StubTaehv()
     d.video_id = None
     d._start_video(0)
     return d
 
 
-def chunk(i, value, start=cf.ChunkStart.CONTINUE, video=1):
+def chunk(i, value, start=cf.ChunkStart.CONTINUE, video=1, fade=False):
     return cf.ChunkLatents(latents=torch.full((1, 1, 2, 2, 2), value), video_id=video, chunk_index=i,
-                           ready=None, start=start)
+                           ready=None, start=start, fade=fade)
 
 
 @pytest.mark.parametrize("pad, cut_frames", [("hold", 4), ("none", 1)])
@@ -457,3 +475,132 @@ def test_clean_refresh_accepts_an_equal_cond_object(no_cuda):
     _, calls, rng = reanchored_chunk(b, torch.full((1, 3, 8), 1.0), 0.5, "clean")  # equal values, new object
     assert torch.allclose(calls[0]["x"], start_latent(b, outs[3].latents, 2, rng))
     assert b.last_rebase.from_clean
+
+
+# ---------------------------------------------------------------- cut fade (dissolve after a re-anchor)
+
+
+def px(v):
+    """The pixel value the stub decoders give a latent of value v: (2v - 1 + 1) * 127.5."""
+    return round(v * 255)
+
+
+def faded(prev, new, ks, n):
+    """Expected pixel values of output frames number ks after a cut, fading from `prev` to `new` over n frames."""
+    out = []
+    for k in ks:
+        a = min((k + 1) / (n + 1), 1.0)
+        out.append(round((1 - a) * prev + a * new))
+    return out
+
+
+def values(frames):
+    return [int(f[0, 0, 0]) for f in frames]
+
+
+def run_cut(d, fade_flag=True):
+    """5 chunks of a video, a re-anchor cut, then 3 more chunks; returns all outputs."""
+    F = cf.ChunkStart.FIRST_FRAME
+    outs = [d.decode(chunk(0, 0.1, F))] + [d.decode(chunk(i, 0.1 * (i + 1))) for i in range(1, 5)]
+    outs.append(d.decode(chunk(5, 0.8, F, fade=fade_flag)))
+    outs += [d.decode(chunk(i, 0.9)) for i in range(6, 9)]
+    return outs
+
+
+@pytest.mark.parametrize("vae", [cf.VaeType.TAEHV, cf.VaeType.WAN])
+def test_cut_fade_weights_span_chunk_boundaries(no_cuda, monkeypatch, vae):
+    d = make_decoder(monkeypatch, fade=8, vae=vae)
+    outs = run_cut(d)
+    last = px(0.5)  # the last frame shown before the cut (chunk 4)
+    assert values(outs[4])[-1] == last
+    # Output frames 0..7 after the cut: a = (k + 1) / 9, from the last shown frame to the new picture.
+    want_cut = faded(last, px(0.8), range(0, 4), 8)  # the cut chunk: its 1 frame held to 4, faded
+    want_next = faded(last, px(0.9), range(4, 8), 8)  # the next chunk: the fade continues across the boundary
+    assert all(abs(g - w) <= 1 for g, w in zip(values(outs[5]), want_cut)), (values(outs[5]), want_cut)
+    assert all(abs(g - w) <= 1 for g, w in zip(values(outs[6]), want_next)), (values(outs[6]), want_next)
+    assert values(outs[7]) == [px(0.9)] * 4 and values(outs[8]) == [px(0.9)] * 4  # done after 8 frames
+    assert [len(o) for o in outs[5:]] == [4, 4, 4, 4]
+    # The weights rise strictly: no frame goes back towards the old picture.
+    seq = values(outs[5]) + values(outs[6])
+    assert all(b > a for a, b in zip(seq, seq[1:]))
+
+
+@pytest.mark.parametrize("vae", [cf.VaeType.TAEHV, cf.VaeType.WAN])
+def test_cut_fade_off_by_default_and_without_the_flag(no_cuda, monkeypatch, vae):
+    plain = run_cut(make_decoder(monkeypatch, fade=0, vae=vae))
+    assert values(plain[5]) == [px(0.8)] * 4 and values(plain[6]) == [px(0.9)] * 4
+    no_flag = run_cut(make_decoder(monkeypatch, fade=8, vae=vae), fade_flag=False)
+    assert [values(o) for o in no_flag] == [values(o) for o in plain]
+
+
+def test_cut_fade_never_on_a_new_video(no_cuda, monkeypatch):
+    d = make_decoder(monkeypatch, fade=8)
+    F = cf.ChunkStart.FIRST_FRAME
+    for i in range(5):
+        d.decode(chunk(i, 0.1 * (i + 1), F if i == 0 else cf.ChunkStart.CONTINUE))
+    out = d.decode(chunk(0, 0.8, F, video=2, fade=True))  # reset(): a new video, even with the flag set
+    assert values(out) == [px(0.8)]
+    assert values(d.decode(chunk(1, 0.9, video=2))) == [px(0.9)] * 4
+
+
+def test_cut_fade_with_pad_none_counts_emitted_frames(no_cuda, monkeypatch):
+    d = make_decoder(monkeypatch, pad="none", fade=8)
+    outs = run_cut(d)
+    last = px(0.5)
+    assert len(outs[5]) == 1 and abs(values(outs[5])[0] - faded(last, px(0.8), [0], 8)[0]) <= 1
+    assert all(abs(g - w) <= 1 for g, w in zip(values(outs[6]), faded(last, px(0.9), range(1, 5), 8)))
+    assert all(abs(g - w) <= 1 for g, w in zip(values(outs[7]), faded(last, px(0.9), range(5, 9), 8)))
+    assert values(outs[7])[-1] == px(0.9) and values(outs[8]) == [px(0.9)] * 4
+
+
+def test_second_cut_during_a_fade_starts_from_the_last_shown_frame(no_cuda, monkeypatch):
+    d = make_decoder(monkeypatch, fade=8)
+    F = cf.ChunkStart.FIRST_FRAME
+    for i in range(5):
+        d.decode(chunk(i, 0.1 * (i + 1), F if i == 0 else cf.ChunkStart.CONTINUE))
+    first = d.decode(chunk(5, 0.8, F, fade=True))
+    shown = values(first)[-1]
+    second = d.decode(chunk(6, 0.2, F, fade=True))  # another cut before the first fade ended
+    assert all(abs(g - w) <= 1 for g, w in zip(values(second), faded(shown, px(0.2), range(0, 4), 8)))
+
+
+def test_wan_cut_restarts_the_feature_cache(no_cuda, monkeypatch):
+    d = make_decoder(monkeypatch, vae=cf.VaeType.WAN)
+    run_cut(d)
+    # caches_in: the summed cache each call got. Chunk 0 and the cut (chunk 5) start from zeros.
+    assert d.model.caches_in[0] == 0 and d.model.caches_in[5] == 0
+    assert d.model.caches_in[4] > 0 and d.model.caches_in[6] > 0
+
+
+def test_backend_sets_the_fade_flag_on_re_anchor_chunks(no_cuda):
+    a = torch.full((1, 3, 8), 1.0)
+    for fade, refresh, want_steer, want_refresh in [(8, True, True, True), (8, False, True, False), (0, True, False, False)]:
+        b = make_backend(cut_fade_frames=fade, cut_fade_refresh=refresh)
+        b.reset(seed=0)
+        outs = [b.generate_chunk(a) for _ in range(10)]
+        assert not any(o.fade for o in outs)  # never on the first chunk of a video or a continuation
+        b.reanchor(1.0, source="last")
+        steer = b.generate_chunk(a)
+        outs = [b.generate_chunk(a) for _ in range(5)]
+        b.reanchor(0.5, source="clean")
+        refresh_chunk = b.generate_chunk(a)
+        assert (steer.fade, refresh_chunk.fade) == (want_steer, want_refresh)
+        assert not any(o.fade for o in outs)
+        b.generate_chunk(a, rebase=cf.Rebase(keep=2))  # keep >= 1: no cut, no fade
+        assert not b.generate_chunk(a).fade
+
+
+def test_cut_fade_options_are_checked():
+    with pytest.raises(ValueError):
+        make_backend(cut_fade_frames=-1)
+
+
+def test_cut_without_fade_ends_a_running_dissolve(no_cuda, monkeypatch):
+    d = make_decoder(monkeypatch, fade=8)
+    F = cf.ChunkStart.FIRST_FRAME
+    for i in range(5):
+        d.decode(chunk(i, 0.1 * (i + 1), F if i == 0 else cf.ChunkStart.CONTINUE))
+    d.decode(chunk(5, 0.8, F, fade=True))  # a steer: the dissolve starts
+    out = d.decode(chunk(6, 0.2, F, fade=False))  # a refresh with cut_fade_refresh=0, mid-dissolve
+    assert values(out) == [px(0.2)] * 4
+    assert values(d.decode(chunk(7, 0.3))) == [px(0.3)] * 4
