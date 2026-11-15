@@ -98,6 +98,16 @@ The blueprint is the plan of record for what each part contains, its first deliv
 A change to a file in `contracts/` needs agreement on the board from every owner whose part uses that message.
 This table replaces the earlier three-way split of the core feature.
 
+Two standing arrangements from the lead, on the board on 2026-11-14:
+
+- The engine side (Arunjay) copies `web/` and the `lucid-studio/dist` build from `main` to the live engine machine, which serves them at `/app/` and `/studio/`; the folder owners still own the code.
+- The engine side took over test cleanup in `engine/`, `commands/` and `steering/` (post #6885918469); it touches a test file only after any open PR on that file has merged.
+
+### Current state
+
+What the project does today, the live demo paths and the latest measured numbers are in the root `README.md`, section "Current state".
+Each folder's `README.md` has the details for that part.
+
 ## 5. Tracks and theme
 
 The main track theme is: go deep into something and do deep research.
