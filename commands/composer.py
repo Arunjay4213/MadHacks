@@ -1,25 +1,43 @@
 """Stable subject, world and modifier wording for the text encoder."""
 
+import re
+
 from .state import KINDS
-from .world import car_prompt, compose_base, is_road_scene, road_scene_world, world_with_overrides
+from .world import car_prompt, compose_base, is_road_scene, road_scene_subject, road_scene_world, world_with_overrides
+
+_ARTICLE_RX = re.compile(r"^(a|an|the)\s+(.+)$", re.IGNORECASE | re.DOTALL)
+
+
+def _intense(phrase: str) -> str:
+    """"intense" in front of the phrase, after its article if it has one: "a large lion" -> "an intense large lion"."""
+    m = _ARTICLE_RX.match(phrase)
+    if m is None:
+        return 'intense ' + phrase
+    article = m.group(1)
+    if article.lower() in ('a', 'an'):
+        article = 'An' if article[0].isupper() else 'an'
+    return f'{article} intense {m.group(2)}'
+
+
+def strength_phrase(phrase: str, strength: float) -> str:
+    """The phrase worded for its strength (0 < strength <= 1.3): a subtle hint of, a moderate amount of, as is,
+    intense. engine/car_template.py uses it too, so a chip reads the same in every prompt."""
+    if strength < 0.5:
+        return 'a subtle hint of ' + phrase
+    if strength < 1:
+        return 'a moderate amount of ' + phrase
+    if strength > 1:
+        return _intense(phrase)
+    return phrase
 
 
 def _phrases(changes):
     """(extras, modifiers): the phrases of the non-world changes that have an effect, strength-worded, by kind."""
     extras, modifiers = [], []
     for change in sorted(changes, key=lambda c: KINDS.index(c['kind'])):
-        if change['kind'] == 'world':
+        if change['kind'] == 'world' or change['strength'] == 0:
             continue
-        strength = change['strength']
-        if strength == 0:
-            continue
-        phrase = change['phrase']
-        if strength < 0.5:
-            phrase = 'a subtle hint of ' + phrase
-        elif strength < 1:
-            phrase = 'a moderate amount of ' + phrase
-        elif strength > 1:
-            phrase = 'intense ' + phrase
+        phrase = strength_phrase(change['phrase'], change['strength'])
         (extras if change['kind'] == 'extra' else modifiers).append(phrase)
     return extras, modifiers
 
@@ -30,7 +48,7 @@ def compose(snapshot):
         # A road scene is always Ishaan's car template, and on it a winter season is the snowy mountain road.
         world_change, rest = road_scene_world(base, changes)
         extras, modifiers = _phrases(rest)
-        return car_prompt(world_with_overrides(world_change, rest), extras, modifiers)
+        return car_prompt(world_with_overrides(world_change, rest), extras, modifiers, road_scene_subject(base))
     worlds = [c for c in changes if c['kind'] == 'world' and c['strength'] > 0]  # zero strength: no effect
     extras, modifiers = _phrases(changes)
     if worlds:

@@ -194,11 +194,11 @@ def _sentence(phrase: str) -> str:
     return phrase[:1].upper() + phrase[1:] + "."
 
 
-def car_prompt(world: str, objects=(), modifiers=()) -> str:
+def car_prompt(world: str, objects=(), modifiers=(), subject: str = CAR_SUBJECT) -> str:
     """Ishaan's car template for a world phrase: subject with its road, camera, objects, scene and light, modifiers,
     style. Object and modifier phrases (already strength-worded) are one sentence each, word for word."""
     road, _, rest = world.strip().rstrip(".").partition(". ")
-    parts = [f"{CAR_SUBJECT}{_REAR}{road}{_FORWARD}", CAMERA, *map(_sentence, objects),
+    parts = [f"{subject}{_REAR}{road}{_FORWARD}", CAMERA, *map(_sentence, objects),
              *([rest + "."] if rest else []), *map(_sentence, modifiers), STYLE]
     return " ".join(parts)
 
@@ -210,8 +210,36 @@ _ROAD_SCENES = {car_prompt(phrase): label for phrase, label in _PHRASES.items()}
 SNOWY_WORLD = WORLDS["snowy mountain road"]
 
 
+# A car base that names its road as a known world, as the dictionary path keeps "new scene of a red sports car
+# driving along a country road". It is a road scene too: its world is that place, and a world change replaces it
+# (compose_base could not, as the place is in the base), so "make it a desert" works when the LLM reader times out.
+_CAR_ON_ROAD_RX = re.compile(
+    r"^(?P<subject>(?:a|an|the)\s+(?:[a-z'-]+\s+){0,4}?car)\s+"
+    r"(?:driving|drives|speeding|speeds|racing|races|cruising|cruises|going|goes|moving|moves)(?:\s+fast)?\s+"
+    r"(?:along|on|through|across|down)\s+(?:(?:a|an|the)\s+)?"
+    r"(?P<place>" + "|".join(sorted(map(re.escape, WORLDS), key=len, reverse=True)) + r")$")
+
+
+def _car_on_road(base: str):
+    return _CAR_ON_ROAD_RX.match(normalize(base)) if isinstance(base, str) else None
+
+
 def is_road_scene(base: str) -> bool:
-    return base in _ROAD_SCENES
+    return base in _ROAD_SCENES or _car_on_road(base) is not None
+
+
+def road_scene_subject(base: str) -> str:
+    """The capitalised subject of a road scene's template: the car the base names, else CAR_SUBJECT."""
+    m = _car_on_road(base)
+    if m is None:
+        return CAR_SUBJECT
+    subject = m.group("subject")
+    return subject[:1].upper() + subject[1:]
+
+
+def _own_world(base: str) -> dict:
+    m = _car_on_road(base)
+    return WORLDS[m.group("place")] if m else WORLDS[_ROAD_SCENES[base]]
 
 
 def road_scene_world(base: str, changes: list) -> tuple[dict, list]:
@@ -226,4 +254,4 @@ def road_scene_world(base: str, changes: list) -> tuple[dict, list]:
     if winter is not None:
         return SNOWY_WORLD, [c for c in changes if c is not winter]
     worlds = [c for c in active if c["kind"] == "world"]
-    return (worlds[-1] if worlds else WORLDS[_ROAD_SCENES[base]]), changes
+    return (worlds[-1] if worlds else _own_world(base)), changes

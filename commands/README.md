@@ -78,6 +78,7 @@ An arbitrary custom base that mixes an unknown world with subjects is rejected r
 
 `world.CAR_BASE` is the car scene: Ishaan's measured car template (board #6886548029) on the country road.
 A base that is that template for any known world is a road scene (`world.is_road_scene`).
+A spoken car base that names a known world as its road ("a red sports car driving along a country road", as the dictionary path keeps a new scene) is a road scene too, with that car as the subject, so "make it a desert" swaps the world when the LLM reader times out.
 On a road scene the composer always writes the template: the subject sentence with the road, the camera sentence, one sentence per object, the scene and light of the world, one sentence per season, weather or time phrase, then the style sentence "Cinematic, highly detailed, realistic, sharp focus, motion blur on the road."
 The style sentence is used only on road scenes, because on the meadow it grew a road.
 Ishaan measured that appending a season to the car prompt does not change the picture, so on a road scene a winter season ("make it winter", "make it snowy") is shown as the snowy mountain road world.

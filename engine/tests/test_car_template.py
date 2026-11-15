@@ -110,18 +110,18 @@ def test_the_worlds_are_ishaans_text_character_for_character():
 
 
 def test_desert_in_the_car_chain_even_when_the_base_names_its_road():
-    # commands.world.compose_base raises ValueError for this base plus any world change, so commands' own reading
-    # of "make it a desert" is unmatched. The engine keeps the base as the bare subject instead.
+    # The dictionary path (Sonnet timed out) keeps the whole sentence as the base; "make it a desert" still swaps the
+    # world to Ishaan's desert template. The engine keeps the base as the bare subject instead.
     plain = CommandService(semantic_reader=lambda *a: None)
-    plain.handle(final(NEW_SCENE))  # the dictionary path: the whole sentence as the base
+    plain.handle(final(NEW_SCENE))
     assert plain.snapshot()["base"] == "a red sports car driving along a country road"
-    assert plain.handle(final("make it a desert"))["state"]["unmatched"]
     reader = FinalReader(FinalReaderState.ON, chat=NoChat(), spec=prompt_spec())
     res = reader("make it a desert", plain.snapshot())
     assert res["operations"][0] == {"op": "new_scene", "base": "a red sports car"}
     assert res["prompt"] == ct.world_prompt("a red sports car", ct.WORLDS["desert"])
-    out = plain.apply_final("make it a desert", res["operations"], None)
+    out = plain.handle(final("make it a desert"))
     assert not out["state"]["unmatched"] and [c["label"] for c in out["state"]["changes"]] == ["desert"]
+    assert out["steer"]["prompt"] == ct.world_prompt("a red sports car", ct.WORLDS["desert"])
 
 
 def test_no_measured_world_asks_the_model_and_the_engine_enforces_the_template():
