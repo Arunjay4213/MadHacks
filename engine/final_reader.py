@@ -1301,7 +1301,7 @@ def scene_after(snapshot: dict, operations: list[dict]) -> dict:
 
 # Changed whenever the engine builds prompts differently from the same reply (the car template, forward motion,
 # the object order, ...), so the disk cache is not reused across that change even when the system prompt is the same.
-PROMPT_BUILD = "2026-11-15 car template, motion words, scene-matched cache"
+PROMPT_BUILD = "2026-11-15 car template, motion words, scene-matched cache, landscape worlds without road words"
 
 
 def fingerprint(system_prompt: str, model: str, build: str = PROMPT_BUILD) -> str:
