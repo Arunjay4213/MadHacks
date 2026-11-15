@@ -72,7 +72,7 @@ def test_operations_and_the_standin_prompt():
     system, user = chat.calls[0]
     assert "edit_base" in system and "WORLD" in system
     assert user == {"scene": {"base": "a red car driving along a road", "changes": []},
-                    "prompt": "a red car driving along a road", "sentence": "make it winter"}
+                    "prompt": "a red car driving along a road", "sentence": "make it winter", "details_max_words": 50}
     assert r("make it winter", snap()) == out and len(chat.calls) == 1  # cached by (prompt before, sentence)
     s = r.stats()
     assert (s["state"], s["calls"], s["cache_hits"], s["p50_ms"] is not None) == ("on", 1, 1, True)
@@ -99,8 +99,9 @@ def test_invalid_replies_fall_back():
     for sentence in "abcdf":
         assert r(sentence, snap()) is None
     s = r.stats()
-    assert s["rejects"] == 3 and s["errors"] == 2  # "not json" counts as a failed call
-    assert r("f", snap()) is None and len(chat.calls) == 5  # a fallback is final in this process: no new call
+    assert s["rejects"] == 4 and s["errors"] == 1  # only the failed HTTP call is an error
+    assert s["retries"] == 3  # "not json", the bad kind and undo are asked again once; [] and the error are not
+    assert r("f", snap()) is None and len(chat.calls) == 8  # a fallback is final in this process: no new call
 
 
 def test_rejected_details_keep_the_edit_with_the_short_prompt():
@@ -196,7 +197,8 @@ def test_prompt_spec_prefers_commands_rewriter(monkeypatch):
     assert r("make it winter", snap())["prompt"] == \
         "a red car driving along a road, " + FORWARD_MOTION + "; snow on the ground; snow"
     assert "his prompt" in chat.calls[0][0]
-    assert seen == [{"details": "snow"}]  # only the details key: his validator rejects any other
+    assert {"details": "snow"} in seen
+    assert all(set(r) == {"details"} for r in seen)  # only the details key: his validator rejects any other
 
 
 def test_load_states():
@@ -329,15 +331,16 @@ def test_a_named_colour_wins_over_making_a_duplicate_look_different():
     # The scene has a red car and the user says "add a red car racing on a road": they want a second RED car.
     red = {"op": "add", "label": "car", "kind": "extra", "phrase": "a red car driving forward", "strength": 1.0}
     second = {"op": "add", "label": "second car", "kind": "extra",
-              "phrase": "a second red car racing alongside it in the next lane", "strength": 1.0}
+              "phrase": "a second small red car racing alongside it in the next lane at the right of the frame",
+              "strength": 1.0}
     chat = FakeChat({"add a red car racing on a road": reply(
         [second], "a country road through green fields, a second red car racing alongside it in the next lane, "
                   "bright sunshine")})
     r = reader(chat)
     out = r("add a red car racing on a road", snap(red, base="a wide shot of a meadow with a single oak tree"))
-    system = chat.calls[0][0]
-    assert "A colour, type or\n  size the user names ALWAYS wins" in system
-    assert "a second\n  red car racing alongside it in the next lane" in system
+    system = " ".join(chat.calls[0][0].split())
+    assert "A colour, type or size the user names ALWAYS wins" in system
+    assert "a second small red car racing in the next lane at the right of the frame" in system
     assert "second red car" in out["prompt"]
     other_colours = {"blue", "green car", "black", "white", "yellow", "silver", "grey", "orange", "purple"}
     new_car = out["prompt"].split("second", 1)[1].split(",")[0]
