@@ -18,7 +18,11 @@ Confirmed ramps are one chunk: the anchor fires at full target. Explicit gradual
 ## Enrichment boundary
 
 The commands.rewriter module exports SYSTEM_PROMPT, build_messages(prompt), and validate_rewrite(prompt, reply).
-Input is exact canonical text, with an optional full final command as context. The model replies with JSON containing only a details string for world, light and texture.
+Input is exact canonical text, with an optional full final command as context.
+With build_messages, the model replies with JSON containing only a details string for world, light and texture.
+The engine does not use build_messages.
+It makes one Sonnet call that reads the command and writes the details together, with SYSTEM_PROMPT as part of its rules and validate_rewrite to check the details.
+That call returns JSON {blocked, operations, details}, not only a details string.
 Validated output retains the source verbatim and appends bounded detail. Empty details return the source; invalid replies return None.
 Target 60–100 total words when useful; maximum 60 added words and 100 total. No new actors, camera moves, motion, events, weather, or claims of seeing previous frames.
 Lexical checks cannot prove semantic faithfulness; inspect outputs and compare frames.
@@ -44,7 +48,8 @@ Text tests alone are insufficient to enable this on the live demo.
 ## World replacement
 
 Place commands are singleton world changes: desert, snowy mountains, neon city, ocean/beach, Mars, forest and meadow.
-They replace the previous world, preserving subjects and other active modifiers; undo restores the prior world.
+They replace the previous world, preserving subjects, objects and the time of day; undo restores the prior world.
+A new world also clears the active season and weather, because the world brings its own (#115).
 The built-in world dictionary uses Ishaan’s measured templates. Explicit later weather/time/season modifiers remove conflicting tagged atmosphere from those templates.
 The default oak/meadow scene and Ishaan’s exact subject/world/style template support safe replacement.
 Subject-only bases can acquire a world. An arbitrary base that mixes an unrecognized world description with subjects is rejected rather than edited with unsafe text surgery; normalize such a base into the template first.
