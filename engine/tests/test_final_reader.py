@@ -142,9 +142,12 @@ def test_the_system_prompt_carries_the_placement_motion_and_camera_rules():
     system = " ".join(reader(FakeChat()).system_prompt.split())
     for rule in ("Return the complete new prompt, never a diff",
                  "for every object say where it is, what it stands or drives on, and which way it faces",
-                 "flying forward away from the camera in the same direction as the car",
+                 "its tail fin and the backs of its engines toward the camera, its nose pointing away toward the horizon",
+                 "front wheels and rear wheels both in view",
+                 "starts a new scene",
+                 "A bare noun phrase",
                  "rewrite the camera wording to match",
-                 "the car seen in side profile driving from left to right",
+                 "the whole length of the car from the side",
                  car_template.WORLDS["winter"].scene):
         assert rule in system, rule
 
@@ -158,7 +161,8 @@ def test_the_user_message_is_the_prompt_on_screen_the_chips_and_the_sentence():
     assert out["operations"][0] == {"op": "free_scene", "prompt": "A bare oak tree.", "chips": ["bare tree"]}
     assert chat.calls[0][1] == {"prompt": "RICH PROMPT", "chips": ["lion"], "sentence": "kill the tree's leaves",
                                 "car_scene": False}
-    r("add jensen huang", snap())
+    free = snap({"op": "free_scene", "prompt": "A bare oak tree.", "chips": ["bare tree"]})
+    r("add jensen huang", free)  # on a composed scene the engine adds him with no call (engine/people.py)
     user = chat.calls[1][1]
     assert user["person_chip"] == "jensen huang" and "leather jacket" in user["sentence"]
     r("i want to see the side profile", snap(base="a red sports car"), current_prompt=car_prompt())
@@ -181,6 +185,14 @@ def test_failed_calls_and_unusable_replies_fall_back_and_are_final_in_the_proces
     s = r.stats()
     assert s["rejects"] == 2 and s["errors"] == 1 and s["retries"] == 2  # unusable replies are asked again once
     assert r("f", snap()) is None and len(chat.calls) == 5  # a fallback is final in this process: no new call
+
+
+def test_a_fallback_on_a_free_scene_is_asked_again():
+    # Review of #273: on a free scene the dictionary refuses edits, so a kept fallback would fail there until restart.
+    chat = FakeChat({"f": httpx.ConnectError("down")})
+    r = reader(chat)
+    free = snap({"op": "free_scene", "prompt": "A bare oak tree.", "chips": ["bare tree"]})
+    assert r("f", free) is None and r("f", free) is None and len(chat.calls) == 2
 
 
 def test_a_repaired_reply_is_asked_again_and_the_better_one_wins():
@@ -258,7 +270,7 @@ def test_load_states_and_call_options():
     env = {"FOUNDRY_ENDPOINT": "https://madhacks-foundry.openai.azure.com", "FOUNDRY_KEY": "k"}
     r = load("sonnet", environ=env, cache_path=None)
     assert r.state is FinalReaderState.ON and r._chat.model == "claude-sonnet-5-5"
-    assert (r._chat.effort, r._chat.thinking, r._chat.max_tokens) == ("low", "between_tools", 1024)
+    assert (r._chat.effort, r._chat.thinking, r._chat.max_tokens) == ("medium", "adaptive", 4096)
     assert r._chat._url == "https://madhacks-foundry.services.ai.azure.com/anthropic/v1/messages"
     r2 = load("sonnet", environ={**env, "FINAL_READER_EFFORT": "medium", "FINAL_READER_THINKING": "adaptive",
                                  "FINAL_READER_MAX_TOKENS": "4096"}, cache_path=None)

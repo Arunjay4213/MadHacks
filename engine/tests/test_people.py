@@ -53,18 +53,52 @@ def labels(out):
     return [c["label"] for c in out["state"]["changes"]]
 
 
-def test_add_jensen_huang_sends_the_description_and_keeps_his_name_on_the_chip():
-    chat, _, svc = service({for_model("add jensen huang"): reply(WITH_HIM, ["man in leather jacket"])})
+BARE = "A wide shot of a meadow with a single bare oak tree."
+
+
+def free_service(replies):
+    """A service whose scene Sonnet already wrote ("kill the tree's leaves"): edits of it go to the model."""
+    chat, reader, svc = service({"kill the tree's leaves": reply(BARE, ["bare branches"]), **replies})
+    svc.handle(final("kill the tree's leaves"))
+    return chat, reader, svc
+
+
+def test_add_jensen_huang_on_a_free_scene_sends_the_description_and_keeps_his_name_on_the_chip():
+    chat, _, svc = free_service({for_model("add jensen huang"): reply(WITH_HIM, ["man in leather jacket"])})
     out = svc.handle(final("add jensen huang"))
-    assert chat.sent[0]["sentence"] == f"add {JENSEN}" and chat.sent[0]["person_chip"] == "jensen huang"
+    assert chat.sent[1]["sentence"] == f"add {JENSEN}" and chat.sent[1]["person_chip"] == "jensen huang"
     assert "jensen huang" in labels(out)  # the engine adds his chip when the model names him another way
     assert out["steer"]["prompt"] == WITH_HIM
 
 
 def test_the_nvidia_ceo_is_the_same_person():
-    chat, _, svc = service({for_model("add the nvidia ceo"): reply(WITH_HIM, ["jensen huang"])})
+    chat, _, svc = free_service({for_model("add the nvidia ceo"): reply(WITH_HIM, ["jensen huang"])})
     out = svc.handle(final("Add the NVIDIA CEO"))
-    assert chat.sent[0]["sentence"] == f"add {JENSEN}" and labels(out) == ["jensen huang"]
+    assert chat.sent[1]["sentence"] == f"add {JENSEN}" and "jensen huang" in labels(out)
+
+
+def test_a_bare_name_is_an_add():
+    # Live on #273, 08:33 UTC: "jensen huang" alone came back not understood.
+    assert for_model("Jensen Huang.") == f"add {JENSEN}" and for_model("i want jensen") == f"add {JENSEN}"
+    assert for_model("jensen dancing") == "jensen dancing"  # more than the name: the words stay
+
+
+def test_a_sentence_that_only_adds_or_removes_him_is_the_engines_on_a_composed_scene_with_no_call():
+    for text in ("jensen huang", "jensen", "add jensen", "add jensen huang", "Add the NVIDIA CEO", "i want jensen"):
+        chat, reader, svc = service({})
+        out = svc.handle(final(text))
+        assert labels(out) == ["jensen huang"] and LEFT in out["steer"]["prompt"], text
+        assert chat.sent == [] and reader.stats()["person_hits"] == 1, text
+        out = svc.handle(final("remove jensen"))
+        assert labels(out) == [] and chat.sent == [] and reader.stats()["person_hits"] == 2, text
+
+
+def test_a_sentence_with_more_than_him_is_not_the_engines():
+    from engine.people import whole_sentence
+    meadow = SceneState().snapshot()
+    for text in ("add jensen huang and a dog", "jensen dancing on the moon", "make jensen wave"):
+        assert whole_sentence(text, meadow) is None, text
+    assert whole_sentence("add jensen huang next to the car", meadow)["phrase"].endswith("next to the car, facing the camera")
 
 
 def test_he_takes_a_free_spot_when_the_lion_holds_the_left():
@@ -84,14 +118,14 @@ def test_put_jensen_huang_next_to_the_car():
 
 
 def test_remove_jensen_huang_and_undo_find_him():
-    chat, _, svc = service({for_model("add jensen huang"): reply(WITH_HIM, ["jensen huang"]),
-                            "remove jensen huang": reply("A wide shot of a meadow with a single oak tree.")})
+    chat, _, svc = free_service({for_model("add jensen huang"): reply(WITH_HIM, ["jensen huang"]),
+                                 "remove jensen huang": reply(BARE, ["bare branches"])})
     svc.handle(final("add jensen huang"))
     out = svc.handle(final("remove jensen huang"))
     assert chat.sent[-1]["sentence"] == "remove jensen huang"  # the words stay, so the chip label matches
-    assert labels(out) == [] and JENSEN not in out["steer"]["prompt"]
+    assert "jensen huang" not in labels(out) and JENSEN not in out["steer"]["prompt"]
     back = svc.handle({"type": "tap", "action": "undo"})
-    assert labels(back) == ["jensen huang"] and back["steer"]["prompt"] == WITH_HIM
+    assert "jensen huang" in labels(back) and back["steer"]["prompt"] == WITH_HIM
 
 
 def test_remove_jensen_huang_through_the_dictionary_when_the_model_is_down():
@@ -103,8 +137,8 @@ def test_remove_jensen_huang_through_the_dictionary_when_the_model_is_down():
 
 def test_add_jensen_huang_with_no_model_answer_is_the_engines_add():
     _, reader, svc = service({})  # every call fails
-    out = svc.handle(final("add jensen huang"))
-    assert labels(out) == ["jensen huang"] and LEFT in out["steer"]["prompt"]
+    out = svc.handle(final("add jensen huang and a dog"))  # not only him: the model is asked, and fails
+    assert "jensen huang" in labels(out) and LEFT in out["steer"]["prompt"]
     assert reader.stats()["errors"] == 1
 
 

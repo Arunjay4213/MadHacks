@@ -90,7 +90,7 @@ def test_refreshing_one_case_keeps_the_other_replies(tmp_path, monkeypatch):
 
     monkeypatch.setattr(R, "REPLIES_FILE", path)
     monkeypatch.setattr(R, "settings_from_env", lambda: object())
-    monkeypatch.setattr(R.FoundryMessages, "from_settings", classmethod(lambda cls, s, t: Real()))
+    monkeypatch.setattr(R.FoundryMessages, "from_settings", classmethod(lambda cls, s, t, **options: Real()))
     monkeypatch.setattr(R, "load_cases", lambda: [{"name": "a", "steps": []}, {"name": "b", "steps": []}])
     monkeypatch.setattr(R, "run_case", one_case)
     monkeypatch.setattr(R, "MIN_GAP_S", 0)

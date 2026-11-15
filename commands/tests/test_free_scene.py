@@ -114,6 +114,23 @@ class DictionaryReadingTests(unittest.TestCase):
         self.assertEqual(dictionary_reading("undo that", snap), [{"op": "undo"}])
         self.assertEqual(snap, state.snapshot())  # pure
 
+    def test_a_remove_that_leaves_a_named_thing_behind_is_not_read_whole(self):
+        # Greptile on #273: "lion" is not in the table, so the clause is not split and only one of them would go.
+        state = SceneState()
+        state.apply(dict(op="add", label="dog", kind="extra", phrase="a dog", strength=1.0))
+        state.apply(dict(op="add", label="lion", kind="extra", phrase="a lion", strength=1.0))
+        snap = state.snapshot()
+        self.assertIsNone(dictionary_reading("remove the dog and the lion", snap))
+        self.assertEqual(dictionary_reading("remove the puppy", snap), [{"op": "remove", "id": "c1"}])
+        self.assertEqual(dictionary_reading("undo the dog", snap), [{"op": "remove", "id": "c1"}])
+
+    def test_a_repeated_add_that_changes_nothing_goes_to_the_final_reader(self):
+        # Greptile on #273: the second "add a dog" changed nothing and skipped Sonnet, which makes it stronger.
+        state = SceneState()
+        state.apply(dict(op="add", label="dog", kind="extra", phrase="a dog", strength=1.0))
+        self.assertIsNone(dictionary_reading("add a dog", state.snapshot()))
+        self.assertEqual(dictionary_reading("undo", SceneState().snapshot()), [{"op": "undo"}])
+
 
 class ServiceOnFreeScenesTests(unittest.TestCase):
     def setUp(self):

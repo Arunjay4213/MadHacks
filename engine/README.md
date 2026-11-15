@@ -500,13 +500,15 @@ With `--reader commands --final-reader sonnet` (live since PR #125), `engine/rea
 2. The content block: a short word list (`BLOCKED_WORDS`) with no call; the model also sets `blocked: true` for sexual, violent or hateful requests.
    A blocked final gives no steer: the words show as unmatched.
 3. A pinned entry (`engine/demo_prompts.json`), then a cached one (keys below).
-4. A measured car world (`car_template.plan`, `Route.MEASURED`): "make it winter" on the car scene, or a new car scene, composed by the engine with no call (`template_hits`).
-5. The fast path: on a composed scene, when the keyword table reads every word of every clause by itself (`commands.service.dictionary_reading`: no vector matcher, no style fallback, no pass-through guess of an unknown object), the dictionary applies it with no call.
+4. A named person on a composed scene, when the sentence is nothing but adding or removing them ("jensen", "jensen huang", "add jensen huang next to the car", "remove jensen"; `people.whole_sentence`): the engine's own add (his hardcoded look, `people.PEOPLE`) or remove, with no call (`person_hits`).
+   A bare name is an add.
+5. A measured car world (`car_template.plan`, `Route.MEASURED`): "make it winter" on the car scene, or a new car scene, composed by the engine with no call (`template_hits`).
+6. The fast path: on a composed scene, when the keyword table reads every word of every clause by itself (`commands.service.dictionary_reading`: no vector matcher, no style fallback, no pass-through guess of an unknown object), the dictionary applies it with no call.
    On a vehicle scene its result still gets the car template (`fallback_prompt`, PR #238).
    "make it winter", "add a dog and a cat", "take me to the beach" and "remove the dog" are read whole; "add a red car", "kill the tree's leaves", "now i want a savannah", "add a lion" (not in the table) and "zoom out" are not.
-6. Otherwise one Sonnet call writes the complete new prompt: a free scene.
+7. Otherwise one Sonnet call writes the complete new prompt: a free scene.
    The scene becomes `commands.state.Origin.FREE`, its prompt is Sonnet's text word for word, and its chips are the labels Sonnet names.
-7. When the call times out, fails or the reply is not a JSON object, the dictionary reads the sentence (the fallback).
+8. When the call times out, fails or the reply is not a JSON object, the dictionary reads the sentence (the fallback).
    On a free scene the dictionary can only start a new scene, so anything else shows as not understood; the old scene is never silently redrawn.
 
 A sentence that mixes undo or reset with edits goes to the dictionary after the content check (Sonnet is asked first only when the dictionary does not read every clause by itself).
@@ -520,7 +522,8 @@ The call:
 - Headers `x-api-key: $FOUNDRY_KEY` and `anthropic-version: 2023-06-01`.
   Body: `{"model": "claude-sonnet-5-5", "max_tokens": 1024, "system": <system prompt>, "messages": [{"role": "user", "content": <JSON>}], "thinking": {"type": "between_tools"}, "output_config": {"effort": "low"}}`.
   No `temperature`: the model rejects it, and `between_tools` is how Sonnet 5.5 runs with thinking off.
-- `FINAL_READER_EFFORT` (low, medium or high; default low), `FINAL_READER_THINKING` (the thinking type, passed as given; default `between_tools`) and `FINAL_READER_MAX_TOKENS` (default 1024) change the call without a code change, for measuring; `--final-timeout-s` (default 3.0) is the time budget.
+- The call runs with adaptive thinking at effort medium and `max_tokens` 4096 (defaults since 2026-11-15), within the time budget `--final-timeout-s` (default 3.0 s): blind-graded calls took 1.84 s p50, 2.09 s p90 and 2.21 s at most (none of 50 over 3 s), graded 4.54 against 4.40 for thinking off at effort low, and always wrote a prompt for "undo that, put the ocean back", which thinking off answered in prose (a reply that is not one JSON object is never used: asked again or the dictionary). Effort high graded 4.64 but took 3.41 s p90.
+  `FINAL_READER_EFFORT` (low, medium or high), `FINAL_READER_THINKING` (the thinking type, passed as given; `between_tools` is thinking off) and `FINAL_READER_MAX_TOKENS` change the call without a code change, for measuring.
 - The user message: `{"prompt": <the prompt the video model sees now, the rich one>, "chips": [<labels shown>], "sentence": <the sentence, a named person replaced by their description>, "car_scene": <true when the prompt on screen is the car template>}`, plus `"view_change": true` on a car scene when the sentence asks for another camera or view (`car_template.asks_view_change`) and `"person_chip"` when the sentence adds a named person.
 - The reply: `{"blocked": bool, "understood": bool, "new_scene": bool, "prompt": str, "chips": [str]}`.
 - The system prompt (`final_reader.SYSTEM_PROMPT` plus `car_template.instructions()`) asks for one complete scene description of at most 150 words: the subject and its place in the frame, its direction of travel, the camera, the setting, the light and the style, with Ishaan's measured car template and worlds as the example.
@@ -548,11 +551,11 @@ The cache and the prompts:
   Change `PROMPT_BUILD` whenever the engine or `commands/` composes prompts differently from the same reply.
   A fallback is final for that key for the life of the process, and an answer that arrives after the wait is dropped (`late_dropped`); fallbacks are not saved.
 - The model sees one prompt per composed scene state: the first rich prompt chosen for a composed prompt (pinned, measured or a car template fallback) replaces it in every later steer, in `likely_prompts` and in `committed_prompt`.
-- Named people (`engine/people.py`): "add jensen huang" (also "jensen", "the nvidia ceo") reaches Sonnet with a visual description instead of the name and `person_chip: "jensen huang"`, so his chip keeps the name; when the model gives nothing usable on a composed scene, the engine adds or removes him itself (`Outcome.PERSON`).
+- Named people (`engine/people.py`): "add jensen huang" (also "jensen", "the nvidia ceo", or the bare name "jensen huang") on a composed scene is the engine's own add with no call (step 4). On a free scene it reaches Sonnet as "add <his visual description>" instead of the name, with `person_chip: "jensen huang"`, so his chip keeps the name; when the model gives nothing usable on a composed scene, the engine adds or removes him itself (`Outcome.PERSON`).
 - Pinned, measured and named-person answers are composed operations, checked by `checked_operations` (`slow_reader.validate`, and `canonical_world` gives a known place its tested phrase).
 - From the #272 stopgap, kept: `commands.world.compose_base` reads an edited oak scene base, an object the sentence only mentions as context ("i want to see the car's side profile") is never added by the keyword table, and a mover the dictionary adds on the car scene gets a heading with the car (`with_heading`) in `fallback_prompt`.
   Its `place_as_new_scene` went with the operations merge: Sonnet now writes the whole prompt, so a base that names a place cannot block a later change.
-- `/stats` `final_reader`: `state` (`off`, `on`, `unavailable`), `reason`, `prompt_spec` (`free scene`), `calls`, `cache_hits`, `blocked`, `not_understood`, `timeouts`, `late_dropped`, `rejects`, `repaired`, `retries`, `errors`, `verdicts`, `pinned`, `pinned_hits`, `template_hits`, `p50_ms`, `last_ms`, `cache_size`, `timeout_s`, `cache_file`.
+- `/stats` `final_reader`: `state` (`off`, `on`, `unavailable`), `reason`, `prompt_spec` (`free scene`), `calls`, `cache_hits`, `blocked`, `not_understood`, `timeouts`, `late_dropped`, `rejects`, `repaired`, `retries`, `errors`, `verdicts`, `pinned`, `pinned_hits`, `template_hits`, `person_hits`, `p50_ms`, `last_ms`, `cache_size`, `timeout_s`, `cache_file`.
 - It is `unavailable` (and the engine runs as with `off`, logged once) when `FOUNDRY_ENDPOINT` or `FOUNDRY_KEY` is missing or the reader is not `commands`.
 - `engine/reader.py` uses `CommandService.snapshot()` and `CommandService.apply_final(text, operations)`; `engine/tests/test_final_reader.py` runs them against the real `CommandService`.
 

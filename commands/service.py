@@ -41,6 +41,9 @@ FILLER_WORDS = frozenset("""
 """.split())
 
 
+# Words a removal may have besides the removed chip's label: its verbs (commands.reader _REMOVE_RX and "undo the ...").
+REMOVE_WORDS = frozenset("remove no more get rid of take away delete without stop lose drop undo from out".split())
+
 # The explicit new scene words; "take me to X" is a place, which keeps the objects, so it is not one.
 _NEW_SCENE_RX = re.compile(r"\bnew scene (?:of|with)\b")
 
@@ -49,11 +52,14 @@ def _words(text: str) -> list[str]:
     return normalize(text).split()
 
 
-def fully_read(clause: str, reading: dict) -> bool:
-    """True when `reading` (commands.reader.read(clause, ...)) accounts for every word of `clause`:
+def fully_read(clause: str, reading: dict, snapshot: dict | None = None) -> bool:
+    """True when `reading` (commands.reader.read(clause, snapshot)) accounts for every word of `clause`:
 
-    - a tested place sentence (commands.world.world_op), an explicit "new scene of ...", a remove or strength
-      change of an existing chip (read already refuses "make the dog black");
+    - a tested place sentence (commands.world.world_op), an explicit "new scene of ...", a strength change of an
+      existing chip (read already refuses "make the dog black");
+    - a remove whose clause has only remove verbs, filler words and the removed chip's own label (or the keyword
+      that names it) besides: "remove the dog and the lion", one clause when "lion" is not in the table, removes
+      only one of them, so it is not read whole;
     - undo or reset with only filler words besides ("undo that", "start over please", not "start over with a beach");
     - an add of a keyword-table entry whose clause has only filler words besides the keyword ("add a dog").
 
@@ -64,8 +70,16 @@ def fully_read(clause: str, reading: dict) -> bool:
         return False
     t = normalize(clause)
     kind = op["op"]
-    if kind in ("remove", "set_strength"):
+    if kind == "set_strength":
         return True
+    if kind == "remove":
+        chip = next((c for c in (snapshot or {}).get("changes", []) if c["id"] == op.get("id")), None)
+        if chip is None:
+            return False
+        allowed = FILLER_WORDS | REMOVE_WORDS | set(_words(chip["label"]))
+        if keyword and KEYWORDS.get(keyword, {}).get("label") == chip["label"]:
+            allowed |= set(_words(keyword))
+        return all(w in allowed for w in _words(t))
     if kind == "new_scene":
         return bool(_NEW_SCENE_RX.search(t))
     if world_op(t) is not None:
@@ -86,8 +100,10 @@ def dictionary_reading(text: str, snapshot: dict) -> list[dict] | None:
 
     The rule both sides use for the fast path (engine/reader.py): a composed scene, Latin text, 1 to MAX_CLAUSES
     clauses, every clause read whole by the keyword table alone (fully_read: no vector matcher, no style fallback,
-    no pass-through guess), and every operation applies and composes on a trial copy. A free scene gives None: only
-    the final reader writes its prompt. Pure: `snapshot` is not changed."""
+    no pass-through guess), and every operation applies and composes on a trial copy. A sentence that leaves the
+    composed prompt as it was (a repeated "add a dog") gives None too, except undo and reset: a request repeated
+    because the user does not see it yet goes to the final reader, which makes it stronger. A free scene gives None:
+    only the final reader writes its prompt. Pure: `snapshot` is not changed."""
     if not isinstance(text, str) or is_free(snapshot) or _has_non_latin_letters(text):
         return None
     clauses = split_commands(text)
@@ -97,7 +113,7 @@ def dictionary_reading(text: str, snapshot: dict) -> list[dict] | None:
     operations = []
     for clause in clauses:
         reading = read(clause, trial.snapshot())
-        if not fully_read(clause, reading):
+        if not fully_read(clause, reading, trial.snapshot()):
             return None
         op = reading["op"]
         try:
@@ -106,6 +122,8 @@ def dictionary_reading(text: str, snapshot: dict) -> list[dict] | None:
         except (ValueError, TypeError, KeyError):
             return None
         operations.extend(op["operations"] if op.get("op") == "batch" else [op])
+    if compose(trial.snapshot()) == compose(snapshot) and not any(o["op"] in ("undo", "reset") for o in operations):
+        return None
     return operations
 
 

@@ -9,8 +9,13 @@
 The spot is where the sentence puts the person ("next to the car"), else the first free one of SPOTS: an object
 whose phrase already says "left" holds the left foreground (the lion), and so on.
 
+A sentence that is only the name ("jensen huang", "i want jensen") is an add too: a bare noun phrase means "add it".
 Only adds are rewritten (Intent.ADD). Any other sentence naming the person ("remove jensen huang") keeps its words,
 so the label of the chip matches it.
+
+whole_sentence(text, snapshot) is the engine's fast path (engine/final_reader.py FinalReader.lookup): the add or
+remove when the sentence is nothing but that ("jensen", "add jensen huang next to the car", "remove jensen"), so a
+composed scene needs no Sonnet call for it.
 """
 
 import dataclasses
@@ -38,6 +43,14 @@ _ADD = re.compile(r"^(?:please\s+)?(?:add|put|place|bring|show|insert|include|dr
 _RELATIVE = re.compile(r"\b(?P<spot>(?:next to|beside|near|in front of|behind|on top of) (?:the|a|an) [a-z ]+?)\s*$")
 
 
+# Words a bare mention may have besides the name: "i want jensen", "show me jensen huang please".
+_BARE_WORDS = frozenset("the a an please now i i'd id we want would like to see me show give us let's lets also "
+                        "here comes".split())
+# Words an add may have besides its verb, the name and its spot, for the add to be the whole sentence.
+_ADD_WORDS = _BARE_WORDS | {"add", "put", "place", "bring", "insert", "include", "drop", "in", "into", "scene",
+                            "picture", "frame", "video", "too"}
+
+
 class Intent(enum.Enum):
     ADD = "add"      # the sentence adds the person: rewritten for the model, the add is the engine's
     OTHER = "other"  # it names the person another way (remove, move, ...): the words stay
@@ -60,21 +73,35 @@ def _alias_rx(alias: str) -> re.Pattern:
     return re.compile(rf"\b{re.escape(alias)}\b")
 
 
+def _rest(t: str, alias: str) -> list[str]:
+    """The words of normalized `t` without the first match of `alias`."""
+    return _alias_rx(alias).sub(" ", t, count=1).split()
+
+
+def _bare(t: str, alias: str) -> bool:
+    """True when normalized `t` is only the name, with filler words ("jensen huang", "i want jensen")."""
+    return all(w in _BARE_WORDS for w in _rest(t, alias))
+
+
 def mention(text: str) -> Mention:
     t = _normalize(text)
     for person in PEOPLE:
         for alias in sorted(person.aliases, key=len, reverse=True):
             if _alias_rx(alias).search(t):
-                return Mention(Intent.ADD if _ADD.match(t) else Intent.OTHER, person, alias)
+                return Mention(Intent.ADD if _ADD.match(t) or _bare(t, alias) else Intent.OTHER, person, alias)
     return Mention(Intent.NONE)
 
 
 def for_model(text: str) -> str:
-    """The sentence as the model reads it: an add of a known person names the description instead."""
+    """The sentence as the model reads it: an add of a known person names the description instead ("add <the
+    description>" for a bare name)."""
     m = mention(text)
     if m.intent is not Intent.ADD:
         return text
-    return _alias_rx(m.alias).sub(m.person.description, _normalize(text), count=1)
+    t = _normalize(text)
+    if not _ADD.match(t):
+        return f"add {m.person.description}"
+    return _alias_rx(m.alias).sub(m.person.description, t, count=1)
 
 
 def spot(text: str, snapshot: dict) -> str:
@@ -113,3 +140,20 @@ def person_remove(text: str, snapshot: dict) -> dict | None:
         return None
     chip = next((c for c in snapshot["changes"] if c["label"] == m.person.label), None)
     return None if chip is None else {"op": "remove", "id": chip["id"]}
+
+
+def whole_sentence(text: str, snapshot: dict) -> dict | None:
+    """The engine's add or remove of a known person when the sentence is nothing but that (the module docstring),
+    else None: "add jensen huang and a dog" is not, so the model or the keyword table reads every part."""
+    m = mention(text)
+    if m.intent is Intent.ADD:
+        t = _normalize(text)
+        spot_m = _RELATIVE.search(t)
+        if spot_m is not None:
+            t = t[:spot_m.start()]
+        if not all(w in _ADD_WORDS for w in _rest(t, m.alias)):
+            return None
+        return person_add(text, snapshot)
+    if m.intent is Intent.OTHER:
+        return person_remove(text, snapshot)
+    return None

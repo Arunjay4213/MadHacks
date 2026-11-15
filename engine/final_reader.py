@@ -28,8 +28,9 @@ Determinism: the cache is keyed by (composed prompt of the scene before, sentenc
 composed prompt is its own prompt. A result is chosen once: a Sonnet result, a block or a "not understood" is saved to
 a JSON file (written atomically) and never regenerated, also across restarts. A timeout (final_timeout_s, 3.0 s by
 default), a failed call or a reply that fails the check gives the fallback, final for that key for the life of the
-process (a late answer is dropped, late_dropped), and not saved to disk, so a passing outage does not disable a
-sentence for good.
+process on a composed scene (a late answer is dropped, late_dropped), and not saved to disk, so a passing outage does
+not disable a sentence for good. On a free scene a fallback is not kept: the dictionary cannot edit that scene, so
+the next try asks again.
 """
 
 import collections
@@ -57,7 +58,14 @@ from .slow_reader import validate as validate_operation
 
 log = logging.getLogger("engine.final_reader")
 
-DEFAULT_TIMEOUT_S = 3.0      # Sonnet measured 1.8 s p50, 2.4 s max from the engine machine
+# With adaptive thinking at effort medium (below), 50 blind-graded calls on 2026-11-15 took 1.84 s p50, 2.09 s p90 and
+# 2.21 s at most (none over 3 s), graded 4.54 against 4.40 for thinking off at effort low, and wrote a prompt every
+# time for "undo that, put the ocean back", which thinking off answered in prose. Effort high graded 4.64 but took
+# 3.41 s p90, too slow for the 3 s wait.
+DEFAULT_TIMEOUT_S = 3.0
+DEFAULT_EFFORT = "medium"       # output_config.effort
+DEFAULT_THINKING = "adaptive"   # thinking.type ("between_tools" is thinking off)
+DEFAULT_MAX_TOKENS = 4096       # room for the thinking; the reply itself is about 200 tokens
 HTTP_TIMEOUT_S = 10.0        # a call may finish after the wait; its answer is then dropped
 WORKERS = 4
 DEFAULT_CACHE_FILE = "~/.cache/madhacks/final_reader.json"
@@ -67,7 +75,7 @@ FENCE = re.compile(r"^\s*```[A-Za-z]*\s*|\s*```\s*$")
 # The video model's text encoder (umT5) reads at most 512 tokens. English prompts run about 4 characters and 1.4
 # tokens a word, so 180 words and commands.state.MAX_FREE_PROMPT_CHARS (1600 characters) stay near 400 tokens.
 MAX_PROMPT_WORDS = 180
-ASKED_PROMPT_WORDS = 120     # what the system prompt asks for (60 to 120), so a long reply still fits the cap
+ASKED_PROMPT_WORDS = 100     # what the system prompt asks for (60 to 100), so a long reply still fits the cap
 # Characters of a pinned or measured operation's phrase: a world sentence from commands/world.py is about 250, and a
 # saved racing car's phrase ends with the lane cue the old final reader added (", white dashed lane markings ...").
 CACHED_MAX_PHRASE = 400 + len(", white dashed lane markings rush toward the viewer")
@@ -204,11 +212,16 @@ Rules:
   grassy plain to the horizon"; "kill the tree's leaves" -> "bare branches". Such a sentence is always understood.
 - A sentence that asks again for what the prompt already says means the user does not see it yet: make it stronger
   and clearer in the words (bigger, closer to the centre, more of it), so the picture changes.
-- A new place ("take me to the desert", "now I want a savannah", "I want a city at night with a car driving on the
-  road") replaces the place: the ground, the background and the light. The objects stay unless the user says
-  otherwise. The video model cannot infer what happens to them, so for every object say where it is, what it stands
-  or drives on, and which way it faces, in words that fit the new place. A thing that cannot stay where it was gets a
-  plausible spot: an animal stands on the ground beside the road.
+- A change of place alone ("take me to the desert", "now I want a savannah", "make it a beach") replaces the place:
+  the ground, the background and the light. The objects stay unless the user says otherwise. The video model cannot
+  infer what happens to them, so for every object say where it is, what it stands or drives on, and which way it
+  faces, in words that fit the new place. A thing that cannot stay where it was gets a plausible spot: an animal
+  stands on the ground beside the road.
+- A sentence that describes a whole new scene, a place together with its own main subject or action ("I now want a
+  city at night with a car driving on the road", "show me a harbour with fishing boats", "a mountain village with
+  people skating on a frozen lake"), starts a new scene: "new_scene" is true, the prompt describes only what the
+  sentence names, and every earlier object, plant change and chip is dropped (the oak tree, bare branches, a lion),
+  unless the sentence keeps it by name ("... and keep the lion").
 - A car or other road vehicle is always on a paved road, street, bridge or car park, also when it is parked, also at a
   beach or in a field: never on sand, grass, snow or water.
 - A place after near, by, beside, next to or behind that the prompt does not have only says where the new thing goes:
@@ -223,14 +236,24 @@ Rules:
   "a single oak tree" next to "a second tree": the model then draws one.
 - Every moving subject (vehicles, aircraft, boats, animals, people) states its direction of travel relative to the
   camera, consistent with the camera. On a car scene anything that moves travels forward away from the camera in the
-  same direction as the car, seen from behind ("a passenger airplane seen from behind, flying forward away from the
-  camera in the same direction as the car, high above the road"), unless the user names another direction.
+  same direction as the car, seen from behind, unless the user names another direction. The video model draws the
+  parts it reads, not the words "seen from behind", so say which parts face the camera and where the front points:
+  an aircraft flying away is "seen from behind, its tail fin and the backs of its engines toward the camera, its nose
+  pointing away toward the horizon" ("a large white passenger airplane high above the road in the upper centre of
+  the frame, seen from behind, its tail fin and the backs of its engines toward the camera, its nose pointing away
+  toward the horizon, flying forward in the same direction as the car"); a vehicle driving away shows "its rear
+  lights and rear bumper toward the camera"; an animal or person walking away shows "its back and tail toward the
+  camera, its head turned away". A side view shows "the whole length of the car from the side, front wheels and
+  rear wheels both in view, its nose pointing to the left edge of the frame".
 - Seasons, weather and time of day are written visibly ("thick white snow covering the whole ground", "a dark night
   sky with a full moon"). "sunny" replaces night. More or less of something ("a little more snow") rewrites it with
   visibly more or less of it.
-- A named person: the sentence already holds their visual description. Write that description, never the name.
+- A named person: when the sentence holds their visual description (the engine puts it there for people it
+  knows), write that description; for any other real person describe their usual look (hair, glasses, clothes),
+  never the name. "person_chip" is their chip.
 - "new_scene" is true only when the user asks for a new scene in so many words ("new scene of a beach", "start over
-  with a castle") or replaces the main subject itself; the prompt then describes only the new scene. Otherwise false.
+  with a castle"), replaces the main subject itself, or describes a whole new scene (a place with its own main
+  subject or action, above); the prompt then describes only the new scene. Otherwise false.
 
 The chips: one short label (1 to 3 words, lower case, at most {max_label} characters) for each thing the user added
 or changed that is still in the picture (objects, place, season, weather, time, camera), in the order they were
@@ -239,7 +262,8 @@ starts with the chips of what the user named.
 
 "understood" is false, with an empty prompt, only when the sentence is not about the picture at all, asks for nothing
 to change ("don't add a lion", "never mind", "leave it"), or asks to undo or reset: then nothing changes on screen. A short or loose sentence about the picture ("zoom out", "more trees",
-"make it cozy") is understood: write your best reading of it. "blocked" is true, with an empty prompt, when the
+"make it cozy") is understood: write your best reading of it. A bare noun phrase ("a lion", "fireworks", "a red
+balloon", "a middle-aged man in a black leather jacket") means: add that thing to the scene. "blocked" is true, with an empty prompt, when the
 sentence asks for sexual, violent (gore, killing or hurting people or animals) or hateful content; plants and
 objects are not violence.
 """
@@ -503,6 +527,7 @@ class FinalReader:
         self._pinned: dict[tuple[str, str], Entry] = dict(pinned or {})  # checked before the cache
         self.pinned_hits = 0
         self.template_hits = 0  # measured car worlds composed by the engine, no call
+        self.person_hits = 0    # a sentence that only adds or removes a named person (engine/people.py), no call
         # composed prompt of a vehicle scene -> the template prompt last given for it, so a dictionary result on that
         # scene keeps its road, scene and light (fallback_prompt)
         self._given_vehicle: dict[str, str] = {}
@@ -572,6 +597,11 @@ class FinalReader:
                 with self._lock:
                     setattr(self, counter, getattr(self, counter) + 1)
                 return hit
+        person = self._person(text, snapshot, people.whole_sentence(text, snapshot))
+        if person is not None:
+            with self._lock:
+                self.person_hits += 1
+            return person
         measured = self._measured(text, snapshot)
         if measured is not None:
             with self._lock:
@@ -602,7 +632,11 @@ class FinalReader:
                 self.timeouts += 1
             if entry.outcome is Outcome.SONNET:
                 entry = dataclasses.replace(entry, scene_before=scene_record(snapshot))
-            self._cache[key] = entry
+            # A fallback is final for the process on a composed scene, where the dictionary acts. On a free scene the
+            # dictionary refuses edits, so a kept fallback would make the sentence fail there until a restart: the
+            # next try asks again.
+            if entry.outcome is not Outcome.FALLBACK or not is_free(snapshot):
+                self._cache[key] = entry
             if entry.outcome is Outcome.BLOCKED:
                 self.blocked += 1
             elif entry.outcome is Outcome.NOT_UNDERSTOOD:
@@ -636,7 +670,7 @@ class FinalReader:
             return {"state": self.state.value, "reason": self.reason or None, "prompt_spec": "free scene",
                     "calls": self.calls, "cache_hits": self.cache_hits,
                     "pinned": len(self._pinned), "pinned_hits": self.pinned_hits,
-                    "template_hits": self.template_hits, "blocked": self.blocked,
+                    "template_hits": self.template_hits, "person_hits": self.person_hits, "blocked": self.blocked,
                     "not_understood": self.not_understood,
                     "timeouts": self.timeouts, "late_dropped": self.late_dropped, "rejects": self.rejects,
                     "repaired": self.repaired, "retries": self.retries, "errors": self.errors,
@@ -675,11 +709,16 @@ class FinalReader:
         """`entry`, or for a FALLBACK on a composed scene and a sentence that adds or removes a named person
         (engine/people.py), the engine's own add or remove with the plain prompt (or the car template): the
         dictionary would label the chip with the description."""
-        if entry.outcome is not Outcome.FALLBACK or is_free(snapshot):
+        if entry.outcome is not Outcome.FALLBACK:
             return entry
-        add = people.person_add(text, snapshot) or people.person_remove(text, snapshot)
-        if add is None:
-            return entry
+        person = self._person(text, snapshot, people.person_add(text, snapshot) or people.person_remove(text, snapshot))
+        return entry if person is None else person
+
+    def _person(self, text: str, snapshot: dict, add: dict | None) -> Entry | None:
+        """A PERSON entry for the engine's add or remove `add` of a named person on a composed scene (the plain
+        prompt, or the car template on a vehicle scene), or None when there is none or it does not apply."""
+        if add is None or is_free(snapshot):
+            return None
         from commands.composer import compose
         try:
             ops = checked_operations([add], snapshot)
@@ -694,8 +733,8 @@ class FinalReader:
                 prompt = compose(after)
         except (ValueError, TypeError, KeyError) as exc:
             log.warning("final reader: the engine's %s for %r does not apply (%r)", add["op"], _short(text), exc)
-            return entry
-        log.info("final reader: %r -> the engine's %s (no usable reply)", _short(text), add["op"])
+            return None
+        log.info("final reader: %r -> the engine's %s of a named person, no call", _short(text), add["op"])
         return Entry(Outcome.PERSON, tuple(ops), prompt)
 
     def fallback_prompt(self, before: dict, after: dict) -> str | None:
@@ -930,15 +969,15 @@ def fingerprint(system_prompt: str, model: str, build: str = PROMPT_BUILD) -> st
 
 
 def call_options(environ=os.environ) -> dict:
-    """The Sonnet call's effort, thinking and max_tokens from FINAL_READER_EFFORT (low, medium, high; default low),
-    FINAL_READER_THINKING (the thinking type; default between_tools, which is thinking off) and
-    FINAL_READER_MAX_TOKENS (default 1024), so they can be measured against each other without a code change."""
-    out = {"effort": environ.get("FINAL_READER_EFFORT") or FoundryMessages.EFFORT,
-           "thinking": environ.get("FINAL_READER_THINKING") or FoundryMessages.THINKING}
+    """The Sonnet call's effort, thinking and max_tokens from FINAL_READER_EFFORT (low, medium, high; default medium),
+    FINAL_READER_THINKING (the thinking type; default adaptive; between_tools is thinking off) and
+    FINAL_READER_MAX_TOKENS (default 4096), so they can be measured against each other without a code change."""
+    out = {"effort": environ.get("FINAL_READER_EFFORT") or DEFAULT_EFFORT,
+           "thinking": environ.get("FINAL_READER_THINKING") or DEFAULT_THINKING}
     if out["effort"] not in ("low", "medium", "high"):
         raise ValueError(f"FINAL_READER_EFFORT must be low, medium or high, got {out['effort']!r}")
     tokens = environ.get("FINAL_READER_MAX_TOKENS")
-    out["max_tokens"] = int(tokens) if tokens else FoundryMessages.MAX_TOKENS
+    out["max_tokens"] = int(tokens) if tokens else DEFAULT_MAX_TOKENS
     return out
 
 

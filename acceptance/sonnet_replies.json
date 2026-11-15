@@ -5,37 +5,28 @@
    "sentence": "add a red car racing on a road",
    "prompt_before": "a wide shot of a meadow with a single oak tree",
    "chips": "",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A single large oak tree stands in the green meadow beside the road at the right of the frame. Green fields stretch wide on both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.\", \"chips\": [\"red car\", \"road\"]}",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a green meadow with a single large oak tree standing in the centre of the frame, its full leafy crown clearly visible. A paved grey asphalt road with a white dashed centre line runs through the meadow in the right foreground and curves away toward the horizon. A red sports car races along the road, seen from behind, its rear lights and rear bumper toward the camera, its nose pointing away toward the horizon, driving fast and moving forward away from the camera. Wildflowers and tall grass line the roadside, with soft hills in the distance. Bright daylight under a blue sky with a few white clouds. Cinematic, highly detailed, realistic, sharp focus, slight motion blur on the road.\", \"chips\": [\"red car\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "add snow near the river",
    "prompt_before": "a wide shot of a meadow with a single oak tree",
    "chips": "",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a winter meadow with a single large oak tree standing in the centre of the frame, its bare branches heavy with snow. Thick white snow covers the whole ground of the meadow, deep and clearly visible in the foreground, with fresh snowflakes drifting down through the air. The camera is static and low, framing the oak tree large and clear against a pale grey overcast sky, with soft snow-covered fields stretching to the horizon behind it. Cold blue winter light, soft diffuse shadows. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"snow\"]}",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a green meadow with a single large oak tree in the centre of the frame, its full leafy crown clearly visible. Thick white snow covers the ground in patches across the foreground and the right side of the meadow, with snowdrifts piled in the grass and a light layer of snow resting on the lower branches of the oak. The camera is static and level, held at a medium distance. Soft overcast daylight with cool, diffuse shadows, a pale grey-blue sky, and distant hills at the horizon. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"snow\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "add a red car",
    "prompt_before": "a wide shot of a meadow with a single oak tree",
    "chips": "",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a green meadow with a single large oak tree in the centre of the frame, its broad leafy crown clearly visible. A red car is parked on a narrow paved road running along the edge of the meadow beside the oak tree, large and clearly visible in the centre of the frame, facing the camera. The camera is steady and static at eye level, showing the whole scene. Soft green grass and wildflowers fill the meadow, with distant rolling hills and a few small trees on the horizon under a bright blue sky with light white clouds. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"red car\"]}",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a meadow with a single oak tree in the centre of the frame, large and clearly visible, its broad green crown spreading over the grass. A narrow paved road crosses the meadow in the foreground, and a red car is parked on the road at the right of the frame, large and clearly visible, facing the camera, its front bumper and headlights toward the viewer. Green grass and wildflowers stretch to the horizon under a blue sky with a few soft clouds, bright daylight, soft shadows. Static camera, cinematic, highly detailed, realistic.\", \"chips\": [\"red car\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
-  },
-  {
-   "sentence": "add a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt",
-   "prompt_before": "a wide shot of a meadow with a single oak tree",
-   "chips": "",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a green meadow with a single large oak tree in the centre of the frame, clearly visible. A middle-aged man with short swept-back grey-black hair and glasses, wearing a black leather jacket over a black t-shirt, stands in the foreground at the left of the frame beside the oak tree, large and clearly visible, facing the camera. The camera is static and wide, showing the whole meadow with soft grass and a few wildflowers, gentle hills in the background under a pale blue sky with light clouds. Soft natural daylight, gentle shadows beneath the oak. Realistic, highly detailed, sharp focus.\", \"chips\": [\"jensen huang\"]}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "don't add a lion",
@@ -43,143 +34,107 @@
    "chips": "",
    "reply": "{\"blocked\": false, \"understood\": false, \"new_scene\": false, \"prompt\": \"\", \"chips\": []}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "add a red car",
    "prompt_before": "a wide shot of a meadow with a single oak tree; a large male lion standing in the centre of the frame beside the oak tree, facing the camera, large and clearly visible; tall swaying grass, soft golden light, dewy green blades, warm earthy tones",
    "chips": "lion",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a meadow with a single oak tree. A large male lion stands in the centre of the frame beside the oak tree, facing the camera, large and clearly visible. A red car is parked on a narrow paved road in the foreground at the right of the frame, seen from the front and facing the camera, large and clearly visible, the road running along the edge of the meadow. Tall swaying grass fills the meadow, dewy green blades, soft golden light, warm earthy tones.\", \"chips\": [\"lion\", \"red car\"]}",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a meadow with a single oak tree. A large male lion stands in the centre of the frame beside the oak tree, facing the camera, large and clearly visible. A red car is parked on a narrow paved road crossing the meadow in the foreground at the right of the frame, seen from the side, large and clearly visible, its nose pointing toward the left edge of the frame. Tall swaying grass and dewy green blades line the road, under soft golden light with warm earthy tones.\", \"chips\": [\"lion\", \"red car\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
-  },
-  {
-   "sentence": "add a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt next to the car",
-   "prompt_before": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
-   "chips": "",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A middle-aged man with short swept-back grey-black hair and glasses, wearing a black leather jacket over a black t-shirt, is seen from behind, running forward away from the camera on the road right beside the car at the left of the frame, large and clearly visible, in the same direction as the car. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.\", \"chips\": [\"jensen huang\"]}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "make the dog black",
    "prompt_before": "a wide shot of a meadow with a single oak tree; a golden retriever standing in the centre of the frame, facing the camera, large and clearly visible; tall swaying grass, soft dew on the blades, warm gentle light, clear open air",
    "chips": "dog",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"a wide shot of a meadow with a single oak tree; a black dog with a glossy jet-black coat standing in the centre of the frame, facing the camera, large and clearly visible; tall swaying grass, soft dew on the blades, warm gentle light, clear open air\", \"chips\": [\"black dog\"]}",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"a wide shot of a meadow with a single oak tree; a black Labrador-sized dog with a glossy jet-black coat standing in the centre of the frame, facing the camera, large and clearly visible; tall swaying grass, soft dew on the blades, warm gentle light, clear open air\", \"chips\": [\"black dog\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "add a red car",
    "prompt_before": "a wide shot of a single oak tree; a dense green pine forest, tall trees all around, soft sunlight through the branches",
    "chips": "forest",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a single oak tree standing in the centre of a dense green pine forest, tall pine trees all around it, soft sunlight falling through the branches. A large red car is parked on a narrow paved forest road in the foreground at the left of the frame, facing the camera, large and clearly visible, with its glossy red paint catching the dappled light. The camera is static, framing the oak tree, the car and the road together. Soft green forest light, sharp focus, realistic, highly detailed.\", \"chips\": [\"forest\", \"red car\"]}",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a single oak tree standing in the centre of the frame, with a dense green pine forest, tall trees all around, and soft sunlight falling through the branches. A narrow paved road with a faint white centre line winds through the forest in the foreground. A large red car is parked on the paved road in the foreground at the left of the frame, facing the camera, its headlights and red bonnet clearly visible, large and clearly visible. Dappled light and soft shadows lie on the asphalt and the forest floor. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"forest\", \"red car\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "just the beach, no car",
    "prompt_before": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
    "chips": "",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": true, \"prompt\": \"A wide establishing shot of an empty tropical beach with pale golden sand in the foreground and gentle turquoise waves rolling onto the shore in the centre of the frame. A line of tall palm trees leans along the right side of the beach, and green hills rise in the distance on the left. The camera is steady and slightly elevated, looking straight out over the water toward a clear horizon, with foam sliding across the wet sand. Sunny tropical day, a clear blue sky, sparkling light on the water, soft warm shadows under the palms. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"beach\"]}",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": true, \"prompt\": \"A wide, empty beach with pale golden sand in the foreground and centre of the frame, gentle turquoise waves rolling in and breaking in white foam along the shoreline from the right to the left of the frame. A line of tall palm trees stands along the back of the beach at the left, and green hills rise in the distance under a clear blue sky. The camera is a slow, steady wide shot from a low height, looking along the shore toward the horizon. Bright sunny tropical day, sparkling light on the water, soft shadows on the sand. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"beach\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "kill the tree's leaves",
    "prompt_before": "a wide shot of a meadow with a single oak tree",
    "chips": "",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a green meadow with a single large oak tree standing in the centre of the frame, its bare, leafless branches spreading wide against the sky, a dark gnarled trunk and a tangle of thin bare twigs clearly visible. The camera is static and holds the whole tree in view. Short green grass covers the ground, with a soft line of distant hills on the horizon. Soft daylight under a pale sky, gentle shadows beneath the tree. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"bare tree\"]}",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a meadow with a single large oak tree standing in the centre of the frame, its branches completely bare, with dark leafless twigs and a gnarled brown trunk clearly visible against the sky. The ground around the tree is open meadow with grass, scattered wildflowers, and a few fallen brown leaves at the base of the trunk. The camera is static and wide, showing the whole tree and the meadow stretching to distant hills on the horizon. Soft overcast daylight, muted natural colours, gentle shadows. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"bare branches\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "add an airplane in the sky",
    "prompt_before": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
    "chips": "",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A large white passenger airplane, seen from behind, flies forward away from the camera in the same direction as the car, high above the road in the upper centre of the frame, clearly visible against the sky. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.\", \"chips\": [\"airplane\"]}",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a straight two-lane country road, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A large white passenger airplane high above the road in the upper centre of the frame, seen from behind, its tail fin and the backs of its engines toward the camera, its nose pointing away toward the horizon, flying forward in the same direction as the car. Green fields and rows of trees line both sides of the road under a clear blue summer sky. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.\", \"chips\": [\"airplane\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "change the point of view to be facing the ocean. i want to see the car's side profile",
    "prompt_before": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a coastal highway on a cliff top, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Grey asphalt with white lane markings runs straight ahead, a low stone wall along the edge of the road, a bright turquoise ocean with white waves far below the cliff on the left side, palm trees and green hills on the right side. Sunny tropical day, clear blue sky, sparkling light on the water. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
    "chips": "ocean coast",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A red sports car, seen in side profile, drives fast from right to left along a coastal highway on a cliff top, moving forward in the direction of travel. The camera tracks alongside the car at the same speed in a smooth, low side tracking shot, facing the ocean, keeping the car centred in the frame while the white dashed centre line streaks past beneath it. Grey asphalt with white lane markings runs straight along the cliff edge, a low stone wall along the edge of the road, a bright turquoise ocean with white waves stretching to the horizon behind the car, palm trees and green hills along the far side of the road. Sunny tropical day, clear blue sky, sparkling light on the water. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.\", \"chips\": [\"ocean coast\", \"side view\"]}",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A red sports car seen exactly side-on, the whole length of the car from the side, front wheels and rear wheels both in view, its nose pointing to the right edge of the frame, drives fast from left to right along a coastal highway on a cliff top, large and centred in the frame. The camera faces the ocean in a smooth tracking shot from the side, level with the car and moving alongside it at the same speed, the car in the foreground and the bright turquoise ocean with white waves filling the background behind it. Grey asphalt with white lane markings runs along the cliff top, a low stone wall along the edge of the road between the car and the ocean, palm trees and green hills on the far side of the road. Sunny tropical day, clear blue sky, sparkling light on the water. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.\", \"chips\": [\"ocean coast\", \"side view\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "zoom out",
    "prompt_before": "a wide shot of a meadow with a single oak tree",
    "chips": "",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A very wide establishing shot from far away, with the camera pulled back to show a vast green meadow with a single oak tree, now small in the frame but still standing in the centre. Soft green grass covers the whole ground, wildflowers dot the meadow, low rolling hills and a line of distant trees on the horizon beneath a bright blue sky with a few white clouds. Gentle daylight, soft shadows, calm and peaceful. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"zoom out\"]}",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A very wide establishing shot of a green meadow filmed from far away, with a single oak tree standing small in the centre of the frame, its full round crown and trunk clearly visible. Short green grass covers the open ground, and wildflowers dot the foreground. Low rolling hills and a line of distant trees sit on the horizon under a soft blue sky with a few white clouds. The camera is static and high enough to show the whole landscape around the tree. Soft natural daylight, gentle shadows, cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"zoom out\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "i want no clouds",
    "prompt_before": "a wide shot of a meadow with a single oak tree",
    "chips": "",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a green meadow with a single large oak tree standing in the centre of the frame, large and clearly visible, under a clear, cloudless deep blue sky. The camera is steady and wide, showing the whole tree and the grass around it. Bright midday sunshine, crisp shadows on the grass. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"clear sky\"]}",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a green meadow with a single large oak tree standing in the centre of the frame, its full leafy crown clearly visible. Soft grass and a few wildflowers cover the ground up to a line of low hills in the distance. A clear, cloudless deep blue sky stretches over the whole scene, bright sunlight casts a crisp shadow of the oak across the grass. The camera is static and level with the ground. Realistic, highly detailed, sharp focus.\", \"chips\": [\"clear sky\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "no trees",
    "prompt_before": "a wide shot of a meadow with a single oak tree",
    "chips": "",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of an open green meadow with short grass and wildflowers stretching to the horizon in the centre of the frame, no objects on the ground, a gentle breeze moving the grass. The camera is static at eye level, showing the flat grassy plain, distant low hills at the horizon and a clear blue sky with a few soft white clouds. Bright midday sunshine, crisp shadows, calm and peaceful. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"open meadow\"]}",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of an open grassy meadow stretching to the horizon, short green grass and a few small wildflowers covering the whole ground, rolling low hills far in the background. The camera is static and level at human eye height, showing the empty meadow in the centre of the frame. Soft sunlight under a clear blue sky with a few thin white clouds, gentle shadows on the grass. Realistic, highly detailed, sharp focus, natural colours.\", \"chips\": [\"no trees\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "add another tree",
    "prompt_before": "a wide shot of a meadow with a single oak tree",
    "chips": "",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a green meadow with two oak trees: the first large oak tree stands in the centre of the frame, with a thick trunk and a full round crown of leaves, and a second, taller oak tree stands in the foreground at the left of the frame, clearly visible and slightly closer to the camera. Short green grass covers the whole ground and a few wildflowers dot the meadow. The camera is static and wide, holding both trees in view with rolling hills in the distance. A bright blue sky with a few soft white clouds, warm natural sunlight and soft shadows under the trees. Realistic, highly detailed, sharp focus.\", \"chips\": [\"second tree\"]}",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a green meadow with two large oak trees, one in the centre of the frame, tall and full with a thick leafy crown, and a second, taller oak tree in the foreground at the left of the frame, its broad trunk and spreading branches clearly visible. Soft green grass and a few wildflowers cover the ground, low hills and distant trees on the horizon. The camera is steady and wide, showing both trees fully. Bright daylight under a pale blue sky with a few light clouds, soft shadows under the trees. Realistic, highly detailed, sharp focus.\", \"chips\": [\"second oak tree\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
-  },
-  {
-   "sentence": "turn it into a beach",
-   "prompt_before": "A wide shot of a green meadow with a single large oak tree in the centre of the frame, its broad leafy crown clearly visible. A red car is parked on a narrow paved road running along the edge of the meadow beside the oak tree, large and clearly visible in the centre of the frame, facing the camera. The camera is steady and static at eye level, showing the whole scene. Soft green grass and wildflowers fill the meadow, with distant rolling hills and a few small trees on the horizon under a bright blue sky with light white clouds. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus.",
-   "chips": "red car",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a sandy beach with a single large oak tree standing in the centre of the frame on pale sand, its broad leafy crown clearly visible. A red car is parked on a narrow paved beachfront road running along the edge of the beach beside the oak tree, large and clearly visible in the centre of the frame, facing the camera. The camera is steady and static at eye level, showing the whole scene. Soft golden sand, scattered shells and low dune grass fill the beach, with a bright turquoise ocean and gentle white waves stretching to the horizon behind them, a few palm trees along the far shore, under a bright blue sky with light white clouds. Bright midday sunshine, crisp shadows. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"red car\", \"beach\"]}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
-  },
-  {
-   "sentence": "remove the lion",
-   "prompt_before": "A wide shot of a meadow with a single oak tree. A large male lion stands in the centre of the frame beside the oak tree, facing the camera, large and clearly visible. A red car is parked on a narrow paved road in the foreground at the right of the frame, seen from the front and facing the camera, large and clearly visible, the road running along the edge of the meadow. Tall swaying grass fills the meadow, dewy green blades, soft golden light, warm earthy tones.",
-   "chips": "lion,red car",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a meadow with a single oak tree standing large and clearly visible in the centre of the frame, its broad green crown and thick trunk rising above the grass. A red car is parked on a narrow paved road in the foreground at the right of the frame, seen from the front and facing the camera, large and clearly visible, the road running along the edge of the meadow. Tall swaying grass fills the meadow, dewy green blades, soft golden light, warm earthy tones.\", \"chips\": [\"red car\"]}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
-  },
-  {
-   "sentence": "remove jensen",
-   "prompt_before": "A wide shot of a green meadow with a single large oak tree in the centre of the frame, clearly visible. A middle-aged man with short swept-back grey-black hair and glasses, wearing a black leather jacket over a black t-shirt, stands in the foreground at the left of the frame beside the oak tree, large and clearly visible, facing the camera. The camera is static and wide, showing the whole meadow with soft grass and a few wildflowers, gentle hills in the background under a pale blue sky with light clouds. Soft natural daylight, gentle shadows beneath the oak. Realistic, highly detailed, sharp focus.",
-   "chips": "jensen huang",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a green meadow with a single large oak tree in the centre of the frame, clearly visible. The camera is static and wide, showing the whole meadow with soft grass and a few wildflowers, with open green grass stretching on both sides of the oak, gentle hills in the background under a pale blue sky with light clouds. Soft natural daylight, gentle shadows beneath the oak. Realistic, highly detailed, sharp focus.\", \"chips\": [], \"prompt_note\": \"person removed, meadow and oak unchanged\"}",
-   "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "um okay",
@@ -187,8 +142,8 @@
    "chips": "winter",
    "reply": "{\"blocked\": false, \"understood\": false, \"new_scene\": false, \"prompt\": \"\", \"chips\": [\"winter\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "what time is it",
@@ -196,71 +151,125 @@
    "chips": "winter",
    "reply": "{\"blocked\": false, \"understood\": false, \"new_scene\": false, \"prompt\": \"\", \"chips\": [\"winter\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
+  },
+  {
+   "sentence": "turn it into a beach",
+   "prompt_before": "A wide shot of a meadow with a single oak tree in the centre of the frame, large and clearly visible, its broad green crown spreading over the grass. A narrow paved road crosses the meadow in the foreground, and a red car is parked on the road at the right of the frame, large and clearly visible, facing the camera, its front bumper and headlights toward the viewer. Green grass and wildflowers stretch to the horizon under a blue sky with a few soft clouds, bright daylight, soft shadows. Static camera, cinematic, highly detailed, realistic.",
+   "chips": "red car",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a sandy beach with a single oak tree in the centre of the frame, large and clearly visible, its broad green crown spreading over pale sand, its trunk rooted in the sand. A narrow paved coastal road runs across the foreground in front of the tree, and a red car is parked on the road at the right of the frame, large and clearly visible, facing the camera, its front bumper and headlights toward the viewer. Pale golden sand stretches behind the tree to a turquoise sea with gentle white waves breaking along the shore, a few palm trees at the far left, under a bright blue sky with a few soft clouds, sunny daylight, soft shadows. Static camera, cinematic, highly detailed, realistic.\", \"chips\": [\"red car\", \"beach\"]}",
+   "model": "claude-sonnet-5-5",
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
+  },
+  {
+   "sentence": "remove the lion",
+   "prompt_before": "A wide shot of a meadow with a single oak tree. A large male lion stands in the centre of the frame beside the oak tree, facing the camera, large and clearly visible. A red car is parked on a narrow paved road crossing the meadow in the foreground at the right of the frame, seen from the side, large and clearly visible, its nose pointing toward the left edge of the frame. Tall swaying grass and dewy green blades line the road, under soft golden light with warm earthy tones.",
+   "chips": "lion,red car",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a meadow with a single oak tree standing large in the centre of the frame, its broad green crown and thick trunk clearly visible, with open grassy meadow stretching beside it. A red car is parked on a narrow paved road crossing the meadow in the foreground at the right of the frame, seen from the side, large and clearly visible, its nose pointing toward the left edge of the frame. Tall swaying grass and dewy green blades line the road, under soft golden light with warm earthy tones.\", \"chips\": [\"red car\"]}",
+   "model": "claude-sonnet-5-5",
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "remove the car near the forest",
-   "prompt_before": "A wide shot of a single oak tree standing in the centre of a dense green pine forest, tall pine trees all around it, soft sunlight falling through the branches. A large red car is parked on a narrow paved forest road in the foreground at the left of the frame, facing the camera, large and clearly visible, with its glossy red paint catching the dappled light. The camera is static, framing the oak tree, the car and the road together. Soft green forest light, sharp focus, realistic, highly detailed.",
+   "prompt_before": "A wide shot of a single oak tree standing in the centre of the frame, with a dense green pine forest, tall trees all around, and soft sunlight falling through the branches. A narrow paved road with a faint white centre line winds through the forest in the foreground. A large red car is parked on the paved road in the foreground at the left of the frame, facing the camera, its headlights and red bonnet clearly visible, large and clearly visible. Dappled light and soft shadows lie on the asphalt and the forest floor. Cinematic, highly detailed, realistic, sharp focus.",
    "chips": "forest,red car",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a single oak tree standing in the centre of a dense green pine forest, tall pine trees all around it, soft sunlight falling through the branches. A narrow empty paved forest road winds through the foreground at the left of the frame, a clear stretch of grey asphalt with green moss along its edges, lined by tall pine trunks. The camera is static, framing the oak tree and the empty road together. Soft green forest light, sharp focus, realistic, highly detailed.\", \"chips\": [\"forest\"]}",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a single oak tree standing in the centre of the frame, with a dense green pine forest, tall trees all around, and soft sunlight falling through the branches. A narrow paved road with a faint white centre line winds through the forest in the foreground, the empty asphalt clear and open from the left of the frame to the right. Dappled light and soft shadows lie on the asphalt and the forest floor. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"forest\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "cut the grass",
-   "prompt_before": "A wide shot of a green meadow with a single large oak tree standing in the centre of the frame, its bare, leafless branches spreading wide against the sky, a dark gnarled trunk and a tangle of thin bare twigs clearly visible. The camera is static and holds the whole tree in view. Short green grass covers the ground, with a soft line of distant hills on the horizon. Soft daylight under a pale sky, gentle shadows beneath the tree. Cinematic, highly detailed, realistic, sharp focus.",
-   "chips": "bare tree",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a meadow with a single large oak tree standing in the centre of the frame, its bare, leafless branches spreading wide against the sky, a dark gnarled trunk and a tangle of thin bare twigs clearly visible. The camera is static and holds the whole tree in view. The grass is freshly mown and cut very short, a smooth, neat, closely trimmed green lawn with clean mowing stripes covering the ground, with a soft line of distant hills on the horizon. Soft daylight under a pale sky, gentle shadows beneath the tree. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"bare tree\", \"cut grass\"]}",
+   "prompt_before": "A wide shot of a meadow with a single large oak tree standing in the centre of the frame, its branches completely bare, with dark leafless twigs and a gnarled brown trunk clearly visible against the sky. The ground around the tree is open meadow with grass, scattered wildflowers, and a few fallen brown leaves at the base of the trunk. The camera is static and wide, showing the whole tree and the meadow stretching to distant hills on the horizon. Soft overcast daylight, muted natural colours, gentle shadows. Cinematic, highly detailed, realistic, sharp focus.",
+   "chips": "bare branches",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a meadow with a single large oak tree standing in the centre of the frame, its branches completely bare, with dark leafless twigs and a gnarled brown trunk clearly visible against the sky. The ground around the tree is freshly mown short lawn, a smooth, even, closely cropped green surface with neat mowing stripes, and a few fallen brown leaves at the base of the trunk. The camera is static and wide, showing the whole tree and the short-cut lawn stretching to distant hills on the horizon. Soft overcast daylight, muted natural colours, gentle shadows. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"bare branches\", \"mown grass\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "i want no grass. arid environment",
-   "prompt_before": "A wide shot of a meadow with a single large oak tree standing in the centre of the frame, its bare, leafless branches spreading wide against the sky, a dark gnarled trunk and a tangle of thin bare twigs clearly visible. The camera is static and holds the whole tree in view. The grass is freshly mown and cut very short, a smooth, neat, closely trimmed green lawn with clean mowing stripes covering the ground, with a soft line of distant hills on the horizon. Soft daylight under a pale sky, gentle shadows beneath the tree. Cinematic, highly detailed, realistic, sharp focus.",
-   "chips": "bare tree,cut grass",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of an arid landscape with a single large oak tree standing in the centre of the frame, its bare, leafless branches spreading wide against the sky, a dark gnarled trunk and a tangle of thin bare twigs clearly visible. The camera is static and holds the whole tree in view. The ground is bare, dry, cracked sandy earth in pale tan and ochre, scattered with a few small stones and dry scrub, with a soft line of distant dry hills on the horizon. Soft daylight under a pale, cloudless sky, gentle shadows beneath the tree. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"bare tree\", \"arid ground\"]}",
+   "prompt_before": "A wide shot of a meadow with a single large oak tree standing in the centre of the frame, its branches completely bare, with dark leafless twigs and a gnarled brown trunk clearly visible against the sky. The ground around the tree is freshly mown short lawn, a smooth, even, closely cropped green surface with neat mowing stripes, and a few fallen brown leaves at the base of the trunk. The camera is static and wide, showing the whole tree and the short-cut lawn stretching to distant hills on the horizon. Soft overcast daylight, muted natural colours, gentle shadows. Cinematic, highly detailed, realistic, sharp focus.",
+   "chips": "bare branches,mown grass",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of an arid landscape with a single large oak tree standing in the centre of the frame, its branches completely bare, with dark leafless twigs and a gnarled brown trunk clearly visible against the sky. The ground around the tree is bare, cracked, dry sandy-brown earth with a few small stones and a few fallen brown leaves at the base of the trunk. The camera is static and wide, showing the whole tree and the dusty, barren ground stretching to distant dry hills on the horizon. Soft overcast daylight, muted natural colours, gentle shadows. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"bare branches\", \"arid ground\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "add a lion",
-   "prompt_before": "A wide shot of an arid landscape with a single large oak tree standing in the centre of the frame, its bare, leafless branches spreading wide against the sky, a dark gnarled trunk and a tangle of thin bare twigs clearly visible. The camera is static and holds the whole tree in view. The ground is bare, dry, cracked sandy earth in pale tan and ochre, scattered with a few small stones and dry scrub, with a soft line of distant dry hills on the horizon. Soft daylight under a pale, cloudless sky, gentle shadows beneath the tree. Cinematic, highly detailed, realistic, sharp focus.",
-   "chips": "bare tree,arid ground",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of an arid landscape with a single large oak tree standing in the centre of the frame, its bare, leafless branches spreading wide against the sky, a dark gnarled trunk and a tangle of thin bare twigs clearly visible. A large male lion with a thick golden mane stands on the bare ground in the foreground at the left of the frame, facing the camera, large and clearly visible, its muscular body in sharp detail. The camera is static and holds both the tree and the lion in view. The ground is bare, dry, cracked sandy earth in pale tan and ochre, scattered with a few small stones and dry scrub, with a soft line of distant dry hills on the horizon. Soft daylight under a pale, cloudless sky, gentle shadows beneath the tree and the lion. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"bare tree\", \"arid ground\", \"lion\"]}",
+   "prompt_before": "A wide shot of an arid landscape with a single large oak tree standing in the centre of the frame, its branches completely bare, with dark leafless twigs and a gnarled brown trunk clearly visible against the sky. The ground around the tree is bare, cracked, dry sandy-brown earth with a few small stones and a few fallen brown leaves at the base of the trunk. The camera is static and wide, showing the whole tree and the dusty, barren ground stretching to distant dry hills on the horizon. Soft overcast daylight, muted natural colours, gentle shadows. Cinematic, highly detailed, realistic, sharp focus.",
+   "chips": "bare branches,arid ground",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of an arid landscape with a single large oak tree standing in the centre of the frame, its branches completely bare, with dark leafless twigs and a gnarled brown trunk clearly visible against the sky. A large male lion with a full golden mane stands in the foreground at the left of the frame on the dry ground, facing the camera, large and clearly visible, its head raised and its eyes looking toward the viewer. The ground around the tree is bare, cracked, dry sandy-brown earth with a few small stones and a few fallen brown leaves at the base of the trunk. The camera is static and wide, showing the whole tree, the lion and the dusty, barren ground stretching to distant dry hills on the horizon. Soft overcast daylight, muted natural colours, gentle shadows. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"bare branches\", \"arid ground\", \"lion\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "now i want a savannah",
-   "prompt_before": "A wide shot of an arid landscape with a single large oak tree standing in the centre of the frame, its bare, leafless branches spreading wide against the sky, a dark gnarled trunk and a tangle of thin bare twigs clearly visible. A large male lion with a thick golden mane stands on the bare ground in the foreground at the left of the frame, facing the camera, large and clearly visible, its muscular body in sharp detail. The camera is static and holds both the tree and the lion in view. The ground is bare, dry, cracked sandy earth in pale tan and ochre, scattered with a few small stones and dry scrub, with a soft line of distant dry hills on the horizon. Soft daylight under a pale, cloudless sky, gentle shadows beneath the tree and the lion. Cinematic, highly detailed, realistic, sharp focus.",
-   "chips": "bare tree,arid ground,lion",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of an African savannah with a single large oak tree standing in the centre of the frame, its wide flat canopy covered in full green leaves, a dark gnarled trunk rising from the ground. A large male lion with a thick golden mane stands on the ground in the foreground at the left of the frame, facing the camera, large and clearly visible, its muscular body in sharp detail. The camera is static and holds both the tree and the lion in view. The ground is open grassland of tall golden-yellow dry grass dotted with a few flat-topped acacia trees and low green bushes, stretching to a far horizon of gentle hills. Warm late-afternoon sunlight under a wide pale blue sky with a few thin clouds, long soft shadows beneath the tree and the lion. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"savannah\", \"lion\"]}",
+   "prompt_before": "A wide shot of an arid landscape with a single large oak tree standing in the centre of the frame, its branches completely bare, with dark leafless twigs and a gnarled brown trunk clearly visible against the sky. A large male lion with a full golden mane stands in the foreground at the left of the frame on the dry ground, facing the camera, large and clearly visible, its head raised and its eyes looking toward the viewer. The ground around the tree is bare, cracked, dry sandy-brown earth with a few small stones and a few fallen brown leaves at the base of the trunk. The camera is static and wide, showing the whole tree, the lion and the dusty, barren ground stretching to distant dry hills on the horizon. Soft overcast daylight, muted natural colours, gentle shadows. Cinematic, highly detailed, realistic, sharp focus.",
+   "chips": "bare branches,arid ground,lion",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of an African savannah with a single large oak tree standing in the centre of the frame, its branches completely bare, with dark leafless twigs and a gnarled brown trunk clearly visible against the sky. A large male lion with a full golden mane stands in the foreground at the left of the frame on the golden grass, facing the camera, large and clearly visible, its head raised and its eyes looking toward the viewer. The ground around the tree is open savannah of tall golden-yellow dry grass with a few small stones and a few fallen brown leaves at the base of the trunk, with scattered flat-topped acacia trees far in the background. The camera is static and wide, showing the whole tree, the lion and the grassland stretching to a flat horizon with low distant hills. Warm late-afternoon sun in a pale blue sky with a few thin clouds, soft long shadows, warm golden light. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"bare branches\", \"lion\", \"savannah\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "i now want a city in the night with a car driving on the road",
-   "prompt_before": "A wide shot of an African savannah with a single large oak tree standing in the centre of the frame, its wide flat canopy covered in full green leaves, a dark gnarled trunk rising from the ground. A large male lion with a thick golden mane stands on the ground in the foreground at the left of the frame, facing the camera, large and clearly visible, its muscular body in sharp detail. The camera is static and holds both the tree and the lion in view. The ground is open grassland of tall golden-yellow dry grass dotted with a few flat-topped acacia trees and low green bushes, stretching to a far horizon of gentle hills. Warm late-afternoon sunlight under a wide pale blue sky with a few thin clouds, long soft shadows beneath the tree and the lion. Cinematic, highly detailed, realistic, sharp focus.",
-   "chips": "savannah,lion",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A dark gray sports car, seen from directly behind with its rear lights facing the camera, drives fast along a wide city street at night, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A single large oak tree with a wide flat canopy of full green leaves and a dark gnarled trunk stands on the pavement beside the street at the right of the frame, lit by the street lamps. A large male lion with a thick golden mane stands on the pavement in the foreground at the left of the frame, facing the camera, large and clearly visible, its muscular body in sharp detail. Tall skyscrapers with glowing windows and bright neon signs rise on both sides of the street, the wet asphalt reflects the colourful lights. Dark night sky, vivid neon glow, a few streetlights casting warm pools of light. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.\", \"chips\": [\"city\", \"night\", \"car\", \"lion\"]}",
+   "prompt_before": "A wide shot of an African savannah with a single large oak tree standing in the centre of the frame, its branches completely bare, with dark leafless twigs and a gnarled brown trunk clearly visible against the sky. A large male lion with a full golden mane stands in the foreground at the left of the frame on the golden grass, facing the camera, large and clearly visible, its head raised and its eyes looking toward the viewer. The ground around the tree is open savannah of tall golden-yellow dry grass with a few small stones and a few fallen brown leaves at the base of the trunk, with scattered flat-topped acacia trees far in the background. The camera is static and wide, showing the whole tree, the lion and the grassland stretching to a flat horizon with low distant hills. Warm late-afternoon sun in a pale blue sky with a few thin clouds, soft long shadows, warm golden light. Cinematic, highly detailed, realistic, sharp focus.",
+   "chips": "bare branches,lion,savannah",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": true, \"prompt\": \"A dark grey car, seen from directly behind with its rear lights facing the camera, drives fast along a wide city street at night, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Tall skyscrapers with glowing windows and bright signs rise on both sides of the street, the wet asphalt reflects the colourful lights of the city, streetlamps line the pavements. Dark night sky, vivid city glow, cinematic night atmosphere. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.\", \"chips\": [\"city\", \"night\", \"car\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   },
   {
    "sentence": "city with road and red car driving",
-   "prompt_before": "A dark gray sports car, seen from directly behind with its rear lights facing the camera, drives fast along a wide city street at night, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A single large oak tree with a wide flat canopy of full green leaves and a dark gnarled trunk stands on the pavement beside the street at the right of the frame, lit by the street lamps. A large male lion with a thick golden mane stands on the pavement in the foreground at the left of the frame, facing the camera, large and clearly visible, its muscular body in sharp detail. Tall skyscrapers with glowing windows and bright neon signs rise on both sides of the street, the wet asphalt reflects the colourful lights. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
-   "chips": "city,night,car,lion",
-   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a wide city street at night, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A single large oak tree with a wide flat canopy of full green leaves and a dark gnarled trunk stands on the pavement beside the street at the right of the frame, lit by the street lamps. A large male lion with a thick golden mane stands on the pavement in the foreground at the left of the frame, facing the camera, large and clearly visible, its muscular body in sharp detail. Tall skyscrapers with glowing windows and bright neon signs rise on both sides of the street, the wet asphalt reflects the colourful lights. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.\", \"chips\": [\"city\", \"night\", \"red car\", \"lion\"]}",
+   "prompt_before": "A dark grey car, seen from directly behind with its rear lights facing the camera, drives fast along a wide city street at night, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Tall skyscrapers with glowing windows and bright signs rise on both sides of the street, the wet asphalt reflects the colourful lights of the city, streetlamps line the pavements. Dark night sky, vivid city glow, cinematic night atmosphere. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+   "chips": "city,night,car",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A red car, seen from directly behind with its rear lights facing the camera, drives fast along a wide city street at night, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A dense city of very tall skyscrapers with glowing windows and bright signs crowds close together on both sides of the wide street, rows of streetlamps and busy pavements line the road, the wet asphalt reflects the colourful lights of the city. Dark night sky, vivid city glow, cinematic night atmosphere. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.\", \"chips\": [\"city\", \"night\", \"red car\"]}",
    "model": "claude-sonnet-5-5",
-   "fingerprint": "28c7760959561d70",
-   "recorded_at": "2026-11-15T08:05:38+00:00"
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
+  },
+  {
+   "sentence": "add a lion",
+   "prompt_before": "A wide shot of a meadow with a single large oak tree standing in the centre of the frame, its branches completely bare, with dark leafless twigs and a gnarled brown trunk clearly visible against the sky. The ground around the tree is open meadow with grass, scattered wildflowers, and a few fallen brown leaves at the base of the trunk. The camera is static and wide, showing the whole tree and the meadow stretching to distant hills on the horizon. Soft overcast daylight, muted natural colours, gentle shadows. Cinematic, highly detailed, realistic, sharp focus.",
+   "chips": "bare branches",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a meadow with a single large oak tree standing in the centre of the frame, its branches completely bare, with dark leafless twigs and a gnarled brown trunk clearly visible against the sky. A large male lion with a full golden mane stands in the foreground at the left of the frame, facing the camera, large and clearly visible, its head raised and its eyes looking toward the lens. The ground around the tree and the lion is open meadow with grass, scattered wildflowers, and a few fallen brown leaves at the base of the trunk. The camera is static and wide, showing the whole tree, the lion and the meadow stretching to distant hills on the horizon. Soft overcast daylight, muted natural colours, gentle shadows. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"bare branches\", \"lion\"]}",
+   "model": "claude-sonnet-5-5",
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
+  },
+  {
+   "sentence": "i now want a city at night with a car driving on the road",
+   "prompt_before": "A wide shot of a meadow with a single large oak tree standing in the centre of the frame, its branches completely bare, with dark leafless twigs and a gnarled brown trunk clearly visible against the sky. A large male lion with a full golden mane stands in the foreground at the left of the frame, facing the camera, large and clearly visible, its head raised and its eyes looking toward the lens. The ground around the tree and the lion is open meadow with grass, scattered wildflowers, and a few fallen brown leaves at the base of the trunk. The camera is static and wide, showing the whole tree, the lion and the meadow stretching to distant hills on the horizon. Soft overcast daylight, muted natural colours, gentle shadows. Cinematic, highly detailed, realistic, sharp focus.",
+   "chips": "bare branches,lion",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": true, \"prompt\": \"A dark blue sedan, seen from directly behind with its rear lights facing the camera, drives fast along a wide city street at night, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. Tall skyscrapers with glowing windows and bright signs rise on both sides of the street, the wet asphalt reflects the colourful lights of the city, street lamps and the red tail lights of other cars glow along the road ahead. Dark night sky, warm and cool city lights, a moody urban atmosphere. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.\", \"chips\": [\"city at night\", \"car\"]}",
+   "model": "claude-sonnet-5-5",
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
+  },
+  {
+   "sentence": "add a middle-aged man with short swept-back grey-black hair and glasses, wearing his signature black leather jacket over a black t-shirt",
+   "prompt_before": "A wide shot of a meadow with a single large oak tree standing in the centre of the frame, its branches completely bare, with dark leafless twigs and a gnarled brown trunk clearly visible against the sky. The ground around the tree is open meadow with grass, scattered wildflowers, and a few fallen brown leaves at the base of the trunk. The camera is static and wide, showing the whole tree and the meadow stretching to distant hills on the horizon. Soft overcast daylight, muted natural colours, gentle shadows. Cinematic, highly detailed, realistic, sharp focus.",
+   "chips": "bare branches",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"A wide shot of a meadow with a single large oak tree standing in the centre of the frame, its branches completely bare, with dark leafless twigs and a gnarled brown trunk clearly visible against the sky. A middle-aged man with short swept-back grey-black hair and glasses, wearing a black leather jacket over a black t-shirt, stands in the foreground at the right of the frame beside the tree, large and clearly visible, facing the camera. The ground around the tree is open meadow with grass, scattered wildflowers, and a few fallen brown leaves at the base of the trunk. The camera is static and wide, showing the whole tree, the man and the meadow stretching to distant hills on the horizon. Soft overcast daylight, muted natural colours, gentle shadows. Cinematic, highly detailed, realistic, sharp focus.\", \"chips\": [\"bare branches\", \"jensen huang\"]}",
+   "model": "claude-sonnet-5-5",
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
+  },
+  {
+   "sentence": "add a dog",
+   "prompt_before": "a wide shot of a meadow with a single oak tree; a golden retriever standing in the centre of the frame, facing the camera, large and clearly visible; tall swaying grass, soft dew on the blades, warm gentle light, clear open air",
+   "chips": "dog",
+   "reply": "{\"blocked\": false, \"understood\": true, \"new_scene\": false, \"prompt\": \"a wide shot of a meadow with a single oak tree standing far behind the dog; a large golden retriever standing in the centre of the frame, close to the camera, facing the camera, its head, chest and whole body big, sharp and clearly visible, filling much of the frame; tall swaying grass, soft dew on the blades, warm gentle light, clear open air\", \"chips\": [\"dog\"]}",
+   "model": "claude-sonnet-5-5",
+   "fingerprint": "377a2d3d3760e9ce",
+   "recorded_at": "2026-11-15T08:43:33+00:00"
   }
  ]
 }

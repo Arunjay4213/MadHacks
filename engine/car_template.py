@@ -348,17 +348,20 @@ the GPU to keep the vehicle seen from behind and driving forward (anything else 
   in X. <road> always names the paved road it drives on (road, highway, street, lane, bridge): for a beach it is
   "a beachfront road with pale sand and waves beside it", never sand or water.
 - "view_change" true means the user asks for another camera position or view ("I want to see the car's side
-  profile"): then the rear view and the camera sentence yield. Write a camera sentence that matches the new view
-  ("a smooth tracking shot from the side, the camera moving alongside the car at the same speed, the car seen in side
-  profile driving from left to right along the coastal road, the ocean behind it"), keep the road and keep the
-  vehicle's direction of travel consistent with that camera. The vehicle still drives on a named road.
+  profile"): then the rear view and the camera sentence yield. Write the subject and camera sentences for the new
+  view with the parts the model can see ("the red sports car seen exactly side-on, the whole length of the car from
+  the side, front wheels and rear wheels both in view, its nose pointing to the left edge of the frame, driving from
+  right to left along the coastal road; a smooth tracking shot from the side, the camera level with the car and
+  moving alongside it at the same speed, the ocean behind it"), keep the road and keep the vehicle's direction of
+  travel consistent with that camera. The vehicle still drives on a named road.
 - The vehicle goes only when the user says so ("remove the car", "just the beach, no car"): then "new_scene" is
   true and the prompt describes X without the vehicle.
 - More or less of the current weather or season ("a little more snow", "less rain"): the same road, and the scene
   and light sentences rewritten with visibly more or less of it ("heavy snow falling thickly, deep snowdrifts";
   "a light dusting of snow").
-- A new prompt whose main subject is a vehicle driving along a road ("a city at night with a car driving on the
-  road") is written in this form too; the other objects become object sentences after the camera sentence.
+- A new scene whose main subject is a vehicle driving along a road ("I now want a city at night with a car driving
+  on the road") is written in this form too, with only what the sentence names: the earlier objects and chips are
+  dropped unless the sentence keeps them by name.
 Measured worlds (road | scene sentence | light sentence):
 {examples}
 """

@@ -20,7 +20,7 @@ import sys
 import time
 from datetime import datetime, timezone
 
-from engine.final_reader import fingerprint, load
+from engine.final_reader import call_options, fingerprint, load
 from engine.foundry import FoundryMessages, settings_from_env
 from engine.tools.acceptance import (REPLIES_FILE, Mode, MissingReply, ReplayChat, RetryRefused, case_modes,
                                      entry_key, load_cases, reply_key, run_case)
@@ -75,7 +75,7 @@ def main(argv=None) -> int:
     if settings is None:
         print("error: FOUNDRY_ENDPOINT and FOUNDRY_KEY must be set (load ~/.madhacks-foundry.env)", file=sys.stderr)
         return 2
-    real = FoundryMessages.from_settings(settings, HTTP_TIMEOUT_S)
+    real = FoundryMessages.from_settings(settings, HTTP_TIMEOUT_S, **call_options())  # the live call's settings
     fp = fingerprint(load("sonnet", chat=real, cache_path=None, demo_prompts=None).system_prompt, real.model)
     existing = json.loads(REPLIES_FILE.read_text())["replies"] if REPLIES_FILE.exists() else []
     # With --refresh-stale a stale reply is not replayed, so the cases run here ask for it again; every entry stays
