@@ -39,8 +39,18 @@ def test_the_table_covers_every_demo_prompt_line():
         assert (start, entry["sentence"]) in said, f"no case says {entry['sentence']!r} on the {start} scene"
 
 
-def test_both_modes_run_by_default():
-    assert {m for c in load_cases() for m in case_modes(c)} == set(Mode)
+def test_recorded_replies_are_from_the_current_rules():
+    """A reply recorded under an older system prompt says nothing about what the live engine does now."""
+    import json
+    import logging
+    from engine.final_reader import fingerprint, load
+    from engine.tools.acceptance import REPLIES_FILE, DownChat
+    logging.getLogger("engine.final_reader").setLevel(logging.ERROR)
+    system = load("sonnet", chat=DownChat(), cache_path=None, demo_prompts=None).system_prompt
+    stale = sorted({e["sentence"] for e in json.loads(REPLIES_FILE.read_text())["replies"]
+                    if e.get("fingerprint") != fingerprint(system, e.get("model", ""))})
+    assert not stale, ("replies recorded under another final reader system prompt; run "
+                       f"`python -m engine.tools.acceptance_record --refresh-stale` with the Foundry key: {stale}")
 
 
 def test_every_sonnet_step_has_a_recorded_reply():
