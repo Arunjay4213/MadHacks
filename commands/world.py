@@ -11,19 +11,28 @@ import re
 from .dictionary import KEYWORD_RX, KEYWORDS, normalize
 from .state import DEFAULT_BASE
 
-# Ishaan's template: prompt = SUBJECT + world phrase + STYLE (plain concatenation). Direction wording not final.
-SUBJECT = ("A red sports car driving fast along a road, seen from behind in a smooth tracking shot, "
-           "the car in the centre of the frame, ")
-STYLE = " Cinematic, highly detailed, realistic, sharp focus, motion blur on the road."
+# Ishaan's measured car template (board #6886548029). With the rear view named, the car stayed seen from behind in
+# 10 of 10 GPU runs, and swapping road, scene and light changed the world (a place appended to a short prompt did not):
+#   {subject}, seen from directly behind ..., drives fast along {road}, moving forward away from the camera. {CAMERA}
+#   {scene} {light} {STYLE}
+# A world phrase below is "{road}. {scene} {light}", so the road is its text before the first ". ".
+CAR_SUBJECT = "A red sports car"
+CAMERA = ("The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car "
+          "centred in the frame while the white dashed centre line rushes toward the viewer.")
+STYLE = "Cinematic, highly detailed, realistic, sharp focus, motion blur on the road."  # road scenes only
+_REAR = ", seen from directly behind with its rear lights facing the camera, drives fast along "
+_FORWARD = ", moving forward away from the camera."
 
 # Each world is a list of segments (text, tags). Joined, the segments are Ishaan's tested sentence verbatim.
 # Tagged segments are the built-in sky/time/weather; world_with_overrides drops one only when an explicit
 # change of the same kind (time/weather/season) says something different.
 _D, _N, _SUN = {"time": "day"}, {"time": "night"}, {"time": "sunset"}
 _TABLE = [
-    ("country road", [("a two-lane country road through green fields and trees", {}),
+    # The world of Ishaan's earlier tested car prompt (the engine's CAR_PROMPT), split the same way.
+    ("country road", [("a straight two-lane country road", {}),
+                      (". Green fields and rows of trees line both sides of the road", {}),
                       (" under a clear blue summer sky", {"time": "day", "weather": "clear", "season": "summer"}),
-                      (", bright sunshine", {"time": "day", "weather": "clear"})],
+                      (". Bright midday sunshine, crisp shadows", {"time": "day", "weather": "clear"})],
      ["country road", "countryside", "fields", "farmland", "the start", "the country"]),
     # desert, snowy mountain road (Ishaan's "winter"), neon city and ocean coast are his measured road | scene | light
     # worlds (board #6886548029), word for word, as "{road}. {scene} {light}", so this path matches the engine's.
@@ -168,17 +177,53 @@ _OAK_SUBJECT = "a wide shot of a single oak tree"
 def compose_base(base: str, world: str) -> str:
     """The base with its world replaced by `world` (a world phrase), never touching the subject.
 
+    Road scenes (is_road_scene) never come here: the composer writes them with car_prompt.
     - DEFAULT_BASE (oak in a meadow): "a wide shot of a single oak tree; " + world.
-    - Ishaan's template (SUBJECT + known world + STYLE, or SUBJECT + STYLE): only the world part is swapped.
     - A subject-only or generic base without its own world words: base + "; " + world.
     - A base that names its own world in an unknown way: ValueError (no guessing which words to cut).
     """
     if base == DEFAULT_BASE:
         return f"{_OAK_SUBJECT}; {world}"
-    if base.startswith(SUBJECT) and base.endswith(STYLE):
-        middle = base[len(SUBJECT):len(base) - len(STYLE)]
-        if not middle or middle in _PHRASES:
-            return SUBJECT + world + STYLE
     if _WORLD_ALIAS_RX.search(normalize(base)):
         raise ValueError(f"base names its own world; cannot replace it safely: {base!r}")
     return f"{base}; {world}"
+
+
+def _sentence(phrase: str) -> str:
+    phrase = phrase.strip().rstrip(".")
+    return phrase[:1].upper() + phrase[1:] + "."
+
+
+def car_prompt(world: str, objects=(), modifiers=()) -> str:
+    """Ishaan's car template for a world phrase: subject with its road, camera, objects, scene and light, modifiers,
+    style. Object and modifier phrases (already strength-worded) are one sentence each, word for word."""
+    road, _, rest = world.strip().rstrip(".").partition(". ")
+    parts = [f"{CAR_SUBJECT}{_REAR}{road}{_FORWARD}", CAMERA, *map(_sentence, objects),
+             *([rest + "."] if rest else []), *map(_sentence, modifiers), STYLE]
+    return " ".join(parts)
+
+
+# The car scene: Ishaan's template on the country road. A base that is the template for any known world is a road
+# scene too, and that world is its own (so "make it night" drops its built-in sunshine).
+CAR_BASE = car_prompt(DEFAULT_WORLD["phrase"])
+_ROAD_SCENES = {car_prompt(phrase): label for phrase, label in _PHRASES.items()}
+SNOWY_WORLD = WORLDS["snowy mountain road"]
+
+
+def is_road_scene(base: str) -> bool:
+    return base in _ROAD_SCENES
+
+
+def road_scene_world(base: str, changes: list) -> tuple[dict, list]:
+    """The world change a road scene shows, and the changes left to render after it.
+
+    A winter season on a road scene IS the snowy mountain road (Ishaan: appending a season to the car prompt does not
+    change the picture, swapping the world does). A new world clears the season in state.py, so an active winter is
+    always newer than the active world, and it wins. Without a world change, the base's own world is shown.
+    """
+    active = [c for c in changes if c.get("strength", 1.0) > 0]
+    winter = next((c for c in active if c["kind"] == "season" and c["label"] == "winter"), None)
+    if winter is not None:
+        return SNOWY_WORLD, [c for c in changes if c is not winter]
+    worlds = [c for c in active if c["kind"] == "world"]
+    return (worlds[-1] if worlds else WORLDS[_ROAD_SCENES[base]]), changes
