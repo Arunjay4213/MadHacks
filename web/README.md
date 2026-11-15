@@ -23,9 +23,9 @@ Its wire format follows `contracts/README.md`.
 
 ## What the page shows
 
-The layout is the "Halo" design: one centred column on a static gradient background.
+The page is branded "Mirage", the product name (decided by the lead on 2026-11-15). The layout is one centred column on a static gradient background.
 
-- Header: the Halo logo and wordmark on the left; on the right a status pill ("Live", "Reconnecting…" or "Offline", with a green, amber or grey dot) and a delay pill ("0.9 s delay": the time from your command to the first frame of the chunk it applies to; amber over 1.5 s, red over 3 s; the server's stage stamps on hover). It shows "— delay" until a command has been measured, and an unmatched command is never measured. A "Mock server" badge shows when the server is the fake one.
+- Header: the logo and the Mirage wordmark on the left; on the right a status pill ("Live", "Reconnecting…" or "Offline", with a green, amber or grey dot) and a delay pill ("0.9 s delay": the time from your command to the first frame of the chunk it applies to; amber over 1.5 s, red over 3 s; the server's stage stamps on hover). It shows "— delay" until a command has been measured, and an unmatched command is never measured. A "Mock server" badge shows when the server is the fake one.
 - The video box, centred, at the engine's 672x384 shape, never cropped or stretched. Inside it: the chips at the top left (one per change the server holds, each with a × to remove it) and the Full screen button at the top right. A notice on the video says when the connection is lost or the stream stalls.
 - The heard caption under the video: the sentence (keyword highlighted), then "Understood · applying now", "Listening…" while you are still speaking or typing, or "Not understood". Partial speech never shows as understood. It fades out 4 s after the last update.
 - The command bar pinned near the bottom: the text box, the amber Hold to talk button, then Mic (Wispr), Undo and Reset, with key hints underneath.
@@ -89,8 +89,8 @@ This is how to check a page change against the live engine before it is merged (
 
 ## Demo day
 
-Both pages are served by the engine: this one at `/app/` and Lucid Studio at `/studio/`.
-On 2026-11-14 the lead named Lucid Studio the judges' page "for now" with `web/` as the tested fallback, and later approved the big-screen redesign of `web/` (PR #104); which page the judges see is the lead's call.
+Both pages are served by the engine: this one at `/app/` and the studio page (`lucid-studio/`, also branded Mirage) at `/studio/`.
+On 2026-11-14 the lead named the studio page the judges' page "for now" with `web/` as the tested fallback, and later approved the big-screen redesign of `web/` (PR #104); which page the judges see is the lead's call.
 
 1. Open `https://<tunnel address>/app/` in Chrome and allow the microphone the first time Chrome asks.
 2. Press Full screen.

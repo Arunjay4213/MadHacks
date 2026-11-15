@@ -1,11 +1,13 @@
-# Pitch and submission draft
+# Mirage: pitch and submission draft
+
+Product name: **Mirage**, subtitle "Live voice-steered video" (decided by the lead on 2026-11-15).
 
 Use this copy after checking it against the final demo. Remove every feature that
 did not work in rehearsal; replace bracketed measurements with real results.
 
 ## Pitch
 
-We build on Training-Free Interactive World Models to let you shape a scene as it unfolds.
+Mirage builds on Training-Free Interactive World Models to let you shape a scene as it unfolds.
 
 A video that never stops generating and changes when you speak.
 For a sentence we already know (pinned or cached), the first frame made from the command arrives 429 to 674 ms after it (command-to-frame latency); that frame starts a 0.5 s dissolve to the new picture.
@@ -34,9 +36,10 @@ The video keeps moving while you shape the scene.
 
 ## Submission outline
 
+- **Name:** Mirage, live voice-steered video.
 - **Inspiration:** interactive visual storytelling controlled by speech.
 - **What it does:** include only features demonstrated on the final integrated system.
-- **How we built it:** built on Training-Free Interactive World Models, with a Python command/state layer, the team's steering and engine, Ani's browser interface, and Lucid Studio, Prateek's second, immersive frontend served at /studio/.
+- **How we built it:** built on Training-Free Interactive World Models, with a Python command/state layer, the team's steering and engine, Ani's browser interface, and the studio page, Prateek's second, immersive frontend served at /studio/ (also branded Mirage).
   Name the exact pretrained model and version used.
 - **Challenges:** provisional speech revisions, stable phrases across prompt
   changes, coherent removals, and running generation within the compute budget.

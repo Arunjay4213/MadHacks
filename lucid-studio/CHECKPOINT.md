@@ -1,4 +1,4 @@
-# Lucid Studio delivery checkpoint
+# Studio page (Mirage) delivery checkpoint
 
 Prateek explicitly lifted the pause on 2026-11-14 and authorized completion,
 PR and merge for issue #40. Work is isolated at

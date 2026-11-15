@@ -40,7 +40,7 @@ export default function LucidOverlay(props: Props) {
         <CommandInput autoFocus commit={props.commit} partial={props.partial} disabled={props.disabled} />
         <p>ENTER TO SHAPE <span>ESC TO DISSOLVE</span></p>
       </motion.div>}
-      {props.help && <motion.section className="lucid-help" aria-label="Lucid gestures" data-lenis-prevent
+      {props.help && <motion.section className="lucid-help" aria-label="Mirage gestures" data-lenis-prevent
         initial={{ opacity: 0, filter: 'blur(8px)' }} animate={{ opacity: 1, filter: 'blur(0px)' }} exit={{ opacity: 0 }}>
         <p className="eyebrow">A FEW WAYS TO DREAM</p>
         <h2>Nothing to learn.<br/><em>A world to change.</em></h2>

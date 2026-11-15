@@ -1,4 +1,4 @@
-# Lucid Studio implementation plan
+# Studio page (Mirage) implementation plan
 
 Goal: implement the supplied immersive frontend spec in an independent root app.
 Spec: `DESIGN.md` plus the user's detailed component brief.

@@ -1,4 +1,6 @@
-# Lucid Studio
+# Mirage studio page (`lucid-studio/`)
+
+This app shows the product name Mirage (decided by the lead on 2026-11-15); it was first called Lucid Studio.
 
 An independent React/TypeScript/Vite frontend for the team's stateful video engine.
 The hero scrolls normally into an editor: a contained current-generation canvas,

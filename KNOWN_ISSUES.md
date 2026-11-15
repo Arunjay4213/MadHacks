@@ -2,7 +2,7 @@
 
 Open problems that are documented here to decide later.
 Each item says what is wrong, what we know, and the options.
-Last updated 2026-11-15 by Arunjay's Claude.
+Last updated 2026-11-15 by Arunjay's Claude (item 2: the product name is Mirage).
 
 ## 1. Two plan gates had no measured result
 
@@ -22,12 +22,12 @@ Gate 3 (stacking several changes and undo) and Gate 4 (pace words such as "slowl
   The pitch must not claim that the scene changes before the speaker finishes.
 - **Delay:** pinned sentences and undo about 0.5 s; sentences that need a new Sonnet call 1.7 to 3.2 s.
 
-## 2. Two frontends and two product names
+## 2. Two frontends, one product name
 
-`web/` (Ani) calls the project "Halo".
-`lucid-studio/` (Prateek) is called "Lucid Studio".
-Judges should see one name and, ideally, one page.
-Options: pick one page for the demo and keep the other as a fallback, and pick one name for the page, the pitch and Devpost.
+The name is decided: the lead named the product "Mirage" on 2026-11-15, with "live voice-steered video" as the subtitle.
+`web/` (Ani) and `lucid-studio/` (Prateek) both show Mirage, as do the pitch and the deck; the earlier names "Halo", "Cue" and "Lucid Studio" are retired.
+Still open: judges should ideally see one page.
+Option: pick one page for the demo and keep the other as a fallback.
 
 ## 3. Model limits we work around instead of solving
 

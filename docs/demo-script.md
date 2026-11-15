@@ -1,4 +1,4 @@
-# Demo script
+# Mirage demo script
 
 Two chains of spoken sentences that are pinned in `engine/demo_prompts.json` (the `demo_chain` field), so each one changes the video in about 0.4 s with no Sonnet call.
 Any other sentence still works, through one Sonnet call, in about 2 s.
