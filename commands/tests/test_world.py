@@ -4,13 +4,25 @@ from commands.state import DEFAULT_BASE, KINDS
 from commands.world import (DEFAULT_WORLD, STYLE, SUBJECT, WORLDS, compose_base, world_op, world_phrase,
                             world_with_overrides)
 
-ISHAAN = {  # exact tested strings, board #6885673339
+# Ishaan's measured worlds as road | scene | light, copied from board #6886548029 ("winter" is our snowy mountain road).
+MEASURED = {
+    "snowy mountain road": ("a snowy mountain road",
+                            "Pine forests covered in thick white snow line both sides, high snowbanks along the edges of the road, snowflakes falling.",
+                            "Cold blue overcast winter light, soft diffuse shadows."),
+    "desert": ("a long straight desert highway",
+               "Red sandstone mesas and golden sand dunes stretch to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt.",
+               "Hot afternoon sun in a cloudless pale blue sky, strong hard shadows."),
+    "neon city": ("a wide city street at night",
+                  "Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both sides, the wet asphalt reflects the colourful lights, light rain falling.",
+                  "Dark night sky, vivid neon glow, cyberpunk atmosphere."),
+    "ocean coast": ("a coastal cliff road",
+                    "A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side.",
+                    "Sunny tropical day, clear blue sky, sparkling light on the water."),
+}
+ISHAAN = {  # exact tested strings, board #6885673339, and the measured worlds as "{road}. {scene} {light}"
     "country road": "a two-lane country road through green fields and trees under a clear blue summer sky, bright sunshine.",
-    "desert": "a long straight desert highway between red sandstone mesas and sand dunes, heat haze, orange sunset sky.",
-    "snowy mountain road": "a snowy mountain road between pine forests covered in thick white snow, snow falling, cold blue overcast light.",
-    "neon city": "a wet city street at night in the rain, tall skyscrapers with glowing neon signs on both sides, reflections on the asphalt.",
-    "ocean coast": "a coastal cliff road beside a bright turquoise ocean with waves and palm trees, sunny tropical day.",
     "mars": "a dusty road across the red rocky surface of Mars, craters and red mountains, a pale pink sky with two small moons.",
+    **{place: f"{road}. {scene} {light}" for place, (road, scene, light) in MEASURED.items()},
 }
 
 
@@ -29,8 +41,13 @@ class TableTest(unittest.TestCase):
         self.assertTrue(STYLE.startswith(" Cinematic") and STYLE.endswith("."))
         self.assertEqual(SUBJECT + ISHAAN["desert"] + STYLE,
                          "A red sports car driving fast along a road, seen from behind in a smooth tracking shot, the car in the "
-                         "centre of the frame, a long straight desert highway between red sandstone mesas and sand dunes, heat "
-                         "haze, orange sunset sky. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.")
+                         "centre of the frame, a long straight desert highway. Red sandstone mesas and golden sand dunes stretch "
+                         "to the horizon on both sides, dry scrub along the roadside, heat haze shimmering above the asphalt. Hot "
+                         "afternoon sun in a cloudless pale blue sky, strong hard shadows. Cinematic, highly detailed, realistic, "
+                         "sharp focus, motion blur on the road.")
+
+    def test_no_night_highway_world(self):  # Ishaan: a plain night highway turns to orange streaks
+        self.assertNotIn("night highway", WORLDS)
 
     def test_entries_have_the_change_shape(self):
         for alias, entry in WORLDS.items():
@@ -83,20 +100,29 @@ class OverridesTest(unittest.TestCase):
     def test_no_conflict_keeps_the_tested_phrase_verbatim(self):
         desert = change("desert", "world", ISHAAN["desert"])
         self.assertEqual(world_with_overrides(desert, [desert]), ISHAAN["desert"])
-        self.assertEqual(world_with_overrides(desert, [desert, change("dog", "extra"), change("sunset", "time")]), ISHAAN["desert"])
+        self.assertEqual(world_with_overrides(desert, [desert, change("dog", "extra"), change("day", "time")]), ISHAAN["desert"])
 
     def test_explicit_time_weather_season_drop_only_conflicting_builtin_sky(self):
         desert = change("desert", "world", ISHAAN["desert"])
         self.assertEqual(world_with_overrides(desert, [desert, change("night", "time")]),
-                         "a long straight desert highway between red sandstone mesas and sand dunes, heat haze.")
+                         "a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on "
+                         "both sides, dry scrub along the roadside, heat haze shimmering above the asphalt.")
         self.assertEqual(world_with_overrides(desert, [desert, change("winter", "season")]),
-                         "a long straight desert highway between red sandstone mesas and sand dunes, orange sunset sky.")
+                         "a long straight desert highway. Red sandstone mesas and golden sand dunes stretch to the horizon on "
+                         "both sides, dry scrub along the roadside. Hot afternoon sun in a cloudless pale blue sky, strong hard "
+                         "shadows.")
         city = change("neon city", "world", ISHAAN["neon city"])
         self.assertEqual(world_with_overrides(city, [city, change("day", "time"), change("fog", "weather")]),
-                         "a wet city street, tall skyscrapers with glowing neon signs on both sides, reflections on the asphalt.")
+                         "a wide city street. Tall skyscrapers covered in glowing pink, blue and purple neon signs rise on both "
+                         "sides, the wet asphalt reflects the colourful lights, vivid neon glow, cyberpunk atmosphere.")
         snowy = change("snowy mountain road", "world", ISHAAN["snowy mountain road"])
         self.assertEqual(world_with_overrides(snowy, [snowy, change("night", "time")]),
-                         "a snowy mountain road between pine forests covered in thick white snow, snow falling.")
+                         "a snowy mountain road. Pine forests covered in thick white snow line both sides, high snowbanks "
+                         "along the edges of the road, snowflakes falling.")
+        coast = change("ocean coast", "world", ISHAAN["ocean coast"])
+        self.assertEqual(world_with_overrides(coast, [coast, change("rain", "weather")]),
+                         "a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one "
+                         "side, palm trees and green hills on the other side.")
 
     def test_unknown_world_phrase_is_left_literal(self):
         custom = change("old harbour", "world", "the old harbour.")
