@@ -12,14 +12,19 @@ A reader is an object with this API (agreed with the commands/ owner):
 
 The engine calls `handle` on one worker thread, in arrival order, never on the generation thread or event loop.
 
-With --final-reader sonnet, FinalReadingService wraps CommandService: every FINAL goes to the final reader
-(final_reader.py) before the dictionary. Its operations are applied to the service's own scene, so chips, heard
-and undo work as for any other edit, and the steer's prompt becomes the final reader's rich prompt.
+With --final-reader sonnet, FinalReadingService wraps CommandService and decides who reads each FINAL, in this order:
+undo and reset sentences (the dictionary), the content block, a pinned or cached answer, a measured car world, the
+dictionary when it reads the whole sentence (commands.service.dictionary_reading), and otherwise one Sonnet call that
+writes the whole new prompt (a free scene, final_reader.py). The answer is applied to the service's own scene, so
+chips, heard and undo work as for any other edit.
 """
 
 import enum
 import logging
 import re
+
+from commands.service import dictionary_reading
+from commands.state import is_free
 
 log = logging.getLogger("engine.reader")
 
@@ -46,16 +51,21 @@ def load_reader(name: str, final_reader=None):
 
 
 class FinalReadingService:
-    """CommandService with the final reader in front of the dictionary for every FINAL.
+    """CommandService with the final reader around the dictionary for every FINAL (the order is in the module
+    docstring).
 
-    final_reader(text, snapshot) gives None (the service reads the sentence itself, as without this wrapper, and on
-    a vehicle scene final_reader.fallback_prompt gives the car template for the result, as for an undo or reset
-    with edits, which the dictionary reads),
-    {"blocked": True} (no steer: unmatched), or {"operations", "prompt"} (applied to the service's scene).
+    final_reader.result(...) gives None (the service reads the sentence itself, as without this wrapper, and on a
+    composed vehicle scene final_reader.fallback_prompt gives the car template for the result), {"blocked": True}
+    or {"not_understood": True} (no steer: unmatched, a guess in flight is rolled back), or {"operations", "prompt"}
+    (applied to the service's scene; for Sonnet one free_scene operation).
 
     The model sees one prompt per scene state: the first rich prompt chosen for a composed prompt is kept in
     `_model_prompts` and replaces that composed prompt in every later steer (an undo back to it, a chip removal,
     a partial's guess) and in likely_prompts and committed_prompt, so a state always gives the same embedding.
+    A free scene's composed prompt is its own prompt, so it needs no mapping.
+
+    A tap on the x of a chip of a free scene is read as the sentence "remove the <label>": only the final reader can
+    take a thing out of a prompt it wrote.
     """
 
     def __init__(self, service, final_reader) -> None:
@@ -66,31 +76,61 @@ class FinalReadingService:
     def handle(self, msg: dict) -> dict:
         if isinstance(msg, dict) and msg.get("type") == "final" and isinstance(msg.get("text"), str) \
                 and isinstance(msg.get("t_client"), int) and not isinstance(msg.get("t_client"), bool):
+            return self._final(msg)
+        if isinstance(msg, dict) and msg.get("type") == "tap" and msg.get("action") == "remove":
             snapshot = self._svc.snapshot()
-            kind = sentence_kind(msg["text"], snapshot)
-            if kind is SentenceKind.CONTROL:  # the dictionary knows these and they add nothing; no call
-                return self._mapped(self._svc.handle(msg))
-            result = self._final_reader(msg["text"], snapshot)  # the content check, for every other sentence
-            if result is not None and result.get("blocked"):
-                log.info("final reader: %r blocked, no steer", msg["text"][:100])
-                return self._mapped(self._svc.apply_final(msg["text"], []))
-            if kind is SentenceKind.MIXED:
-                # Not blocked. The final reader leaves undo and reset to the dictionary, so its operations would
-                # drop them: the dictionary reads the whole sentence, as it would without this wrapper.
-                return self._dictionary(msg, snapshot)
-            if result is not None:
-                # The service steers to the composed prompt and _mapped gives the rich one, so an undo back to
-                # this state, or another sentence reaching it, gives the same words (the same embedding).
-                out = self._svc.apply_final(msg["text"], result["operations"])
-                if out["steer"] is not None:
-                    self._model_prompts.setdefault(out["steer"]["prompt"], result["prompt"])
-                return self._mapped(out)
-            return self._dictionary(msg, snapshot)  # no answer: a timeout, an error or an unusable reply
+            chip = next((c for c in snapshot["changes"] if c["id"] == msg.get("id")), None)
+            if is_free(snapshot) and chip is not None:
+                text = f"remove the {chip['label']}"
+                log.info("final reader: the x on free chip %r is read as %r", chip["label"], text)
+                return self._final({"type": "final", "text": text, "t_client": 0})
         return self._mapped(self._svc.handle(msg))
 
+    def _final(self, msg: dict) -> dict:
+        text = msg["text"]
+        snapshot = self._svc.snapshot()
+        kind = sentence_kind(text, snapshot)
+        if kind is SentenceKind.CONTROL:  # the dictionary knows these and they add nothing; no call
+            return self._mapped(self._svc.handle(msg))
+        fr = self._final_reader
+        entry = fr.lookup(text, snapshot)  # the content block, pinned, cached or measured: no call
+        whole = entry is None and dictionary_reading(text, snapshot) is not None
+        if kind is SentenceKind.MIXED:
+            # The final reader leaves undo and reset to the dictionary, which reads the whole sentence. When it does
+            # not read every clause by itself, Sonnet is still asked first, as the content check.
+            if entry is None and not whole:
+                entry = fr.ask(text, snapshot, self.committed_prompt)
+            if entry is not None and fr.result(entry, text, snapshot) == {"blocked": True}:
+                return self._blocked(text)
+            return self._dictionary(msg, snapshot)
+        if whole:
+            return self._dictionary(msg, snapshot)  # the fast path: the keyword table reads every word
+        if entry is None:
+            entry = fr.ask(text, snapshot, self.committed_prompt)
+        result = fr.result(entry, text, snapshot)
+        if result is None:
+            return self._dictionary(msg, snapshot)  # no answer: a timeout, an error or a reply that failed the check
+        if result.get("blocked"):
+            return self._blocked(text)
+        if result.get("not_understood"):
+            log.info("final reader: %r not understood, no steer", text[:100])
+            return self._mapped(self._svc.apply_final(text, []))
+        # The service steers to the composed prompt and _mapped gives the rich one, so an undo back to this state,
+        # or another sentence reaching it, gives the same words (the same embedding).
+        out = self._svc.apply_final(text, result["operations"])
+        if out["steer"] is not None:
+            self._model_prompts.setdefault(out["steer"]["prompt"], result["prompt"])
+        return self._mapped(out)
+
+    def _blocked(self, text: str) -> dict:
+        log.info("final reader: %r blocked, no steer", text[:100])
+        return self._mapped(self._svc.apply_final(text, []))
+
     def _dictionary(self, msg: dict, snapshot: dict) -> dict:
-        """A final the dictionary reads (no usable answer, or an undo or reset with edits). On a vehicle scene the
-        final reader still gives the car template for the new state, so the car keeps driving forward."""
+        """A final the dictionary reads (the fast path, no usable answer, or an undo or reset with edits). On a
+        composed vehicle scene the final reader still gives the car template for the new state, so the car keeps
+        driving forward. On a free scene the dictionary applies only a new scene; anything else shows as not
+        understood (commands.state refuses edits of a free scene), never a silent redraw."""
         out = self._svc.handle(msg)
         if out["steer"] is not None and not out["state"]["unmatched"] \
                 and out["steer"]["prompt"] not in self._model_prompts:

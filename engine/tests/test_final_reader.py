@@ -1,7 +1,7 @@
-"""The Sonnet final reader (engine/final_reader.py) and its CommandService wrapper (engine/reader.py).
+"""The Sonnet final reader (engine/final_reader.py) and its CommandService wrapper (engine/reader.py), issue #271.
 
-A fake chat client stands in for Foundry: no network. The wrapper and its shim run against the real
-commands.service.CommandService, so a change to its private fields fails here, not in the live demo.
+A fake chat client stands in for Foundry: no network. The wrapper runs against the real commands.service.CommandService,
+so a change to its private fields fails here, not in the live demo.
 """
 
 import json
@@ -13,21 +13,26 @@ import pytest
 
 from commands.service import CommandService
 from commands.state import SceneState
-from engine.final_reader import (FORWARD_MOTION, CacheFile, FinalReader,
-                                 FinalReaderState, expand_operations, fingerprint, load, prompt_spec, scene_after)
+from engine import car_template
+from engine.final_reader import (CacheFile, FinalReader, FinalReaderState, Outcome, Verdict, call_options, check_reply,
+                                 fingerprint, fit_prompt, load, reply_chips)
 from engine.foundry import FoundryMessages
 from engine.reader import FinalReadingService, load_reader
 
+OAK = "a wide shot of a meadow with a single oak tree"
+CAR = "new scene of a red sports car driving along a country road"
 WINTER = {"op": "add", "label": "winter", "kind": "season", "phrase": "snow on the ground", "strength": 1.0}
-LION = {"op": "add", "label": "lion", "kind": "extra", "phrase": "a lion in the grass", "strength": 0.5}
+LION = {"op": "add", "label": "lion", "kind": "extra", "phrase": "a lion in the grass", "strength": 1.0}
 
 
-def reply(ops=(), details="", blocked=False):
-    return json.dumps({"blocked": blocked, "operations": list(ops), "details": details})
+def reply(prompt="", chips=(), understood=True, blocked=False, new_scene=False):
+    return json.dumps({"blocked": blocked, "understood": understood, "new_scene": new_scene, "prompt": prompt,
+                       "chips": list(chips)})
 
 
 class FakeChat:
-    """Answers `replies[sentence]` (a reply string or an exception). A sentence in `slow` waits for its event."""
+    """Answers `replies[sentence]` (a reply string, an exception, or a function of the user message). A sentence in
+    `slow` waits for its event first. Any other sentence: not understood."""
 
     model = "fake-sonnet"
 
@@ -38,84 +43,173 @@ class FakeChat:
 
     def complete(self, system, messages):
         user = json.loads(messages[-1]["content"])
-        self.calls.append((system, user))
+        self.calls.append((system, user, messages))
         if user["sentence"] in self.slow:
             self.slow[user["sentence"]].wait(10)
-        answer = self.replies.get(user["sentence"], reply())
+        answer = self.replies.get(user["sentence"], reply(understood=False))
+        if callable(answer):
+            answer = answer(user, len(messages))
         if isinstance(answer, Exception):
             raise answer
         return answer
 
 
 def reader(chat, **kwargs):
-    """The live reader: the spec of commands.rewriter (prompt_spec), unless a test checks the stand-in's wording."""
-    return FinalReader(FinalReaderState.ON, chat=chat, **{"spec": prompt_spec(), **kwargs})
+    return FinalReader(FinalReaderState.ON, chat=chat, **kwargs)
 
 
-def snap(*ops, base="a wide shot of a red car driving along a road"):
+def snap(*ops, base=OAK):
     s = SceneState(base)
     for op in ops:
         s.apply(op)
     return s.snapshot()
 
 
-def test_operations_and_the_prompt():
-    chat = FakeChat({"make it winter": "```json\n" + reply([WINTER], "a snowy mountain road between pine forests, "
-                                                                     "snow falling, cold blue light") + "\n```"})
+def final(text, t=1):
+    return {"type": "final", "text": text, "t_client": t}
+
+
+def wrapper(chat, **kwargs):
+    return FinalReadingService(CommandService(semantic_reader=lambda *a: None), reader(chat, **kwargs))
+
+
+def car_prompt(world="country", objects=()):
+    return car_template.world_prompt("a red sports car", car_template.WORLDS[world], objects)
+
+
+# --- the light check --------------------------------------------------------------------------------------
+
+def test_a_reply_becomes_one_free_scene_operation():
+    a = check_reply(json.loads(reply("A bare oak tree on cracked dry earth.", ["Bare Tree", "arid ground"])),
+                    {"car_scene": False})
+    assert a.verdict is Verdict.ACCEPTED
+    assert a.entry.operations == ({"op": "free_scene", "prompt": "A bare oak tree on cracked dry earth.",
+                                   "chips": ["bare tree", "arid ground"]},)
+
+
+@pytest.mark.parametrize("answer, verdict", [
+    (reply(blocked=True), Verdict.BLOCKED),
+    (reply(understood=False), Verdict.NOT_UNDERSTOOD),
+    (reply("   "), Verdict.NOT_UNDERSTOOD),
+    ("[1, 2]", Verdict.INVALID),
+])
+def test_blocked_not_understood_and_unusable_replies(answer, verdict):
+    assert check_reply(json.loads(answer), {}).verdict is verdict
+
+
+def test_a_long_prompt_is_cut_at_sentences_not_refused():
+    long = " ".join(f"Sentence {n} has five words." for n in range(60))  # 300 words
+    prompt, cut = fit_prompt(long)
+    assert len(prompt.split()) <= 180 and prompt.startswith("Sentence 0 has") and prompt.endswith(".") and cut
+    style_kept, _ = fit_prompt(car_prompt() + " " + long.replace("Sentence", "Extra") + " " + car_template.STYLE)
+    assert style_kept.endswith(car_template.STYLE) and car_template.is_template(style_kept)
+    a = check_reply(json.loads(reply(long, ["x"])), {})
+    assert a.verdict is Verdict.REPAIRED and len(a.entry.prompt.split()) <= 180
+
+
+def test_chips_are_cleaned_never_a_reason_to_refuse():
+    assert reply_chips(["A Very Long Chip Label With Many Words", "lion", "lion", 3, ""], "jensen huang") == \
+        ["a very long chip label", "lion", "jensen huang"]
+    assert reply_chips("lion") == []
+
+
+def test_a_car_scene_keeps_the_template_unless_the_view_or_the_scene_changes():
+    car = {"car_scene": True}
+    beach = car_prompt("ocean coast")
+    assert check_reply(json.loads(reply(beach, ["beach"])), car).verdict is Verdict.ACCEPTED
+    on_sand = "A red sports car parked on the sand of a wide beach, facing the waves."
+    broken = check_reply(json.loads(reply(on_sand, ["beach"])), car)
+    assert broken.verdict is Verdict.REPAIRED and "car scene" in broken.reasons[0]  # used, logged, asked again
+    road = car_prompt().replace("a straight two-lane country road", "the soft sand of a beach")
+    assert "paved road" in check_reply(json.loads(reply(road)), car).reasons[0]
+    assert check_reply(json.loads(reply(on_sand, new_scene=True)), car).verdict is Verdict.ACCEPTED
+    side = ("A red sports car, seen in side profile, drives from left to right along a coastal road. A smooth "
+            "tracking shot from the side, the camera moving alongside the car, the ocean behind it.")
+    assert check_reply(json.loads(reply(side)), {**car, "view_change": True}).verdict is Verdict.ACCEPTED
+    assert check_reply(json.loads(reply(on_sand)), {**car, "view_change": True}).verdict is Verdict.REPAIRED
+
+
+def test_view_change_words():
+    assert car_template.asks_view_change("change the point of view to be facing the ocean. "
+                                         "i want to see the car's side profile")
+    for text in ("zoom out", "a wider shot", "aerial view please", "low angle", "pan to the left"):
+        assert car_template.asks_view_change(text), text
+    for text in ("make it winter", "add a pancake", "take me to the beach"):
+        assert not car_template.asks_view_change(text), text
+
+
+def test_the_system_prompt_carries_the_placement_motion_and_camera_rules():
+    system = " ".join(reader(FakeChat()).system_prompt.split())
+    for rule in ("Return the complete new prompt, never a diff",
+                 "for every object say where it is, what it stands or drives on, and which way it faces",
+                 "flying forward away from the camera in the same direction as the car",
+                 "rewrite the camera wording to match",
+                 "the car seen in side profile driving from left to right",
+                 car_template.WORLDS["winter"].scene):
+        assert rule in system, rule
+
+
+# --- the reader -------------------------------------------------------------------------------------------
+
+def test_the_user_message_is_the_prompt_on_screen_the_chips_and_the_sentence():
+    chat = FakeChat({"kill the tree's leaves": reply("A bare oak tree.", ["bare tree"])})
     r = reader(chat)
-    out = r("make it winter", snap())
-    assert out["operations"] == [WINTER]
-    # the clause that names a road and the forests (objects) is cut; the rest follows the composed prefix
-    assert out["prompt"] == ("a wide shot of a red car driving along a road, " + FORWARD_MOTION + "; snow on the ground; "
-                             "snow falling, cold blue light")
-    system, user = chat.calls[0]
-    assert "edit_base" in system and '"details"' in system
-    assert user == {"scene": {"base": "a wide shot of a red car driving along a road", "changes": []},
-                    "prompt": "a wide shot of a red car driving along a road", "sentence": "make it winter", "details_max_words": 45}
-    assert r("make it winter", snap()) == out and len(chat.calls) == 1  # cached by (prompt before, sentence)
-    s = r.stats()
-    assert (s["state"], s["calls"], s["cache_hits"], s["p50_ms"] is not None) == ("on", 1, 1, True)
+    out = r("kill the tree's leaves", snap(LION), current_prompt="RICH PROMPT")
+    assert out["operations"][0] == {"op": "free_scene", "prompt": "A bare oak tree.", "chips": ["bare tree"]}
+    assert chat.calls[0][1] == {"prompt": "RICH PROMPT", "chips": ["lion"], "sentence": "kill the tree's leaves",
+                                "car_scene": False}
+    r("add jensen huang", snap())
+    user = chat.calls[1][1]
+    assert user["person_chip"] == "jensen huang" and "leather jacket" in user["sentence"]
+    r("i want to see the side profile", snap(base="a red sports car"), current_prompt=car_prompt())
+    assert chat.calls[2][1]["car_scene"] and chat.calls[2][1]["view_change"]
 
 
-def test_word_list_blocks_without_a_call():
-    chat = FakeChat()
-    r = reader(chat)
-    assert r("show me a naked man", snap()) == {"blocked": True}
-    assert not chat.calls and r.stats()["blocked"] == 1
-
-
-def test_the_model_can_block():
+def test_word_list_blocks_without_a_call_and_the_model_can_block():
     chat = FakeChat({"make them hurt each other": reply(blocked=True)})
     r = reader(chat)
+    assert r("show me a naked man", snap()) == {"blocked": True} and not chat.calls
     assert r("make them hurt each other", snap()) == {"blocked": True}
-    assert r("make them hurt each other", snap()) == {"blocked": True} and len(chat.calls) == 1
+    assert r("make them hurt each other", snap()) == {"blocked": True} and len(chat.calls) == 1  # saved
 
 
-def test_invalid_replies_fall_back():
-    chat = FakeChat({"a": "not json", "b": reply([{"op": "add", "kind": "planet", "label": "x", "phrase": "p"}]),
-                     "c": reply([]), "d": reply([{"op": "undo"}]), "f": httpx.ConnectError("down")})
+def test_failed_calls_and_unusable_replies_fall_back_and_are_final_in_the_process():
+    chat = FakeChat({"a": "not json", "b": "[]", "f": httpx.ConnectError("down")})
     r = reader(chat)
-    for sentence in "abcdf":
+    for sentence in "abf":
         assert r(sentence, snap()) is None
     s = r.stats()
-    assert s["rejects"] == 4 and s["errors"] == 1  # only the failed HTTP call is an error
-    assert s["retries"] == 3  # "not json", the bad kind and undo are asked again once; [] and the error are not
-    assert r("f", snap()) is None and len(chat.calls) == 8  # a fallback is final in this process: no new call
+    assert s["rejects"] == 2 and s["errors"] == 1 and s["retries"] == 2  # unusable replies are asked again once
+    assert r("f", snap()) is None and len(chat.calls) == 5  # a fallback is final in this process: no new call
 
 
-def test_rejected_details_keep_the_edit_with_the_short_prompt():
-    # The user said "make it winter" and the model understood it; only its wording was too long. Winter still
-    # happens, with the composed prompt, rather than the sentence being thrown away.
-    r = reader(FakeChat({"make it winter": reply([WINTER], "x " * 200)}))
-    out = r("make it winter", snap())
-    assert out == {"operations": [WINTER],
-                   "prompt": "a wide shot of a red car driving along a road, " + FORWARD_MOTION + "; snow on the ground"}
-    assert r.stats()["details_rejected"] == 1 and r.stats()["rejects"] == 0
+def test_a_repaired_reply_is_asked_again_and_the_better_one_wins():
+    good = car_prompt("ocean coast")
+    chat = FakeChat({"take me to a sunny beach with palm trees": lambda user, n: reply("A car on the sand.") if n == 1
+                     else reply(good, ["beach"])})
+    r = reader(chat)
+    out = r("take me to a sunny beach with palm trees", snap(base="a red sports car"), current_prompt=car_prompt())
+    assert out["prompt"] == good and r.stats()["retries"] == 1
+    rejected = json.loads(chat.calls[1][2][-1]["content"])["rejected"]
+    assert "car scene" in rejected[0]
+
+
+def test_a_slow_retry_keeps_the_usable_first_reply():
+    gate = threading.Event()
+
+    def answer(user, n):
+        if n > 1:
+            gate.wait(5)
+        return reply("A car on the sand.", ["beach"])
+    r = reader(FakeChat({"to the sand": answer}), timeout_s=0.4)
+    out = r("to the sand", snap(base="a red sports car"), current_prompt=car_prompt())
+    gate.set()
+    assert out["prompt"] == "A car on the sand." and r.stats()["timeouts"] == 1
 
 
 def test_timeout_falls_back_once_and_drops_the_late_answer():
     gate = threading.Event()
-    chat = FakeChat({"slow": reply([WINTER], "snow")}, slow={"slow": gate})
+    chat = FakeChat({"slow": reply("A slow prompt.")}, slow={"slow": gate})
     r = reader(chat, timeout_s=0.1)
     t0 = time.monotonic()
     assert r("slow", snap()) is None
@@ -128,91 +222,52 @@ def test_timeout_falls_back_once_and_drops_the_late_answer():
     assert r("slow", snap()) is None and len(chat.calls) == 1  # no late swap, no new call
 
 
-def test_edit_base_keeps_changes_and_one_undo_reverts_it():
-    before = snap(WINTER, LION, base="a wide shot of a meadow with a single oak tree")
-    ops = expand_operations([{"op": "edit_base", "base": "a wide shot of a meadow with a single lighthouse"}], before)
-    assert ops[0] == {"op": "new_scene", "base": "a wide shot of a meadow with a single lighthouse"}
-    after = scene_after(before, ops)
-    assert after["base"] == "a wide shot of a meadow with a single lighthouse"
-    assert [(c["label"], c["kind"], c["phrase"], c["strength"]) for c in after["changes"]] == \
-        [(c["label"], c["kind"], c["phrase"], c["strength"]) for c in before["changes"]]
-    # applied as one batch to the real SceneState: one undo restores the old base and changes
-    s = SceneState("a wide shot of a meadow with a single oak tree")
-    s.apply(WINTER)
-    s.apply(LION)
-    assert s.apply({"op": "batch", "operations": ops})
-    assert s.snapshot()["base"].endswith("lighthouse") and len(s.snapshot()["changes"]) == 2
-    s.apply({"op": "undo"})
-    assert s.snapshot()["base"].endswith("oak tree")
-    assert [c["label"] for c in s.snapshot()["changes"]] == ["winter", "lion"]
-    # ids of the old scene are gone after a base edit
-    lion_id = before["changes"][1]["id"]
-    assert expand_operations([{"op": "edit_base", "base": "x"}, {"op": "remove", "id": lion_id}], before) is None
-
-
 def test_cache_file_survives_a_restart(tmp_path):
     path = tmp_path / "sub" / "cache.json"
-    chat = FakeChat({"make it winter": reply([WINTER], "snow"), "boom": httpx.ConnectError("down"),
-                     "make them hurt each other": reply(blocked=True)})
+    chat = FakeChat({"cut the grass": reply("A mown lawn.", ["mown grass"]), "boom": httpx.ConnectError("down"),
+                     "make them hurt each other": reply(blocked=True), "hmm": reply(understood=False)})
     r = reader(chat)
     r._file = CacheFile(path, fingerprint(r.system_prompt, chat.model))
-    first = r("make it winter", snap())
-    r("boom", snap())
-    r("make them hurt each other", snap())
+    first = r("cut the grass", snap())
+    for sentence in ("boom", "make them hurt each other", "hmm"):
+        r(sentence, snap())
     data = json.loads(path.read_text())
-    assert {e["outcome"] for e in data["entries"]} == {"sonnet", "blocked"}  # the fallback is not saved
+    assert {e["outcome"] for e in data["entries"]} == {"sonnet", "blocked", "not_understood"}  # no fallback saved
     assert not list(path.parent.glob(".final-reader-*"))
-
-    chat2 = FakeChat({"make it winter": reply([WINTER], "something else entirely")})
+    chat2 = FakeChat({"cut the grass": reply("Something else entirely.")})
     r2 = reader(chat2, cache_file=CacheFile(path, fingerprint(r.system_prompt, chat.model)))
-    assert r2("make it winter", snap()) == first and not chat2.calls  # never regenerated
+    assert r2("cut the grass", snap()) == first and r2("hmm", snap()) == {"not_understood": True}
+    assert not chat2.calls  # never regenerated
     r3 = reader(FakeChat(), cache_file=CacheFile(path, fingerprint(r.system_prompt, "another model")))
     assert r3.stats()["cache_size"] == 0
 
 
-def test_cached_operations_must_still_fit_the_scene():
-    s = snap(LION)
-    lion_id = s["changes"][0]["id"]
-    chat = FakeChat({"remove it": reply([{"op": "remove", "id": lion_id}], "")})
+def test_a_cached_free_scene_is_used_only_on_the_same_scene():
+    chat = FakeChat({"cut the grass": reply("A mown lawn.", ["mown grass"])})
     r = reader(chat)
-    assert r("remove it", s)["operations"] == [{"op": "remove", "id": lion_id}]
-    other = dict(s, changes=[dict(s["changes"][0], id="c9")])  # the same scene, the lion has another id
-    assert r("remove it", other)["operations"] == [{"op": "remove", "id": "c9"}]
-    assert len(chat.calls) == 1
+    r("cut the grass", snap())
+    lion_weak = snap({**LION, "strength": 0.0})  # the same composed prompt (a zero chip is left out), another scene
+    r("cut the grass", lion_weak)
+    assert len(chat.calls) == 2
 
 
-def test_prompt_spec_uses_commands_rewriter(monkeypatch):
-    from commands import rewriter
-    seen = []
-
-    def validate_rewrite(p, r):
-        seen.append(r)
-        return f"{p}; {r['details']}"
-    monkeypatch.setattr(rewriter, "SYSTEM_PROMPT", "his prompt")
-    monkeypatch.setattr(rewriter, "validate_rewrite", validate_rewrite)
-    spec = prompt_spec()
-    assert spec.name == "commands.rewriter" and spec.details_instructions == "his prompt"
-    chat = FakeChat({"make it winter": reply([WINTER], "snow")})
-    r = reader(chat, spec=spec)
-    # the vehicle subject still gets the forward-driving words with commands.rewriter
-    assert r("make it winter", snap())["prompt"] == \
-        "a wide shot of a red car driving along a road, " + FORWARD_MOTION + "; snow on the ground; snow"
-    assert "his prompt" in chat.calls[0][0]
-    assert {"details": "snow"} in seen
-    assert all(set(r) == {"details"} for r in seen)  # only the details key: his validator rejects any other
-
-
-def test_load_states():
+def test_load_states_and_call_options():
     assert load("off").state is FinalReaderState.OFF
     r = load("sonnet", environ={}, cache_path=None)
     assert r.state is FinalReaderState.UNAVAILABLE and "FOUNDRY" in r.stats()["reason"]
-    r = load("sonnet", environ={"FOUNDRY_ENDPOINT": "https://madhacks-foundry.openai.azure.com", "FOUNDRY_KEY": "k"},
-             cache_path=None)
+    env = {"FOUNDRY_ENDPOINT": "https://madhacks-foundry.openai.azure.com", "FOUNDRY_KEY": "k"}
+    r = load("sonnet", environ=env, cache_path=None)
     assert r.state is FinalReaderState.ON and r._chat.model == "claude-sonnet-5-5"
+    assert (r._chat.effort, r._chat.thinking, r._chat.max_tokens) == ("low", "between_tools", 1024)
     assert r._chat._url == "https://madhacks-foundry.services.ai.azure.com/anthropic/v1/messages"
+    r2 = load("sonnet", environ={**env, "FINAL_READER_EFFORT": "medium", "FINAL_READER_THINKING": "adaptive",
+                                 "FINAL_READER_MAX_TOKENS": "4096"}, cache_path=None)
+    assert (r2._chat.effort, r2._chat.thinking, r2._chat.max_tokens) == ("medium", "adaptive", 4096)
+    with pytest.raises(ValueError):
+        call_options({"FINAL_READER_EFFORT": "max"})
     load_reader("standin", r)
     assert r.state is FinalReaderState.UNAVAILABLE and "--reader commands" in r.reason
-    assert r("make it winter", snap()) is None  # UNAVAILABLE behaves as OFF
+    assert r("cut the grass", snap()) is None  # UNAVAILABLE behaves as OFF
     with pytest.raises(ValueError):
         load("gpt")
 
@@ -222,77 +277,118 @@ def test_request_body_shape():
 
     def handler(request):
         seen.append(request)
-        return httpx.Response(200, json={"content": [{"type": "text", "text": reply([WINTER], "snow")}],
+        return httpx.Response(200, json={"content": [{"type": "text", "text": reply("A mown lawn.")}],
                                          "stop_reason": "end_turn"})
     client = httpx.Client(transport=httpx.MockTransport(handler),
                           headers={"x-api-key": "k", "anthropic-version": "2023-06-01"})
     chat = FoundryMessages("https://madhacks-foundry.services.ai.azure.com/anthropic/v1/messages", "k", client=client)
     r = reader(chat)
-    assert r("make it winter", snap())["operations"] == [WINTER]
+    assert r("cut the grass", snap())["prompt"] == "A mown lawn."
     body = json.loads(seen[0].content)
     assert set(body) == {"model", "max_tokens", "system", "messages", "thinking", "output_config"}
     assert body["model"] == "claude-sonnet-5-5" and body["max_tokens"] == 1024
     assert body["thinking"] == {"type": "between_tools"} and body["output_config"] == {"effort": "low"}
     assert body["system"] == r.system_prompt and body["messages"][0]["role"] == "user"
-    assert seen[0].headers["x-api-key"] == "k" and seen[0].headers["anthropic-version"] == "2023-06-01"
 
 
-# --- the wrapper against the real CommandService ----------------------------------------------------------
+# --- the wrapper: the order of a final, against the real CommandService ------------------------------------
+
+def test_the_order_control_pinned_dictionary_then_sonnet():
+    chat = FakeChat({"kill the tree's leaves": reply("A wide shot of a meadow with a bare oak tree.", ["bare tree"])})
+    from engine.final_reader import DEFAULT_DEMO_PROMPTS, load_pinned
+    svc = wrapper(chat, pinned=load_pinned(DEFAULT_DEMO_PROMPTS))
+    out = svc.handle(final("make it winter"))  # pinned: no call
+    assert "snow" in out["steer"]["prompt"] and not chat.calls
+    out = svc.handle(final("add a dog and a cat"))  # the dictionary reads every word: no call
+    assert [c["label"] for c in out["state"]["changes"]] == ["winter", "dog", "cat"] and not chat.calls
+    out = svc.handle(final("kill the tree's leaves"))  # the dictionary would add "trees": Sonnet writes it
+    assert len(chat.calls) == 1 and chat.calls[0][1]["prompt"] != svc._svc.snapshot()["base"]
+    assert "a dog standing nearby" in chat.calls[0][1]["prompt"]  # the prompt on screen, the rich one
+    assert out["steer"]["prompt"] == "A wide shot of a meadow with a bare oak tree."
+    assert [c["label"] for c in out["state"]["changes"]] == ["bare tree"] and not out["state"]["unmatched"]
+    assert svc.committed_prompt == out["steer"]["prompt"] and svc.likely_prompts() == [out["steer"]["prompt"]]
+    out = svc.handle(final("undo"))  # control: no call, back to the composed scene and its rich prompt
+    assert len(chat.calls) == 1 and [c["label"] for c in out["state"]["changes"]] == ["winter", "dog", "cat"]
 
 
-def final(text, t=1):
-    return {"type": "final", "text": text, "t_client": t}
+def test_the_leads_stuck_sequence_changes_the_prompt_every_step():
+    # Live 07:27 UTC: after "arid environment" was written into the base, every place change failed.
+    steps = ["kill the tree's leaves", "cut the grass", "i want no grass. arid environment", "add a lion",
+             "now i want a savannah", "i now want a city in the night with a car driving on the road",
+             "city with road and red car driving"]
+    city = car_prompt("neon city", ["A large male lion stands on the pavement at the left of the road"])
+    answers = {s: reply(f"Prompt {n}: {s}.", [f"chip {n}"]) for n, s in enumerate(steps)}
+    answers[steps[5]] = reply(city, ["city at night", "car", "lion"])
+    answers[steps[6]] = reply(city.replace("A red sports car", "A bright red sports car"), ["city at night", "red car"])
+    svc = wrapper(FakeChat(answers))
+    prompts = [svc.committed_prompt]
+    for s in steps:
+        out = svc.handle(final(s))
+        assert out["steer"] is not None and not out["state"]["unmatched"], s
+        prompts.append(out["steer"]["prompt"])
+    assert len(set(prompts)) == len(prompts)
+    assert prompts[-1].startswith("A bright red sports car")
 
 
-def service():
-    return CommandService(semantic_reader=lambda *a: None)
-
-
-def test_public_service_methods_used_by_the_wrapper():
-    svc = service()
-    assert svc.snapshot()["base"] == "a wide shot of a meadow with a single oak tree"
-    out = svc.apply_final("winter and a lion", [WINTER, LION])
-    assert [c["label"] for c in out["state"]["changes"]] == ["winter", "lion"]
-    assert out["state"]["heard"] == "winter and a lion" and not out["state"]["unmatched"]
-    assert out["steer"]["prompt"] == svc.committed_prompt and not out["steer"]["provisional"]
-    out = svc.apply_final("blocked words", [])
+def test_a_timeout_on_a_free_scene_shows_not_understood_never_a_redraw():
+    gate = threading.Event()
+    chat = FakeChat({"cut the grass": reply("A mown lawn.", ["mown grass"]), "add a dog": reply("x")},
+                    slow={"add a dog": gate})
+    svc = wrapper(chat, timeout_s=0.2)
+    svc.handle(final("cut the grass"))
+    out = svc.handle(final("add a dog"))  # read whole by the dictionary, but the scene is free: Sonnet, then late
+    gate.set()
     assert out["steer"] is None and out["state"]["unmatched"]
-    out = svc.handle(final("undo"))
-    assert out["state"]["changes"] == []  # the two operations were one edit
+    assert svc.committed_prompt == "A mown lawn."
 
 
-def test_wrapper_end_to_end_with_the_real_service():
-    oak = "a wide shot of a meadow with a single oak tree"
-    chat = FakeChat({
-        "make it winter": reply([WINTER], "a snowy meadow, cold blue light"),
-        "add a lion": reply([LION], "a snowy meadow with a lion, cold blue light"),
-        "turn the tree into a lighthouse": reply([{"op": "edit_base", "base": oak.replace("oak tree", "lighthouse")}],
-                                                 "a snowy meadow around a white lighthouse, a lion nearby"),
-        "make them fight with weapons": reply(blocked=True),
-    })
-    svc = FinalReadingService(service(), reader(chat))
-    winter = svc.handle(final("make it winter"))
-    assert winter["steer"]["prompt"] == oak + "; snow on the ground; a snowy meadow, cold blue light"
-    assert "road" not in winter["steer"]["prompt"]
-    assert [c["label"] for c in winter["state"]["changes"]] == ["winter"]
-    lion = svc.handle(final("add a lion"))
-    assert [c["label"] for c in lion["state"]["changes"]] == ["winter", "lion"]
-    out = svc.handle(final("turn the tree into a lighthouse"))
-    assert [(c["label"], c["strength"]) for c in out["state"]["changes"]] == [("winter", 1.0), ("lion", 0.5)]
-    assert "lighthouse" in out["steer"]["prompt"] and svc.committed_prompt == out["steer"]["prompt"]
-    blocked = svc.handle(final("make them fight with weapons"))
-    assert blocked["steer"] is None and blocked["state"]["unmatched"]
-    n = len(chat.calls)
-    back = svc.handle(final("go back"))  # the dictionary's undo, no call
-    assert len(chat.calls) == n
-    assert back["steer"]["prompt"] == lion["steer"]["prompt"]  # the same rich prompt as before: same embedding
-    assert [c["label"] for c in back["state"]["changes"]] == ["winter", "lion"]
-    # a fallback (no operations) uses the dictionary path
-    out = svc.handle(final("add a dog"))
-    assert "dog" in [c["label"] for c in out["state"]["changes"]]
-    # partials and taps still go to the service
-    assert svc.handle({"type": "partial", "text": "make it", "t_client": 9})["steer"] is None
-    assert svc.handle({"type": "tap", "action": "reset"})["state"]["changes"] == []
+def test_a_timeout_on_a_composed_scene_falls_back_to_the_dictionary():
+    gate = threading.Event()
+    chat = FakeChat({"add a red car": reply("x")}, slow={"add a red car": gate})
+    svc = wrapper(chat, timeout_s=0.1)
+    out = svc.handle(final("add a red car"))
+    gate.set()
+    assert [c["label"] for c in out["state"]["changes"]] == ["car"]
+
+
+def test_not_understood_rolls_back_a_guess():
+    svc = wrapper(FakeChat())
+    guess = svc.handle({"type": "partial", "text": "add a dog", "t_client": 1})
+    assert guess["steer"]["provisional"]
+    out = svc.handle(final("add a dog with wings, or not, i am unsure"))
+    assert out["state"]["unmatched"] and out["steer"]["prompt"] == OAK and not out["steer"]["provisional"]
+
+
+def test_a_tap_on_a_free_chip_asks_to_remove_it():
+    chat = FakeChat({"add a lion": reply("A lion beside a bare oak tree.", ["bare tree", "lion"]),
+                     "remove the lion": reply("A bare oak tree.", ["bare tree"])})
+    svc = wrapper(chat)
+    out = svc.handle(final("add a lion"))
+    lion = next(c["id"] for c in out["state"]["changes"] if c["label"] == "lion")
+    out = svc.handle({"type": "tap", "action": "remove", "id": lion})
+    assert chat.calls[-1][1]["sentence"] == "remove the lion"
+    assert out["steer"]["prompt"] == "A bare oak tree." and [c["label"] for c in out["state"]["changes"]] == ["bare tree"]
+    out = svc.handle({"type": "tap", "action": "undo"})
+    assert out["steer"]["prompt"] == "A lion beside a bare oak tree."
+
+
+def test_a_new_scene_from_a_free_scene_is_composed_again():
+    from engine.final_reader import DEFAULT_DEMO_PROMPTS, load_pinned
+    chat = FakeChat({"cut the grass": reply("A mown lawn.", ["mown grass"])})
+    svc = wrapper(chat, pinned=load_pinned(DEFAULT_DEMO_PROMPTS))
+    svc.handle(final("cut the grass"))
+    out = svc.handle(final(CAR))  # measured: no call
+    assert len(chat.calls) == 1 and car_template.is_template(out["steer"]["prompt"])
+    assert svc._svc.snapshot()["origin"] == "composed"
+
+
+def test_a_mixed_sentence_the_dictionary_cannot_read_is_still_checked_by_the_model():
+    chat = FakeChat({"reset and add a bloody axe": reply(blocked=True)})
+    svc = wrapper(chat)
+    out = svc.handle(final("reset and add a bloody axe"))
+    assert out["steer"] is None and out["state"]["unmatched"] and len(chat.calls) == 1
+    out = svc.handle(final("reset and add a dog"))  # read whole: the dictionary, no call
+    assert [c["label"] for c in out["state"]["changes"]] == ["dog"] and len(chat.calls) == 1
 
 
 def test_engine_reports_the_final_reader():
@@ -302,38 +398,10 @@ def test_engine_reports_the_final_reader():
     e.stop()
 
 
-@pytest.mark.parametrize("base, moves", [
-    ("a red sports car on a road", True),
-    ("a wide shot of a red car on a road", True),
-    ("a wide shot of a meadow with a single oak tree", False),
-    ("a red car driving away from the camera", False),  # already told
-    ("a wide shot of a red carpet", False),  # "carpet" is not a car
-    # Greptile on PR #89 (final_reader.py:153): a vehicle that stands or comes toward the camera is not told to drive away
-    ("a red car parked beside the oak tree", False),
-    ("a car driving toward the camera", False),
-    ("a wide shot of a taxi stopped at a red light", False),
-    ("an oncoming truck on a mountain road", False),
-])
-def test_forward_motion_for_moving_vehicles_only(base, moves):
-    from engine.final_reader import with_forward_motion
-    assert with_forward_motion(base) == (f"{base}, {FORWARD_MOTION}" if moves else base)
-
-
-def test_a_named_colour_wins_over_making_a_duplicate_look_different():
-    # The scene has a red car and the user says "add a red car racing on a road": they want a second RED car.
-    red = {"op": "add", "label": "car", "kind": "extra", "phrase": "a red car driving forward", "strength": 1.0}
-    second = {"op": "add", "label": "second car", "kind": "extra",
-              "phrase": "a second small red car racing alongside it in the next lane at the right of the frame",
-              "strength": 1.0}
-    chat = FakeChat({"add a red car racing on a road": reply(
-        [second], "a country road through green fields, a second red car racing alongside it in the next lane, "
-                  "bright sunshine")})
+def test_outcomes_are_counted_by_verdict():
+    chat = FakeChat({"a": reply("A."), "b": reply(understood=False), "c": "nope"})
     r = reader(chat)
-    out = r("add a red car racing on a road", snap(red, base="a wide shot of a meadow with a single oak tree"))
-    system = " ".join(chat.calls[0][0].split())
-    assert "A colour, type or size the user names ALWAYS wins" in system
-    assert "a second small red car racing in the next lane at the right of the frame" in system
-    assert "second small red car" in out["prompt"]
-    other_colours = {"blue", "green car", "black", "white", "yellow", "silver", "grey", "orange", "purple"}
-    new_car = out["prompt"].split("second", 1)[1].split(",")[0]
-    assert not any(c in new_car for c in other_colours) and "red" in new_car
+    for s in "abc":
+        r(s, snap())
+    assert r.stats()["verdicts"] == {"accepted": 1, "invalid": 1, "not_understood": 1}
+    assert r.stats()["not_understood"] == 1 and Outcome.NOT_UNDERSTOOD.saved

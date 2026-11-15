@@ -1,9 +1,10 @@
 """Named people the video model cannot draw (it has no real faces): a name is turned into a visual description.
 
     "add jensen huang" -> Sonnet reads "add a middle-aged man with short swept-back grey-black hair and glasses,
-    wearing his signature black leather jacket over a black t-shirt", and the engine sets the add itself:
-    label "jensen huang" (the user's words, shown on the chip, so "remove jensen huang" and undo find it) and the
-    phrase PERSON.description + ", a large figure standing <spot>, facing the camera".
+    wearing his signature black leather jacket over a black t-shirt" and is told person_chip "jensen huang", so the
+    chip keeps the user's words ("remove jensen huang" and undo find it). When the model gives nothing usable on a
+    composed scene, the engine sets the add itself (person_add): label "jensen huang" and the phrase
+    PERSON.description + ", a large figure standing <spot>, facing the camera".
 
 The spot is where the sentence puts the person ("next to the car"), else the first free one of SPOTS: an object
 whose phrase already says "left" holds the left foreground (the lion), and so on.
@@ -112,14 +113,3 @@ def person_remove(text: str, snapshot: dict) -> dict | None:
         return None
     chip = next((c for c in snapshot["changes"] if c["label"] == m.person.label), None)
     return None if chip is None else {"op": "remove", "id": chip["id"]}
-
-
-def with_person(text: str, ops, snapshot: dict):
-    """The model's operations with its add of the person replaced by the engine's (the first add of kind extra),
-    or the engine's add appended when the model gave none. Unchanged for a sentence that adds no known person."""
-    add = person_add(text, snapshot)
-    if add is None or not isinstance(ops, list):
-        return ops
-    i = next((n for n, op in enumerate(ops) if isinstance(op, dict) and op.get("op") == "add"
-              and op.get("kind") == "extra"), None)
-    return [*ops[:i], add, *ops[i + 1:]] if i is not None else [*ops, add]
