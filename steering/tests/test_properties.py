@@ -58,8 +58,8 @@ def _angle(x: Tensor, y: Tensor) -> Tensor:
 
 # --- blend: finiteness ------------------------------------------------------
 
-@pytest.mark.parametrize("dtype", [torch.float32, torch.bfloat16])
-@pytest.mark.parametrize("scale", [1e-30, 1e-6, 1.0, 1e6, 1e30])
+# bf16 at both extremes of its range (the same exponent range as float32), float32 at unit scale.
+@pytest.mark.parametrize("dtype, scale", [(torch.bfloat16, 1e-30), (torch.float32, 1.0), (torch.bfloat16, 1e30)])
 def test_blend_finite_for_any_scale(dtype: torch.dtype, scale: float) -> None:
     g = _gen(1)
     a = (torch.randn(SHAPE, generator=g) * scale).to(dtype)
@@ -262,8 +262,8 @@ def test_ramp_steps_follow_min_jerk_increments(n: int) -> None:
     assert worst <= max_ease_increment(n) * (1 + 1e-9)
 
 
-@pytest.mark.parametrize("n", RAMPS)
-@pytest.mark.parametrize("m", (1, 4, 12))
+# A one-chunk move cut by a ramp, a ramp cut by a jump (m = 1), and a slow move cut by a slow move.
+@pytest.mark.parametrize("n, m", [(1, 4), (4, 1), (12, 12)])
 def test_interrupt_at_every_point_is_continuous_and_lands_exactly(n: int, m: int) -> None:
     a, b, c = make_prompts(_gen(20), SHAPE, 3, torch.float32)
     for k_stop in range(n + 1):

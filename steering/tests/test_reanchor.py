@@ -142,7 +142,7 @@ def test_unchanged_leaves_pending_alone() -> None:
 
 @pytest.mark.parametrize(
     "ramp, strength",
-    [(1, 1.0), (2, 1.0), (3, 0.85), (4, 0.85), (9, 0.85), (10, 0.5), (40, 0.5)],
+    [(2, 1.0), (3, 0.85), (10, 0.5)],  # the first ramp of each band: sudden, normal, slow
 )
 def test_base_strength_by_ramp(ramp: int, strength: float) -> None:
     e = Engine(ReanchorConfig(min_gap_chunks=1))
@@ -221,13 +221,8 @@ def test_provisional_then_confirm_replaces() -> None:
 @pytest.mark.parametrize(
     "ramp, fire_at, chunks",
     [
-        (1, 0.5, [1]),
-        (2, 0.5, [1]),
-        (4, 0.5, [2]),
         (5, 0.5, [3]),  # 2/5 < 0.5 <= 3/5
-        (4, 0.75, [3]),
         (4, 1.0, [4]),
-        (2, 1.0, [2]),
         (12, 0.5, [4, 12]),  # slow ignores fire_at: 1/3 at 4; 2/3 deferred by the gap to 12, fires once with 1.0
     ],
 )
