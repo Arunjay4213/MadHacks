@@ -73,6 +73,41 @@ class RemoveWorldKeepsObjectsTest(unittest.TestCase):
         r = s.handle({"type": "final", "text": "remove the forest", "t_client": 2})
         self.assertEqual(labels(r), ["trees"])
 
+    def test_remove_the_forest_when_only_the_world_is_present(self):
+        s = svc()
+        s.handle({"type": "final", "text": "make it a forest", "t_client": 1})
+        r = s.handle({"type": "final", "text": "remove the forest", "t_client": 2})
+        self.assertEqual(labels(r), [])
+
+    def test_removing_an_object_located_in_the_world_keeps_the_world(self):
+        for added, spoken in [("add a car", "remove the car near the forest"),
+                              ("add a dog", "remove the dog in the forest"),
+                              ("add a lion", "remove the lion near the forest"),
+                              ("add a tree", "remove the tree in the forest")]:
+            s = svc()
+            for t in ["make it a forest", added]:
+                s.handle({"type": "final", "text": t, "t_client": 1})
+            r = s.handle({"type": "final", "text": spoken, "t_client": 2})
+            self.assertEqual(labels(r), ["forest"], spoken)
+
+    def test_any_world_named_as_a_location_keeps_the_world(self):
+        # "meadow", "desert" and the rest share no dictionary alias with an object, unlike "forest".
+        for world in ["meadow", "desert", "mars", "neon city", "ocean coast", "country road"]:
+            for spoken in [f"remove the car near the {world}", f"remove the car in the {world}"]:
+                s = svc()
+                for t in [f"make it a {world}", "add a car"]:
+                    s.handle({"type": "final", "text": t, "t_client": 1})
+                r = s.handle({"type": "final", "text": spoken, "t_client": 2})
+                self.assertEqual(labels(r), [world], spoken)
+
+    def test_naming_the_world_first_still_removes_it(self):
+        for world in ["meadow", "desert", "neon city"]:
+            s = svc()
+            for t in [f"make it a {world}", "add a car"]:
+                s.handle({"type": "final", "text": t, "t_client": 1})
+            r = s.handle({"type": "final", "text": f"remove the {world}", "t_client": 2})
+            self.assertEqual(labels(r), ["car"], world)
+
 
 class AccentedPaceTest(unittest.TestCase):
     CAFE = {"op": "add", "label": "café", "kind": "extra", "phrase": "a small café", "strength": 1.0}

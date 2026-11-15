@@ -746,8 +746,9 @@ class Backend:
                     x_last = self._clean_anchor  # a refresh: the clean anchor stays as it is
                     if self.refresh_noise == "fixed":
                         # Seeded by the anchor, not drawn from the main stream: the same picture every refresh.
+                        # Reduced to 64 bits, the range manual_seed accepts, so any reset seed works.
                         rng = torch.Generator(device=self.device).manual_seed(
-                            1_000_003 * self._video_seed + int(self.clean_anchor_chunk))
+                            (1_000_003 * self._video_seed + int(self.clean_anchor_chunk)) % (1 << 64))
                         noisy = torch.randn(noisy.shape, device=self.device, dtype=self.dtype, generator=rng)
                 elif not plan.from_clean or self._clean_anchor is not None:
                     # A steer (or any other rebase): the old clean anchor shows the old scene.

@@ -144,10 +144,19 @@ def resolve(query: str, snapshot: dict):
     q = _norm(query)
     # Present labels as whole phrases, longest first: "dark knight" before the "dark" alias of night.
     aliases = list(KEYWORD_RX.finditer(q))
+    # A world named before any preposition is the target ("remove the forest"); after one it is only
+    # another object's location ("remove the car near the meadow"), so it never competes with the object.
+    location = _PREP_RX.search(q)
+    head_end = location.start() if location else len(q)
     named = []
     for change in changes:
         for match in re.finditer(r"\b" + re.escape(_norm(change["label"])) + r"\b", q):
-            if change["kind"] == "world" or not any(a.start() <= match.start() and match.end() <= a.end()
+            if change["kind"] == "world":
+                if match.start() < head_end:
+                    named.append(change)
+                    break
+                continue
+            if not any(a.start() <= match.start() and match.end() <= a.end()
                        and KEYWORDS[a.group()]["label"] != change["label"] for a in aliases):
                 named.append(change)
                 break

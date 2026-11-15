@@ -44,14 +44,13 @@ export function useGenerativeWorld(options: Options) {
     if (!partial) dissolve.current = setTimeout(() => setTranscript(''), 1100);
   }, []);
 
-  const performCommit = useCallback(async (prompt: string, simulate = true) => {
+  const performCommit = useCallback(async (prompt: string, simulate: boolean, coords: SpatialCoords | null) => {
     const generation = mutationGeneration.current;
     const text = prompt.trim();
     if (!text) return false;
     showWords(text);
     if (simulate) setSimulateUntil(performance.now() + 1500);
     const intent = parseIntent(text, opts.current.remoteModifiers ?? worldRef.current.modifiers);
-    const coords = pinRef.current;
     const spatialIntent = intent?.kind === 'add' && coords ? { ...intent, coords } : intent;
     const next = spatialIntent ? evolve(worldRef.current, spatialIntent) : worldRef.current;
     if (opts.current.adapter) {
@@ -76,9 +75,10 @@ export function useGenerativeWorld(options: Options) {
   }, [showWords]);
 
   const commit = useCallback((prompt: string, simulate = true) => {
-    if (!opts.current.adapter || opts.current.remoteModifiers !== undefined) return performCommit(prompt, simulate);
+    const coords = pinRef.current;
+    if (!opts.current.adapter || opts.current.remoteModifiers !== undefined) return performCommit(prompt, simulate, coords);
     const generation = mutationGeneration.current;
-    const result = mutationQueue.current.then(() => generation === mutationGeneration.current ? performCommit(prompt, simulate) : false);
+    const result = mutationQueue.current.then(() => generation === mutationGeneration.current ? performCommit(prompt, simulate, coords) : false);
     mutationQueue.current = result;
     return result;
   }, [performCommit]);
