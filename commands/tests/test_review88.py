@@ -65,5 +65,24 @@ class ApplyFinalPaceTest(unittest.TestCase):
         self.assertEqual((r["steer"]["prompt"], r["steer"]["ramp_chunks"]), ("A dog arrives in the meadow.", RAMP["slow"]))
 
 
+class RemoveWorldKeepsObjectsTest(unittest.TestCase):
+    def test_remove_the_forest_keeps_the_added_trees(self):
+        s = svc()
+        for t in ["make it a forest", "add a tree"]:
+            s.handle({"type": "final", "text": t, "t_client": 1})
+        r = s.handle({"type": "final", "text": "remove the forest", "t_client": 2})
+        self.assertEqual(labels(r), ["trees"])
+
+
+class AccentedPaceTest(unittest.TestCase):
+    CAFE = {"op": "add", "label": "café", "kind": "extra", "phrase": "a small café", "strength": 1.0}
+
+    def test_slowly_add_a_cafe_ramps_gradually(self):
+        s = CommandService(semantic_reader=lambda t, x: None, slow_reader=lambda t, x: self.CAFE)
+        r = s.handle({"type": "final", "text": "slowly add a café", "t_client": 1})
+        self.assertEqual((labels(r), r["steer"]["ramp_chunks"]), (["café"], RAMP["slow"]))
+        self.assertEqual(RAMP["slow"], 12)
+
+
 if __name__ == "__main__":
     unittest.main()
