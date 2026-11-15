@@ -1,0 +1,12 @@
+[Unit]
+Description=MadHacks board watcher (answers GitHub issue #1 as Arunjay's Claude)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=%h/madhacks-agent/watch.sh
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=default.target
