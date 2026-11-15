@@ -40,6 +40,11 @@ latent saved `clean_anchor_after` (3) chunks after the last reset or steer re-an
 latent has already drifted (over-contrast, blocky grass) and a refresh from it bakes that in; a
 refresh from the clean anchor does not (measured, MODEL_NOTES.md).
 
+Steer start (all off by default): steer_anchor_t starts a full-strength steer from the last clean
+latent noised to that level instead of pure noise, steer_noise=fixed draws all of that chunk's
+noise from a generator seeded by the video's seed, the same for every steer of the video, and
+steer_steps sets that chunk's schedule. They keep more of the shot's layout across a world change.
+
 Threads and devices: generation, prompt encoding and decoding each run on their own CUDA
 stream. The decoder object owns all decode state and receives only the ChunkLatents passed
 in, so it can move to `decode_device` or to another process later.
@@ -73,6 +78,9 @@ NUM_BLOCKS = 30
 NUM_HEADS = 12
 HEAD_DIM = 128
 TEXT_LEN = 512
+# Added to the video's seed term for the fixed steer noise; a refresh adds its clean anchor's chunk (a
+# small int) instead, so the two generators never share a seed within a video.
+STEER_NOISE_SEED_OFFSET = 0x57EE_0000_0000_0001
 
 # Official configs and checkpoints, paths relative to repo_dir.
 VARIANTS = {
@@ -132,6 +140,21 @@ class ChunkLatents:
 
 
 @dataclasses.dataclass(frozen=True)
+class SteerStart:
+    """How a steer chunk was started when a steer option shaped it (Backend.last_rebase.steer).
+
+    t: the 0-1000 level (unwarped, like steer_anchor_t) the last clean latent was noised to; None:
+        pure noise (steer_anchor_t unset, or no clean latent yet).
+    noise: "fixed" or "fresh" (steer_noise).
+    timesteps: the denoising timesteps run for the chunk, warped, as the generator got them.
+    """
+
+    t: Optional[int]
+    noise: str
+    timesteps: tuple[int, ...]
+
+
+@dataclasses.dataclass(frozen=True)
 class Rebase:
     """Restart the frame cache before a chunk, keeping the last `keep` clean frames (LongLive's
     KV recache, arXiv 2509.22622, with positions restarted at 0). Plain ints, so callers can build
@@ -146,12 +169,16 @@ class Rebase:
         its schedule and is denoised with schedule[n:] (n = 0 is pure noise).
     from_clean: with anchor_step > 0, start from the clean anchor (see Backend.reanchor) instead
         of the last latent; falls back to the last latent when there is no clean anchor yet.
+    steer: output only, on Backend.last_rebase: how the steer options (steer_anchor_t,
+        steer_noise, steer_steps) started this chunk, or None when none of them applied.
+        Ignored when passed in.
     """
 
     keep: int = 3
     memory_noise: int = 0
     anchor_step: Optional[int] = None
     from_clean: bool = False
+    steer: Optional[SteerStart] = None
 
     @classmethod
     def of(cls, value) -> Optional["Rebase"]:
@@ -179,6 +206,43 @@ def _import_repo(repo_dir: str):
     if repo_dir not in sys.path:
         sys.path.insert(0, repo_dir)
     return repo_dir
+
+
+def _steer_options(steer_anchor_t=None, steer_noise="fresh", steer_steps=None, steer_noise_first_frame=False):
+    """Check and normalise the steer-start options; raises ValueError on a bad value. Returns
+    (anchor_t or None, "fresh" | "fixed", steps tuple or None, first-frame flag)."""
+    if isinstance(steer_anchor_t, str) and steer_anchor_t.strip().lower() == "none":
+        steer_anchor_t = None
+    if steer_anchor_t is not None:
+        if isinstance(steer_anchor_t, bool) or not 0 < int(steer_anchor_t) <= 1000:
+            raise ValueError(f"steer_anchor_t must be in 1..1000 or None, got {steer_anchor_t!r}")
+        steer_anchor_t = int(steer_anchor_t)
+    if steer_noise not in ("fresh", "fixed"):
+        raise ValueError(f"steer_noise must be 'fresh' or 'fixed', got {steer_noise!r}")
+    if isinstance(steer_steps, str):
+        text = steer_steps.strip()
+        if text.lower() == "none":
+            steer_steps = None
+        else:
+            try:
+                steer_steps = [int(v) for v in text.split(",")]
+            except ValueError:
+                raise ValueError(f"steer_steps must be a comma list of timesteps such as 800,500, got {text!r}") from None
+    elif isinstance(steer_steps, int) and not isinstance(steer_steps, bool):
+        steer_steps = [steer_steps]  # the server turns a single number into an int
+    if steer_steps is not None:
+        steps = tuple(int(v) for v in steer_steps)
+        if not steps:
+            raise ValueError("steer_steps must not be empty")
+        if any(not 0 <= v <= 1000 for v in steps) or any(a <= b for a, b in zip(steps, steps[1:])):
+            raise ValueError(f"steer_steps must be strictly descending timesteps in 0..1000, got {list(steps)}")
+        first = 1000 if steer_anchor_t is None else steer_anchor_t
+        if steps[0] != first:
+            raise ValueError(f"steer_steps must start at {first} ("
+                             + ("steer_anchor_t" if steer_anchor_t is not None else "pure noise, since steer_anchor_t is unset")
+                             + f"), got {list(steps)}")
+        steer_steps = steps
+    return steer_anchor_t, steer_noise, steer_steps, bool(steer_noise_first_frame)
 
 
 def _timestep_list(scheduler, steps_1000: list[int], warp: bool) -> torch.Tensor:
@@ -361,6 +425,8 @@ class Backend:
         unknown = set(auto_rebase) - set(inspect.signature(self._init_runtime).parameters)
         if unknown:
             raise TypeError(f"unknown backend options {sorted(unknown)}")
+        steer_keys = inspect.signature(_steer_options).parameters
+        _steer_options(**{k: v for k, v in auto_rebase.items() if k in steer_keys})  # fails before any weights load
 
         repo_dir = _import_repo(repo_dir)
         from omegaconf import OmegaConf
@@ -445,6 +511,10 @@ class Backend:
         cut_fade_refresh: bool = True,
         refresh_noise: str = "fixed",
         refresh_anchor_t: Optional[int] = None,
+        steer_anchor_t: Optional[int] = None,
+        steer_noise: str = "fresh",
+        steer_steps=None,
+        steer_noise_first_frame: bool = False,
     ) -> None:
         """Generation state: lock, stream, RNG, caches, counters, automatic rebase settings.
         Split out of __init__ so tests can build a Backend around a stub generator."""
@@ -473,6 +543,18 @@ class Backend:
         # The 0-1000 level (unwarped, like the config's steps) the clean anchor is noised to on a
         # refresh, instead of the strength's anchor step; None: the anchor step.
         self.refresh_anchor_t = None if refresh_anchor_t is None else int(refresh_anchor_t)
+        # Steer start (MODEL_NOTES.md, "Steer start"): they shape only a steer chunk, the one a
+        # reanchor(strength, source="last") at a strength mapping to anchor step 0 asks for.
+        (self.steer_anchor_t, self.steer_noise, self.steer_steps,
+         self.steer_noise_first_frame) = _steer_options(steer_anchor_t, steer_noise, steer_steps, steer_noise_first_frame)
+        self._steer_options_on = self.steer_anchor_t is not None or self.steer_noise == "fixed" or self.steer_steps is not None
+        if self.steer_steps is not None:
+            self._steer_schedule = torch.stack([self._timestep(t) for t in self.steer_steps])
+        elif self.steer_anchor_t is not None:
+            t0 = self._timestep(self.steer_anchor_t)
+            self._steer_schedule = torch.stack([t0] + [s for s in self.first_chunk_steps if s < t0])
+        else:
+            self._steer_schedule = None  # the first-frame schedule, as today
         if int(cut_fade_frames) < 0:
             raise ValueError(f"cut_fade_frames must be >= 0, got {cut_fade_frames}")
         # Dissolve from the last shown frame over this many frames after a re-anchor cut (0 = off);
@@ -612,7 +694,10 @@ class Backend:
         source "last" (a steer): start from the last latent; the clean anchor is dropped and saved
         again `clean_anchor_after` chunks later, so it shows the new scene. source "clean" (a
         refresh): start from the clean anchor, which is kept; with no clean anchor yet, as "last"
-        but without dropping or re-saving anything."""
+        but without dropping or re-saving anything.
+
+        A steer (source "last") whose strength maps to anchor step 0 is what the steer options
+        (steer_anchor_t, steer_noise, steer_steps) shape; nothing else is."""
         if source not in ("last", "clean"):
             raise ValueError(f"reanchor source must be 'last' or 'clean', got {source!r}")
         step = self.anchor_step_for_strength(strength)
@@ -655,6 +740,12 @@ class Backend:
         if not 0 <= t_1000 <= 1000:
             raise ValueError(f"timestep must be in 0..1000, got {t_1000}")
         return _timestep_list(self.scheduler, [int(t_1000)], self._warp)[0]
+
+    def _steer_generator(self) -> torch.Generator:
+        """The fixed steer noise: made again, identically, for every steer (and, with
+        steer_noise_first_frame, the first frame) of this video. Reduced to 64 bits like the refresh seed."""
+        return torch.Generator(device=self.device).manual_seed(
+            (1_000_003 * self._video_seed + STEER_NOISE_SEED_OFFSET) % (1 << 64))
 
     def _rebase(self, plan: Rebase, cond_dict: dict) -> int:
         """Clear the frame cache and re-encode the last `keep` clean frames at positions 0..keep-1
@@ -712,10 +803,11 @@ class Backend:
             # `cond` may have been written on another thread's stream (the steerer's blend).
             self._gen_stream.wait_stream(torch.cuda.default_stream(self.device))
             pending = self._pending_reanchor
+            from_reanchor = False  # this chunk runs the re-anchor reanchor() asked for
             if pending is not None:
                 self._pending_reanchor = None
                 if rebase is None:
-                    rebase = pending
+                    rebase, from_reanchor = pending, True
             changed = cond is not self._last_cond
             plan = reason = None
             if rebase is not None or self._auto_steer is not None or self._auto_refresh is not None:
@@ -729,11 +821,16 @@ class Backend:
 
             f = self.num_frame_per_block
             lh, lw = self.latent_hw
-            noisy = torch.randn([1, f, LATENT_CHANNELS, lh, lw], device=self.device, dtype=self.dtype, generator=self._rng)
+            # A steer the steer options shape: reanchor(source="last") at a strength mapping to step 0.
+            steer = (self._steer_options_on and from_reanchor and plan is not None and plan.keep == 0
+                     and plan.anchor_step == 0 and not plan.from_clean)
+            rng = self._rng  # a fixed-noise refresh or steer uses its own generator for this chunk
+            if (steer and self.steer_noise == "fixed") or (self.state is GenState.EMPTY and self.steer_noise_first_frame):
+                rng = self._steer_generator()  # all of this chunk's noise; the main stream is not advanced
+            noisy = torch.randn([1, f, LATENT_CHANNELS, lh, lw], device=self.device, dtype=self.dtype, generator=rng)
             schedule = self.first_chunk_steps if self.state is GenState.EMPTY else self.denoising_steps
             start = ChunkStart.FIRST_FRAME if self.state is GenState.EMPTY else ChunkStart.CONTINUE
             fade = False
-            rng = self._rng  # a fixed-noise refresh uses its own generator for this chunk
             if plan is not None:
                 x_last = self._history[-1] if self._history else None
                 from_clean = plan.from_clean and self._clean_anchor is not None
@@ -741,7 +838,6 @@ class Backend:
                     # The scene changed without a steer re-anchor (a provisional or a steer too weak
                     # to repaint): the clean anchor shows the old scene, so this refresh is a steer.
                     from_clean = False
-                rng = self._rng
                 if from_clean:
                     x_last = self._clean_anchor  # a refresh: the clean anchor stays as it is
                     if self.refresh_noise == "fixed":
@@ -786,7 +882,21 @@ class Backend:
                 else:
                     n = None if n is None else 0
                     from_clean = False
-                self.last_rebase = Rebase(keep, int(plan.memory_noise), n, from_clean)
+                steer_start = None
+                if steer and keep == 0:
+                    t_steer = None
+                    if self.steer_anchor_t is not None and x_last is not None:
+                        # Start from the last clean latent noised to steer_anchor_t (warped like the steps).
+                        t0 = self._timestep(self.steer_anchor_t)
+                        noisy = self.scheduler.add_noise(
+                            x_last.flatten(0, 1), noisy.flatten(0, 1), t0 * torch.ones([f], device=self.device, dtype=torch.long),
+                        ).unflatten(0, noisy.shape[:2])
+                        schedule, t_steer = self._steer_schedule, self.steer_anchor_t
+                    elif self.steer_anchor_t is None and self._steer_schedule is not None:
+                        schedule = self._steer_schedule  # steer_steps from pure noise (it starts at 1000)
+                    # else: steer_anchor_t set but no clean latent yet: pure noise, the first-frame schedule.
+                    steer_start = SteerStart(t_steer, self.steer_noise, tuple(int(t) for t in schedule))
+                self.last_rebase = Rebase(keep, int(plan.memory_noise), n, from_clean, steer_start)
                 if reason is not None:
                     self.auto_rebases[reason] += 1
             current_start = self.frame_index * self.frame_seq_length
@@ -864,6 +974,15 @@ def load(width: int, height: int, steps: Optional[int] = None, device: str = "cu
     refresh_noise ("fresh" or "fixed"): "fixed" seeds a refresh's noise by its clean anchor, so every
     refresh from one anchor gives the same picture. refresh_anchor_t (None, or 1..1000): the level a
     refresh noises the clean anchor to, instead of the strength's anchor step (500 = step 2, 250 = step 3).
+    Steer start (all off by default; they shape only a steer: reanchor(strength, source="last") with a
+    strength mapping to anchor step 0, strength > 0.75 on the 4-step first-frame schedule):
+    steer_anchor_t (None, or 1..1000): start from the last clean latent noised to this level (unwarped,
+    like refresh_anchor_t) instead of pure noise. steer_noise ("fresh" or "fixed"): "fixed" draws all
+    the steer chunk's noise from a generator seeded by the video's seed, the same for every steer of
+    the video, without advancing the main stream. steer_steps (comma list such as "800,500", or None):
+    the steer chunk's schedule, strictly descending in 0..1000, starting at steer_anchor_t (or 1000 when
+    it is unset); None: steer_anchor_t and the first-frame steps below it, or the first-frame schedule.
+    steer_noise_first_frame (0): the first frame of every video uses the fixed steer noise too.
     """
     # Options may arrive as strings from the server's --backend-opt KEY=VALUE.
     flag = lambda v: v if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes", "on")  # noqa: E731
@@ -872,7 +991,9 @@ def load(width: int, height: int, steps: Optional[int] = None, device: str = "cu
              "steer_min_gap": int, "steer_fire_on_change": flag, "refresh_every": int, "refresh_keep": int,
              "refresh_memory_noise": int, "clean_anchor_after": int, "cut_fade_frames": int,
              "cut_fade_refresh": flag, "refresh_noise": str,
-             "refresh_anchor_t": lambda v: None if str(v).lower() == "none" else int(v)}
+             "refresh_anchor_t": lambda v: None if str(v).lower() == "none" else int(v),
+             "steer_anchor_t": lambda v: None if v is None or str(v).lower() == "none" else int(v),
+             "steer_noise": str, "steer_noise_first_frame": flag}
     options = {k: types[k](v) if k in types else v for k, v in options.items()}
     steps = int(steps) if steps is not None and int(steps) > 0 else None  # 0 or None: distilled schedule
     t0 = time.time()
