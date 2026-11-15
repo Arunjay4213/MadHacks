@@ -100,3 +100,22 @@ def test_a_calibration_with_no_answers_reports_instead_of_crashing(tmp_path):
                                            "questions": [{"q": "Is there a lion?", "expect": "yes"}]}]}))
     out = L.calibrate(L.Judge(Chat([]), max_calls=0, gap_s=0), cal, tmp_path)
     assert out["accuracy"] is None and "no answers" in (tmp_path / "calibration.md").read_text()
+
+
+def test_a_closed_connection_keeps_the_steps_played_before_it(monkeypatch):
+    import asyncio
+
+    played = []
+
+    async def send(msg, case, index, label, step):
+        if len(played) == 1:  # the connection closes after the first step
+            raise RuntimeError("an engine connection closed during the run")
+        return L.Played(case, index, label, step or {}, 0.0, 1)
+
+    for name in ("RESET_WAIT_S", "START_WAIT_S"):
+        monkeypatch.setattr(L, name, 0)
+    monkeypatch.setattr(L, "LOOK_AFTER_S", -3.0)  # no wait between steps
+    cases = [{"name": "c", "steps": [{"say": "make it winter"}, {"say": "add a lion"}]}]
+    with pytest.raises(RuntimeError):
+        asyncio.run(L.play_cases(cases, 0, send, dict, played))
+    assert [p.label for p in played] == ["make it winter"]

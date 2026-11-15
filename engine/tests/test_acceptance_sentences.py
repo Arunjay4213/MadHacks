@@ -52,3 +52,33 @@ def test_every_sonnet_step_has_a_recorded_reply():
             missing |= {(case["name"], key[1]) for key in chat.missing}
     assert not missing, ("no recorded Sonnet reply for these; run `python -m engine.tools.acceptance_record` with the "
                          f"Foundry key: {sorted(missing)}")
+
+
+def test_refreshing_one_case_keeps_the_other_replies(tmp_path, monkeypatch):
+    import json
+    from engine.tools import acceptance_record as R
+
+    path = tmp_path / "replies.json"
+    old = [{"sentence": "s1", "prompt_before": "p", "ids": "", "reply": "r1", "fingerprint": "old"},
+           {"sentence": "s2", "prompt_before": "p", "ids": "", "reply": "r2", "fingerprint": "old"}]
+    path.write_text(json.dumps({"replies": old}))
+
+    class Real:
+        model = "m"
+
+        def complete(self, system, messages):
+            return "new"
+
+    def one_case(case, mode, chat, timeout_s=None):
+        chat.complete("sys", [{"role": "user", "content": json.dumps({"prompt": "p", "sentence": "s1", "scene": {}})}])
+        return [], chat
+
+    monkeypatch.setattr(R, "REPLIES_FILE", path)
+    monkeypatch.setattr(R, "settings_from_env", lambda: object())
+    monkeypatch.setattr(R.FoundryMessages, "from_settings", classmethod(lambda cls, s, t: Real()))
+    monkeypatch.setattr(R, "load_cases", lambda: [{"name": "a", "steps": []}, {"name": "b", "steps": []}])
+    monkeypatch.setattr(R, "run_case", one_case)
+    monkeypatch.setattr(R, "MIN_GAP_S", 0)
+    assert R.main(["--refresh-stale", "--case", "a"]) == 0
+    saved = {e["sentence"]: e["reply"] for e in json.loads(path.read_text())["replies"]}
+    assert saved == {"s1": "new", "s2": "r2"}

@@ -221,12 +221,12 @@ class Played:
     result: dict = field(default_factory=dict)
 
 
-async def play(base: str, cases: list[dict], gap_s: float) -> tuple[list[Played], list, float]:
+async def play(base: str, cases: list[dict], gap_s: float) -> tuple[list[Played], list, str | None]:
     """Run the cases on the engine; returns the played steps, the frames [(t, chunk, index, jpeg)] in script
-    seconds, and the stop time."""
+    seconds, and why the run stopped early (None when every case was played). A connection that closes stops the
+    run, and what was played before it is still returned, so the report shows it."""
     import websockets
     from engine.tools import demo_run as h
-    from engine.tools.acceptance import STARTS, step_label
 
     rec = h.Recording()
     wsb = h.ws_base(base)
@@ -255,25 +255,12 @@ async def play(base: str, cases: list[dict], gap_s: float) -> tuple[list[Played]
             print(f"  {p.sent_t:6.1f} s  {case}: {label}")
             return p
 
-        for case in cases:
-            await send({"type": "tap", "action": "reset"}, case["name"], -1, "reset", None)
-            await asyncio.sleep(RESET_WAIT_S)
-            for sentence in STARTS[case.get("start", "meadow")]:
-                await send({"type": "final", "text": sentence}, case["name"], -1, f"start: {sentence}", None)
-                await asyncio.sleep(START_WAIT_S)
-            for i, step in enumerate(case["steps"]):
-                if "say" in step:
-                    msg = {"type": "final", "text": step["say"]}
-                else:
-                    msg = {"type": "tap", "action": step["tap"]}
-                    if step["tap"] == "remove":
-                        from engine.tools.acceptance import chip_matches
-                        ids = [c["id"] for c in latest_state().get("changes", [])
-                               if chip_matches(step["chip"], c.get("label", ""))]
-                        msg["id"] = ids[0] if ids else "missing"
-                played.append(await send(msg, case["name"], i, step_label(step), step))
-                await asyncio.sleep(max(gap_s, step.get("look_after_s", LOOK_AFTER_S) + 3.0))
-        t_stop = time.monotonic()
+        aborted = None
+        try:
+            await play_cases(cases, gap_s, send, latest_state, played)
+        except (RuntimeError, websockets.ConnectionClosed) as exc:
+            aborted = f"stopped early: {exc}"
+            print(f"  {aborted}")
         control_task.cancel()
         await asyncio.gather(control_task, return_exceptions=True)
     frames_task.cancel()
@@ -282,7 +269,28 @@ async def play(base: str, cases: list[dict], gap_s: float) -> tuple[list[Played]
         replies = [m for _t, m in rec.states if m.get("t_client") == p.t_client]
         p.reply = replies[-1] if replies else None
     frames = [(t - t0, c, i, j) for t, c, i, j in rec.frames if t >= t0]
-    return played, frames, t_stop - t0
+    return played, frames, aborted
+
+
+async def play_cases(cases: list[dict], gap_s: float, send, latest_state, played: list[Played]) -> None:
+    from engine.tools.acceptance import STARTS, chip_matches, step_label
+    for case in cases:
+        await send({"type": "tap", "action": "reset"}, case["name"], -1, "reset", None)
+        await asyncio.sleep(RESET_WAIT_S)
+        for sentence in STARTS[case.get("start", "meadow")]:
+            await send({"type": "final", "text": sentence}, case["name"], -1, f"start: {sentence}", None)
+            await asyncio.sleep(START_WAIT_S)
+        for i, step in enumerate(case["steps"]):
+            if "say" in step:
+                msg = {"type": "final", "text": step["say"]}
+            else:
+                msg = {"type": "tap", "action": step["tap"]}
+                if step["tap"] == "remove":
+                    ids = [c["id"] for c in latest_state().get("changes", [])
+                           if chip_matches(step["chip"], c.get("label", ""))]
+                    msg["id"] = ids[0] if ids else "missing"
+            played.append(await send(msg, case["name"], i, step_label(step), step))
+            await asyncio.sleep(max(gap_s, step.get("look_after_s", LOOK_AFTER_S) + 3.0))
 
 
 def pick_frame(p: Played, frames: list) -> tuple[int | None, dict]:
@@ -333,7 +341,8 @@ def write_report(out: Path, played: list[Played], frames: list, calib: dict | No
                "delay_ms_range": [delays[0], delays[-1]] if delays else None,
                "vision_calls": judge.calls,
                "calibration_accuracy": calib.get("accuracy") if calib else None,
-               "overall": "pass" if judged and len(passed) == len(judged) and not unjudged else "fail", **meta}
+               "overall": ("pass" if judged and len(passed) == len(judged) and not unjudged
+                           and not meta.get("aborted") else "fail"), **meta}
     (out / "results.json").write_text(json.dumps({"summary": summary, "steps": steps}, indent=2) + "\n")
     lines = ["# Acceptance run (real model, vision judge)", "",
              f"Overall: **{summary['overall'].upper()}**: {summary['passed']} of {summary['judged']} judged steps "
@@ -343,7 +352,8 @@ def write_report(out: Path, played: list[Played], frames: list, calib: dict | No
              f"{summary['delay_ms_range']}. Vision calls: {judge.calls}"
              + (f"; judge calibration {calib['right']} of {calib['questions']} right ({pct(calib['accuracy'])})"
                 if calib else "") + ".",
-             f"Engine: {meta.get('url')}, {meta.get('backend')}, started {meta.get('started')}.", "",
+             f"Engine: {meta.get('url')}, {meta.get('backend')}, started {meta.get('started')}."
+             + (f" The run {meta['aborted']}; the steps after it were not played." if meta.get("aborted") else ""), "",
              "| case | step | verdict | delay ms | wrong answers |", "|---|---|---|---|---|"]
     for s in steps:
         wrong = "; ".join(f"{r['q']} -> {r['answer']}" for r in s.get("questions", []) if r["ok"] is False)
@@ -430,10 +440,11 @@ def main(argv=None) -> int:
         return 2
     h.warn_shared(base, not args.yes)
     started = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    played, frames, _stop = asyncio.run(play(base, cases, args.gap))
+    played, frames, aborted = asyncio.run(play(base, cases, args.gap))
     judge_played(judge, played, frames, out)
     summary = write_report(out, played, frames, calib, judge,
-                           {"url": base, "backend": stats.get("backend"), "started": started})
+                           {"url": base, "backend": stats.get("backend"), "started": started,
+                            "aborted": aborted})
     print(json.dumps({k: v for k, v in summary.items() if k != "items"}, indent=1))
     return 0 if summary["overall"] == "pass" else 1
 

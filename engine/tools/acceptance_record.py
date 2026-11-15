@@ -77,20 +77,24 @@ def main(argv=None) -> int:
     real = FoundryMessages.from_settings(settings, HTTP_TIMEOUT_S)
     fp = fingerprint(load("sonnet", chat=real, cache_path=None, demo_prompts=None).system_prompt, real.model)
     existing = json.loads(REPLIES_FILE.read_text())["replies"] if REPLIES_FILE.exists() else []
+    # With --refresh-stale a stale reply is not replayed, so the cases run here ask for it again; every entry stays
+    # in the file until a new reply for the same key replaces it (a stale reply of a case not run here is kept).
+    replay = [e for e in existing if not (args.refresh_stale and e.get("fingerprint") != fp)]
     if args.refresh_stale:
-        stale = [e for e in existing if e.get("fingerprint") != fp]
-        existing = [e for e in existing if e.get("fingerprint") == fp]
-        print(f"{len(stale)} replies were made under another system prompt or model; asking again")
-    chat = RecordingChat({entry_key(e): e["reply"] for e in existing}, real)
+        print(f"{len(existing) - len(replay)} replies were made under another system prompt or model; "
+              "asking again for those the chosen cases use")
+    chat = RecordingChat({entry_key(e): e["reply"] for e in replay}, real)
     for case in load_cases():
         if args.case and case["name"] not in args.case or Mode.SONNET not in case_modes(case):
             continue
         print(case["name"])
         run_case(case, Mode.SONNET, chat, timeout_s=RECORD_WAIT_S)
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    existing += [{"sentence": s, "prompt_before": p, "ids": ids, "reply": r, "model": real.model,
-                  "fingerprint": fp, "recorded_at": now}
-                 for (p, s, ids), r in chat.new.items()]
+    merged = {entry_key(e): e for e in existing}
+    merged.update({(p, s, ids): {"sentence": s, "prompt_before": p, "ids": ids, "reply": r, "model": real.model,
+                                 "fingerprint": fp, "recorded_at": now}
+                   for (p, s, ids), r in chat.new.items()})
+    existing = list(merged.values())
     REPLIES_FILE.write_text(json.dumps({"about": "First Sonnet replies of the final reader, recorded by "
                                                  "engine/tools/acceptance_record.py; keyed by the composed prompt "
                                                  "before the sentence, the sentence as sent to the model and the chip ids.",
