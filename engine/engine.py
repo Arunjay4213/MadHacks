@@ -16,6 +16,10 @@ Re-anchor (--reanchor on, off by default): steering.reanchor.ReanchorPolicy sits
 every applied target (on_target after Controller.handle), is asked once per chunk where cond and progress are taken
 (next_chunk), and restarts on a reset (on_reset). An anchor it returns goes to the backend in Engine._generate.
 
+Cut latency (both off by default, see FlushOnCut and SteerInterrupt): --flush-on-cut on drops the old frames still
+waiting to be sent when a steer cut's frames are decoded, and --interrupt-on-steer on stops the old-scene chunk in
+flight (backend.interrupt()) when the policy says the next chunk is a steer cut (ReanchorPolicy.fires_next_chunk).
+
 Recovery: an exception in the generation or decode thread does not stop the engine. The generation thread moves
 to RECOVERING, drops the queued chunks and frames, calls backend.reset() and restarts the steerer on the starting
 prompt (the model stays loaded), then goes back to GENERATING. After `recovery_limit` crashes within
@@ -89,6 +93,8 @@ class EngineConfig:
     recovery_limit: int = 3         # this many crashes within recovery_window_s -> FAILED
     recovery_window_s: float = 60.0
     short_chunk: str = "crossfade"  # "fill", "hold" or "crossfade": see ShortChunkMode
+    flush_on_cut: str = "off"       # "off" or "on": see FlushOnCut
+    interrupt_on_steer: str = "off"  # "off" or "on": see SteerInterrupt
 
 
 class ShortChunkMode(enum.Enum):
@@ -100,6 +106,82 @@ class ShortChunkMode(enum.Enum):
     FILL = "fill"            # no padding: the chunk plays with the frames it has (the old behaviour)
     HOLD = "hold"            # the missing slots repeat the chunk's first frame
     CROSSFADE = "crossfade"  # the missing slots blend linearly from the last frame before the chunk to its first
+
+
+class FlushOnCut(enum.Enum):
+    """What happens to the old frames still waiting to be sent when a steer cut's frames are decoded.
+
+    About 5 frames (0.3 s) of the old scene are queued ahead of a command; with OFF the cut waits behind them.
+    ON drops them, so the cut is the next frame on screen. Only frames of the same video older than the cut are
+    dropped, and only once the cut's own frames are decoded, so the stream never waits on an empty queue for them.
+    A refresh (the same scene) never flushes.
+    """
+    OFF = "off"  # the old frames play out first (the old behaviour)
+    ON = "on"    # the old frames are dropped when the steer cut's frames are ready
+
+
+class SteerInterrupt(enum.Enum):
+    """Whether a steer stops the old-scene chunk being generated. Chosen once, when the backend is loaded."""
+    OFF = "off"                  # --interrupt-on-steer off: the chunk in flight always finishes
+    ON = "on"                    # a steer that re-anchors on the next chunk stops the chunk in flight
+    UNSUPPORTED = "unsupported"  # asked for, but re-anchor is not on or the backend has no interrupt(): as OFF
+
+
+class InFlight(enum.Enum):
+    """The generate_chunk call the generation thread is making now. Decides whether a steer may stop it.
+
+    IDLE -> VIDEO_START | ANCHOR | CONTINUATION when the chunk takes its cond (Engine._begin_chunk, under the
+    CommandBook lock), CONTINUATION -> STOPPING when a steer asks the backend to stop it (Engine._stop_in_flight,
+    under the same lock), and back to IDLE when the call returns or raises (Engine._end_chunk).
+    """
+    IDLE = "idle"                  # no chunk is being generated
+    VIDEO_START = "video_start"    # the first chunk of a video (start, reset, recovery): never stopped
+    ANCHOR = "anchor"              # a re-anchor chunk (a steer cut or a refresh): never stopped
+    CONTINUATION = "continuation"  # an old-scene chunk that continues the video: a steer cut may stop it
+    STOPPING = "stopping"          # backend.interrupt() was called: it stops at its next pass boundary, or finishes
+
+
+@dataclass
+class DissolveFix:
+    """Moves the backend's dissolve after a flushed steer cut so it starts from the frame the client saw last.
+
+    The decoder dissolves into a cut from the last frame it decoded (`decoded`), output frame k being
+    (1 - a) * decoded + a * new with a = (k + 1) / (length + 1) (causal_forcing's VideoDecoder._fade). After a
+    flush that frame was never shown: the client saw `shown`, a few frames earlier in the old scene. Adding
+    (1 - a) * (shown - decoded) to frame k turns it into (1 - a) * shown + a * new, so the picture dissolves from
+    what was on screen instead of jumping ahead in the old scene first. It runs over the same frames as the
+    decoder's dissolve, across chunk boundaries.
+    """
+    video: int
+    shown: np.ndarray    # uint8 [H, W, 3]: the last frame sent before the cut
+    decoded: np.ndarray  # uint8 [H, W, 3]: the frame the decoder dissolves from
+    length: int          # the decoder's dissolve length (cut_fade_frames)
+    done: int = 0        # frames of the dissolve already corrected
+
+    @property
+    def finished(self) -> bool:
+        return self.done >= self.length
+
+    def apply(self, frames: np.ndarray) -> np.ndarray:
+        n = min(len(frames), self.length - self.done)
+        if n <= 0:
+            return frames
+        k = np.arange(n, dtype=np.float32) + self.done
+        keep_old = (1.0 - np.minimum((k + 1) / (self.length + 1), 1.0)).reshape(-1, 1, 1, 1)
+        shift = self.shown.astype(np.float32) - self.decoded.astype(np.float32)
+        out = frames.copy()
+        out[:n] = np.clip(np.rint(frames[:n].astype(np.float32) + keep_old * shift), 0, 255).astype(np.uint8)
+        self.done += n
+        return out
+
+
+def dissolve_length(backend, latents) -> int:
+    """How many frames the backend's decoder dissolves over into this chunk (0: no dissolve).
+
+    The real backend marks a cut it dissolves into with ChunkLatents.fade and dissolves over its cut_fade_frames;
+    the fake backend's latents are a dict with the same "fade" key."""
+    fade = latents.get("fade", False) if isinstance(latents, dict) else getattr(latents, "fade", False)
+    return int(getattr(backend, "cut_fade_frames", 0) or 0) if fade else 0
 
 
 class ChunkShape(enum.Enum):
@@ -411,6 +493,13 @@ class Engine:
             raise ValueError(f"short_chunk must be one of {', '.join(m.value for m in ShortChunkMode)}, "
                              f"got {config.short_chunk!r}") from None
         self.reanchor_state = ReanchorState.OFF  # set from config.reanchor once the backend is loaded
+        try:
+            self.flush_on_cut = FlushOnCut(config.flush_on_cut)
+        except ValueError:
+            raise ValueError(f"flush_on_cut must be 'off' or 'on', got {config.flush_on_cut!r}") from None
+        if config.interrupt_on_steer not in ("off", "on"):
+            raise ValueError(f"interrupt_on_steer must be 'off' or 'on', got {config.interrupt_on_steer!r}")
+        self.steer_interrupt = SteerInterrupt.OFF  # set from config.interrupt_on_steer once the backend is loaded
         self.policy: ReanchorPolicy | None = None  # exists exactly when reanchor_state is ON
         self.on_fatal: Callable[[str], None] | None = None  # called once on FAILED; the server exits the process
         self.recorder = Recorder(config.record_dir, config.record_max_bytes)
@@ -454,6 +543,19 @@ class Engine:
         self.short_chunks = 0                       # short chunks found inside a video (padded unless FILL)
         self.last_short_chunk: dict | None = None   # {"chunk", "frames" decoded, "pad_ms"} of the latest one
         self.client_counts: Callable[[], dict] = lambda: {}
+        # Cut latency. _inflight is the chunk being generated (InFlight), under _inflight_lock.
+        self._inflight_lock = threading.Lock()
+        self._inflight = InFlight.IDLE
+        self._generated_video: int | None = None  # the video of the last chunk generated (generation thread)
+        self.interrupted_chunks = 0  # chunks stopped for a steer cut (never decoded, shown or counted)
+        self.late_interrupts = 0     # stops asked for after the chunk's last pass boundary: the chunk finished
+        # The streamer and a flush share _playout_lock: the flush takes the last frame sent, and the streamer drops an
+        # old frame it took from the queue while the flush ran (_flushed_before). Both only under the lock.
+        self._playout_lock = threading.Lock()
+        self._flush_mark: tuple[int, int] | None = None  # (video, cut chunk) of the last flush
+        self._last_taken: tuple[int, np.ndarray] | None = None  # (video, frame) the streamer took last to send
+        self.flushes = 0
+        self.flushed_frames = 0
 
     # --- lifecycle -------------------------------------------------------------------------
 
@@ -503,6 +605,9 @@ class Engine:
             if self._stop.is_set():
                 return
             self.reanchor_state = self._reanchor_support()
+            self.steer_interrupt = self._interrupt_support()
+            if self.flush_on_cut is FlushOnCut.ON and self.reanchor_state is not ReanchorState.ON:
+                log.warning("--flush-on-cut on has no effect without re-anchor: there are no steer cuts")
             self.lifecycle.transition(Lifecycle.WARMING, "backend loaded")
             self.encoder = EncoderService(self.backend.encode_prompt_with_ids, background_turn=self.prefetch.take)
             self.encoder.start()
@@ -642,6 +747,49 @@ class Engine:
                     self.config.backend)
         return ReanchorState.UNSUPPORTED
 
+    def _interrupt_support(self) -> SteerInterrupt:
+        """The steer interrupt state for config.interrupt_on_steer; logs once when it cannot be on."""
+        if self.config.interrupt_on_steer == "off":
+            return SteerInterrupt.OFF
+        if self.reanchor_state is not ReanchorState.ON:
+            log.warning("--interrupt-on-steer on needs re-anchor on (the policy says when a steer cut is next); "
+                        "running without it")
+            return SteerInterrupt.UNSUPPORTED
+        if not callable(getattr(self.backend, "interrupt", None)):
+            log.warning("--interrupt-on-steer on but backend %s has no interrupt(); running without it",
+                        self.config.backend)
+            return SteerInterrupt.UNSUPPORTED
+        log.info("interrupt on steer: a steer cut due on the next chunk stops the old-scene chunk in flight")
+        return SteerInterrupt.ON
+
+    def _begin_chunk(self, anchor: Anchor | None) -> None:
+        """Generation thread, in _take_cond under the CommandBook lock: IDLE -> what this chunk is."""
+        if self._generated_video != self.video:
+            stage = InFlight.VIDEO_START
+        else:
+            stage = InFlight.ANCHOR if anchor is not None else InFlight.CONTINUATION
+        with self._inflight_lock:
+            self._inflight = stage
+
+    def _end_chunk(self) -> InFlight:
+        """Generation thread, when generate_chunk returns or raises: back to IDLE. Returns the stage it ended in."""
+        with self._inflight_lock:
+            stage, self._inflight = self._inflight, InFlight.IDLE
+        return stage
+
+    def _stop_in_flight(self) -> None:
+        """Steer worker, under the CommandBook lock, after a target the policy re-anchors on at the next chunk:
+        CONTINUATION -> STOPPING. The chunk in flight took its cond before this target (both run under that lock),
+        so it is an old-scene chunk; the cut waits for it unless it stops. A refresh, a cut or a video's first
+        chunk is never stopped. The backend stops it at its next pass boundary; if it is already past its last
+        boundary it finishes, and the backend drops the request when the next chunk starts."""
+        with self._inflight_lock:
+            if self._inflight is not InFlight.CONTINUATION:
+                return
+            self._inflight = InFlight.STOPPING
+            self.backend.interrupt()
+        log.info("steer cut due on the next chunk: stopping the old-scene chunk in flight")
+
     def _generate(self, cond, anchor: Anchor | None):
         """The one backend call per chunk. `anchor` is None unless reanchor_state is ON."""
         if anchor is not None:
@@ -652,6 +800,7 @@ class Engine:
         """Under the CommandBook lock: this chunk's cond and progress, and the policy's anchor for it."""
         cond, progress = self.steerer.get_cond(), self.steerer.progress
         anchor = self.policy.next_chunk(progress, self.steerer.is_moving) if self.policy is not None else None
+        self._begin_chunk(anchor)
         return cond, progress, anchor
 
     def _apply_target(self, target: dict) -> dict:
@@ -659,6 +808,8 @@ class Engine:
         result = self.controller.handle(target)
         if self.policy is not None:
             self.policy.on_target(target, result)
+            if self.steer_interrupt is SteerInterrupt.ON and self.policy.fires_next_chunk():
+                self._stop_in_flight()
         return result
 
     # --- generation ------------------------------------------------------------------------
@@ -693,7 +844,25 @@ class Engine:
                 log.debug("chunk %d: conditioning changed (progress %.2f)", chunk, progress)
             last_cond = cond
             t0 = time.perf_counter()
-            latents = self._generate(cond, anchor)
+            try:
+                latents = self._generate(cond, anchor)
+            except Exception as exc:
+                stage = self._end_chunk()
+                if not (getattr(exc, "chunk_interrupted", False) and stage is InFlight.STOPPING):
+                    raise
+                # Stopped for a steer cut: nothing of it is decoded, shown or timed, and the backend is as before
+                # the call, so the cut takes this chunk's number. Commands scheduled onto it stay scheduled there.
+                with self._stats_lock:
+                    self.interrupted_chunks += 1
+                log.info("chunk %d: stopped after %.0f ms for a steer cut, which takes its number", chunk,
+                         (time.perf_counter() - t0) * 1e3)
+                continue
+            if self._end_chunk() is InFlight.STOPPING:
+                with self._stats_lock:
+                    self.late_interrupts += 1
+                log.info("chunk %d: the stop for a steer cut came after its last pass boundary; the chunk is kept",
+                         chunk)
+            self._generated_video = self.video
             gen_ms = (time.perf_counter() - t0) * 1e3
             self.book.chunk_generated(chunk)
             if self.prefetch.chunk_done(idle_ms, self.book.in_flight, self.encoder.work_ms):
@@ -830,6 +999,9 @@ class Engine:
         # before the next chunk; a short chunk cross-fades from it. Only this thread touches it.
         last_video: int | None = None
         last_frame: np.ndarray | None = None
+        # The last frame the backend decoded (before any change here): the decoder dissolves into a cut from it.
+        decoded_last: np.ndarray | None = None
+        fix: DissolveFix | None = None  # the dissolve being moved to start from the last shown frame, if any
         try:
             while not self._stop.is_set():
                 try:
@@ -843,6 +1015,22 @@ class Engine:
                     frames = np.asarray(backend.decode_chunk(latents))
                     t1 = time.perf_counter()
                     decoded = len(frames)
+                    if fix is not None and (fix.video != meta.video or meta.anchor is not None):
+                        fix = None  # a new video or another cut: the decoder's dissolve restarts or ends
+                    if self._is_flushed_cut(meta):
+                        shown = self._flush_playout(meta)
+                        length = dissolve_length(backend, latents)
+                        same_video = last_video == meta.video
+                        if shown is not None and same_video and length > 0 and decoded_last is not None:
+                            fix = DissolveFix(meta.video, shown, decoded_last, length)
+                        if shown is not None and same_video:
+                            last_frame = shown  # a short cut chunk cross-fades from what was on screen too
+                    if decoded:
+                        decoded_last = frames[-1]
+                    if fix is not None:
+                        frames = fix.apply(frames)
+                        if fix.finished:
+                            fix = None
                     shape = chunk_shape(decoded, backend.frames_per_chunk,
                                         last_frame is None or last_video != meta.video)
                     if shape is ChunkShape.SHORT:
@@ -862,7 +1050,8 @@ class Engine:
                         log.warning("chunk %d decoded to 0 frames", meta.chunk)
                         self._gate.add(-meta.est_frames)
                     for i, jpeg in enumerate(jpegs):
-                        if not self._put(self._playout_queue, (i, jpeg, meta), "playout buffer full, decode blocked"):
+                        if not self._put(self._playout_queue, (i, jpeg, meta, frames[i]),
+                                         "playout buffer full, decode blocked"):
                             return
                 except Exception as exc:
                     self._report_crash(f"decode thread at chunk {meta.chunk}", exc)
@@ -870,6 +1059,51 @@ class Engine:
                     self._decode_queue.task_done()
         except Exception as exc:
             self._fail("decode thread", exc)
+
+    def _is_flushed_cut(self, meta: ChunkMeta) -> bool:
+        return self.flush_on_cut is FlushOnCut.ON and meta.anchor is not None and meta.anchor.reason == "steer"
+
+    def _flush_playout(self, meta: ChunkMeta) -> np.ndarray | None:
+        """Decode thread, once a steer cut is decoded and before its frames are queued: drop the frames of this video
+        older than the cut that are still waiting to be sent, so the cut is the next thing on screen.
+
+        Frames of an older video (the tail before a reset) are kept, in order. Returns the last frame of this video
+        the streamer took to send, which stays the last old frame on screen, or None if there is none."""
+        dropped = []
+        with self._playout_lock:
+            self._flush_mark = (meta.video, meta.chunk)
+            kept = []
+            while True:
+                try:
+                    item = self._playout_queue.get_nowait()
+                except queue.Empty:
+                    break
+                (dropped if self._flushed_before(item[2]) else kept).append(item)
+            for item in kept:
+                self._playout_queue.put_nowait(item)  # room: they were just taken out
+            taken = self._last_taken
+            shown = taken[1] if taken is not None and taken[0] == meta.video else None
+        self._dropped(dropped)
+        with self._stats_lock:
+            self.flushes += 1
+        log.info("chunk %d: steer cut, %d old frames dropped from the playout queue", meta.chunk, len(dropped))
+        return shown
+
+    def _flushed_before(self, meta: ChunkMeta) -> bool:
+        """Under _playout_lock: the frame is of the video and older than the cut of the last flush."""
+        mark = self._flush_mark
+        return mark is not None and meta.video == mark[0] and meta.chunk < mark[1]
+
+    def _dropped(self, items: list) -> None:
+        """Frames dropped by a flush: they leave the lead gate's count as if sent, and are counted."""
+        if not items:
+            return
+        self._gate.sent(len(items))
+        for index, _jpeg, meta, _frame in items:
+            if index == 0:
+                self._gate.add(meta.frames - meta.est_frames)  # the correction _send_frame makes at frame 0
+        with self._stats_lock:
+            self.flushed_frames += len(items)
 
     def _pad_short(self, frames: np.ndarray, previous: np.ndarray, chunk: int) -> np.ndarray:
         """Decode thread: pad a short chunk to frames_per_chunk by the --short-chunk mode; one log line."""
@@ -895,8 +1129,16 @@ class Engine:
         try:
             while not self._stop.is_set():
                 try:
-                    index, jpeg, meta = self._playout_queue.get(timeout=0.1)
+                    item = self._playout_queue.get(timeout=0.1)
                 except queue.Empty:
+                    continue
+                index, jpeg, meta, frame = item
+                with self._playout_lock:
+                    old = self._flushed_before(meta)  # taken from the queue while a flush dropped the rest
+                    if not old:
+                        self._last_taken = (meta.video, frame)
+                if old:
+                    self._dropped([item])
                     continue
                 now = time.monotonic()
                 if next_due is None:
@@ -1117,6 +1359,9 @@ class Engine:
                     "last_chunk": self.last_anchor_chunk,
                     "config": reanchor_changes(self.reanchor_config),
                 },
+                "cut": {"flush": self.flush_on_cut.value, "flushes": self.flushes,
+                        "flushed_frames": self.flushed_frames, "interrupt": self.steer_interrupt.value,
+                        "interrupted_chunks": self.interrupted_chunks, "late_interrupts": self.late_interrupts},
                 "short_chunks": {"mode": self.short_chunk_mode.value, "count": self.short_chunks,
                                  "last_chunk": None if self.last_short_chunk is None else self.last_short_chunk["chunk"],
                                  "last": self.last_short_chunk},

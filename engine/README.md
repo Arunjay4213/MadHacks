@@ -242,7 +242,7 @@ python -m engine.server --backend fake|causal_forcing --reader standin|commands 
     --steps 0 --base-prompt "..." --jpeg-quality 80 --precompute-file prompts.txt \
     --device cuda:0 --decode-device cuda:0 --backend-opt key=value --lead-margin 1.3 --reanchor off --reanchor-opt key=value --log-level info \
     --record-dir ~/recordings --record-max-gb 20 --final-reader off --final-timeout-s 3.0 --final-cache ~/.cache/madhacks/final_reader.json \
-    --short-chunk crossfade
+    --short-chunk crossfade --flush-on-cut off --interrupt-on-steer off
 ```
 
 - `--steps 0` (the default) runs the denoising schedule the backend's checkpoint was distilled for; the real model is distilled for 2 steps, so any other number changes the schedule.
@@ -258,6 +258,8 @@ python -m engine.server --backend fake|causal_forcing --reader standin|commands 
 - `--reanchor-opt key=value` sets one field of the policy's `ReanchorConfig` and may be repeated (see "Re-anchor").
 - `--final-reader off|sonnet` (default `off`), `--final-timeout-s` and `--final-cache` control the Sonnet final reader (see "Final reader (Sonnet)").
 - `--short-chunk fill|hold|crossfade` (default `crossfade`) sets how a chunk with fewer frames than `frames_per_chunk` is padded (see "Short chunks").
+- `--flush-on-cut off|on` and `--interrupt-on-steer off|on` (both default `off`) make a steer cut reach the screen sooner (see "Cut latency").
+- The fake backend's `pass_ms`, `denoise_passes` (2), `cut_passes` (4), `defer_context` (0) and `cut_fade_frames` (0) run the real model's passes and dissolve, to time "Cut latency" on a laptop; `pass_ms=0`, the default, keeps the single `gen_ms` sleep.
 - The fake backend's `short_on_chunks=40,80` makes those chunks (numbered across resets, as `fail_on_chunk`) 1 frame long and labels them "short chunk", to test "Short chunks".
 - `--record-dir` and `--record-max-gb` control the recorder (see "Recorder"); `--record-dir none` turns it off.
 - SIGINT or SIGTERM shuts down cleanly, finalizes the open recording and moves the engine to STOPPED.
@@ -281,7 +283,7 @@ They keep the shot's layout across a world change (tree trunk shift 12 to 21 px 
 They are not on the live engine yet.
 
 - `defer_context` (0): 1 runs each chunk's context pass (its frame KV cache write) at the start of the next chunk instead of at the end of its own, and skips it when that chunk rebases (every re-anchor), so a latent reaches the decoder one pass (about 90 ms) sooner and a cut does not pay for the old scene's pass. Latents and RNG draws are unchanged.
-- `Backend.interrupt()` is not an option but a method: any thread may call it to stop a non-rebase chunk at its next pass boundary (`ChunkInterrupted`), leaving the backend as if the call had not been made, so a steer cut can take that chunk's number. The engine does not call it yet.
+- `Backend.interrupt()` is not an option but a method: any thread may call it to stop a non-rebase chunk at its next pass boundary (`ChunkInterrupted`), leaving the backend as if the call had not been made, so a steer cut can take that chunk's number. The engine calls it with `--interrupt-on-steer on` (see "Cut latency").
 
 See `engine/MODEL_NOTES.md`, "The cost of a cut": alone they give little on the live engine, which holds about 5 frames of old video ahead of a command.
 
@@ -396,6 +398,36 @@ Other examples: `--reanchor-opt steer_strength=0.9`, `--reanchor-opt min_gap_chu
 The options are checked when the server starts, before the backend loads.
 An unknown key, a value that does not convert, or a value `ReanchorConfig` rejects makes the server exit at once with a message such as `--reanchor-opt: unknown re-anchor option 'bogus'; known options: ...`.
 The options are kept with `--reanchor off` too, but have no effect there.
+
+## Cut latency (flush and interrupt)
+
+About 5 frames (0.3 s) of the old scene are queued ahead of a command, in the playout queue and in the chunk being generated, and a steer cut waits behind them.
+Two engine options remove that wait. Both are off by default, each is an enum, and each shows in `/stats` under `cut`.
+
+- `--flush-on-cut on` (`FlushOnCut`): when a steer cut's frames are decoded, the decode thread drops the frames of the same video older than the cut that are still waiting to be sent, then queues the cut.
+  It runs only once the cut's frames exist, so the stream never waits on an empty queue for them, and the lead gate counts the dropped frames as sent, so the next chunk starts on time.
+  A refresh never flushes, and frames of an older video (the tail before a reset) are kept.
+  The streamer and the flush share one lock: a frame the streamer took while the flush ran is dropped too, and the flush knows exactly which frame was the last one sent.
+- `--interrupt-on-steer on` (`SteerInterrupt`, needs `--reanchor on` and a backend with `interrupt()`): when an applied target makes `ReanchorPolicy.fires_next_chunk()` true, the chunk being generated is stopped with `backend.interrupt()`.
+  The chunk in flight is an `InFlight` state: `video_start`, `anchor` (a cut or a refresh), `continuation` or `stopping`; only `continuation` is ever stopped, so a refresh, a cut and the first chunk after a reset or recovery always finish.
+  The stopped chunk raises `ChunkInterrupted`; it is never decoded, shown, timed or counted, and the cut takes its chunk number, so `applies_from_chunk`, `generated` and `shown` are the cut's.
+  A stop that comes after the chunk's last pass boundary lets it finish (`late_interrupts` in `/stats`).
+- Recorder: it saves exactly what was shown. Dropped frames and stopped chunks are not in the mp4, so a flushed cut shows the same jump in the recording as on screen.
+- Dissolve (`cut_fade_frames`): the decoder dissolves into a cut from the last frame it decoded, which a flush has just dropped. The engine moves that dissolve to start from the frame the client saw last (`DissolveFix`: frame k gets (1 - a) × (shown - decoded) added, a = (k + 1) / (N + 1)), over the same 8 frames, so the old picture does not jump ahead before it fades.
+  Without a flush the last decoded frame is the last shown one, and nothing changes.
+
+Measured with `python -m engine.tools.cut_latency` (fake backend at the live pass timings: a pass 69 ms, decode 22 ms, `--reanchor on` with a refresh every 24 chunks, 24 cached ramp-1 commands per row, POST /target heard to shown):
+
+| Variant | heard to shown, median / p90 ms | stalls | chunks stopped | old frames dropped | checks |
+|---|---|---|---|---|---|
+| today (5-pass cut) | 554 / 621 | 0 | 0 | 0 | ok |
+| 2-step cut + defer_context | 545 / 605 | 0 | 0 | 0 | ok |
+| + flush | 393 / 487 | 0 | 0 | 48 | ok |
+| + flush + interrupt | 296 / 349 | 0 | 15 | 22 | ok |
+
+Ishaan's prototype measured 566/674, 523/635, 414/471 and 300/376 for the same rows (PR #187). A 2-step cut alone saves a pass only after the old frames have played, so the gain comes from the flush and the interrupt.
+
+The live flags for all of it: `--backend-opt steer_steps=1000,500 --backend-opt defer_context=1 --flush-on-cut on --interrupt-on-steer on`.
 
 ## Commands
 
