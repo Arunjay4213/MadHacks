@@ -22,7 +22,7 @@ Environment=COMMAND_SEMANTIC=1
 # Optional secrets for the LLM slow reader (FOUNDRY_ENDPOINT, FOUNDRY_KEY, FOUNDRY_DEPLOYMENT); mode 600, never in git.
 # The leading '-' lets the engine start without it.
 EnvironmentFile=-/home/ubuntu/.madhacks-foundry.env
-ExecStart=/home/ubuntu/engine-venv/bin/python -m engine.server --backend causal_forcing --reader commands --width 672 --height 384 --backend-opt vae=taehv --backend-opt cut_fade_frames=8 --reanchor on --reanchor-opt refresh_every_chunks=48 --final-reader sonnet --host 127.0.0.1 --port 8000 --record-dir /home/ubuntu/recordings
+ExecStart=/home/ubuntu/engine-venv/bin/python -m engine.server --backend causal_forcing --reader commands --width 672 --height 384 --backend-opt vae=taehv --backend-opt cut_fade_frames=8 --reanchor on --reanchor-opt refresh_every_chunks=24 --final-reader sonnet --host 127.0.0.1 --port 8000 --record-dir /home/ubuntu/recordings
 Restart=always
 RestartSec=2
 # SIGTERM goes to the server only; it shuts down cleanly and closes ffmpeg's input so the recording is finalized.
