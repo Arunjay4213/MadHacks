@@ -18,14 +18,13 @@ the same model, settings and machine used for judging.
 | Time | Command / action | Check before saying it works |
 |---|---|---|
 | 0:00 | Start at the meadow | Moving video is coming from the real engine; show mock status if using a mock. |
-| 0:15 | “Make it winter.” | Winter appears without a cut; a winter chip appears. |
+| 0:15 | “Make it winter.” | Winter appears as a cut to a new picture, dissolved over about 0.5 s (every command is a re-anchor); a winter chip appears. |
 | 0:30 | “Also add a river.” | River appears and winter stays. |
-| 0:45 | “Slowly turn to night.” | Three chips; the transition is visibly slower than the calibrated default. |
-| 1:00 | “A lot more snow.” | Snow is visibly heavier. State strength is wording, not a verified model blend weight. |
+| 0:45 | “Make it night.” | Three chips; night arrives with the same short dissolve. Not shown in the demo: “slowly” and “a lot more snow” are not measured on the real model. |
 | 1:10 | “Remove the river.” | Winter and night remain; only river is removed. |
 | 1:20 | “Go back.” | River returns: undo also reverses a removal. |
 | 1:30 | Let someone outside the team speak | Unknown commands either reach the configured slow reader or are shown as unmatched. |
-| 2:15 | Try “make it winter” on the live mic | Early steering is provisional; only describe it as faster after measuring it. |
+| 2:15 | Try “make it winter” on the live mic | The picture changes on the final sentence. Not shown in the demo: early steering on partial words, because a provisional guess never re-anchors. |
 | 2:30 | “Nothing is trained. All of it happens while the model is running.” | Explain how commands, named changes and undo let the audience shape a continuous video. |
 | 2:50 | Return to the live video | Do not describe a backup recording as live. |
 
