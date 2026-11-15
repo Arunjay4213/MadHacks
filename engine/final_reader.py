@@ -247,11 +247,15 @@ Rules:
 - Objects get explicit size and position words. The first object is large and in the centre ("a large brown horse
   standing beside the oak tree in the centre of the frame, facing the camera, large and clearly visible"); a later one
   takes a free place ("a large male lion standing in the foreground at the left of the frame, facing the camera").
-- A car or other vehicle the user adds or names drives by default, on a road; it is parked only when the user says
-  parked or stopped. When a vehicle drives, the road runs through the whole frame along its direction of travel, and
-  the camera follows the vehicle in a smooth tracking shot at its speed and keeps it centred (the car template's
-  camera), unless the user asks for a static or other camera. A driving vehicle is never "facing the camera" unless
-  the user asks to see its front.
+- A driving car or other road vehicle is always written with the car template's first sentence and camera sentence
+  word for word (below): seen from directly behind with its rear lights facing the camera, moving forward away from the
+  camera, the camera following directly behind in a low tracking shot at the same speed, the white dashed centre line
+  rushing toward the viewer. This is the only driving shot the video model draws forward; any other wording made cars
+  reverse, leave the road or turn toward the camera. A request to see the car from the side or the front keeps this
+  shot and its forward motion, unless the user says the words "side view": then the camera moves to the side and the
+  prompt says which way the car's front points and that it drives forward. A car the user adds or names drives in
+  this shot by default. Every other vehicle in the scene is parked and still, at the side of the road or at a curb,
+  away from people, never between a person and the camera.
 - Counts agree everywhere in the prompt. "add another tree" rewrites the scene with the new number ("a wide shot of
   a meadow with two oak trees, one in the centre and a second, taller one in the foreground at the left"), never
   "a single oak tree" next to "a second tree": the model then draws one.
@@ -455,11 +459,13 @@ class Verdict(enum.Enum):
     BLOCKED = "blocked"                # the model refused the sentence
     INVALID = "invalid"                # not JSON or not an object: asked again, else the dictionary
     UNCHANGED = "unchanged"            # the prompt is the one on screen (often a cut took the change): as INVALID
+    NOT_FORWARD = "not_forward"        # a driving vehicle without the car template's forward motion: as INVALID
     FAILED = "failed"                  # the call failed: the dictionary path
 
 
-RETRY_VERDICTS = frozenset({Verdict.INVALID, Verdict.UNCHANGED, Verdict.REPAIRED})
-VERDICT_RANK = {Verdict.FAILED: 0, Verdict.INVALID: 1, Verdict.UNCHANGED: 1, Verdict.NOT_UNDERSTOOD: 2,
+RETRY_VERDICTS = frozenset({Verdict.INVALID, Verdict.UNCHANGED, Verdict.NOT_FORWARD, Verdict.REPAIRED})
+VERDICT_RANK = {Verdict.FAILED: 0, Verdict.INVALID: 1, Verdict.UNCHANGED: 1, Verdict.NOT_FORWARD: 1,
+                Verdict.NOT_UNDERSTOOD: 2,
                 Verdict.REPAIRED: 3,
                 Verdict.ACCEPTED: 4, Verdict.BLOCKED: 4}
 
@@ -573,6 +579,20 @@ def retry_fits(elapsed_s: float, timeout_s: float) -> bool:
     return elapsed_s <= timeout_s * RETRY_SHARE + 1e-9
 
 
+_VEHICLE_RX = re.compile(r"\b(?:car|cars|sports car|truck|van|bus|jeep|suv|taxi|motorcycle|motorbike|vehicle)\b")
+_DRIVING_RX = re.compile(r"\b(?:drives?|driving|races?|racing|speeds?|speeding|cruis(?:es|ing)|zooms?|zooming)\b")
+
+
+def drives_without_template(prompt: str, sentence: str = "") -> bool:
+    """True when `prompt` has a vehicle that drives but not the car template's forward motion (car_template.FORWARD,
+    "moving forward away from the camera"), and the user did not ask for a "side view" in so many words. Only the
+    template's shot is drawn forward by the video model; other driving wording reversed the car or left the road."""
+    low = prompt.lower()
+    if "side view" in sentence.lower():
+        return False
+    return bool(_VEHICLE_RX.search(low) and _DRIVING_RX.search(low)) and car_template.FORWARD.strip(" ,.").lower() not in low
+
+
 def check_reply(reply, user: dict) -> Attempt:
     """The light check of one parsed reply for the user message `user` (the dictionary it was sent). It repairs what
     it can instead of refusing a reasonable sentence: only a reply that is not an object falls back."""
@@ -588,6 +608,10 @@ def check_reply(reply, user: dict) -> Attempt:
     if prompt == " ".join(str(user.get("prompt") or "").split()):
         why = "the prompt is the one on screen, so nothing would change" + (f" ({problems[0]})" if problems else "")
         return Attempt(Verdict.UNCHANGED, Entry(Outcome.FALLBACK), (why,))
+    if drives_without_template(prompt, user.get("sentence") or ""):
+        return Attempt(Verdict.NOT_FORWARD, Entry(Outcome.FALLBACK),
+                       ("a driving vehicle must use the car template's first sentence and camera sentence word for "
+                        f"word (seen from directly behind ...{car_template.FORWARD}); any other driving shot reverses",))
     if user.get("car_scene") and reply.get("new_scene") is not True:
         problems += tuple(car_template.template_problems(prompt, view_change=bool(user.get("view_change"))))
     chips, dropped = chips_in_prompt(reply_chips(reply.get("chips"), user.get("person_chip")),
@@ -958,13 +982,13 @@ class FinalReader:
             self.verdicts[best.verdict.value] += 1
             if best.verdict is Verdict.FAILED:
                 self.errors += 1
-            elif best.verdict in (Verdict.INVALID, Verdict.UNCHANGED):
+            elif best.verdict in (Verdict.INVALID, Verdict.UNCHANGED, Verdict.NOT_FORWARD):
                 self.rejects += 1
             elif best.verdict is Verdict.REPAIRED:
                 self.repaired += 1
         if best.verdict is Verdict.REPAIRED:
             log.warning("final reader: %r used with repairs: %s", _short(text), "; ".join(best.reasons)[:400])
-        if best.verdict in (Verdict.FAILED, Verdict.INVALID, Verdict.UNCHANGED):
+        if best.verdict in (Verdict.FAILED, Verdict.INVALID, Verdict.UNCHANGED, Verdict.NOT_FORWARD):
             log.warning("final reader: no usable reply for %r: %s", _short(text), "; ".join(best.reasons)[:400])
         elif best.verdict is Verdict.BLOCKED:
             log.info("final reader: the model blocked %r", _short(text))

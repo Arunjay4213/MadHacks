@@ -125,8 +125,11 @@ def test_a_car_scene_keeps_the_template_unless_the_view_or_the_scene_changes():
     assert check_reply(json.loads(reply(on_sand, new_scene=True)), car).verdict is Verdict.ACCEPTED
     side = ("A red sports car, seen in side profile, drives from left to right along a coastal road. A smooth "
             "tracking shot from the side, the camera moving alongside the car, the ocean behind it.")
-    assert check_reply(json.loads(reply(side)), {**car, "view_change": True}).verdict is Verdict.ACCEPTED
-    assert check_reply(json.loads(reply(on_sand)), {**car, "view_change": True}).verdict is Verdict.REPAIRED
+    side_view = {**car, "view_change": True, "sentence": "show me a side view of the car"}
+    assert check_reply(json.loads(reply(side)), side_view).verdict is Verdict.ACCEPTED
+    assert check_reply(json.loads(reply(on_sand)), side_view).verdict is Verdict.REPAIRED
+    # Without the words "side view" a driving car keeps the template's forward shot (live: the side view reversed).
+    assert check_reply(json.loads(reply(side)), {**car, "view_change": True}).verdict is Verdict.NOT_FORWARD
 
 
 def test_view_change_words():
@@ -509,3 +512,16 @@ def test_a_retry_starts_only_when_it_fits_in_the_wait():
     from engine.final_reader import retry_fits
     assert retry_fits(1.4, 3.5) and retry_fits(1.5, 3.5)
     assert not retry_fits(1.6, 3.5) and not retry_fits(1.6, 3.0)
+
+
+def test_a_driving_vehicle_must_use_the_car_template_shot():
+    # Live 2026-11-15: every driving wording but the template's reversed the car, left the road or turned it around.
+    from engine.final_reader import drives_without_template
+    assert drives_without_template("A red car drives along a city street at night, the camera static.")
+    assert not drives_without_template(car_prompt())
+    assert not drives_without_template("A red car parked at the curb on the right side of the street.")
+    assert not drives_without_template("A red car drives past, seen from the side.", "show me a side view")
+    chat = FakeChat({"add a car driving": reply("A meadow with a red car driving across it from left to right.")})
+    r = reader(chat)
+    assert r("add a car driving", snap()) is None  # not used: the dictionary reads it
+    assert r.stats()["verdicts"] == {"not_forward": 1}
