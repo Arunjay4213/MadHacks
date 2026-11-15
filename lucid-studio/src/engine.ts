@@ -88,19 +88,18 @@ export function makeLatencyTracker() {
 
 // Mirrors web/lib.js: an echoed draft is not a confirmed operation.
 export function makeHeardTracker() {
-  const partials = new Map<string, number>();
+  const partials: { text: string; t: number; inherited: number | null }[] = [];
   const finals: { text: string; t: number }[] = [];
   return {
-    sentPartial(text: string, now = Date.now()) {
-      partials.set(text, now);
-      if (partials.size > 50) partials.delete(partials.keys().next().value!);
+    sentPartial(text: string, t: number, inherited: number | null) {
+      partials.push({ text, t, inherited });
+      if (partials.length > 100) partials.shift();
     },
-    sentFinal(text: string, t: number) { partials.clear(); finals.push({ text, t }); if (finals.length > 50) finals.shift(); },
-    clearPartials() { partials.clear(); },
-    classify(text: string | null, t: number | null, now = Date.now()) {
+    sentFinal(text: string, t: number) { partials.length = 0; finals.push({ text, t }); if (finals.length > 50) finals.shift(); },
+    clearPartials() { partials.length = 0; },
+    classify(text: string | null, t: number | null) {
       if (finals.some(f => f.text === text && f.t === t)) return 'confirmed';
-      const sentAt = text === null ? undefined : partials.get(text);
-      return sentAt !== undefined && now - sentAt < 5000 ? 'pending' : 'other';
+      return partials.some(p => p.text === text && (p.t === t || p.inherited === t)) ? 'pending' : 'other';
     },
   };
 }
@@ -116,6 +115,7 @@ export function useEngineStream(endpoint: string | null, notify: (text: string) 
   notifyRef.current = notify;
   const timing = useRef(makeLatencyTracker());
   const heard = useRef(makeHeardTracker());
+  const lastServerClient = useRef<number | null>(null);
 
   useEffect(() => {
     setCanvas(null); setState(null); setConnected(false); setSample(null);
@@ -190,6 +190,7 @@ export function useEngineStream(endpoint: string | null, notify: (text: string) 
           const incoming = parseEngineState(data);
           if (!incoming) { notifyRef.current('Ignored an invalid engine message'); return; }
           const status = heard.current.classify(incoming.heard, incoming.tClient);
+          lastServerClient.current = incoming.tClient;
           incoming.confirmed = status === 'confirmed' && incoming.kind !== 'partial';
           if (status === 'pending') { incoming.kind = 'partial'; incoming.keyword = ''; incoming.unmatched = false; }
           const measured = timing.current.onServer(incoming);
@@ -223,7 +224,7 @@ export function useEngineStream(endpoint: string | null, notify: (text: string) 
     if (control.current?.readyState !== WebSocket.OPEN) throw new Error('Engine disconnected. Command was not queued.');
     const timestamp = Date.now();
     if (type === 'final') { setSample(null); timing.current.sent(timestamp); heard.current.sentFinal(text, timestamp); }
-    else heard.current.sentPartial(text);
+    else heard.current.sentPartial(text, timestamp, lastServerClient.current);
     control.current.send(JSON.stringify({ type, text, t_client: timestamp }));
   };
   const adapter: WorldStreamAdapter = { sendMutation: async payload => sendText('final', payload.prompt) };

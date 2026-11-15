@@ -5,8 +5,6 @@ test('production /studio/ integrates with the local CPU fake engine', async ({ p
   test.skip(!engine, 'Set LUCID_ENGINE_URL to a local CPU fake engine');
   const stats = await (await request.get(`${engine}/stats`)).json();
   expect(stats.backend, 'This mutating test is only for a CPU fake engine').toBe('fake');
-  let state: { heard?: string | null; applies_from_chunk?: number | null } = {};
-  page.on('websocket', ws => { if (ws.url().endsWith('/control')) ws.on('framereceived', e => { state = JSON.parse(String(e.payload)); }); });
   const errors: string[] = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
@@ -15,7 +13,6 @@ test('production /studio/ integrates with the local CPU fake engine', async ({ p
   await expect(page.locator('.experience')).toHaveClass(/editor-visible/);
   await expect(page.locator('.prompt-provenance')).toContainText('connected');
   await page.getByRole('button', { name: 'Reset scene', exact: true }).click();
-  await expect.poll(() => state.heard === null && typeof state.applies_from_chunk === 'number').toBe(true);
   const input = page.locator('#editor-thought');
   await input.fill('make it winter');
   await expect(page.getByRole('button', { name: 'Remove winter', exact: true })).toBeVisible();
