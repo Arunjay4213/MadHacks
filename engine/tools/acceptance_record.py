@@ -7,7 +7,7 @@
 
 Runs every case in `sonnet` mode with the real Foundry client behind the same stand-in the test uses: a reply already
 in the file is replayed, a missing first reply is asked for once and saved, and a retry is refused (the live engine
-never retries within its 3 s wait). A saved reply is never asked for again, so the test stays deterministic; delete an
+never retries within its 3.5 s wait). A saved reply is never asked for again, so the test stays deterministic; delete an
 entry from the file to record it afresh.
 Each reply keeps the fingerprint of the final reader's system prompt and model it was made under; after a change to
 the rules, `--refresh-stale` asks those sentences again, so the table checks what the live engine would now do. Calls are paced (Azure returns 429 after about 20 calls in 40 s).
@@ -27,7 +27,7 @@ from engine.tools.acceptance import (REPLIES_FILE, Mode, MissingReply, ReplayCha
 
 MIN_GAP_S = 2.0      # between two real calls
 HTTP_TIMEOUT_S = 30.0
-# The reader waits this long while recording (not its live 3 s), so a slow call is saved before the case moves on
+# The reader waits this long while recording (not its live 3.5 s), so a slow call is saved before the case moves on
 # instead of the case going on from the dictionary's scene while the call still runs.
 RECORD_WAIT_S = HTTP_TIMEOUT_S + 10.0
 

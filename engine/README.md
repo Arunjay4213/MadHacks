@@ -106,7 +106,7 @@ The live command line is `ExecStart` in `engine/deploy/madhacks-engine.service`:
 python -m engine.server --backend causal_forcing --reader commands --width 672 --height 384 \
     --backend-opt vae=taehv --backend-opt cut_fade_frames=8 \
     --backend-opt steer_steps=1000,500 --backend-opt defer_context=1 \
-    --reanchor on --reanchor-opt refresh_every_chunks=24 --reanchor-opt slow_strength=1.0 --final-reader sonnet \
+    --reanchor on --reanchor-opt refresh_every_chunks=24 --reanchor-opt slow_strength=1.0 --final-reader sonnet --final-timeout-s 3.5 \
     --flush-on-cut on --interrupt-on-steer on \
     --host 127.0.0.1 --port 8000 --record-dir /home/ubuntu/recordings
 ```
@@ -129,6 +129,7 @@ The unit also sets `COMMAND_SEMANTIC=1` and loads `~/.madhacks-foundry.env`.
 | `--reader commands` | The `commands/` scene state, dictionary and composer read every sentence. |
 | `COMMAND_SEMANTIC=1` | Turns on the CPU vector matcher in `commands/` for finals the dictionary misses (PR #73, PR #78). |
 | `--final-reader sonnet` | Every final sentence goes to one Claude Sonnet 5.5 call that returns the operations and a rich prompt, with the dictionary as the instant result for partials and the backup on a timeout (PR #87, PR #120, live since PR #125). |
+| `--final-timeout-s 3.5` | How long a final waits for Sonnet (also the default since #285). At 3.0 s, "make it slow" on a long chain (about 300 tokens of prompt) timed out 2 of 3 runs, with a median call of 1.98 s (regression sweep on 243a1e7); the lead rejected 5.5 s. |
 | `--demo-prompts` (default `engine/demo_prompts.json`) | The demo sentences' Sonnet prompts are pinned, so every run draws the same words and a prompt checked on the GPU stays as checked (see "Final reader (Sonnet)"). |
 | `--record-dir /home/ubuntu/recordings` | Every video is saved as an mp4, for the backup video and for checks such as Ishaan's refresh review. |
 
@@ -451,7 +452,7 @@ contract 1 on `/control` -> reader worker thread: `reader.handle` -> `steer` (co
 
 - The reader API, agreed with the `commands/` owner, is in `engine/reader.py`:
   `handle(msg) -> {"steer": contract 2 or None, "state": {...}}`, `state_fields()`, `likely_prompts()` and `committed_prompt`.
-- Every contract 1 message (`partial`, `final`, `tap`) goes to `reader.handle`, one at a time in arrival order on its own worker thread, because it may block for up to 1.5 s (the slow reader) or 3 s (the Sonnet final reader), both below.
+- Every contract 1 message (`partial`, `final`, `tap`) goes to `reader.handle`, one at a time in arrival order on its own worker thread, because it may block for up to 1.5 s (the slow reader) or 3.5 s (the Sonnet final reader), both below.
   If it raises ValueError, the client gets `{"error": ...}` on `/control`.
 - The stand-in reader takes a `final` text as the whole new prompt with a 4-chunk ramp, gives no steer for `partial` and `tap`, and keeps an empty changes list.
 - The `steer` dict is passed unchanged to `steering.Controller.handle`, including optional fields such as `strength` and `without_prompt`.
@@ -510,9 +511,10 @@ With `--reader commands --final-reader sonnet` (live since PR #125), `engine/rea
    A bare name is an add.
 5. A measured car world (`car_template.plan`, `Route.MEASURED`): "make it winter" on the car scene, or a new car scene, composed by the engine with no call (`template_hits`).
 6. The fast path: on a composed scene, when the keyword table reads every word of every clause by itself (`commands.service.dictionary_reading`: no vector matcher, no style fallback, no pass-through guess of an unknown object) and the result is one the table writes well (`engine/reader.py` `fast_path_ok`), the dictionary applies it with no call.
-   Writes well means: undo, reset, remove, strength changes, explicit new scenes, and adds of a place, season, weather or time of day at full strength on a scene without a vehicle.
+   Writes well means: undo, reset, remove, strength changes, explicit new scenes, and adds of a place, season, weather or time of day only on the plain base scene (no changes, no vehicle), at full strength, with no strength or amount word in the sentence ("some", "a little", "light", "a lot", "more", "less" and the other strength words of `commands/reader.py`).
    Object adds, partial strengths ("add a little fog") and adds on a vehicle scene go to Sonnet: the table's object phrases changed the count or the thing ("add an eagle" gave "a flock of birds", "add a human" a group of people) and had no size or position, "a little fog" read "a subtle hint of a thick fog", and on the car scene the template kept "clear blue summer sky" beside "a thick fog" (regression sweep on #273).
-   "make it winter", "take me to the beach" and "remove the dog" are read whole; "add a dog", "add a red car", "kill the tree's leaves", "now i want a savannah" and "zoom out" are not.
+   On a scene with changes the table only appends its phrase ("make it snow" on the neon city kept "light rain falling" beside "winter scenery with snow on the ground"), and "gradually add some fog" wrote "a thick fog" (regression sweep on 243a1e7, #285): both go to Sonnet now.
+   "make it winter" and "take me to the beach" on the plain meadow, and "remove the dog", are read whole; "make it night" on a winter scene, "add some fog", "add a dog", "add a red car", "kill the tree's leaves", "now i want a savannah" and "zoom out" are not.
 7. Otherwise one Sonnet call writes the complete new prompt: a free scene.
    The scene becomes `commands.state.Origin.FREE`, its prompt is Sonnet's text word for word, and its chips are the labels Sonnet names.
 8. When the call times out, fails or the reply is not a JSON object, the dictionary reads the sentence (the fallback).
@@ -534,12 +536,12 @@ The call:
 - Headers `x-api-key: $FOUNDRY_KEY` and `anthropic-version: 2023-06-01`.
   Body: `{"model": "claude-sonnet-5-5", "max_tokens": 1024, "system": <system prompt>, "messages": [{"role": "user", "content": <JSON>}], "thinking": {"type": "between_tools"}, "output_config": {"effort": "low"}}`.
   No `temperature`: the model rejects it, and `between_tools` is how Sonnet 5.5 runs with thinking off.
-- The call runs with thinking off (`between_tools`) at effort low and `max_tokens` 1024, within the time budget `--final-timeout-s` (default 3.0 s). Adaptive thinking at effort medium graded a little better on a short test prompt (4.54 against 4.40), but on the real system prompt the regression sweep (209 chains, 2026-11-15) measured p50 2.16 s against 1.65 s, 14 timeouts against 5 at 3.0 s, and replies that began with reasoning prose instead of JSON, so it is off. A reply that is not one JSON object is never used: it is asked again or the dictionary reads the sentence.
+- The call runs with thinking off (`between_tools`) at effort low and `max_tokens` 1024, within the time budget `--final-timeout-s` (default 3.5 s since #285: at 3.0 s "make it slow" on a long chain timed out 2 of 3 runs). Adaptive thinking at effort medium graded a little better on a short test prompt (4.54 against 4.40), but on the real system prompt the regression sweep (209 chains, 2026-11-15) measured p50 2.16 s against 1.65 s, 14 timeouts against 5 at 3.0 s, and replies that began with reasoning prose instead of JSON, so it is off. A reply that is not one JSON object is never used: it is asked again or the dictionary reads the sentence.
   `FINAL_READER_EFFORT` (low, medium or high), `FINAL_READER_THINKING` (the thinking type, passed as given; `between_tools` is thinking off) and `FINAL_READER_MAX_TOKENS` change the call without a code change, for measuring.
 - The user message: `{"prompt": <the prompt the video model sees now, the rich one>, "chips": [<labels shown>], "sentence": <the sentence, a named person replaced by their description>, "car_scene": <true when the prompt on screen is the car template>}`, plus `"view_change": true` on a car scene when the sentence asks for another camera or view (`car_template.asks_view_change`) and `"person_chip"` when the sentence adds a named person.
 - The reply: `{"blocked": bool, "understood": bool, "new_scene": bool, "prompt": str, "chips": [str]}`.
 - The system prompt (`final_reader.SYSTEM_PROMPT` plus `car_template.instructions()`) asks for one complete scene description of at most 150 words: the subject and its place in the frame, its direction of travel, the camera, the setting, the light and the style, with Ishaan's measured car template and worlds as the example.
-  Its rules: keep everything the sentence does not change word for word; on a change of place say for every object where it is, what it stands or drives on and which way it faces (a car goes on a road); explicit size and position words for objects; every moving thing states its direction of travel, and on the car scene it travels forward away from the camera like the car; counts agree in the whole prompt ("two oak trees", never "a single oak tree" and "a second tree"); a "no" becomes a positive description ("no clouds" is "a clear, cloudless deep blue sky"); a request repeated for something already in the prompt makes it stronger; the camera wording changes only when asked (zoom, wider or closer, side, aerial, front, low angle, pan); `new_scene` only for an explicit new scene or a new main subject; one short chip per thing the user added or changed.
+  Its rules: keep everything the sentence does not change word for word; on a change of place say for every object where it is, what it stands or drives on and which way it faces (a car goes on a road); explicit size and position words for objects; every moving thing states its direction of travel, and on the car scene it travels forward away from the camera like the car; counts agree in the whole prompt ("two oak trees", never "a single oak tree" and "a second tree"); a "no" becomes a positive description ("no clouds" is "a clear, cloudless deep blue sky"); a request repeated for something already in the prompt makes it stronger; the camera wording changes only when asked (zoom, wider or closer, side, aerial, front, low angle, pan) or when a vehicle starts driving; when the scene has grown past 100 words the new prompt is shorter than the old one, the oldest details compressed first; a new place named in any words ("city background", "middle of the city") replaces the old place and its landscape (the meadow, the oak, the grass) unless the user mentions it, and the thing the user talks about becomes the main subject; a vehicle drives by default (parked only when the user says so) on a road through the whole frame, with the car template's following camera unless another is asked for, and never "facing the camera" unless the user asks for its front; a new weather keeps the season ("make it rain" on a snowy night keeps the snow on the ground), and only what falls from the sky is replaced; `new_scene` only for an explicit new scene or a new main subject; one short chip per thing the user added or changed, and only chips whose words are still in the prompt (#285).
   "understood" is false only for a sentence that is not about the picture.
 
 The light check (`final_reader.check_reply`) repairs what it can and never refuses a reasonable sentence:
@@ -548,11 +550,15 @@ The light check (`final_reader.check_reply`) repairs what it can and never refus
 - A prompt over 300 words (`MAX_PROMPT_WORDS`) or 1900 characters is cut sentence by sentence from the end (the car template's style sentence stays last). umT5 reads 512 tokens; Sonnet's prompts measured 1.4 tokens a word and at least 3.9 characters a token, so both caps stay under 512. The earlier cap (180 words, 1600 characters) cut the sentence with the new object off long prompts (regression sweep on #273).
 - A reply whose prompt is the prompt on screen (`Verdict.UNCHANGED`, often a cut that took the change away) is not used: it is asked again when there is time, else the dictionary reads the sentence, and on a free scene that shows as not understood, never as a chip with no change on screen.
 - Chips are cleaned (lower case, whole words up to 24 characters, at most 16, no duplicates), never a reason to drop the reply.
+- Chips match the prompt (`chips_in_prompt`): a chip whose words were in the prompt on screen and are in none of the new prompt is dropped and logged.
+  A chip's words are its own content words and, for a keyword table label, all its aliases ("winter": snow, snowy, frost, icy, ...).
+  A chip with no words in either prompt ("zoom out") and the named person's chip stay.
+  Regression sweep on 243a1e7 (#285): "make it rain" on a snowy night took every snow word out and the "winter" chip stayed with nothing behind it.
 - On a car scene that is not a new scene, the prompt must still start with the template's subject sentence (any subject, any road) and its camera sentence word for word, and the road must name a drivable surface (`car_template.DRIVABLE`).
   With `view_change` only a drivable road is needed, so "I want to see the car's side profile" can rewrite the camera.
   A reply that breaks this is still used and logged (`Verdict.REPAIRED`).
-- A REPAIRED or unusable reply is asked again once, with the reasons, when the first call took under half the wait; a REPAIRED first reply is kept if the retry runs past the wait.
-  On the live 3 s wait at about 2 s a call the retry happens only in offline runs.
+- A REPAIRED or unusable reply is asked again once, with the reasons, when the first call took at most 3/7 of the wait (`RETRY_SHARE`), so a second call still fits; a REPAIRED first reply is kept if the retry runs past the wait.
+  On the live 3.5 s wait that is a first call under 1.5 s, as it was at 3.0 s with half the wait; with half of 3.5 s, retries after 1.6 s first calls ran past the wait (#285).
 - The reply states are named in `Verdict` (accepted, repaired, not_understood, blocked, invalid, unchanged, failed); `/stats` counts the final verdict of every call in `verdicts`.
 
 The cache and the prompts:

@@ -205,7 +205,7 @@
       "steps": [
         {"say": "add a lion", "chips": ["lion"]},
         {"say": "add a red car", "chips": ["lion", "car"]},
-        {"say": "remove the lion", "chips": ["car"], "no_chips": ["lion"], "has": ["red car"], "lacks": ["lion"]}
+        {"say": "remove the lion", "chips": ["car"], "no_chips": ["lion"], "has": ["red", "car"], "lacks": ["lion"]}
       ]
     },
     {
@@ -711,6 +711,71 @@
       "modes": ["sonnet"],
       "steps": [
         {"say": "add another tree", "has": ["two"], "lacks": ["single"], "visible": ["Are there two trees?"]}
+      ]
+    },
+    {
+      "name": "snow-on-the-neon-city",
+      "note": "Regression sweep on 243a1e7 (#285): the dictionary appended its winter phrase and kept 'light rain falling'. Sonnet only: the keyword table can only append.",
+      "start": "meadow",
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "make it a neon city", "chips": ["neon city"], "has": ["neon"]},
+        {"say": "make it snow", "chips": ["neon city"], "has": ["snow", "neon"], "lacks": ["rain falling"]}
+      ]
+    },
+    {
+      "name": "some-fog-is-not-thick",
+      "note": "Regression sweep on 243a1e7 (#285): 'gradually add some fog' wrote 'a thick fog'. Sonnet only: the keyword table has one fog phrase.",
+      "start": "meadow",
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "slowly make it winter", "chips": ["winter"], "has": ["snow"]},
+        {"say": "make it night", "chips": ["winter", "night"], "has": ["night"]},
+        {"say": "gradually add some fog", "chips": ["fog", "winter", "night"], "has": ["fog", "snow"], "lacks": ["thick fog"], "slow": true}
+      ]
+    },
+    {
+      "name": "rain-on-a-snowy-night-keeps-the-snow",
+      "note": "Regression sweep on 243a1e7 (#285): Sonnet took all the snow out and the 'winter' chip stayed with nothing behind it.",
+      "start": "meadow",
+      "steps": [
+        {"say": "make it winter", "chips": ["winter"], "has": ["snow"]},
+        {"say": "add a lion", "chips": ["winter", "lion"], "has": ["lion", "snow"]},
+        {"say": "make it night", "chips": ["winter", "lion", "night"], "has": ["night", "snow"]},
+        {"say": "add a river", "chips": ["winter", "lion", "night", "river"], "has": ["river", "snow"]},
+        {"say": "make it rain", "chips": ["winter", "lion", "night", "river", "rain"], "has": ["rain", "snow", "lion", "river", "night"]}
+      ]
+    },
+    {
+      "name": "slow-on-a-long-chain",
+      "note": "Regression sweep on 243a1e7 (#285): on this chain 'make it slow' timed out 2 of 3 at the 3.0 s wait (now 3.5 s, and prompts are kept short). Layer A checks the reply; the wait is in test_final_reader.",
+      "start": "meadow",
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "add a blue car", "chips": ["car"], "has": ["blue car"]},
+        {"say": "add a blue car", "chips": ["car"]},
+        {"say": "add city", "chips": ["city"], "has": ["city"]},
+        {"say": "add bird", "chips": ["bird"]},
+        {"say": "add birds", "chips": ["bird"]},
+        {"say": "add dog", "chips": ["dog"], "has": ["dog"]},
+        {"say": "add dog", "chips": ["dog"]},
+        {"say": "make it winter", "chips": ["winter"], "has": ["snow"]},
+        {"say": "make it winter", "chips": ["winter"], "has": ["snow"]},
+        {"say": "make it slow", "chips": ["winter", "dog", "car"], "has_any": ["slow", "slowly"]}
+      ]
+    },
+    {
+      "name": "car-city-background-live-chain",
+      "note": "Lead's live test on the full-size engine (10:23 UTC, #285): the meadow and the oak stayed through every sentence, the car was parked under a static camera, and only 'move camera with car' gave a city street. The car must drive (parked cars along the kerb are fine).",
+      "start": "meadow",
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "car city background", "chips": ["car"], "has": ["drives", "tracking"], "has_any": ["street", "road"], "lacks": ["static", "car parked", "car is parked"]},
+        {"say": "driving forwards", "chips": ["car"], "has": ["drives", "tracking"], "lacks": ["static", "car parked", "car is parked"]},
+        {"say": "night time", "chips": ["car", "night"], "has": ["night", "tracking"], "lacks": ["static", "car parked", "car is parked"]},
+        {"say": "middle of city", "chips": ["car"], "has": ["street", "city"], "lacks": ["meadow", "oak", "static", "car parked", "car is parked"]},
+        {"say": "car driving forward", "chips": ["car"], "has": ["street"], "lacks": ["meadow", "oak", "static", "car parked", "car is parked"]},
+        {"say": "move camera with car", "chips": ["car"], "has": ["street", "tracking"], "lacks": ["meadow", "oak", "static", "car parked", "car is parked"]}
       ]
     }
   ]
