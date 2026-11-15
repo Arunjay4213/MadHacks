@@ -29,7 +29,7 @@ def main(argv: list[str]) -> int:
         if e["prompt_before"] == start:
             scene = SceneState(DEFAULT_BASE)
         before = compose(scene.snapshot())
-        ops = fr.expand_operations(e["operations"], scene.snapshot()) if e["operations"] else None
+        ops = fr.checked_operations(e["operations"], scene.snapshot()) if e["operations"] else None
         trial = copy.deepcopy(scene)
         if ops:
             trial.apply(ops[0] if len(ops) == 1 else {"op": "batch", "operations": ops})
@@ -46,7 +46,7 @@ def main(argv: list[str]) -> int:
                 res = reader(e["sentence"], snap)
                 if res is None or res.get("blocked"):
                     sys.exit(f"no result for #{n} {e['sentence']!r}: {res}")
-                ops = fr.expand_operations(res["operations"], snap)
+                ops = fr.checked_operations(res["operations"], snap)
                 trial = copy.deepcopy(scene)
                 trial.apply(ops[0] if len(ops) == 1 else {"op": "batch", "operations": ops})
                 e.update({"prompt_before": before, "operations": res["operations"], "prompt": res["prompt"],

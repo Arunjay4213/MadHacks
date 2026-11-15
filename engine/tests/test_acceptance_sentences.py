@@ -74,8 +74,8 @@ def test_refreshing_one_case_keeps_the_other_replies(tmp_path, monkeypatch):
     from engine.tools import acceptance_record as R
 
     path = tmp_path / "replies.json"
-    old = [{"sentence": "s1", "prompt_before": "p", "ids": "", "reply": "r1", "fingerprint": "old"},
-           {"sentence": "s2", "prompt_before": "p", "ids": "", "reply": "r2", "fingerprint": "old"}]
+    old = [{"sentence": "s1", "prompt_before": "p", "chips": "", "reply": "r1", "fingerprint": "old"},
+           {"sentence": "s2", "prompt_before": "p", "chips": "", "reply": "r2", "fingerprint": "old"}]
     path.write_text(json.dumps({"replies": old}))
 
     class Real:
@@ -85,12 +85,12 @@ def test_refreshing_one_case_keeps_the_other_replies(tmp_path, monkeypatch):
             return "new"
 
     def one_case(case, mode, chat, timeout_s=None):
-        chat.complete("sys", [{"role": "user", "content": json.dumps({"prompt": "p", "sentence": "s1", "scene": {}})}])
+        chat.complete("sys", [{"role": "user", "content": json.dumps({"prompt": "p", "sentence": "s1", "chips": []})}])
         return [], chat
 
     monkeypatch.setattr(R, "REPLIES_FILE", path)
     monkeypatch.setattr(R, "settings_from_env", lambda: object())
-    monkeypatch.setattr(R.FoundryMessages, "from_settings", classmethod(lambda cls, s, t: Real()))
+    monkeypatch.setattr(R.FoundryMessages, "from_settings", classmethod(lambda cls, s, t, **options: Real()))
     monkeypatch.setattr(R, "load_cases", lambda: [{"name": "a", "steps": []}, {"name": "b", "steps": []}])
     monkeypatch.setattr(R, "run_case", one_case)
     monkeypatch.setattr(R, "MIN_GAP_S", 0)

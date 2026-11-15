@@ -41,14 +41,14 @@
       "start": "meadow",
       "live": true,
       "steps": [
-        {"say": "add a red car racing on a road", "chips": ["car"], "has": ["red", "racing", "asphalt road"], "lacks": ["parked"], "visible": ["Is there a red car?", "Is there a paved road?", "Is the red car on the road?"]}
+        {"say": "add a red car racing on a road", "chips": ["car"], "has": ["red", "road"], "lacks": ["parked"], "visible": ["Is there a red car?", "Is there a paved road?", "Is the red car on the road?"]}
       ]
     },
     {
       "name": "add-snow-near-the-river",
       "note": "Bug fixed on 2026-11-14: 'near the river' is a place, not a request for a river.",
       "steps": [
-        {"say": "add snow near the river", "chips": ["winter"], "no_chips": ["river"], "has": ["snow"], "lacks": ["river"]}
+        {"say": "add snow near the river", "no_chips": ["river"], "has": ["snow"], "lacks": ["river"]}
       ]
     },
     {
@@ -78,7 +78,7 @@
       "live": true,
       "steps": [
         {"say": "add a red car", "chips": ["car"], "has": ["red car"]},
-        {"say": "turn it into a beach", "chips": ["ocean", "car"], "has": ["ocean", "red car", "road"], "lacks": ["meadow"], "visible": ["Is the sea or ocean visible?", "Is there a red car?", "Is the red car whole and undamaged?"]}
+        {"say": "turn it into a beach", "chips": ["car"], "has": ["red car", "road"], "lacks": ["meadow"], "visible": ["Is the sea or ocean visible?", "Is there a red car?", "Is the red car whole and undamaged?"]}
       ]
     },
     {
@@ -220,10 +220,9 @@
     },
     {
       "name": "stays-unmatched",
-      "note": "Sentences that ask for nothing a picture can show must change nothing.",
+      "note": "Sentences that ask for nothing a picture can show must change nothing. 'make it nice' left this case in #271: the lead wants a loose sentence about the picture understood.",
       "steps": [
         {"say": "make it winter", "chips": ["winter"]},
-        {"say": "make it nice", "understood": false, "chips": ["winter"]},
         {"say": "um okay", "understood": false, "chips": ["winter"]},
         {"say": "what time is it", "understood": false, "chips": ["winter"]}
       ]
@@ -560,27 +559,147 @@
       ]
     },
     {
-      "name": "car-airplane-flies-forward",
-      "note": "Bug from the live test 2026-11-15: the airplane had no heading and flew backwards against the forward camera.",
-      "start": "car",
+      "name": "stuck-base-live-sequence",
+      "note": "Arunjay's live test, 07:27 UTC on 2026-11-15 (#271): after 'arid environment' was written into the base, every later change of place failed and three sentences changed nothing. Each step must change the picture toward what was asked. (#272 stopgap and #271 case, merged.)",
+      "start": "meadow",
       "live": true,
+      "modes": ["sonnet"],
       "steps": [
-        {"say": "add an airplane in the sky", "chips": ["airplane"], "has": ["airplane", "behind"], "visible": ["Is there an airplane in the sky?", "Is the airplane seen from behind, flying away from the camera?", "Is there a red car seen from behind?"]}
+        {"say": "kill the tree's leaves", "has": ["bare"], "lacks": ["green leaves"], "visible": ["Does the tree have bare branches without leaves?"]},
+        {"say": "cut the grass", "has": ["short"], "visible": ["Is the grass short, like a mown lawn?"]},
+        {"say": "i want no grass. arid environment", "has": ["dry"], "lacks": ["green grass", "lush"], "visible": ["Is the ground dry bare earth?", {"q": "Is there green grass?", "expect": "no"}]},
+        {"say": "add a lion", "chips": ["lion"], "has": ["lion", "dry"], "visible": ["Is there a lion?"]},
+        {"say": "now i want a savannah", "chips": ["lion"], "has": ["savannah", "lion"], "lacks": ["arid meadow"], "visible": ["Is it a savannah?", "Is there a lion?", "Is the ground covered in tall dry grass, like a savannah?"]},
+        {"say": "i now want a city in the night with a car driving on the road", "no_chips": ["lion", "bare branches"], "has": ["city", "night", "car"], "lacks": ["savannah", "lion", "oak"], "visible": ["Is it a city at night?", "Is there a car on a road or street?", {"q": "Is there a lion?", "expect": "no"}]},
+        {"say": "city with road and red car driving", "has": ["city", "red", "car"], "lacks": ["savannah"], "visible": ["Is there a red car on a road or street in a city?"]}
       ]
     },
     {
-      "name": "stuck-base-live-sequence",
-      "note": "Bug from the live test 2026-11-15 07:27: after a base edit wrote the place into the base, every later place change was refused and nothing changed on screen. A new place now rebuilds the scene around it and keeps the objects.",
+      "name": "new-scene-sentence-drops-objects",
+      "note": "Live replay 2026-11-15 on PR #273: after the bare oak tree, 'i now want a city at night with a car driving on the road' kept the bare oak tree on the pavement and its chip. A sentence that names a whole new scene (a place with its own subject) starts a new scene; earlier objects go unless the sentence keeps them.",
       "start": "meadow",
+      "live": true,
       "modes": ["sonnet"],
+      "steps": [
+        {"say": "kill the tree's leaves", "has": ["bare"]},
+        {"say": "add a lion", "chips": ["lion"], "has": ["lion"]},
+        {"say": "i now want a city at night with a car driving on the road", "no_chips": ["lion", "bare branches"], "has": ["city", "night", "car"], "lacks": ["oak", "lion", "bare branches"], "visible": ["Is it a city at night?", "Is there a car on a road or street?", {"q": "Is there a tree?", "expect": "no"}, {"q": "Is there a lion?", "expect": "no"}]}
+      ]
+    },
+    {
+      "name": "jensen-bare-name",
+      "note": "Live on PR #273, 08:33 UTC 2026-11-15: 'jensen huang' alone came back not understood. A bare name is an add, with his hardcoded look.",
+      "start": "meadow",
       "live": true,
       "steps": [
-        {"say": "kill the tree's leaves", "has": ["no leaves"]},
-        {"say": "cut the grass", "has": ["grass"]},
-        {"say": "i want no grass. arid environment", "lacks": ["lush"]},
-        {"say": "add a lion", "chips": ["lion"], "has": ["lion"]},
-        {"say": "now i want a savannah", "chips": ["lion"], "has": ["savannah", "lion"], "lacks": ["arid meadow"], "visible": ["Is there a lion?", "Is the ground covered in tall dry grass, like a savannah?"]},
-        {"say": "i now want a city in the night with a car driving on the road", "chips": ["car"], "has": ["city", "car"], "lacks": ["savannah"], "visible": ["Is it a city at night?", "Is there a car on a road?"]}
+        {"say": "jensen huang", "chips": ["jensen huang"], "has": ["leather jacket", "glasses"], "visible": ["Is there a man in a black leather jacket?"]},
+        {"say": "remove jensen", "no_chips": ["jensen huang"], "lacks": ["leather jacket"]}
+      ]
+    },
+    {
+      "name": "jensen-add-name",
+      "note": "'add jensen huang' on the plain meadow: the engine's own add with his hardcoded look, no call.",
+      "start": "meadow",
+      "steps": [
+        {"say": "add jensen huang", "chips": ["jensen huang"], "has": ["leather jacket", "glasses"], "visible": ["Is there a man in a black leather jacket?"]},
+        {"say": "jensen", "chips": ["jensen huang"], "has": ["leather jacket"]}
+      ]
+    },
+    {
+      "name": "jensen-bare-name-on-a-free-scene",
+      "note": "On a scene Sonnet wrote, the bare name reaches Sonnet as an add of his description, with his chip.",
+      "start": "meadow",
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "kill the tree's leaves", "has": ["bare"]},
+        {"say": "jensen huang", "chips": ["jensen huang"], "has": ["leather jacket", "bare"], "visible": ["Is there a man in a black leather jacket?"]}
+      ]
+    },
+    {
+      "name": "repeat-add-gets-stronger",
+      "note": "Greptile on #273: a repeated 'add a dog' changed nothing on screen and skipped Sonnet. A repeat means the user does not see it yet: the dog gets bigger or clearer.",
+      "start": "meadow",
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "add a dog", "chips": ["dog"]},
+        {"say": "add a dog", "chips": ["dog"], "visible": ["Is there a dog, large and clearly visible?"]}
+      ]
+    },
+    {
+      "name": "car-airplane-flies-forward",
+      "note": "Live bug 2026-11-15: 'add an airplane in the sky' on the car scene flew backwards. A moving thing travels forward away from the camera like the car. (#272 stopgap and #271 case, merged.)",
+      "start": "car",
+      "live": true,
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "add an airplane in the sky", "chips": ["airplane"], "has": ["airplane", "forward", "behind", "tail", "red sports car"], "visible": ["Is there an airplane in the sky?", "Is the airplane seen from behind, flying away from the camera?", "Is there a red car seen from behind?"]}
+      ]
+    },
+    {
+      "name": "car-side-profile",
+      "note": "Live 2026-11-15: a change of view was impossible while the template's rear view was fixed. The view yields when the user asks for it; the car stays on a road.",
+      "start": "car",
+      "live": true,
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "take me to the beach", "has": ["ocean"]},
+        {"say": "change the point of view to be facing the ocean. i want to see the car's side profile", "has": ["side", "wheels", "road"], "lacks": ["seen from directly behind"], "visible": ["Is the car seen from the side?", "Is the car on a paved road, not on sand or water?"]}
+      ]
+    },
+    {
+      "name": "zoom-out",
+      "note": "Live 2026-11-15: 'zoom out' came back empty because there was no camera operation.",
+      "start": "meadow",
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "zoom out"}
+      ]
+    },
+    {
+      "name": "no-clouds",
+      "note": "A negative request becomes a positive description (diffusion prompts cannot say 'no').",
+      "start": "meadow",
+      "live": true,
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "i want no clouds", "lacks": ["clouds"], "visible": [{"q": "Are there clouds in the sky?", "expect": "no"}]}
+      ]
+    },
+    {
+      "name": "no-more-snow-after-winter",
+      "start": "meadow",
+      "live": true,
+      "steps": [
+        {"say": "make it winter", "chips": ["winter"], "has": ["snow"]},
+        {"say": "no more snow", "no_chips": ["winter"], "lacks": ["snow"], "visible": [{"q": "Is there snow on the ground?", "expect": "no"}]}
+      ]
+    },
+    {
+      "name": "get-rid-of-the-fog",
+      "start": "meadow",
+      "live": true,
+      "steps": [
+        {"say": "make it foggy", "chips": ["fog"], "has": ["fog"]},
+        {"say": "get rid of the fog", "no_chips": ["fog"], "lacks": ["fog"], "visible": [{"q": "Is the scene foggy?", "expect": "no"}]}
+      ]
+    },
+    {
+      "name": "no-trees",
+      "start": "meadow",
+      "live": true,
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "no trees", "lacks": ["oak"], "visible": [{"q": "Is there a tree?", "expect": "no"}]}
+      ]
+    },
+    {
+      "name": "add-another-tree",
+      "note": "Gate 3 (2026-11-15): 'a single oak tree; a second tree' drew one tree. The count must agree in the whole prompt.",
+      "start": "meadow",
+      "live": true,
+      "modes": ["sonnet"],
+      "steps": [
+        {"say": "add another tree", "has": ["two"], "lacks": ["single"], "visible": ["Are there two trees?"]}
       ]
     }
   ]

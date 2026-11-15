@@ -52,7 +52,8 @@ class CountingChat:
 
     def complete(self, system, messages):
         self.calls.append(json.loads(messages[-1]["content"])["sentence"])
-        return json.dumps({"blocked": False, "operations": [OPS["make it winter"][0]], "details": "fresh words"})
+        return json.dumps({"blocked": False, "understood": True, "new_scene": False,
+                           "prompt": "A snowy harbour, fresh words.", "chips": ["winter"]})
 
 
 def final(text):

@@ -20,7 +20,7 @@ import sys
 import time
 from datetime import datetime, timezone
 
-from engine.final_reader import fingerprint, load
+from engine.final_reader import call_options, fingerprint, load
 from engine.foundry import FoundryMessages, settings_from_env
 from engine.tools.acceptance import (REPLIES_FILE, Mode, MissingReply, ReplayChat, RetryRefused, case_modes,
                                      entry_key, load_cases, reply_key, run_case)
@@ -75,7 +75,7 @@ def main(argv=None) -> int:
     if settings is None:
         print("error: FOUNDRY_ENDPOINT and FOUNDRY_KEY must be set (load ~/.madhacks-foundry.env)", file=sys.stderr)
         return 2
-    real = FoundryMessages.from_settings(settings, HTTP_TIMEOUT_S)
+    real = FoundryMessages.from_settings(settings, HTTP_TIMEOUT_S, **call_options())  # the live call's settings
     fp = fingerprint(load("sonnet", chat=real, cache_path=None, demo_prompts=None).system_prompt, real.model)
     existing = json.loads(REPLIES_FILE.read_text())["replies"] if REPLIES_FILE.exists() else []
     # With --refresh-stale a stale reply is not replayed, so the cases run here ask for it again; every entry stays
@@ -94,13 +94,13 @@ def main(argv=None) -> int:
     merged = {entry_key(e): e for e in existing}
     if not args.case and not chat.failed:  # every case ran from the right scenes: drop what no case asked for
         merged = {k: e for k, e in merged.items() if k in set(chat.used)}
-    merged.update({(p, s, ids): {"sentence": s, "prompt_before": p, "ids": ids, "reply": r, "model": real.model,
-                                 "fingerprint": fp, "recorded_at": now}
-                   for (p, s, ids), r in chat.new.items()})
+    merged.update({(p, s, chips): {"sentence": s, "prompt_before": p, "chips": chips, "reply": r, "model": real.model,
+                                   "fingerprint": fp, "recorded_at": now}
+                   for (p, s, chips), r in chat.new.items()})
     existing = list(merged.values())
     REPLIES_FILE.write_text(json.dumps({"about": "First Sonnet replies of the final reader, recorded by "
-                                                 "engine/tools/acceptance_record.py; keyed by the composed prompt "
-                                                 "before the sentence, the sentence as sent to the model and the chip ids.",
+                                                 "engine/tools/acceptance_record.py; keyed by the prompt on screen "
+                                                 "before the sentence, the sentence as sent to the model and the chips shown.",
                                         "replies": existing}, indent=1) + "\n")
     print(f"{len(chat.new)} new replies, {len(existing)} in {REPLIES_FILE}")
     if chat.failed:

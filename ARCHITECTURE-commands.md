@@ -2,6 +2,7 @@
 
 This document describes the path a spoken or typed sentence takes until the engine has a prompt to steer to.
 It was written on 2026-11-15 from `main` at cf031f8, after about five patches by different agents, so that one reader can see the whole design.
+Issue #271 (the same day) changed the path of a final: Sonnet now writes the whole prompt of a free scene instead of operations merged into the composed scene; the sections below describe that.
 It is for agents, so it names files and functions instead of explaining Python.
 
 Scope: `commands/` (reader, world, composer, state, service, semantic, rewriter, dictionary and `keywords.json`), `engine/reader.py`, `engine/final_reader.py`, `engine/car_template.py`, `engine/slow_reader.py`, `engine/people.py` and the loading of `engine/demo_prompts.json`.
@@ -20,17 +21,17 @@ The other branch of `load_reader`, `CommandService(slow_reader=from_env(), ...)`
 | Object | File | Job |
 |---|---|---|
 | `StateCachingReader` | `engine/slow_reader.py` | Answers `state_fields()` from the last `handle()` result, so the streamer never waits on the service lock. |
-| `FinalReadingService` | `engine/reader.py` | Sends each final sentence to the Sonnet final reader before the dictionary, and maps each composed prompt to the first rich prompt chosen for it. |
-| `FinalReader` | `engine/final_reader.py` | Content block, pinned and cached lookup, the measured car template, the Sonnet call, reply checks, retry, disk cache. |
-| `car_template` | `engine/car_template.py` | Routes a sentence on a vehicle scene (measured world, model, or not a vehicle) and writes the car template prompt. |
-| `people` | `engine/people.py` | Replaces a named person with a visual description and builds the engine's own add for them. |
-| `CommandService` | `commands/service.py` | Scene state, partial guesses, the dictionary reading of a final, `apply_final` for the engine's operations. |
+| `FinalReadingService` | `engine/reader.py` | Decides who reads each final (dictionary, pinned, measured, Sonnet), reads the x on a free chip as "remove the <label>", and maps each composed prompt to the first rich prompt chosen for it. |
+| `FinalReader` | `engine/final_reader.py` | `lookup` (content block, pinned, cached, measured car world), `ask` (the Sonnet call, the light check, retry, disk cache) and `result`. |
+| `car_template` | `engine/car_template.py` | Routes a sentence on a vehicle scene (measured world or not), writes the car template prompt, and checks that a free prompt is still the template (`template_problems`, `asks_view_change`). |
+| `people` | `engine/people.py` | Replaces a named person with a visual description for Sonnet, and builds the engine's own add or remove when Sonnet gives nothing usable. |
+| `CommandService` | `commands/service.py` | Scene state, partial guesses, the dictionary reading of a final, `apply_final` for the engine's operations, and `dictionary_reading`, the fast-path rule. |
 | `reader` | `commands/reader.py` | One clause to one operation: keyword table, pace and strength words, name matching, clause splitting. |
 | `world` | `commands/world.py` | Place commands, the table of tested world sentences, and the commands-side car template. |
 | `composer` | `commands/composer.py` | Scene snapshot to one prompt, in a fixed order with stable wording. |
-| `state` | `commands/state.py` | `SceneState`: base, changes, the operations, undo history. |
+| `state` | `commands/state.py` | `SceneState`: origin (composed or free), base, changes or the free prompt, the operations, undo history. |
 | `semantic` | `commands/semantic.py` | Optional CPU vector match for a final clause the dictionary misses. |
-| `rewriter` | `commands/rewriter.py` | The system prompt rules and the validator for the Sonnet `details` field. |
+| `rewriter` | `commands/rewriter.py` | `MAX_TOTAL_WORDS`; its details rules and validator have had no caller since #271. |
 
 ## The path of a partial
 
@@ -49,28 +50,28 @@ Partials never reach Sonnet, the content block or the car template.
 
 ## The path of a final, live
 
-1. Steps 1 and 2 as for a partial; `FinalReadingService.handle` sees a final with a valid `t_client`.
+1. Steps 1 and 2 as for a partial; `FinalReadingService.handle` sees a final with a valid `t_client` and calls `_final`.
 2. It takes `CommandService.snapshot()` and classifies the sentence with `sentence_kind(text, snapshot)`: it splits it with `reader.split_commands`, reads every clause with `reader.read`, and names each clause with `clause_kind` (`BARE_CONTROL`, `SCENE_RESET`, `EDIT`).
 3. `SentenceKind.CONTROL` (every clause is a bare undo or reset) goes to `CommandService.handle`, the dictionary path below, with no call and no content check.
-4. Any other sentence goes to `FinalReader.__call__(text, snapshot)`:
-   1. `blocked_word(text)` checks `BLOCKED_WORDS`; a hit returns `{"blocked": True}` with no call.
-   2. The key is `(compose(snapshot), text)`; the pinned entries (`engine/demo_prompts.json`) are checked first, then the in-memory and disk cache.
-   3. `_from_cache` uses a SONNET or PINNED entry only on the same scene (`scene_ids`), maps its change ids to the live ones, and checks every operation again with `slow_reader.validate` and `CACHED_MAX_PHRASE`.
-   4. `_measured` asks `car_template.plan(text, snapshot)`; `Route.MEASURED` (a vehicle scene with no objects and one measured world word, or a new vehicle scene) is answered by the engine with `measured_operations` and `world_prompt`, with no call (`Outcome.TEMPLATE`).
-   5. Otherwise `_call` runs on the thread pool and the caller waits `timeout_s` (3.0 s live).
-   6. `_attempt` sends one user message: the scene, the composed prompt, the sentence with named people replaced (`people.for_model`), `details_max_words` (`details_budget`), and `car_template` fields when the route is not PLAIN.
-   7. `_check` reads the reply: `blocked` gives BLOCKED; `people.with_person` puts in the engine's add of a named person; `expand_operations` validates and rewrites the operations; `scene_after` applies them to a rebuilt copy of the scene.
-   8. When the new scene has a vehicle subject, `_check_vehicle` keeps the base as the bare vehicle (`bare_vehicle_operations`), checks `road`, `scene` and `light` (`field_problems`), and builds the template (`world_prompt`, `check_prompt`).
-   9. Otherwise `_check` composes the new scene, checks the phrases of new objects (`phrase_problems`), and cuts bad details clauses with `repair_details`, which uses `rewriter.validate_rewrite` on `scene_prefix(scene)`.
-   10. The result is a `Verdict` (ACCEPTED, REPAIRED, PHRASE, PLAIN, EMPTY, BLOCKED, INVALID, FAILED); PHRASE, PLAIN and INVALID are asked again once if the first call took under half the wait.
-   11. On a timeout the entry is FALLBACK, kept in memory only, and a late answer is counted as `late_dropped`; SONNET and BLOCKED entries are saved to the disk cache.
-   12. `_or_person` turns a FALLBACK on "add <named person>" into the engine's own add (`Outcome.PERSON`).
-   13. `_given` remembers the template prompt of a vehicle scene (`_given_vehicle`), so the next call on that scene is told its current road, scene and light.
-5. Back in `FinalReadingService.handle`:
-   1. `{"blocked": True}` calls `CommandService.apply_final(text, [], None)`: no change, unmatched, and a guess in flight is rolled back.
-   2. `SentenceKind.MIXED` (bare undo or reset plus edits, not blocked) goes to `CommandService.handle`, so the dictionary runs the undo or reset in order.
-   3. A result calls `CommandService.apply_final(text, operations, None)`, which validates and applies the operations as one batch and steers to the composed prompt; `_model_prompts.setdefault(composed, rich)` then makes the rich prompt the one the model sees for that state, now and later.
-   4. None (FALLBACK) goes to `CommandService.handle`, the dictionary path.
+4. `FinalReader.lookup(text, snapshot)` gives an `Entry` known without a call, or None:
+   1. `blocked_word(text)` checks `BLOCKED_WORDS`; a hit is `Outcome.BLOCKED`.
+   2. The key is `(compose(snapshot), sentence_key(text))` (for a free scene `compose` is its own prompt); the pinned entries (`engine/demo_prompts.json`) are checked first, then the in-memory and disk cache.
+      `_from_cache` uses a SONNET or PINNED entry only on the same scene (`scene_ids`: origin, free prompt, base and every chip), maps its chip ids to the live ones, and checks every operation again with `checked_operations`.
+   3. `_measured` asks `car_template.plan(text, snapshot)`; `Route.MEASURED` (a composed vehicle scene with no objects and one measured world word, or a new vehicle scene from any scene) is answered with `measured_operations` and `world_prompt` (`Outcome.TEMPLATE`).
+5. `SentenceKind.MIXED` (bare undo or reset plus edits): when the dictionary does not read every clause by itself, `FinalReader.ask` is called as the content check; a block gives no steer, anything else goes to `CommandService.handle`, which runs the undo or reset in order.
+6. The fast path: with no entry, when `commands.service.dictionary_reading(text, snapshot)` reads the whole sentence (a composed scene only), `CommandService.handle` reads it, with no call; `_dictionary` gives a vehicle scene the car template through `fallback_prompt`.
+7. Otherwise `FinalReader.ask(text, snapshot, committed_prompt)`: `_call` runs on the thread pool and the caller waits `timeout_s` (3.0 s live).
+   1. `_attempt` sends one user message (`user_message`): the prompt on screen (the rich one), the chips, the sentence with a named person replaced (`people.for_model`), `car_scene` (`car_template.is_template` of the prompt on screen), and `view_change` and `person_chip` when they apply.
+   2. `check_reply` is the light check: `blocked` gives BLOCKED; `understood` false or an empty prompt gives NOT_UNDERSTOOD; `fit_prompt` cuts a prompt over 180 words or 1600 characters at sentences; `reply_chips` cleans the chips; on a car scene that is not a new scene, `car_template.template_problems` checks the template (only a drivable road with `view_change`).
+      The result is one operation `{"op": "free_scene", "prompt", "chips"}`, `Verdict.ACCEPTED`, or `REPAIRED` when something was cut or broken (still used).
+   3. REPAIRED and INVALID (not a JSON object) are asked again once, with the reasons, when the first call took under half the wait; a REPAIRED first reply is kept in `Pending.usable` if the retry runs late.
+   4. On a timeout the entry is FALLBACK, kept in memory only, and a late answer is counted as `late_dropped`; SONNET, BLOCKED and NOT_UNDERSTOOD entries are saved to the disk cache.
+8. `FinalReader.result(entry, text, snapshot)`: `_or_person` turns a FALLBACK on "add <named person>" on a composed scene into the engine's own add (`Outcome.PERSON`), and `_given` remembers the template prompt of a composed vehicle scene for `fallback_prompt`.
+9. Back in `FinalReadingService._final`:
+   1. `{"blocked": True}` and `{"not_understood": True}` call `CommandService.apply_final(text, [])`: no change, unmatched, and a guess in flight is rolled back.
+   2. A result calls `CommandService.apply_final(text, operations)`, which validates and applies the operations as one batch and steers to the composed prompt; `_model_prompts.setdefault(composed, rich)` keeps the rich prompt of a composed state (a free scene's composed prompt is already its prompt).
+   3. None (FALLBACK) goes to `CommandService.handle`, the dictionary path; on a free scene it applies only a new scene, so anything else shows as not understood.
+10. A tap on the x of a free scene's chip is read as the final "remove the <label>" through steps 2 to 9.
 
 ## The path of a final on the dictionary
 
@@ -97,7 +98,7 @@ This runs when the final reader gives None, for CONTROL and MIXED sentences, and
 | Pace (slowly, suddenly) to ramp | `reader._pace`, `reader.RAMP`, `service._final` and `service.apply_final` | `apply_final` runs the whole `read()` only to get the pace. `RAMP["confirm"]` and `RAMP["sudden"]` equal `RAMP["default"]`, so the swaps to them do nothing. |
 | Provisional guess | `service._partial`, `service._commit`, `PROVISIONAL_CAP` | |
 | One change per kind; world replaces world | `state.SceneState.apply` | One owner. |
-| A world clears season and weather | `state.WORLD_CLEARS` in `SceneState.apply` | Owner. `final_reader.world_first` reorders a sentence's adds so a season said in the same sentence survives, and drops seasons a base edit copied. `car_template.measured_operations` also removes time changes for a measured world. |
+| A world clears season and weather | `state.WORLD_CLEARS` in `SceneState.apply` | Owner. `car_template.measured_operations` also removes time changes for a measured world. |
 | Built-in sky of a world vs. an explicit change | `world.world_with_overrides` | Owner; only for known worlds. |
 | Winter on a road scene is the snowy mountain road | `world.road_scene_world` (dictionary path) and `car_template.WORLD_WORDS` (engine path) | Two implementations. |
 | Night on a car scene | `car_template.WORLD_WORDS` maps night to the neon city; the dictionary path adds a night phrase to the template | The same sentence gives different prompts on the two paths. |
@@ -106,18 +107,18 @@ This runs when the final reader gives None, for CONTROL and MIXED sentences, and
 | Car template constants | `world.CAMERA`, `STYLE`, `_REAR`, `_FORWARD` and copies in `car_template`; `final_reader.VEHICLE_STYLE` is `world.STYLE` again | Copied constants. |
 | Known places | `world._TABLE` (`WORLDS`) | One owner; `car_template._measured` and `final_reader.canonical_world` read it. |
 | Season, weather and time labels | `keywords.json` via `dictionary.KEYWORDS` | One owner; `final_reader._vocabulary` and `canonical_change` read it. `car_template.WORLD_WORDS` is a separate word table for vehicle scenes. |
-| Sonnet merge into scene state | `final_reader.expand_operations` (`canonical_world`, `canonical_change`, `distinct_label`, `with_lane_cue`, `world_first`, edit_base expansion), then `service.apply_final` | |
+| Sonnet answer into scene state | one `free_scene` operation through `service.apply_final` (#271) | Pinned and measured operations go through `final_reader.checked_operations` (`canonical_world`). |
 | Rich prompt per scene state | `FinalReadingService._model_prompts.setdefault` | The first rich prompt for a composed prompt wins for the life of the process. |
 | Pinned lookup | `final_reader.load_pinned` (replays `demo_prompts.json` from its base), `FinalReader.__call__`, `_from_cache` | Pinned is checked before the cache, and needs the same scene (`scene_ids`). |
 | Cached lookup | `CacheFile`, `FinalReader.__call__`, `_from_cache` | Keyed by `(compose(snapshot), sentence)`; the file is tied to `fingerprint(system_prompt, model, PROMPT_BUILD)`. |
 | Unsafe content block | `final_reader.BLOCKED_WORDS` and the model's `blocked` flag | Only for finals that reach the final reader. CONTROL sentences skip it (they add nothing), partials skip it, and with `--final-reader off` there is no block at all. |
 | Deliberately unmatched text (negation, transforms) | `reader.is_blocked`, `reader._NEGATION_RX`, `_TRANSFORM_RX`, `world._BLOCKED_RX`, the inline regex in `semantic.SemanticReader.__call__` | Three word lists with small differences. The name `is_blocked` is easy to confuse with the content block. |
 | Fallback order on the dictionary path | `service._final`: read, vector, slow reader, style | |
-| Fallback order on the engine path | `FinalReadingService.handle` and `FinalReader.__call__`: block, pinned, cache, measured template, Sonnet, dictionary | |
-| Phrase length limits | `slow_reader.MAX_PHRASE` 120, `final_reader.OBJECT_MAX_PHRASE` 240, `FINAL_MAX_PHRASE` 400, `CACHED_MAX_PHRASE` | |
+| Fallback order on the engine path | `FinalReadingService._final`: control, block, pinned, cache, measured template, dictionary fast path, Sonnet, dictionary | |
+| Phrase and prompt length limits | `slow_reader.MAX_PHRASE` 120, `final_reader.CACHED_MAX_PHRASE`, `final_reader.MAX_PROMPT_WORDS` 180, `state.MAX_FREE_PROMPT_CHARS` 1600 | |
 | Batch size | `state.apply` (literal 16), `reader.MAX_CLAUSES` 16, `final_reader.BATCH_LIMIT` 16, `slow_reader.BATCH_LIMIT` 16 | One number in four places. |
-| Base edit ("turn the tree into a lighthouse") keeps the changes | `final_reader.expand_operations` (edit_base) and `slow_reader.edit_base` (added in #210) | Two expansions with different orders: the slow reader puts world changes first, the final reader keeps the scene order and then runs `world_first`. |
-| Details word limits | `rewriter.MAX_DETAIL_WORDS`, `MAX_TOTAL_WORDS` | `final_reader` reads them with `getattr(rewriter, ..., default)`; the default 100 is stale (the value is 180) and never used. |
+| Base edit ("turn the tree into a lighthouse") keeps the changes | Sonnet's free prompt live; `slow_reader.edit_base` (#210) with `--final-reader off` | |
+| Free scene or composed scene | `state.Origin` (the snapshot's `origin`) | Owner; `service.dictionary_reading` and `SceneState.apply` refuse dictionary edits of a free scene. |
 
 ## Duplicated rules and data
 
@@ -126,7 +127,6 @@ This runs when the final reader gives None, for CONTROL and MIXED sentences, and
 - Vehicle and road scene detection is done three ways (see the table).
 - Winter on a car scene is decided twice (`road_scene_world`, `car_template.WORLD_WORDS`), and night on a car scene gives different prompts on the two paths.
 - The negation and transform word list exists three times (`reader`, `world`, `semantic`).
-- The base edit expansion exists twice (`final_reader.expand_operations`, `slow_reader.edit_base`).
 - The batch limit 16 is written four times; the label limit 24 is written as a bare number in `final_reader.distinct_label`.
 - `final_reader._scene_for_model` and `slow_reader._scene_for_model` are the same function, and `final_reader.scene_record` is the same again.
 - `_check` and `_check_vehicle` in `final_reader.py` repeat the same four lines that find new objects and their phrase problems.

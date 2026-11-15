@@ -134,15 +134,15 @@ class RetryRefused(RuntimeError):
     again (it does only when the first call took under half the wait); refusing it here keeps the replay the same."""
 
 
-def scene_ids(scene: dict) -> str:
-    """The chip ids of the scene sent to the model, in order ("c1,c3"): a saved reply may name them (a remove), and
-    the same prompt can come back with other ids (winter added, removed and added again), so they are in the key."""
-    return ",".join(c["id"] for c in scene.get("changes", []))
+def chip_key(user: dict) -> str:
+    """The chips shown before the sentence, in order ("winter,lion"): the same prompt can come with other chips (a
+    zero-strength chip is not in the prompt), and a reply names the chips to show, so they are in the key."""
+    return ",".join(user.get("chips", []))
 
 
 def reply_key(user: dict) -> tuple[str, str, str]:
-    """(the composed prompt before, the sentence as sent to the model, the chip ids)."""
-    return user["prompt"], user["sentence"], scene_ids(user["scene"])
+    """(the prompt on screen before, the sentence as sent to the model, the chips shown)."""
+    return user["prompt"], user["sentence"], chip_key(user)
 
 
 class ReplayChat:
@@ -174,7 +174,7 @@ class DownChat:
 
 
 def entry_key(e: dict) -> tuple[str, str, str]:
-    return e["prompt_before"], e["sentence"], e["ids"]
+    return e["prompt_before"], e["sentence"], e.get("chips", "")
 
 
 def load_replies(path: Path = REPLIES_FILE) -> dict[tuple[str, str, str], str]:

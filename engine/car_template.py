@@ -23,8 +23,8 @@ Routes (Route) for one final sentence:
 - MEASURED: the sentence names exactly one of the measured worlds (WORLDS) and nothing else, on a vehicle scene
   with no objects, or it starts a new vehicle scene with a measured world (or no world: country). The engine
   builds the operations and the prompt; no model call.
-- MODEL: a vehicle scene, but no measured world fits. Sonnet gives the operations plus road, scene and light, and
-  the engine checks them (field_problems) and puts them in the template.
+- MODEL: a vehicle scene, but no measured world fits. Sonnet writes the whole prompt in the template form, and the
+  engine checks the subject, road and camera sentences (template_problems).
 - PLAIN: not a vehicle scene: the usual final reader path.
 """
 
@@ -119,7 +119,7 @@ _NEW_SCENE = re.compile(r"^(?:(?:a|start a|make a|give me a)\s+)?new scene (?:of
 
 class Route(enum.Enum):
     MEASURED = "measured"  # the engine composes a measured world: no model call
-    MODEL = "model"        # a vehicle scene with no measured world: Sonnet fills road, scene and light
+    MODEL = "model"        # a vehicle scene with no measured world: Sonnet writes the template prompt
     PLAIN = "plain"        # not a vehicle scene: the usual path
 
 
@@ -248,62 +248,70 @@ def current_world(snapshot: dict) -> World | None:
     return WORLDS.get(worlds[-1]["label"])
 
 
-# --- the model's fields ---------------------------------------------------------------------------------
+# --- the template check of a free prompt ----------------------------------------------------------------
 
-MAX_ROAD_WORDS = 14
 # A road slot without one of these words left the car on the sand or in the water (live acceptance run, 2026-11-15).
 DRIVABLE = frozenset({"road", "roads", "highway", "street", "lane", "avenue", "boulevard", "bridge", "motorway",
                       "freeway", "causeway", "drive", "promenade", "track", "asphalt"})
-# Raised from 40 and 20 (live, 2026-11-15): a good reply on the ocean coast was refused for 43 words, as long as the
-# measured world's own scene sentence.
-MAX_SCENE_WORDS = 60
-MAX_LIGHT_WORDS = 30
-# The subject and camera sentences are the engine's; the fields never move the camera or re-frame the shot.
-CAMERA_WORDS = frozenset("""
-    camera cameras shot shots tracking frame framing framed zoom zooms zooming pan pans panning lens angle
-    aerial drone closeup close-up viewer centred centered
-""".split())
+_TEMPLATE_HEAD = re.compile(r"^(?P<subject>[A-Z][^.!?]*?)" + re.escape(REAR) + r"(?P<road>[^.!?]+?)" + re.escape(FORWARD)
+                            + r" ")
 
 
-def _sentence_count(text: str) -> int:
-    return len([s for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s])
-
-
-def field_problems(reply: dict) -> list[str]:
-    """Why the model's road, scene and light cannot go in the template; [] when they can."""
-    out = []
-    fields = {k: reply.get(k) for k in ("road", "scene", "light")}
-    for k, v in fields.items():
-        if not isinstance(v, str) or not v.strip():
-            out.append(f'"{k}" is missing: a vehicle scene needs "road", "scene" and "light"')
-        elif "\n" in v or "\r" in v:
-            out.append(f'"{k}" has a line break')
-    if out:
-        return out
-    road, scene, light = (" ".join(fields[k].split()) for k in ("road", "scene", "light"))
-    if not re.match(r"^(?:a|an|the)\s", road) or re.search(r"[.!?;]", road):
-        out.append('"road" must be a noun phrase like "a snowy mountain road", with no period')
-    elif not set(re.findall(r"[a-z]+", road.lower())) & DRIVABLE:
-        out.append('"road" must name the paved road the vehicle drives on (road, highway, street, lane, bridge), '
-                   'or the vehicle is drawn on sand, water or grass')
-    for k, v, limit in (("road", road, MAX_ROAD_WORDS), ("scene", scene, MAX_SCENE_WORDS),
-                        ("light", light, MAX_LIGHT_WORDS)):
-        if len(v.split()) > limit:
-            out.append(f'"{k}" has {len(v.split())} words, the limit is {limit}')
-        bad = sorted(set(re.findall(r"[a-z-]+", v.lower())) & CAMERA_WORDS)
-        if bad:
-            out.append(f'"{k}" has camera or framing words {", ".join(map(repr, bad))}: the camera sentence is fixed')
-    for k, v in (("scene", scene), ("light", light)):
-        if not v[:1].isupper() or not v.endswith(".") or _sentence_count(v) != 1:
-            out.append(f'"{k}" must be one sentence that starts with a capital letter and ends with a period')
-    return out
-
-
-def model_world(reply: dict) -> World | None:
-    """The model's road, scene and light as a World (name "model"), or None when field_problems finds any."""
-    if field_problems(reply):
+def template_parts(prompt) -> tuple[str, str] | None:
+    """(subject, road) when `prompt` starts as the car template: the subject sentence "<Subject>, seen from directly
+    behind with its rear lights facing the camera, drives fast along <road>, moving forward away from the camera."
+    and then the camera sentence for that subject's vehicle word, word for word. Else None."""
+    if not isinstance(prompt, str):
         return None
-    return World("model", *(" ".join(reply[k].split()) for k in ("road", "scene", "light")))
+    m = _TEMPLATE_HEAD.match(prompt)
+    if m is None:
+        return None
+    subject = m.group("subject")
+    subject = subject[:1].lower() + subject[1:]
+    if not prompt[m.end():].startswith(camera_sentence(subject)):
+        return None
+    return subject, m.group("road")
+
+
+def is_template(prompt) -> bool:
+    """True when `prompt` is a car template prompt (template_parts): the final reader then keeps it one."""
+    return template_parts(prompt) is not None
+
+
+# A sentence that asks for another camera or view of the car ("change the point of view to be facing the ocean,
+# i want to see the car's side profile"): the template's rear view and camera sentence then yield to the model's.
+_VIEW_RX = re.compile(r"\b(?:point of view|pov|viewpoint|view|camera|angle|perspective|profile|side on|from the "
+                      r"(?:side|front|left|right|above)|bird'?s[ -]eye|aerial|drone|overhead|close[ -]?up|zoom|"
+                      r"wider|closer|shot|pan|framing)\b")
+
+
+def asks_view_change(sentence) -> bool:
+    """True when the sentence asks for another camera position or view."""
+    return isinstance(sentence, str) and bool(_VIEW_RX.search(normalize(sentence)))
+
+
+def _drivable(text: str) -> bool:
+    return bool(set(re.findall(r"[a-z]+", text.lower())) & DRIVABLE)
+
+
+def template_problems(prompt: str, view_change: bool = False) -> list[str]:
+    """Why a free prompt for a car scene is not the car template any more; [] when it is. Any subject may drive
+    (the user may recolour or swap the car); the road must name a paved surface (DRIVABLE). With `view_change`
+    (the sentence asks for another camera or view, asks_view_change) the rear view and the camera sentence may
+    change: the prompt need only still name a drivable road under the vehicle."""
+    if view_change:
+        if _drivable(prompt):
+            return []
+        return ["the vehicle must still drive on a paved road the prompt names (road, highway, street, lane, bridge)"]
+    parts = template_parts(prompt)
+    if parts is None:
+        return ['the scene is a car scene: keep the first sentence "<Subject>' + REAR + '<road>' + FORWARD +
+                '" and then the camera sentence word for word (only the road may change), or set "new_scene" true '
+                'when the user asks for the vehicle to go']
+    if not _drivable(parts[1]):
+        return [f'the road "{parts[1]}" must name the paved road the vehicle drives on (road, highway, street, '
+                'lane, bridge), or the vehicle is drawn on sand, water or grass']
+    return []
 
 
 def check_prompt(prompt: str, subject: str, objects=()) -> bool:
@@ -324,43 +332,45 @@ def check_prompt(prompt: str, subject: str, objects=()) -> bool:
     return _sentence_count(middle[len(said):]) == 2
 
 
+def _sentence_count(text: str) -> int:
+    return len([s for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s])
+
+
 INSTRUCTIONS = """
-Vehicle scenes. When the NEW scene, after your operations, has a vehicle as its main subject (its base names a car,
-truck, van, bus, motorcycle, jeep or taxi), the engine writes the video prompt from a fixed template:
-  "<Subject>, seen from directly behind with its rear lights facing the camera, drives fast along <road>, moving
-  forward away from the camera. The camera follows directly behind the car ... rushes toward the viewer. <scene>
-  <light> Cinematic, highly detailed, realistic, sharp focus, motion blur on the road."
-The engine writes the subject and camera sentences itself. For such a scene, reply with three more fields and
-leave "details" empty: {"blocked": ..., "operations": [...], "details": "", "road": "...", "scene": "...", "light": "..."}
-- "road": a noun phrase for the road of the new scene, starting with "a", at most 14 words, no period. It always
-  names the paved road the vehicle drives on (road, highway, street, lane, bridge): the video model draws the vehicle
-  on whatever this says. For a beach it is a road beside the beach ("a beachfront road with pale sand and waves
-  beside it"), never sand or water.
-- "take me to X", "go to X", "drive to X", "turn it into X" on a vehicle scene: the vehicle keeps driving, now on a
-  road in X. The vehicle goes only when the user says so ("remove the car", "just the beach, no car"): then reply
-  with ONE new_scene whose base describes X itself ("a wide sandy beach with gentle turquoise waves") and no add
-  of kind world (a base that names a place cannot take another place).
-- "scene": ONE sentence (at most 60 words) about what lines both sides of the road: landscape, buildings, weather
-  you can see. Never the camera, the shot or the frame. The scene's objects (kind extra) are added by the engine
-  from their phrases, word for word: do not describe them again.
-- "light": ONE short sentence (at most 30 words) about the light and the sky.
-- The world of the new scene: its place, season, weather and time of day. A change of place replaces the road,
-  the scene and the light together. If "car_template" in the user message gives the current road, scene and
-  light, keep what the sentence does not change.
-- More or less of the current world ("a little more snow", "a lot more snow", "less rain" on the snowy road or in
-  the rain): ONE set_strength on that world change (never a new add: it would replace the world), the same road,
-  and "scene" and "light" rewritten with visibly more or less of it ("heavy snow falling thickly, deep snowdrifts"
-  for more; "a light dusting of snow" for less). The engine draws only what road, scene and light say.
-- For a new scene of a vehicle, use new_scene with the base being only the vehicle ("a blue pickup truck") and an
-  add of kind world for its place.
-Measured examples (road | scene | light):
+The car template. When the main subject is a vehicle driving along a road, the prompt has this form, measured on
+the GPU to keep the vehicle seen from behind and driving forward (anything else made it drive backwards):
+  "<Subject>{rear}<road>{forward} {camera} <one sentence per object> <scene sentence> <light sentence> {style}"
+- The camera sentence names the subject's vehicle word: "the car" for a car, "the truck" for a truck, and so on.
+- "car_scene" true means the prompt on screen has this form. Keep the subject sentence and the camera sentence word
+  for word; change only <road> when the place changes (and the subject's own words only when the user changes the
+  vehicle, "make the car blue"). Objects, place, weather and light go in the sentences after the camera sentence.
+- "take me to X", "go to X", "drive to X", "turn it into X" on a car scene: the vehicle keeps driving, now on a road
+  in X. <road> always names the paved road it drives on (road, highway, street, lane, bridge): for a beach it is
+  "a beachfront road with pale sand and waves beside it", never sand or water.
+- "view_change" true means the user asks for another camera position or view ("I want to see the car's side
+  profile"): then the rear view and the camera sentence yield. Write the subject and camera sentences for the new
+  view with the parts the model can see ("the red sports car seen exactly side-on, the whole length of the car from
+  the side, front wheels and rear wheels both in view, its nose pointing to the left edge of the frame, driving from
+  right to left along the coastal road; a smooth tracking shot from the side, the camera level with the car and
+  moving alongside it at the same speed, the ocean behind it"), keep the road and keep the vehicle's direction of
+  travel consistent with that camera. The vehicle still drives on a named road.
+- The vehicle goes only when the user says so ("remove the car", "just the beach, no car"): then "new_scene" is
+  true and the prompt describes X without the vehicle.
+- More or less of the current weather or season ("a little more snow", "less rain"): the same road, and the scene
+  and light sentences rewritten with visibly more or less of it ("heavy snow falling thickly, deep snowdrifts";
+  "a light dusting of snow").
+- A new scene whose main subject is a vehicle driving along a road ("I now want a city at night with a car driving
+  on the road") is written in this form too, with only what the sentence names: the earlier objects and chips are
+  dropped unless the sentence keeps them by name.
+Measured worlds (road | scene sentence | light sentence):
 {examples}
 """
 
 
 def instructions() -> str:
-    return INSTRUCTIONS.replace("{examples}", "\n".join(
-        f"- {w.name}: {w.road} | {w.scene} | {w.light}" for w in WORLDS.values()))
+    return INSTRUCTIONS.format(rear=REAR, forward=FORWARD, camera=camera_sentence("a car"), style=STYLE,
+                               examples="\n".join(f"- {w.name}: {w.road} | {w.scene} | {w.light}"
+                                                  for w in WORLDS.values()))
 
 
 def parse_world(prompt, subject: str, objects=()) -> World | None:

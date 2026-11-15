@@ -19,7 +19,7 @@ class StateTests(unittest.TestCase):
         self.assertEqual([c["label"] for c in state.snapshot()["changes"]], ["winter", "river", "night"])
         for _ in range(3):
             self.assertTrue(state.apply(dict(op="undo")))
-        self.assertEqual(state.snapshot(), dict(base="meadow", changes=[], can_undo=False))
+        self.assertEqual(state.snapshot(), dict(base="meadow", origin="composed", prompt=None, changes=[], can_undo=False))
         self.assertFalse(state.apply(dict(op="undo")))
 
     def test_singleton_replaces_while_extras_stack(self):

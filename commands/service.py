@@ -2,14 +2,16 @@
 
 import copy
 import enum
+import re
 import threading
 import time
 import unicodedata
 
 from .composer import compose
+from .dictionary import normalize
 from .reader import KEYWORDS, MAX_CLAUSES, RAMP, is_blocked, ramp_for, read, split_commands, spot, style_fallback
-from .state import SceneState
-from .world import WORLDS
+from .state import Origin, SceneState, is_free
+from .world import WORLDS, world_op
 
 PROVISIONAL_CAP = 0.4
 SEMANTIC_WAIT_S = 0.05  # the local vector match is ~10 ms; never let it eat the slow LLM's budget
@@ -25,6 +27,104 @@ class Applied(enum.Enum):
 def _has_non_latin_letters(text: str) -> bool:
     """True if normalization would drop letters (Chinese, Cyrillic, accented...): the reader cannot see them."""
     return any(ch.isalpha() and not ch.isascii() for ch in unicodedata.normalize("NFKC", text))
+
+
+# Words a clause may have besides the keyword it was read by, for the keyword table's reading to be the whole
+# clause: articles, edit and add verbs, pace and strength words. "add a dog" and "make it slowly snow" are read
+# whole; "add a red car" (red), "kill the tree's leaves" and "now i want a savannah" are not.
+FILLER_WORDS = frozenset("""
+    a an the some it its it's this that make add put place bring give show me us turn into set let lets let's have
+    get now please also then and just can could you i we want like there be is to of whole scene picture video
+    more less little bit lot very slightly much really
+    slowly gradually gently suddenly instantly quickly immediately by over time
+    start again everything all from scratch
+""".split())
+
+
+# Words a removal may have besides the removed chip's label: its verbs (commands.reader _REMOVE_RX and "undo the ...").
+REMOVE_WORDS = frozenset("remove no more get rid of take away delete without stop lose drop undo from out".split())
+
+# The explicit new scene words; "take me to X" is a place, which keeps the objects, so it is not one.
+_NEW_SCENE_RX = re.compile(r"\bnew scene (?:of|with)\b")
+
+
+def _words(text: str) -> list[str]:
+    return normalize(text).split()
+
+
+def fully_read(clause: str, reading: dict, snapshot: dict | None = None) -> bool:
+    """True when `reading` (commands.reader.read(clause, snapshot)) accounts for every word of `clause`:
+
+    - a tested place sentence (commands.world.world_op), an explicit "new scene of ...", a strength change of an
+      existing chip (read already refuses "make the dog black");
+    - a remove whose clause has only remove verbs, filler words and the removed chip's own label (or the keyword
+      that names it) besides: "remove the dog and the lion", one clause when "lion" is not in the table, removes
+      only one of them, so it is not read whole;
+    - undo or reset with only filler words besides ("undo that", "start over please", not "start over with a beach");
+    - an add of a keyword-table entry whose clause has only filler words besides the keyword ("add a dog").
+
+    An add of an object the table does not know (the pass-through "add a glowing unicorn"), the "show me ..." guess,
+    and any reading that leaves a word unused ("add a red car", "kill the tree's leaves") are not read whole."""
+    op, keyword = reading["op"], reading["keyword"]
+    if op is None:
+        return False
+    t = normalize(clause)
+    kind = op["op"]
+    if kind == "set_strength":
+        return True
+    if kind == "remove":
+        chip = next((c for c in (snapshot or {}).get("changes", []) if c["id"] == op.get("id")), None)
+        if chip is None:
+            return False
+        allowed = FILLER_WORDS | REMOVE_WORDS | set(_words(chip["label"]))
+        if keyword and KEYWORDS.get(keyword, {}).get("label") == chip["label"]:
+            allowed |= set(_words(keyword))
+        return all(w in allowed for w in _words(t))
+    if kind == "new_scene":
+        return bool(_NEW_SCENE_RX.search(t))
+    if world_op(t) is not None:
+        return True
+    if kind in ("undo", "reset") or (kind == "add" and keyword in KEYWORDS):
+        rest = _words(t)
+        key = _words(keyword or "")
+        for i in range(len(rest) - len(key) + 1):  # drop the first match of the keyword itself
+            if key and rest[i:i + len(key)] == key:
+                rest = rest[:i] + rest[i + len(key):]
+                break
+        return all(w in FILLER_WORDS for w in rest)
+    return False
+
+
+def dictionary_reading(text: str, snapshot: dict) -> list[dict] | None:
+    """The keyword table's operations for `text` on `snapshot` when it reads the whole sentence, else None.
+
+    The rule both sides use for the fast path (engine/reader.py): a composed scene, Latin text, 1 to MAX_CLAUSES
+    clauses, every clause read whole by the keyword table alone (fully_read: no vector matcher, no style fallback,
+    no pass-through guess), and every operation applies and composes on a trial copy. A sentence that leaves the
+    composed prompt as it was (a repeated "add a dog") gives None too, except undo and reset: a request repeated
+    because the user does not see it yet goes to the final reader, which makes it stronger. A free scene gives None:
+    only the final reader writes its prompt. Pure: `snapshot` is not changed."""
+    if not isinstance(text, str) or is_free(snapshot) or _has_non_latin_letters(text):
+        return None
+    clauses = split_commands(text)
+    if not 1 <= len(clauses) <= MAX_CLAUSES:
+        return None
+    trial = SceneState.from_snapshot(snapshot)
+    operations = []
+    for clause in clauses:
+        reading = read(clause, trial.snapshot())
+        if not fully_read(clause, reading, trial.snapshot()):
+            return None
+        op = reading["op"]
+        try:
+            trial.apply(op)
+            compose(trial.snapshot())
+        except (ValueError, TypeError, KeyError):
+            return None
+        operations.extend(op["operations"] if op.get("op") == "batch" else [op])
+    if compose(trial.snapshot()) == compose(snapshot) and not any(o["op"] in ("undo", "reset") for o in operations):
+        return None
+    return operations
 
 
 def _validate(msg) -> None:
@@ -75,6 +175,8 @@ class CommandService:
 
     def likely_prompts(self) -> list[str]:
         with self._lock:
+            if self._state.origin is Origin.FREE:  # the dictionary cannot edit a free scene: nothing to encode ahead
+                return [self._committed]
             labels = {e["label"]: e for e in KEYWORDS.values()}
             candidates = {self._committed}
             labels.update({e["label"]: e for e in WORLDS.values()})
@@ -86,7 +188,7 @@ class CommandService:
             return sorted(candidates)
 
     def snapshot(self) -> dict:
-        """A deep copy of the committed scene state, for the engine's LLM final reader."""
+        """A deep copy of the committed scene state, for the engine's LLM final reader (with its "origin")."""
         with self._lock:
             return self._state.snapshot()
 
@@ -162,6 +264,11 @@ class CommandService:
     def _partial(self, text: str):
         self._heard = text
         self._unmatched = False
+        if self._state.origin is Origin.FREE:
+            # Only the final reader edits a free scene, so a partial guesses nothing (a guess in flight, from before
+            # the scene became free, cannot exist: every final ends it).
+            self._keyword = None
+            return None
         word = spot(text)
         self._keyword = word
         label = KEYWORDS[word]["label"] if word else None
