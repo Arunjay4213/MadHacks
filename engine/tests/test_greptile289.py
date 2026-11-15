@@ -37,6 +37,8 @@ def test_a_camera_zoom_on_a_parked_car_is_used():
     assert drive_shot(clause) is DriveShot.NONE  # the camera's verb in the car's own sentence
     # Greptile #291 P1: words between the camera and its verb.
     assert drive_shot(STREET + " The camera is slowly zooming in on the car.") is DriveShot.NONE
+    with_zoom = "A red car is parked at the curb, with the camera slowly zooming in on it."  # Greptile #291 P1
+    assert drive_shot(with_zoom) is DriveShot.NONE
 
 
 def test_a_camera_sentence_with_a_car_driving_in_it_is_still_a_driving_car():
