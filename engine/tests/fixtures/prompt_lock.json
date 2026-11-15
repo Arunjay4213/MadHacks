@@ -3423,7 +3423,7 @@
    {
     "say": "add a dog",
     "steer": {
-     "prompt": "a red sports car; a dog standing nearby; a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side; thick fog",
+     "prompt": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a quiet country road in thick fog, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A dog standing nearby. Pale fields and dim trees fade into the fog on both sides. Soft grey diffuse light under a white sky. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
      "ramp_chunks": 1,
      "provisional": false,
      "cap": 1.0
@@ -3450,8 +3450,8 @@
      "keyword": "dog",
      "unmatched": false
     },
-    "committed": "a red sports car; a dog standing nearby; a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below on one side, palm trees and green hills on the other side; thick fog",
-    "likely_prompts_sha": "1863e2cb52475471",
+    "committed": "A red sports car, seen from directly behind with its rear lights facing the camera, drives fast along a quiet country road in thick fog, moving forward away from the camera. The camera follows directly behind the car in a smooth, low tracking shot at the same speed, keeping the car centred in the frame while the white dashed centre line rushes toward the viewer. A dog standing nearby. Pale fields and dim trees fade into the fog on both sides. Soft grey diffuse light under a white sky. Cinematic, highly detailed, realistic, sharp focus, motion blur on the road.",
+    "likely_prompts_sha": "3a58995e3a28edde",
     "model_calls": [
      {
       "scene": {

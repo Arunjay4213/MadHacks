@@ -236,3 +236,45 @@ def test_removing_a_world_chip_goes_back_to_the_country_template():
     assert out["steer"]["prompt"] == start == ct.world_prompt("a red sports car", ct.WORLDS["country"])
     svc.handle(final("make it winter"))
     assert svc.handle(final("take me back to the countryside"))["steer"]["prompt"] == start
+
+
+class HangingChat:
+    """Sonnet that does not answer within the engine's wait: every sentence times out."""
+
+    model = "fake-sonnet"
+
+    def __init__(self):
+        import threading
+        self.gate = threading.Event()
+
+    def complete(self, system, messages):
+        self.gate.wait(5)
+        raise AssertionError("too late: the engine has already used the dictionary")
+
+
+def test_after_a_sonnet_timeout_a_dog_on_the_car_scene_keeps_the_car_driving_forward():
+    # Issue #237: the timeout path sent "a red sports car; a dog standing nearby", so the car could reverse or the
+    # shot changed. The user still wants the same forward-driving car on the same road, now with a dog.
+    chat = HangingChat()
+    reader = FinalReader(FinalReaderState.ON, chat=chat, spec=prompt_spec(), timeout_s=0.1)
+    svc = FinalReadingService(CommandService(semantic_reader=lambda *a: None), reader)
+    start = svc.handle(final(NEW_SCENE))["steer"]["prompt"]
+    out = svc.handle(final("add a dog"))
+    country = ct.WORLDS["country"]
+    assert reader.stats()["timeouts"] == 1 and [c["label"] for c in out["state"]["changes"]] == ["dog"]
+    assert out["steer"]["prompt"] == (f"{HEAD}{country.road}, moving forward away from the camera. {CAMERA} "
+                                      f"A dog standing nearby. {country.scene} {country.light} {STYLE}")
+    assert ct.check_prompt(out["steer"]["prompt"], "a red sports car", ["a dog standing nearby"])
+    assert svc.handle({"type": "tap", "action": "undo"})["steer"]["prompt"] == start
+    chat.gate.set()
+    reader.stop()
+
+
+def test_after_a_sonnet_timeout_a_scene_without_a_vehicle_keeps_the_composed_prompt():
+    chat = HangingChat()
+    reader = FinalReader(FinalReaderState.ON, chat=chat, spec=prompt_spec(), timeout_s=0.1)
+    plain = CommandService(semantic_reader=lambda *a: None)
+    svc = FinalReadingService(CommandService(semantic_reader=lambda *a: None), reader)
+    assert svc.handle(final("add a dog"))["steer"] == plain.handle(final("add a dog"))["steer"]
+    chat.gate.set()
+    reader.stop()

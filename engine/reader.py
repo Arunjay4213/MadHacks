@@ -48,7 +48,8 @@ def load_reader(name: str, final_reader=None):
 class FinalReadingService:
     """CommandService with the final reader in front of the dictionary for every FINAL.
 
-    final_reader(text, snapshot) gives None (the service reads the sentence itself, as without this wrapper),
+    final_reader(text, snapshot) gives None (the service reads the sentence itself, as without this wrapper, and on
+    a vehicle scene final_reader.fallback_prompt gives the car template for the result),
     {"blocked": True} (no steer: unmatched), or {"operations", "prompt"} (applied to the service's scene).
 
     The model sees one prompt per scene state: the first rich prompt chosen for a composed prompt is kept in
@@ -83,6 +84,15 @@ class FinalReadingService:
                 if out["steer"] is not None:
                     self._model_prompts.setdefault(out["steer"]["prompt"], result["prompt"])
                 return self._mapped(out)
+            # No answer (a timeout, an error or an unusable reply): the dictionary reads it. On a vehicle scene the
+            # final reader still gives the car template for the new state, so the car keeps driving forward.
+            out = self._svc.handle(msg)
+            if out["steer"] is not None and not out["state"]["unmatched"] \
+                    and out["steer"]["prompt"] not in self._model_prompts:
+                prompt = self._final_reader.fallback_prompt(snapshot, self._svc.snapshot())
+                if prompt is not None:
+                    self._model_prompts[out["steer"]["prompt"]] = prompt
+            return self._mapped(out)
         return self._mapped(self._svc.handle(msg))
 
     def state_fields(self) -> dict:
