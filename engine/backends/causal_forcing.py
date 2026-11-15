@@ -90,6 +90,7 @@ class VaeType(str, enum.Enum):
 class GenState(enum.Enum):
     EMPTY = "empty"  # no frame generated since load() or reset(); next call starts a new video
     STREAMING = "streaming"  # frame cache holds past frames; next call continues the video
+    REANCHOR_PENDING = "reanchor_pending"  # next call drops the frame history and restarts it from the last frame
 
 
 class DecoderState(enum.Enum):
@@ -237,6 +238,8 @@ class Backend:
         attn_window_frames: int = 21,
         sink_frames: int = 0,
         max_latent_frames: int = 65536,
+        reanchor_every_frames: int = 0,
+        reanchor_strength: float = 0.6,
         text_encoder_device: Optional[str] = None,
         compile: bool = False,
         seed: int = 0,
@@ -258,6 +261,8 @@ class Backend:
         self.max_latent_frames = max_latent_frames
         if sink_frames >= attn_window_frames:
             raise ValueError("sink_frames must be smaller than attn_window_frames")
+        self.reanchor_every_frames = reanchor_every_frames  # 0: no periodic re-anchor
+        self.reanchor_strength = float(reanchor_strength)
 
         repo_dir = _import_repo(repo_dir)
         from omegaconf import OmegaConf
@@ -297,6 +302,7 @@ class Backend:
 
             # Denoising schedules.
             warp = bool(cfg.warp_denoising_step)
+            self._warp = warp
             distilled = [int(t) for t in cfg.denoising_step_list]
             if steps is None or steps == len(distilled):
                 chosen = distilled
@@ -329,6 +335,10 @@ class Backend:
         self.frame_index = 0  # latent frames generated in this video (absolute RoPE position)
         self._last_cond: Optional[torch.Tensor] = None
         self.crossattn_resets = 0  # how many times the text K/V cache was recomputed (for tests)
+        self._last_latent: Optional[torch.Tensor] = None  # clean latents of the previous call
+        self._frames_since_anchor = 0  # latent frames since the video start or the last re-anchor
+        self._reanchor_strength: Optional[float] = None  # strength of the pending re-anchor
+        self.reanchors = 0  # how many re-anchors ran (for tests)
 
     # ---- caches -------------------------------------------------------------------------------
 
@@ -352,6 +362,19 @@ class Backend:
                 }
                 for _ in range(NUM_BLOCKS)
             ]
+
+    def _clear_frame_cache(self):
+        for c in self.kv_cache:
+            c["global_end_index"].zero_()
+            c["local_end_index"].zero_()
+
+    def _reanchor_schedule(self, strength: float) -> torch.Tensor:
+        """Timesteps for a re-anchored frame: start at `strength` (0..1 of the noise range,
+        warped like the distilled schedule), then the first-frame steps below it."""
+        raw = min(1000, max(1, int(round(strength * 1000))))
+        start = _timestep_list(self.scheduler, [raw], self._warp)[0]
+        rest = [t for t in self.first_chunk_steps.tolist() if t < float(start) - 1e-3]
+        return torch.tensor([float(start)] + rest)
 
     def _reset_crossattn_cache(self):
         for c in self.crossattn_cache:
@@ -394,10 +417,28 @@ class Backend:
                     c["local_end_index"].zero_()
             self._reset_crossattn_cache()
             self._last_cond = None
+            self._last_latent = None
+            self._reanchor_strength = None
+            self._frames_since_anchor = 0
             self.frame_index = 0
             self.chunk_index = 0
             self.video_id += 1
             self.state = GenState.EMPTY
+
+    def request_reanchor(self, strength: float) -> None:
+        """Re-anchor on the next generate_chunk call: the frame history is dropped and the
+        next frame starts from the last frame noised to `strength` (0..1), denoised under the
+        cond of that call with the first-frame schedule. Layout comes from the last frame,
+        everything the text asks for can change. Higher strength changes more.
+        The video continues for the viewer (same video_id, chunk_index keeps counting, the
+        decoder keeps its state). Ignored before the first frame of a video."""
+        if not 0.0 < strength <= 1.0:
+            raise ValueError("strength must be in (0, 1]")
+        with self._gen_lock:
+            if self.state is GenState.EMPTY:
+                return
+            self._reanchor_strength = float(strength)
+            self.state = GenState.REANCHOR_PENDING
 
     @torch.no_grad()
     def generate_chunk(self, cond: torch.Tensor) -> ChunkLatents:
@@ -413,8 +454,29 @@ class Backend:
 
             f = self.num_frame_per_block
             lh, lw = self.latent_hw
-            noisy = torch.randn([1, f, LATENT_CHANNELS, lh, lw], device=self.device, dtype=self.dtype, generator=self._rng)
-            schedule = self.first_chunk_steps if self.state is GenState.EMPTY else self.denoising_steps
+            if (self.state is GenState.STREAMING and self.reanchor_every_frames > 0
+                    and self._frames_since_anchor >= self.reanchor_every_frames):
+                # Periodic re-anchor: a named transition, same as request_reanchor().
+                self._reanchor_strength = self.reanchor_strength
+                self.state = GenState.REANCHOR_PENDING
+
+            noise = torch.randn([1, f, LATENT_CHANNELS, lh, lw], device=self.device, dtype=self.dtype, generator=self._rng)
+            if self.state is GenState.EMPTY:
+                noisy, schedule = noise, self.first_chunk_steps
+            elif self.state is GenState.REANCHOR_PENDING:
+                # Restart the frame history from the last frame (see request_reanchor).
+                self._clear_frame_cache()
+                self.frame_index = 0
+                self._frames_since_anchor = 0
+                self.reanchors += 1
+                schedule = self._reanchor_schedule(self._reanchor_strength)
+                prev = self._last_latent[:, -f:]
+                noisy = self.scheduler.add_noise(
+                    prev.flatten(0, 1), noise.flatten(0, 1), schedule[0] * torch.ones([f], device=self.device, dtype=torch.long)
+                ).unflatten(0, prev.shape[:2])
+                self._reanchor_strength = None
+            else:
+                noisy, schedule = noise, self.denoising_steps
             current_start = self.frame_index * self.frame_seq_length
 
             for i, t in enumerate(schedule):
@@ -449,7 +511,9 @@ class Backend:
             ready.record(self._gen_stream)
             out = ChunkLatents(latents=denoised, video_id=self.video_id, chunk_index=self.chunk_index, ready=ready)
             self.frame_index += f
+            self._frames_since_anchor += f
             self.chunk_index += 1
+            self._last_latent = denoised
             self.state = GenState.STREAMING
             return out
 
@@ -468,10 +532,12 @@ def load(width: int, height: int, steps: Optional[int] = None, device: str = "cu
 
     Options: variant ("framewise_2step" default, "framewise_1step", "chunkwise_4step"),
     repo_dir, vae ("wan" or "taehv"), attn_window_frames (21), sink_frames (0),
-    max_latent_frames (65536), text_encoder_device, compile (False), seed (0).
+    max_latent_frames (65536), reanchor_every_frames (0: off), reanchor_strength (0.6),
+    text_encoder_device, compile (False), seed (0).
     """
     # Options may arrive as strings from the server's --backend-opt KEY=VALUE.
     types = {"attn_window_frames": int, "sink_frames": int, "max_latent_frames": int, "seed": int,
+             "reanchor_every_frames": int, "reanchor_strength": float,
              "compile": lambda v: v if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes", "on")}
     options = {k: types[k](v) if k in types else v for k, v in options.items()}
     steps = int(steps) if steps is not None and int(steps) > 0 else None  # 0 or None: distilled schedule
