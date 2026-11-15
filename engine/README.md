@@ -381,7 +381,9 @@ The nano slow reader is not used in this mode; partials, taps and undo or reset 
   This is the engine's stand-in (`PromptSpec` "engine stand-in"); when `commands.rewriter` imports, its `SYSTEM_PROMPT` and `validate_rewrite` are used instead with no code change.
   The validator gets `{"details": ...}` only, checked against the composed prompt of the new scene, with the forward-driving words added to a vehicle subject.
   The system prompt wraps its text as the rules for the `details` field, so the model sees one reply shape.
-  The prefix the details follow is the composed prompt with the object phrases right after the subject, word for word, so a positioned lion or "a small red car parked beside the oak tree" stays in the same words and place in every later prompt.
+  The prefix the details follow is the composed prompt reordered as subject, season and weather phrases, object phrases word for word, then the rest (world, time), so a positioned lion or "a red car parked beside the oak tree" stays in the same words and place in every later prompt.
+  On GPU, an object phrase before the winter phrase lost the winter (green grass), so the season and weather come first; a world change clears them in `commands/state.py`, so they do not come back.
+  The first object of a scene is the main one: its phrase may not say "small" and it takes the centre ("a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible"); a later one takes a free place (the lion in the left foreground).
   The user message also has `details_max_words`, what the validator's 100-word total leaves, and the system prompt lists the words the validator and the engine refuse in details (objects, season, weather and time words the scene does not have, motion, camera, time order, negation, position words, and road words in a scene without a road).
   Every rejected clause is logged at WARNING with its reason (the word limits, or the words `validate_rewrite` refuses, found by asking it about single words, since it returns no reason) and an excerpt.
   The engine cuts those clauses, then clauses from the end until the details fit (`details_repaired`).
@@ -391,7 +393,8 @@ The nano slow reader is not used in this mode; partials, taps and undo or reset 
   The reply states are named in `Verdict` (accepted, repaired, phrase, plain, empty, blocked, invalid, failed).
 - An object phrase may have up to 200 characters (the nano slow reader keeps 120), so a positioned phrase is valid.
   A vehicle added on a road gets "white dashed lane markings rush toward the viewer" at the end of its phrase; `FORWARD_MOTION` ends with the same cue.
-- A new place (an add of kind world) also removes the earlier season and weather changes that the sentence does not set itself, so a desert after "make it winter" has no snow; the time of day stays.
+- A new place (an add of kind world) clears the earlier season and weather in `commands/state.py` (#115), so a desert after "make it winter" has no snow; the time of day stays.
+  The engine moves a sentence's world add before its season and weather adds, so "take me to a snowy desert" keeps the snow it asked for.
 - Anchors: "new scene of a red sports car driving along a country road" gives the base `a red sports car driving along a country road` and Ishaan's tested prompt, verbatim.
   Every later prompt of that scene starts with its first two sentences word for word (subject, motion and camera), then the changes and the details, and ends with its style sentence (`ANCHORS` in `engine/final_reader.py`).
 - "motion blur on the road" (the stand-in's vehicle style) and road words in details are used only when the scene has a road: on GPU the oak meadow grew a road or tyre tracks from them.

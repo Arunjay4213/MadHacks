@@ -17,7 +17,8 @@ WINTER = {"op": "add", "label": "winter", "kind": "season",
 NIGHT = {"op": "add", "label": "night", "kind": "time", "phrase": "deep night, dark sky, soft cold moonlight",
          "strength": 1.0}
 CAR = {"op": "add", "label": "red car", "kind": "extra",
-       "phrase": "a small red car parked beside the oak tree at the right of the frame, facing the camera", "strength": 1.0}
+       "phrase": "a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible",
+       "strength": 1.0}
 LION = {"op": "add", "label": "lion", "kind": "extra",
         "phrase": "a large male lion standing in the foreground at the left of the frame, facing the camera", "strength": 1.0}
 DESERT = {"op": "add", "label": "desert", "kind": "world", "phrase": "a desert", "strength": 1.0}
@@ -103,9 +104,9 @@ def test_fully_rejected_details_are_asked_again_with_the_reason():
 
 def test_a_desert_drops_winter_and_object_phrases_carry_no_world_words():
     # (b) Real shape: after "make it winter", "add a red car" gave "a red car parked on the snowy ground" and the
-    # desert kept "deep winter, snow covering the ground". A world change now removes the earlier season and
-    # weather; an object phrase with world words is asked again.
-    snowy = dict(CAR, phrase="a small red car parked on the snowy ground at the right of the frame")
+    # desert kept "deep winter, snow covering the ground". A world change now clears the earlier season and
+    # weather (commands.state, #115); an object phrase with world words is asked again.
+    snowy = dict(CAR, phrase="a red car parked on the snowy ground in the centre of the frame, large and clearly visible")
     chat = ReplayChat({"make it winter": reply([WINTER], "powdery snow drifts"),
                        "add a red car": [reply([snowy], "pale snow-dusted ground"), reply([CAR], "pale snow-dusted ground")],
                        "make it night": reply([NIGHT], "pale silver light on the sand"),
@@ -120,8 +121,10 @@ def test_a_desert_drops_winter_and_object_phrases_carry_no_world_words():
 
 
 def test_a_season_said_with_the_place_stays():
+    # commands.state clears season and weather on a world add (#115); the engine applies the world first, so a
+    # reply that lists winter before the desert still keeps the snow the sentence asked for.
     chat = ReplayChat({"make it winter": reply([WINTER], "powdery snow drifts"),
-                       "take me to a snowy desert": reply([DESERT, WINTER], "pale sand under a thin crust of snow")})
+                       "take me to a snowy desert": reply([WINTER, DESERT], "pale sand under a thin crust of snow")})
     _, results = play(chat, ["make it winter", "take me to a snowy desert"])
     assert {c["kind"] for c in results[-1]["scene"]["changes"]} == {"world", "season"}
 
@@ -164,8 +167,10 @@ def test_a_new_object_without_size_or_position_is_asked_again_and_then_kept_afte
     _, results = play(chat, ["add a lion", "make it winter", "make it night"])
     reasons = chat.calls[1][1]["rejected"]
     assert any("no size word" in r for r in reasons) and any("no position words" in r for r in reasons)
-    for res in results:
-        assert res["prompt"].startswith("a wide shot of a meadow with a single oak tree; " + LION["phrase"] + "; ")
+    subject = "a wide shot of a meadow with a single oak tree; "
+    assert results[0]["prompt"].startswith(subject + LION["phrase"] + "; ")
+    for res in results[1:]:  # winter comes before the objects; the lion stays verbatim right after it
+        assert res["prompt"].startswith(subject + WINTER["phrase"] + "; " + LION["phrase"] + "; "), res["prompt"]
 
 
 def test_the_car_chain_keeps_ishaans_first_two_sentences():
@@ -200,8 +205,9 @@ def test_position_phrases_stay_verbatim_and_details_never_place_things():
                        "make it winter": reply([WINTER], "powdery snow drifts, soft diffuse light"),
                        "make it night": reply([NIGHT], "the oak tree far in the distance, pale silver light on the snow")})
     _, results = play(chat, ["add a red car", "make it winter", "make it night"])
-    head = "a wide shot of a meadow with a single oak tree; " + CAR["phrase"] + "; "
-    assert all(r["prompt"].startswith(head) for r in results)
+    subject = "a wide shot of a meadow with a single oak tree; "
+    assert results[0]["prompt"].startswith(subject + CAR["phrase"] + "; ")
+    assert all(r["prompt"].startswith(subject + WINTER["phrase"] + "; " + CAR["phrase"] + "; ") for r in results[1:])
     assert "distance" not in results[-1]["prompt"] and results[-1]["prompt"].endswith("pale silver light on the snow")
 
 
@@ -230,3 +236,31 @@ def test_a_second_red_car_gets_its_own_label_and_the_first_one_stays():
     _, (_, res) = play(chat, ["add a red car", "add a red car racing on a road"])
     assert [c["label"] for c in res["scene"]["changes"]] == ["red car", "second red car"]
     assert CAR["phrase"] in res["prompt"] and second["phrase"] + ", " + LANE_CUE in res["prompt"]
+
+
+def test_the_season_comes_before_a_new_object_and_a_desert_does_not_bring_it_back():
+    # Measured on GPU: "add a red car" after "make it winter" lost the winter (green grass) when the car phrase
+    # came first. The season and weather phrases now come right after the subject, before the objects.
+    chat = ReplayChat({"make it winter": reply([WINTER], "powdery snow drifts"),
+                       "add a red car": reply([CAR], "pale frost-dusted grass, crisp cold air"),
+                       "make it a desert": reply([DESERT], "warm rippled sand, dry cracked earth")})
+    _, (_, car, desert) = play(chat, ["make it winter", "add a red car", "make it a desert"])
+    assert car["prompt"].startswith(
+        "a wide shot of a meadow with a single oak tree; " + WINTER["phrase"] + "; " + CAR["phrase"] + "; ")
+    assert desert["prompt"].startswith("a wide shot of a single oak tree; " + CAR["phrase"] + "; ")
+    assert WINTER["phrase"] not in desert["prompt"]
+
+
+def test_the_main_object_is_not_small_and_a_later_one_may_be():
+    # Measured on GPU: "a small red car ... at the right of the frame" was small and far right in every frame.
+    small = dict(CAR, phrase="a small red car parked beside the oak tree at the right of the frame, facing the camera")
+    chat = ReplayChat({"add a red car": [reply([small], "soft green grass"), reply([CAR], "soft green grass")],
+                       "add a bird": reply([{"op": "add", "label": "bird", "kind": "extra", "strength": 1.0,
+                                             "phrase": "a small bird perched on a branch at the left of the frame"}],
+                                           "soft green grass")})
+    _, (car, bird) = play(chat, ["add a red car", "add a bird"])
+    assert any("the main object" in r and "'small'" in r for r in chat.calls[1][1]["rejected"])
+    assert car["operations"] == [CAR] and len(chat.calls) == 3  # the bird is not the main object: no retry
+    system = " ".join(chat.calls[0][0].split())
+    assert "a red car parked beside the oak tree in the centre of the frame, facing the camera, large and clearly visible" in system
+    assert "a large male lion standing in the foreground at the left of the frame, facing the camera" in system

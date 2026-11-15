@@ -258,21 +258,24 @@ class Prefix:
 
 
 def scene_prefix(scene: dict) -> Prefix:
-    """The fixed part of the prompt of `scene`, from the commands/ composer. The phrases of the scene's objects
-    come right after the subject, word for word, so a positioned lion stays where it is in every later prompt.
+    """The fixed part of the prompt of `scene`, from the commands/ composer: the subject, then the season and
+    weather phrases, then the phrases of the scene's objects word for word, then the rest (world, time).
+    Measured on GPU: with the object before the winter phrase, "add a red car" lost the winter (green grass).
+    The objects stay early and verbatim, so a positioned lion stays where it is in every later prompt.
+    A world change clears season and weather in commands.state, so no dropped season comes back here.
     A vehicle subject gets FORWARD_MOTION. A scene whose base has an Anchor starts with the anchor's lead."""
     from commands.composer import compose
     parts = [p.strip() for p in compose(scene).split(";")]
     subject, rest = parts[0], parts[1:]
-    phrases = [p.rstrip(".") for p in _scene_objects(scene)]
-    objects = [p for p in rest if any(p.endswith(ph) for ph in phrases)]
-    others = [p for p in rest if p not in objects]
+    conditions = [p for p in rest if any(p.endswith(ph) for ph in _scene_phrases(scene, ("season", "weather")))]
+    objects = [p for p in rest if p not in conditions and any(p.endswith(ph) for ph in _scene_phrases(scene, ("extra",)))]
+    others = [p for p in rest if p not in conditions and p not in objects]
     anchor = ANCHORS.get(scene["base"])
     if anchor is None:
-        return Prefix(PrefixKind.COMPOSED, "; ".join([with_forward_motion(subject), *objects, *others]))
-    if not objects and not others:
+        return Prefix(PrefixKind.COMPOSED, "; ".join([with_forward_motion(subject), *conditions, *objects, *others]))
+    if not rest:
         return Prefix(PrefixKind.ANCHOR_FULL, anchor.prompt)
-    changes = "; ".join([*objects, *others])
+    changes = "; ".join([*conditions, *objects, *others])
     return Prefix(PrefixKind.ANCHOR_LEAD, f"{anchor.lead} {changes[:1].upper()}{changes[1:]}", anchor.style)
 
 
@@ -286,6 +289,11 @@ class PromptSpec:
     validate: Callable[[dict, dict], str | None]
     prefix: Callable[[dict], Prefix] | None = None
     check: Callable[[str, dict], str | None] | None = None
+
+
+def _scene_phrases(scene: dict, kinds: tuple[str, ...]) -> list[str]:
+    """The phrases (without a final period) of the scene's changes of `kinds` that are on."""
+    return [c["phrase"].rstrip(".") for c in scene["changes"] if c["kind"] in kinds and c["strength"] > 0]
 
 
 def _scene_objects(scene: dict) -> list[str]:
@@ -431,19 +439,27 @@ def repair_details(spec: PromptSpec, scene: dict, details: str) -> Repair:
     return Repair(None, tuple(dropped))
 
 
-def phrase_problems(op: dict) -> list[str]:
+MAIN_OBJECT_SMALL_WORDS = frozenset({"small", "tiny", "little", "distant"})
+
+
+def phrase_problems(op: dict, main: bool = False) -> list[str]:
     """Rule breaks in the phrase of a new object (an add of kind extra): world words (a place, season, weather or
     time: they belong to the world, and "parked on the snowy ground" stays snowy in a desert), or no size or
-    position words (the video model then draws it small or leaves it out)."""
+    position words (the video model then draws it small or leaves it out). `main`: the first object of the
+    scene, which must not be small (measured on GPU: "a small red car" was small and far right in every frame)."""
     from commands.dictionary import normalize
     phrase = normalize(op["phrase"])
     words = set(phrase.split())
+    small = sorted(words & MAIN_OBJECT_SMALL_WORDS) if main else []
     found = sorted({a for a in [*_vocabulary(), *_known_worlds()] if a not in ("bright", "dark")
                     and re.search(rf"\b{re.escape(a)}\b", phrase)})
     out = []
     if found:
         out.append(f"the phrase of {op['label']!r} has world words {', '.join(map(repr, found))}: describe only the object, its size and its position")
-    if not words & SIZE_WORDS:
+    if small:
+        out.append(f"the phrase of {op['label']!r}, the main object, says {', '.join(map(repr, small))}: make it large "
+                   "and clearly visible, in the centre of the frame")
+    if not words & SIZE_WORDS and not ({"clearly", "visible"} <= words):
         out.append(f"the phrase of {op['label']!r} has no size word (large, small, ...)")
     if not words & PHRASE_POSITION_WORDS:
         out.append(f"the phrase of {op['label']!r} has no position words (in the foreground at the left of the frame, beside the oak tree, ...)")
@@ -453,8 +469,8 @@ def phrase_problems(op: dict) -> list[str]:
 _PLACE_RULE = """- A PLACE or setting ("take me to the desert", "make it a desert", "go to Mars", "switch to a
   neon city") is ONE add of kind world: label = the place in 1 to 3 words, phrase = a short description of that
   place. It replaces the old world and KEEPS every object: a red car added before stays in the desert.
-  A new place brings its own season and weather: the engine removes the earlier season and weather changes, so
-  a desert after "make it winter" has no snow. Add a season or weather again only if the user says it in the same
+  A new place brings its own season and weather: the earlier season and weather changes are cleared, so a
+  desert after "make it winter" has no snow. Add a season or weather again only if the user says it in the same
   sentence ("a snowy desert"). The time of day stays.
   Known places, use exactly these labels when one fits: {places}."""
 
@@ -476,8 +492,10 @@ Rules for operations:
 - Write phrases as concrete visual descriptions. A season, weather or time phrase is under 12 words.
 - A new object, animal or person (kind extra) gets a phrase of at most 25 words (under 200 characters) with
   explicit size and position words that a video model obeys: where it is in the frame and, when it helps, next
-  to what, for example "a large male lion standing in the foreground at the left of the frame,
-  facing the camera" or "a small red car parked beside the oak tree at the right of the frame". The engine keeps
+  to what. The first object added to a scene is the main one: never "small", it takes the centre and is large,
+  for example "a red car parked beside the oak tree in the centre of the frame, facing the camera, large and
+  clearly visible". A later object takes a free place, for example "a large male lion standing in the
+  foreground at the left of the frame, facing the camera" when the centre is taken. The engine keeps
   that phrase word for word, right after the subject, in every later prompt, also after a change of place,
   season or time, so it must not name a place, ground, season, weather or time of day ("in the snow", "on the
   sand", "at night" are wrong): only the object, its size, its position and what it does.
@@ -936,8 +954,9 @@ class FinalReader:
         except (ValueError, TypeError, KeyError) as exc:
             return Attempt(Verdict.INVALID, Entry(Outcome.FALLBACK), (f"the new scene does not compose: {exc!r}",))
         known = {(c["label"], c["phrase"]) for c in snapshot["changes"]}
-        problems = [p for op in clean if op["op"] == "add" and op["kind"] == "extra"
-                    and (op["label"], op["phrase"]) not in known for p in phrase_problems(op)]
+        added = [c for c in after["changes"] if c["kind"] == "extra" and (c["label"], c["phrase"]) not in known]
+        main = next((c for c in after["changes"] if c["kind"] == "extra"), None)  # the first object of the scene
+        problems = [p for c in added for p in phrase_problems(c, main=c is main)]
         for p in problems:
             log.warning("final reader: %r: %s", _short(text), p)
         details = reply.get("details")
@@ -1017,8 +1036,8 @@ def expand_operations(ops: list, snapshot: dict) -> list[dict] | None:
     change replaces the place, not an object of the base such as the tree), so this expansion stays.
     An operation naming a change id after a base edit or a new scene is invalid (those ids are gone), and undo
     and reset stay with the dictionary.
-    A world add (a new place) also removes the earlier season and weather changes that the sentence does not
-    replace itself: a desert after "make it winter" has no snow. The time of day stays.
+    A world add clears the earlier season and weather in commands.state (#115); world_first keeps a season said
+    in the same sentence.
     A new_scene whose base is an anchor's base gets that base exactly. A vehicle added on a road gets LANE_CUE.
     """
     out: list[dict] = []
@@ -1042,12 +1061,21 @@ def expand_operations(ops: list, snapshot: dict) -> list[dict] | None:
             clean = {**clean, "base": anchor.base} if anchor else clean
         rebuilt = rebuilt or clean["op"] == "new_scene"
         out.append(with_lane_cue(distinct_label(canonical_change(canonical_world(clean)), snapshot, out)))
-    if not rebuilt and any(o["op"] == "add" and o["kind"] == "world" for o in out):
-        replaced = {o["kind"] for o in out if o["op"] == "add"}
-        removed = {o["id"] for o in out if o["op"] == "remove"}
-        out += [{"op": "remove", "id": c["id"]} for c in snapshot["changes"]
-                if c["kind"] in ("season", "weather") and c["kind"] not in replaced and c["id"] not in removed]
-    return out if len(out) <= BATCH_LIMIT else None
+    return world_first(out) if len(out) <= BATCH_LIMIT else None
+
+
+def world_first(ops: list[dict]) -> list[dict]:
+    """The world adds of a sentence moved before its season and weather adds (each group keeps its order).
+    commands.state clears season and weather on a world add (#115), so "take me to a snowy desert" read as
+    winter then desert would lose the winter it asked for. A new_scene or edit_base stays first."""
+    worlds = [o for o in ops if o["op"] == "add" and o["kind"] == "world"]
+    if not worlds:
+        return ops
+    first = next((i for i, o in enumerate(ops) if o["op"] == "add" and o["kind"] in ("season", "weather")), None)
+    if first is None or first > ops.index(worlds[0]):
+        return ops
+    rest = [o for o in ops if o not in worlds]
+    return rest[:first] + worlds + rest[first:]
 
 
 _ORDINALS = ("second", "third", "fourth", "fifth", "sixth")
