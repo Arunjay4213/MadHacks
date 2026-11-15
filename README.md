@@ -66,6 +66,64 @@ Run them on their own with:
 python -m pytest -q -m tools
 ```
 
+## Acceptance
+
+The acceptance check tests what a user gets, with no person looking at frames.
+All cases live in one data file, `acceptance/sentences.json`, and both layers read it.
+
+### Add a case
+
+Add an object to `cases`:
+
+```
+{"name": "desert-after-winter", "start": "meadow", "live": true, "steps": [
+  {"say": "make it winter", "chips": ["winter"], "has": ["snow"]},
+  {"say": "make it a desert", "chips": ["desert"], "no_chips": ["winter"], "has": ["sand"], "lacks": ["snow"],
+   "visible": ["Is the ground sand or desert?", {"q": "Is there snow on the ground?", "expect": "no"}]}
+]}
+```
+
+- `start`: `meadow` (the starting scene) or `car` (the red sports car on the country road).
+- A step is `say` (a typed or spoken sentence) or `tap` (`undo`, `reset`, or `remove` with `chip`, the x on a chip).
+- `understood` (default true): false means the user should see the words as not understood and nothing should change.
+- `chips` must be on screen, `no_chips` must not; "car" matches the chip "red car", and "horse" matches "horses".
+- `has` and `lacks`: words that must or must not be in the prompt the video model gets (case does not matter).
+- `slow`: true when a pace word must make the change gradual.
+- `strength`: `{"winter": "up"}` or `"down"` against the step before, or `"low"`, `"full"`, `"high"` against 1.
+- `visible`: yes/no questions about the frame, for Layer B; a plain string expects yes.
+- `live: true` puts the case in the Layer B run; `modes` limits Layer A to `sonnet` or `dictionary`.
+- Write what the user asked for, never what the code prints today.
+  When the code is wrong, add `"xfail": {"sonnet": "bug: ..."}` (or `dictionary`) to that case only.
+
+### Layer A: sentences to prompts (CPU, in the default suite)
+
+```
+python -m pytest -q engine/tests/test_acceptance_sentences.py
+```
+
+Each case runs through the live engine's reader stack (`FinalReadingService`, `FinalReader`, `CommandService`) in two modes.
+`sonnet` uses the pinned demo prompts and the real Sonnet replies recorded in `acceptance/sonnet_replies.json`.
+`dictionary` has Sonnet unavailable, as when Foundry is down: the keyword table, the measured car worlds and named people decide.
+A new sentence in `sonnet` mode needs its reply recorded once, with the Foundry key, for example on the engine machine:
+
+```
+set -a; . ~/.madhacks-foundry.env; set +a
+python -m engine.tools.acceptance_record                  # only the missing replies
+python -m engine.tools.acceptance_record --refresh-stale  # after a change to the final reader's rules
+```
+
+### Layer B: the real model and a vision judge (on demand, marker `tools`)
+
+```
+python -m engine.tools.acceptance_live --calibrate --url http://127.0.0.1:8000 --out runs/accept
+python -m pytest -q -m tools engine/tests/test_acceptance_live.py   # its own logic, no engine
+```
+
+It plays every case with `live: true` on a running engine, takes the frame 3 s after each step (or 1 s after a late first frame), and asks the Foundry deployment `claude-sonnet-5-5` the step's `visible` questions plus a picture-quality question.
+It writes `report.md` with the frames, answers, reasons and the command-to-screen delay per step.
+`--calibrate` first judges the frames with known contents in `acceptance/vision_calibration.json` and reports the judge's accuracy.
+It needs `FOUNDRY_ENDPOINT` and `FOUNDRY_KEY`, makes at most 60 vision calls, and changes the shared live video: post on the board before a run on the live engine.
+
 ## Team board setup (do this once, about 2 minutes)
 
 Our coding agents talk to each other on one pinned GitHub issue, the [Message Board](https://github.com/Arunjay4213/MadHacks/issues/1).
