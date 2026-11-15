@@ -293,6 +293,8 @@ def parse_args(argv=None) -> argparse.Namespace:
                    help="denoising steps per chunk; 0 uses the schedule the backend's checkpoint was distilled for")
     p.add_argument("--device", default="cuda:0", help="generation device (the fake backend ignores it)")
     p.add_argument("--decode-device", default="cuda:0", help="decode device (the fake backend ignores it)")
+    p.add_argument("--decode-remote", metavar="HOST:PORT",
+                   help="decode on an engine.remote_decode service (Wan VAE on another GPU); local decode is the fallback")
     p.add_argument("--base-prompt", default=EngineConfig.base_prompt,
                    help="starting prompt, used when the reader has no committed prompt")
     p.add_argument("--jpeg-quality", type=int, default=80)
@@ -337,7 +339,8 @@ def main(argv=None) -> None:
     except ValueError as exc:
         raise SystemExit(f"--reanchor-opt: {exc}") from None
     config = EngineConfig(backend=args.backend, reader=args.reader, width=args.width, height=args.height, steps=args.steps,
-                          device=args.device, decode_device=args.decode_device, backend_options=options,
+                          device=args.device, decode_device=args.decode_device, decode_remote=args.decode_remote,
+                          backend_options=options,
                           base_prompt=args.base_prompt, jpeg_quality=args.jpeg_quality,
                           precompute_file=args.precompute_file, lead_margin=args.lead_margin,
                           reanchor=args.reanchor, reanchor_options=reanchor_options,

@@ -62,6 +62,7 @@ class EngineConfig:
     steps: int = 0                  # 0: the backend's distilled schedule
     device: str = "cuda:0"
     decode_device: str = "cuda:0"
+    decode_remote: str | None = None  # HOST:PORT of an engine.remote_decode service; local decode is the fallback
     backend_options: dict = field(default_factory=dict)
     base_prompt: str = "a wide shot of a meadow with a single oak tree"  # used when the reader has no committed prompt
     jpeg_quality: int = 80
@@ -268,6 +269,7 @@ class Engine:
         self.book = CommandBook()
         self.encoder: EncoderService | None = None
         self.backend = None
+        self.remote_decoder = None  # a RemoteDecoder when config.decode_remote is set, after the backend loads
         self.steerer: Steerer | None = None
         self.controller: Controller | None = None
         self.failure: str | None = None
@@ -335,6 +337,8 @@ class Engine:
         self._steer_pool.shutdown(wait=False, cancel_futures=True)
         if self.encoder:
             self.encoder.stop()
+        if self.remote_decoder is not None:
+            self.remote_decoder.close()
         self.recorder.stop()
         if self.lifecycle.state is not Lifecycle.STOPPED:
             self.lifecycle.transition(Lifecycle.STOPPED, "shutdown")
@@ -363,6 +367,11 @@ class Engine:
                      self.backend.frames_per_chunk)
             if self._stop.is_set():
                 return
+            if cfg.decode_remote:
+                from .remote_decode import make_remote_decoder
+
+                self.remote_decoder = make_remote_decoder(cfg.decode_remote, self.backend)
+                log.info("decoding on %s, falling back to the local decoder when it is not reachable", cfg.decode_remote)
             self.reanchor_state = self._reanchor_support()
             self.lifecycle.transition(Lifecycle.WARMING, "backend loaded")
             self.encoder = EncoderService(self.backend.encode_prompt_with_ids, background_turn=self.prefetch.take)
@@ -649,7 +658,8 @@ class Engine:
     # --- decode ----------------------------------------------------------------------------
 
     def _decode_loop(self) -> None:
-        backend, quality = self.backend, self.config.jpeg_quality
+        quality = self.config.jpeg_quality
+        decode = self.remote_decoder.decode if self.remote_decoder is not None else self.backend.decode_chunk
         try:
             while not self._stop.is_set():
                 try:
@@ -660,7 +670,7 @@ class Engine:
                     if self._crashed.is_set():
                         continue  # the video is broken; recovery drops it
                     t0 = time.perf_counter()
-                    frames = backend.decode_chunk(latents)
+                    frames = decode(latents)
                     t1 = time.perf_counter()
                     jpegs = [encode_jpeg(f, quality) for f in frames]
                     t2 = time.perf_counter()
@@ -907,6 +917,8 @@ class Engine:
             out["encoder"] = {"cache_size": self.encoder.cache_size, "pending": self.encoder.pending, "hits": self.encoder.hits,
                               "misses": self.encoder.misses, "last_encode_ms": _round(self.encoder.last_encode_ms),
                               "prefetch": self.prefetch.state.value}
+        if self.remote_decoder is not None:
+            out["remote_decode"] = self.remote_decoder.stats()
         out["recorder"] = self.recorder.stats()
         out["clients"] = self.client_counts()
         return out
