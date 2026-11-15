@@ -236,3 +236,93 @@ def test_removing_a_world_chip_goes_back_to_the_country_template():
     assert out["steer"]["prompt"] == start == ct.world_prompt("a red sports car", ct.WORLDS["country"])
     svc.handle(final("make it winter"))
     assert svc.handle(final("take me back to the countryside"))["steer"]["prompt"] == start
+
+
+class HangingChat:
+    """Sonnet that does not answer within the engine's wait: every sentence times out."""
+
+    model = "fake-sonnet"
+
+    def __init__(self):
+        import threading
+        self.gate = threading.Event()
+
+    def complete(self, system, messages):
+        self.gate.wait(5)
+        raise AssertionError("too late: the engine has already used the dictionary")
+
+
+def test_after_a_sonnet_timeout_a_dog_on_the_car_scene_keeps_the_car_driving_forward():
+    # Issue #237: the timeout path sent "a red sports car; a dog standing nearby", so the car could reverse or the
+    # shot changed. The user still wants the same forward-driving car on the same road, now with a dog.
+    chat = HangingChat()
+    reader = FinalReader(FinalReaderState.ON, chat=chat, spec=prompt_spec(), timeout_s=0.1)
+    svc = FinalReadingService(CommandService(semantic_reader=lambda *a: None), reader)
+    start = svc.handle(final(NEW_SCENE))["steer"]["prompt"]
+    out = svc.handle(final("add a dog"))
+    country = ct.WORLDS["country"]
+    assert reader.stats()["timeouts"] == 1 and [c["label"] for c in out["state"]["changes"]] == ["dog"]
+    assert out["steer"]["prompt"] == (f"{HEAD}{country.road}, moving forward away from the camera. {CAMERA} "
+                                      f"A dog standing nearby. {country.scene} {country.light} {STYLE}")
+    assert ct.check_prompt(out["steer"]["prompt"], "a red sports car", ["a dog standing nearby"])
+    assert svc.handle({"type": "tap", "action": "undo"})["steer"]["prompt"] == start
+    chat.gate.set()
+    reader.stop()
+
+
+def test_after_a_sonnet_timeout_a_scene_without_a_vehicle_keeps_the_composed_prompt():
+    chat = HangingChat()
+    reader = FinalReader(FinalReaderState.ON, chat=chat, spec=prompt_spec(), timeout_s=0.1)
+    plain = CommandService(semantic_reader=lambda *a: None)
+    svc = FinalReadingService(CommandService(semantic_reader=lambda *a: None), reader)
+    assert svc.handle(final("add a dog"))["steer"] == plain.handle(final("add a dog"))["steer"]
+    chat.gate.set()
+    reader.stop()
+
+
+MARS = {"blocked": False, "details": "", "road": "a dusty red road across mars",
+        "operations": [{"op": "add", "label": "mars", "kind": "world", "phrase": "the red surface of mars",
+                        "strength": 1.0}],
+        "scene": "Red rocks and craters line both sides of the road.", "light": "A pale pink sky, hazy sunlight."}
+
+
+class MarsThenHanging(HangingChat):
+    """Sonnet answers "take me to mars" and times out on everything else."""
+
+    def complete(self, system, messages):
+        if json.loads(messages[-1]["content"])["sentence"] == "take me to mars":
+            return json.dumps(MARS)
+        return super().complete(system, messages)
+
+
+def test_two_timeouts_in_a_row_on_a_model_world_keep_the_road_and_the_fog():
+    # Greptile on PR #238: the fog sentence of the first fallback made its prompt unreadable, so the next timed-out
+    # sentence lost Mars and the template.
+    chat = MarsThenHanging()
+    reader = FinalReader(FinalReaderState.ON, chat=chat, spec=prompt_spec(), timeout_s=0.3)
+    svc = FinalReadingService(CommandService(semantic_reader=lambda *a: None), reader)
+    for sentence in [NEW_SCENE, "take me to mars", "make it foggy"]:
+        svc.handle(final(sentence))
+    out = svc.handle(final("add a dog"))
+    assert [c["label"] for c in out["state"]["changes"]] == ["mars", "fog", "dog"]
+    assert out["steer"]["prompt"] == (f"{HEAD}{MARS['road']}, moving forward away from the camera. {CAMERA} "
+                                      f"A dog standing nearby. A thick fog in the air. {MARS['scene']} "
+                                      f"{MARS['light']} {STYLE}")
+    chat.gate.set()
+    reader.stop()
+
+
+def test_undo_and_an_edit_on_a_car_scene_keeps_the_car_template():
+    # Greptile on PR #238: an undo with an edit is read by the dictionary, which gave the short composed prompt.
+    chat = HangingChat()
+    reader = FinalReader(FinalReaderState.ON, chat=chat, spec=prompt_spec(), timeout_s=0.1)
+    svc = FinalReadingService(CommandService(semantic_reader=lambda *a: None), reader)
+    svc.handle(final(NEW_SCENE))
+    svc.handle(final("make it winter"))
+    out = svc.handle(final("undo and add a dog"))
+    country = ct.WORLDS["country"]
+    assert [c["label"] for c in out["state"]["changes"]] == ["dog"]
+    assert out["steer"]["prompt"] == (f"{HEAD}{country.road}, moving forward away from the camera. {CAMERA} "
+                                      f"A dog standing nearby. {country.scene} {country.light} {STYLE}")
+    chat.gate.set()
+    reader.stop()
