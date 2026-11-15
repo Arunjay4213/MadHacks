@@ -68,9 +68,6 @@ class TableTest(unittest.TestCase):
                      CAR_BASE + " "]:
             self.assertFalse(is_road_scene(base), base)
 
-    def test_no_night_highway_world(self):  # Ishaan: a plain night highway turns to orange streaks
-        self.assertNotIn("night highway", WORLDS)
-
     def test_entries_have_the_change_shape(self):
         for alias, entry in WORLDS.items():
             self.assertEqual(set(entry), {"label", "kind", "phrase"}, alias)

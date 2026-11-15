@@ -86,59 +86,33 @@ class RemoveWorldKeepsObjectsTest(unittest.TestCase):
             r = s.handle({"type": "final", "text": spoken, "t_client": 2})
             self.assertEqual(labels(r), ["forest"], spoken)
 
-    def test_any_world_named_as_a_location_keeps_the_world(self):
+    def test_remove_with_a_location_removes_only_the_named_object(self):
         # "meadow", "desert" and the rest share no dictionary alias with an object, unlike "forest".
+        cases = []
         for world in ["meadow", "desert", "mars", "neon city", "ocean coast", "country road"]:
             for spoken in [f"remove the car near the {world}", f"remove the car in the {world}"]:
-                s = svc()
-                for t in [f"make it a {world}", "add a car"]:
-                    s.handle({"type": "final", "text": t, "t_client": 1})
-                r = s.handle({"type": "final", "text": spoken, "t_client": 2})
-                self.assertEqual(labels(r), [world], spoken)
-
-    def test_naming_the_world_first_still_removes_it(self):
-        for world in ["meadow", "desert", "neon city"]:
-            s = svc()
-            for t in [f"make it a {world}", "add a car"]:
-                s.handle({"type": "final", "text": t, "t_client": 1})
-            r = s.handle({"type": "final", "text": f"remove the {world}", "t_client": 2})
-            self.assertEqual(labels(r), ["car"], world)
-
-    def test_removing_an_absent_object_located_in_the_world_changes_nothing(self):
-        for world, spoken in [("meadow", "remove the dragon near the meadow"),
-                              ("meadow", "remove the car near the meadow"),
-                              ("meadow", "remove the car in the meadows"),
-                              ("forest", "remove the car near the forest"),
+                cases.append(([f"make it a {world}", "add a car"], spoken, [world]))
+        for world in ["meadow", "desert", "neon city"]:  # naming the world first still removes it
+            cases.append(([f"make it a {world}", "add a car"], f"remove the {world}", ["car"]))
+        # an absent object located in the world, or near another object, changes nothing
+        for world, spoken in [("meadow", "remove the dragon near the meadow"), ("meadow", "remove the car near the meadow"),
+                              ("meadow", "remove the car in the meadows"), ("forest", "remove the car near the forest"),
                               ("desert", "remove the dog by the desert")]:
-            s = svc()
-            s.handle({"type": "final", "text": f"make it a {world}", "t_client": 1})
-            r = s.handle({"type": "final", "text": spoken, "t_client": 2})
-            self.assertEqual(labels(r), [world], spoken)
-
-    def test_removing_an_absent_object_near_another_object_keeps_it(self):
-        s = svc()
-        s.handle({"type": "final", "text": "add a car", "t_client": 1})
-        r = s.handle({"type": "final", "text": "remove the dragon near the car", "t_client": 2})
-        self.assertEqual(labels(r), ["car"])
-
-    def test_object_named_by_alias_beats_a_newer_world_location(self):
-        s = svc()
-        for t in ["add a car", "make it a meadow"]:
-            s.handle({"type": "final", "text": t, "t_client": 1})
-        r = s.handle({"type": "final", "text": "remove the automobile near the meadow", "t_client": 2})
-        self.assertEqual(labels(r), ["meadow"])
-
-    def test_custom_world_with_a_preposition_in_its_name(self):
-        for world in ["city on mars", "temple in the jungle"]:
-            for spoken, left in [(f"remove the {world}", ["car"]),
-                                 (f"remove the car near the {world}", [world]),
+            cases.append(([f"make it a {world}"], spoken, [world]))
+        cases.append((["add a car"], "remove the dragon near the car", ["car"]))
+        # an object named by an alias beats a newer world named as its location
+        cases.append((["add a car", "make it a meadow"], "remove the automobile near the meadow", ["meadow"]))
+        for world in ["city on mars", "temple in the jungle"]:  # a custom world with a preposition in its name
+            for spoken, left in [(f"remove the {world}", ["car"]), (f"remove the car near the {world}", [world]),
                                  (f"remove the dragon near the {world}", [world, "car"])]:
+                cases.append(([f"take me to a {world}", "add a car"], spoken, left))
+        for setup, spoken, left in cases:
+            with self.subTest(setup=setup, spoken=spoken):
                 s = svc()
-                for t in [f"take me to a {world}", "add a car"]:
+                for t in setup:
                     s.handle({"type": "final", "text": t, "t_client": 1})
                 r = s.handle({"type": "final", "text": spoken, "t_client": 2})
-                self.assertEqual(labels(r), left, spoken)
-
+                self.assertEqual(labels(r), left)
 
 class AccentedPaceTest(unittest.TestCase):
     CAFE = {"op": "add", "label": "café", "kind": "extra", "phrase": "a small café", "strength": 1.0}

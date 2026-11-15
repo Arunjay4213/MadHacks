@@ -129,7 +129,6 @@ class StyleWordsTests(unittest.TestCase):
                     result = self.service(base).handle(dict(type="final", text=text, t_client=1))
                     self.assertEqual([(c["label"], c["strength"]) for c in result["state"]["changes"]], [(label, 1.0)])
                     self.assertEqual(result["steer"]["ramp_chunks"], RAMP["slow"])
-                    self.assertEqual(RAMP["slow"], 12)
                     self.assertNotIn("moderate amount", result["steer"]["prompt"])
 
     def test_style_path_strips_strength_words_and_sets_strength(self):

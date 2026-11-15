@@ -302,14 +302,21 @@ def test_engine_reports_the_final_reader():
     e.stop()
 
 
-def test_forward_motion_for_vehicles_only():
+@pytest.mark.parametrize("base, moves", [
+    ("a red sports car on a road", True),
+    ("a wide shot of a red car on a road", True),
+    ("a wide shot of a meadow with a single oak tree", False),
+    ("a red car driving away from the camera", False),  # already told
+    ("a wide shot of a red carpet", False),  # "carpet" is not a car
+    # Greptile on PR #89 (final_reader.py:153): a vehicle that stands or comes toward the camera is not told to drive away
+    ("a red car parked beside the oak tree", False),
+    ("a car driving toward the camera", False),
+    ("a wide shot of a taxi stopped at a red light", False),
+    ("an oncoming truck on a mountain road", False),
+])
+def test_forward_motion_for_moving_vehicles_only(base, moves):
     from engine.final_reader import with_forward_motion
-    car = with_forward_motion("a red sports car on a road")
-    assert car == "a red sports car on a road, " + FORWARD_MOTION
-    assert with_forward_motion("a wide shot of a meadow with a single oak tree") == "a wide shot of a meadow with a single oak tree"
-    told = "a red car driving away from the camera"
-    assert with_forward_motion(told) == told
-    assert with_forward_motion("a wide shot of a red carpet") == "a wide shot of a red carpet"  # "carpet" is not a car
+    assert with_forward_motion(base) == (f"{base}, {FORWARD_MOTION}" if moves else base)
 
 
 def test_a_named_colour_wins_over_making_a_duplicate_look_different():

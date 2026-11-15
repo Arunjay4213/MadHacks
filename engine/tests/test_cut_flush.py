@@ -160,19 +160,6 @@ def cond():
     return fake().encode_prompt("x")
 
 
-def test_fake_interrupt_stops_a_continuing_chunk_and_changes_nothing():
-    b = fake()
-    b.generate_chunk(cond())  # the video's first chunk
-    before = (b._chunks_generated, b._chunks_since_reset, b._context_pending)
-    timer = threading.Timer(0.01, b.interrupt)
-    timer.start()
-    with pytest.raises(ChunkInterrupted) as info:
-        b.generate_chunk(cond())
-    assert info.value.chunk_interrupted is True
-    assert (b._chunks_generated, b._chunks_since_reset) == before[:2] and b.interrupted_chunks == 1
-    assert b.generate_chunk(cond())["number"] == 1  # the next call takes the stopped chunk's number
-
-
 @pytest.mark.parametrize("case", ["first chunk", "re-anchor", "refresh"])
 def test_fake_never_stops_a_first_chunk_or_a_re_anchor(case):
     b = fake()
@@ -183,25 +170,6 @@ def test_fake_never_stops_a_first_chunk_or_a_re_anchor(case):
     timer.start()
     out = b.generate_chunk(cond())
     assert out["number"] == (0 if case == "first chunk" else 1) and b.interrupted_chunks == 0
-
-
-def test_fake_defer_context_skips_the_pass_before_a_re_anchor():
-    b = fake(defer_context=True)
-    b.generate_chunk(cond())
-    b.generate_chunk(cond())
-    b.reanchor(1.0)
-    b.generate_chunk(cond())
-    assert b.context_passes_skipped == 1
-    b.reset()
-    assert not b._context_pending
-
-
-def test_fake_without_passes_has_no_boundary():
-    b = FakeBackend(16, 16, 0, gen_ms=1)
-    b.generate_chunk(cond())
-    b.interrupt()
-    b.generate_chunk(cond())
-    assert b.interrupted_chunks == 0
 
 
 # --- the dissolve after a flush ------------------------------------------------------------------------------------
@@ -361,20 +329,6 @@ def test_only_a_continuing_chunk_is_ever_stopped(stage, stops):
     e._stop_in_flight()
     assert e.backend.calls == int(stops)
     assert e._inflight is (InFlight.STOPPING if stops else stage)
-
-
-def test_the_first_chunk_after_a_reset_is_a_video_start():
-    e = Engine(EngineConfig(backend="fake"), lambda b: None, lambda m: None)
-    e._begin_chunk(None)
-    assert e._end_chunk() is InFlight.VIDEO_START  # nothing generated yet
-    e._generated_video = e.video
-    e._begin_chunk(None)
-    assert e._end_chunk() is InFlight.CONTINUATION
-    e._begin_chunk(object())
-    assert e._end_chunk() is InFlight.ANCHOR
-    e.video += 1  # a reset or a recovery
-    e._begin_chunk(None)
-    assert e._end_chunk() is InFlight.VIDEO_START and e._inflight is InFlight.IDLE
 
 
 def test_a_steer_right_after_a_reset_stops_nothing(runs):

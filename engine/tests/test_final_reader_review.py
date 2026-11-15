@@ -171,15 +171,6 @@ def test_a_cached_base_edit_does_not_bring_back_a_removed_chip():
     assert sum(1 for c in chat.calls if c["sentence"] == sentence) == 2
 
 
-def test_a_vehicle_that_stands_or_comes_toward_the_camera_is_not_told_to_drive_away():
-    # Greptile on PR #89 (final_reader.py:153).
-    from engine.final_reader import FORWARD_MOTION, with_forward_motion
-    for base in ["a red car parked beside the oak tree", "a car driving toward the camera",
-                 "a wide shot of a taxi stopped at a red light", "an oncoming truck on a mountain road"]:
-        assert with_forward_motion(base) == base, base
-    assert with_forward_motion("a wide shot of a red car on a road").endswith(FORWARD_MOTION)
-
-
 def test_a_cache_written_by_another_prompt_build_is_not_reused(tmp_path):
     # Greptile on PR #89 (final_reader.py:143): a prompt saved before the engine changed how it builds prompts
     # came back after a restart, because the fingerprint had only the system prompt and the model.
