@@ -1,6 +1,6 @@
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeTypeBox, typeBoxAttrs } from '../lib.js';
+import { makeTypeBox, typeBoxAttrs, TYPE_REVEAL_MS } from '../lib.js';
 
 function box() {
   const seen = [];
@@ -29,11 +29,29 @@ test('type box: Esc hides it only while it is open and empty', () => {
   assert.equal(tb.closesOnKey('Enter', ''), false);
 });
 
-test('type box: typing reveals a hidden box; dictation and whole inserts (Wispr Flow) do not', () => {
-  const { tb } = box();
-  assert.equal(tb.afterInput('typing'), 'reveal-soon');
-  assert.equal(tb.afterInput('burst'), 'cancel-reveal');
-  assert.equal(tb.afterInput('whole'), 'cancel-reveal');
-  tb.show();
-  assert.equal(tb.afterInput('typing'), null); // open stays open, including after a send
+test('type box: typing reveals a hidden box once it pauses; a 30 ms dictation burst and a paste never do', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const { tb } = box();
+    // Wispr Flow-style burst: keys 30 ms apart; makeInputClassifier calls the 4th key a burst.
+    for (const kind of ['typing', 'typing', 'typing', 'burst']) {
+      tb.input(kind);
+      mock.timers.tick(30);
+    }
+    mock.timers.tick(500);
+    assert.equal(tb.open, false, 'a dictated burst opened the box');
+    tb.input('whole'); // a paste
+    mock.timers.tick(500);
+    assert.equal(tb.open, false);
+    // a person typing: the box opens once the keys pause for TYPE_REVEAL_MS
+    tb.input('typing');
+    mock.timers.tick(TYPE_REVEAL_MS - 1);
+    assert.equal(tb.open, false);
+    mock.timers.tick(1);
+    assert.equal(tb.open, true);
+    tb.input('typing'); // open stays open, including after a send
+    assert.equal(tb.open, true);
+  } finally {
+    mock.timers.reset();
+  }
 });

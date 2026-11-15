@@ -4,7 +4,7 @@ import {
   backoffMs, makeFrameGate, makeLatencyTracker, makeTranscriber,
   changesKey, commandKey, makeInputClassifier, wordsLabels, makeHeardTracker, PUSH_TO_TALK_CODE, isPushToTalk, micErrorText,
   wsBaseUrl, fitSize, videoNotice, formatStamps, isResetShortcut, makeOrderedFinals, makeSpeechEndpointer,
-  makeTypeBox, TYPE_REVEAL_MS,
+  makeTypeBox,
 } from './lib.js';
 
 const $ = (id) => document.getElementById(id);
@@ -394,16 +394,10 @@ const typeBox = makeTypeBox((attrs) => {
   refocus();
 });
 el.keyboard.addEventListener('click', () => typeBox.toggle());
-// Typed characters open a hidden box so people see what they type. A first keystroke waits briefly:
-// Wispr Flow dictation arrives as a burst (or one paste) and should stay on the voice line only.
-let revealTimer = 0;
+// Typed characters open a hidden box so people see what they type, once typing pauses; Wispr Flow
+// dictation (a burst or one paste) stays on the voice line only (makeTypeBox in lib.js).
 function revealIfTyping(kind) {
-  const next = typeBox.afterInput(kind);
-  if (next === 'reveal-soon' && !revealTimer) revealTimer = setTimeout(() => { revealTimer = 0; typeBox.show(); }, TYPE_REVEAL_MS);
-  if (next === 'cancel-reveal') {
-    clearTimeout(revealTimer);
-    revealTimer = 0;
-  }
+  typeBox.input(kind);
 }
 document.addEventListener('keydown', (e) => {
   if (typeBox.closesOnKey(e.key, el.command.value)) typeBox.hide();
