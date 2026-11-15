@@ -40,6 +40,12 @@ latent saved `clean_anchor_after` (3) chunks after the last reset or steer re-an
 latent has already drifted (over-contrast, blocky grass) and a refresh from it bakes that in; a
 refresh from the clean anchor does not (measured, MODEL_NOTES.md).
 
+Cut latency (both off by default): defer_context runs each chunk's context pass (writing its clean
+frame into the frame KV cache) at the start of the next chunk, and skips it when that chunk rebases,
+so a latent reaches the decoder one pass sooner and a cut does not pay for the old scene's pass.
+interrupt() stops the chunk in flight at its next pass boundary, for a steer cut that should not wait
+behind an old-scene chunk; the stopped call raises ChunkInterrupted and leaves no trace.
+
 Steer start (all off by default): steer_anchor_t starts a full-strength steer from the last clean
 latent noised to that level instead of pure noise, steer_noise=fixed draws all of that chunk's
 noise from a generator seeded by the video's seed, the same for every steer of the video, and
@@ -105,6 +111,17 @@ VARIANTS = {
 class VaeType(str, enum.Enum):
     WAN = "wan"  # official Wan2.1 VAE decoder, streaming with a feature cache (demo_utils/vae_block3.py)
     TAEHV = "taehv"  # tiny decoder shipped by the official demo (demo_utils/taehv.py)
+
+
+class ChunkInterrupted(RuntimeError):
+    """generate_chunk stopped at a pass boundary because interrupt() was called (a steer cut is next).
+
+    Nothing of the chunk is kept: the chunk and frame counters, the history, the clean anchor, the
+    rebase counters and the main noise stream are as before the call, so the next generate_chunk takes
+    the same chunk number. The engine recognises it by the `chunk_interrupted` attribute, without
+    importing this module."""
+
+    chunk_interrupted = True
 
 
 class GenState(enum.Enum):
@@ -515,6 +532,7 @@ class Backend:
         steer_noise: str = "fresh",
         steer_steps=None,
         steer_noise_first_frame: bool = False,
+        defer_context: bool = False,
     ) -> None:
         """Generation state: lock, stream, RNG, caches, counters, automatic rebase settings.
         Split out of __init__ so tests can build a Backend around a stub generator."""
@@ -555,6 +573,14 @@ class Backend:
             self._steer_schedule = torch.stack([t0] + [s for s in self.first_chunk_steps if s < t0])
         else:
             self._steer_schedule = None  # the first-frame schedule, as today
+        # Cut latency (MODEL_NOTES.md, "The cost of a cut"). defer_context: the context pass of a chunk
+        # runs at the start of the next generate_chunk (before its text-cache reset, so under its own
+        # cond), or not at all when that chunk rebases, since the rebase clears the frame cache.
+        self.defer_context = bool(defer_context)
+        self._pending_context: Optional[tuple] = None  # (denoised, cond, current_start) of the last chunk
+        self.context_passes_skipped = 0  # deferred context passes a rebase made unnecessary
+        self._interrupt = threading.Event()  # interrupt(): stop the chunk in flight at its next pass boundary
+        self.interrupted_chunks = 0
         if int(cut_fade_frames) < 0:
             raise ValueError(f"cut_fade_frames must be >= 0, got {cut_fade_frames}")
         # Dissolve from the last shown frame over this many frames after a re-anchor cut (0 = off);
@@ -650,6 +676,8 @@ class Backend:
             with torch.cuda.device(self.device), torch.cuda.stream(self._gen_stream):
                 self._clear_frame_cache()
             self._reset_crossattn_cache()
+            self._pending_context = None  # the frame cache it would write was just cleared
+            self._interrupt.clear()  # meant for a chunk of the old video
             self._last_cond = None
             self.frame_index = 0
             self.chunk_index = 0
@@ -796,12 +824,15 @@ class Backend:
         """One chunk. `rebase` (a Rebase, a dict of its fields, or None) restarts the frame cache
         before this chunk; with steer_rebase / refresh_every set, the backend may also do so by
         itself. An explicit `rebase` always wins for that chunk. Ignored on the first chunk of a
-        video. Rebase needs a framewise variant."""
+        video. Rebase needs a framewise variant.
+
+        Raises ChunkInterrupted when interrupt() stops this chunk (see interrupt)."""
         with self._gen_lock, torch.cuda.device(self.device), torch.cuda.stream(self._gen_stream):
             if self.frame_index + self.num_frame_per_block > self.max_latent_frames:
                 raise RuntimeError("reached max_latent_frames; call reset() or load with a larger max_latent_frames")
             # `cond` may have been written on another thread's stream (the steerer's blend).
             self._gen_stream.wait_stream(torch.cuda.default_stream(self.device))
+            self._interrupt.clear()  # an interrupt() that missed the previous chunk's last boundary is moot
             pending = self._pending_reanchor
             from_reanchor = False  # this chunk runs the re-anchor reanchor() asked for
             if pending is not None:
@@ -810,10 +841,24 @@ class Backend:
                     rebase, from_reanchor = pending, True
             changed = cond is not self._last_cond
             plan = reason = None
+            steer_pending = self._steer_pending  # _plan_rebase may change it; restored if this chunk is stopped
             if rebase is not None or self._auto_steer is not None or self._auto_refresh is not None:
                 plan, reason = self._plan_rebase(changed, Rebase.of(rebase))
                 if plan is not None and self.num_frame_per_block != 1:
                     raise ValueError("rebase needs a framewise variant (1 latent frame per chunk)")
+            # interrupt() can stop only a chunk that continues the video: a rebase or a first frame is
+            # the cut itself. `undo` is what a stop puts back: the main noise stream, the cond the text
+            # cache was built for, and the automatic steer's change tracking.
+            undo = (self._rng.get_state(), self._last_cond, steer_pending) \
+                if plan is None and self.state is GenState.STREAMING else None
+            passes = 0  # generator calls this chunk has made: a boundary exists only after one
+            if self._pending_context is not None:
+                ctx, self._pending_context = self._pending_context, None
+                if plan is not None:
+                    self.context_passes_skipped += 1  # the rebase clears the frame cache it would write
+                else:
+                    self._context_pass(*ctx)  # before the text-cache reset: that cache still holds ctx's cond
+                    passes += 1
             if changed or plan is not None:
                 self._reset_crossattn_cache()
                 self._last_cond = cond
@@ -902,6 +947,9 @@ class Backend:
             current_start = self.frame_index * self.frame_seq_length
 
             for i, t in enumerate(schedule):
+                if passes:
+                    self._stop_if_interrupted(undo)
+                passes += 1
                 timestep = torch.ones([1, f], device=self.device, dtype=torch.int64) * t
                 _, denoised = self.generator(
                     noisy_image_or_video=noisy,
@@ -919,15 +967,13 @@ class Backend:
                         nxt * torch.ones([f], device=self.device, dtype=torch.long),
                     ).unflatten(0, denoised.shape[:2])
 
-            # Write the clean frame into the frame KV cache (official step 3.3).
-            self.generator(
-                noisy_image_or_video=denoised,
-                conditional_dict=cond_dict,
-                timestep=torch.ones([1, f], device=self.device, dtype=torch.int64) * self.context_noise,
-                kv_cache=self.kv_cache,
-                crossattn_cache=self.crossattn_cache,
-                current_start=current_start,
-            )
+            # Write the clean frame into the frame KV cache (official step 3.3), now or at the start of
+            # the next chunk (defer_context).
+            if self.defer_context:
+                self._pending_context = (denoised, cond, current_start)
+            else:
+                self._stop_if_interrupted(undo)
+                self._context_pass(denoised, cond, current_start)
             if f == 1:
                 self._history.append(denoised)  # a reference, for a later rebase
             if self.chunk_index == self._clean_capture_chunk:
@@ -944,6 +990,50 @@ class Backend:
             self.chunk_index += 1
             self.state = GenState.STREAMING
             return out
+
+    def _context_pass(self, denoised: torch.Tensor, cond: torch.Tensor, current_start: int) -> None:
+        """Write a clean latent into the frame KV cache under `cond` (caller holds the lock and the stream)."""
+        f = denoised.shape[1]
+        self.generator(
+            noisy_image_or_video=denoised,
+            conditional_dict={"prompt_embeds": cond},
+            timestep=torch.ones([1, f], device=self.device, dtype=torch.int64) * self.context_noise,
+            kv_cache=self.kv_cache,
+            crossattn_cache=self.crossattn_cache,
+            current_start=current_start,
+        )
+
+    def interrupt(self) -> None:
+        """Any thread: stop the generate_chunk in flight at its next pass boundary (between two model
+        passes) with ChunkInterrupted. For a steer cut that should not wait behind an old-scene chunk.
+
+        Only a chunk that continues the video is stopped, never a rebase (a cut, a refresh) or the
+        first chunk of a video. The stopped call leaves the backend as if it had not been made: same
+        chunk and frame index (the next chunk takes its number), history, clean anchor, last_rebase and
+        counters, and the main noise stream is rolled back to where it was before the call, so with
+        steer_noise=fresh the cut draws what it would have drawn had reanchor() come one chunk sooner,
+        wherever the interrupt landed. The frame KV cache keeps the stopped passes' noisy frame at the
+        next position: a cut clears it, and a normal chunk at that position overwrites it, as each
+        denoising pass of a chunk does. If the stopped call had rebuilt the text cache for a new cond,
+        that cache is marked stale. A call that misses the last boundary of the chunk in flight (or
+        comes between chunks) is dropped when the next chunk starts or at reset()."""
+        self._interrupt.set()
+
+    def _stop_if_interrupted(self, undo: Optional[tuple]) -> None:
+        """A pass boundary: raise ChunkInterrupted after undoing the chunk's state changes, if asked."""
+        if undo is None or not self._interrupt.is_set():
+            return
+        self._interrupt.clear()
+        rng_state, last_cond, steer_pending = undo
+        self._rng.set_state(rng_state)
+        self._steer_pending = steer_pending
+        if self._last_cond is not last_cond:
+            # The text cache now holds this chunk's cond. Mark it stale so the next chunk rebuilds it from
+            # its own cond, even when that is the previous cond again (which is not a change).
+            self._last_cond = last_cond
+            self._reset_crossattn_cache()
+        self.interrupted_chunks += 1
+        raise ChunkInterrupted(f"chunk {self.chunk_index} stopped at a pass boundary by interrupt()")
 
     def decode_chunk(self, latents: ChunkLatents) -> np.ndarray:
         return self.decoder.decode(latents)
@@ -983,6 +1073,11 @@ def load(width: int, height: int, steps: Optional[int] = None, device: str = "cu
     the steer chunk's schedule, strictly descending in 0..1000, starting at steer_anchor_t (or 1000 when
     it is unset); None: steer_anchor_t and the first-frame steps below it, or the first-frame schedule.
     steer_noise_first_frame (0): the first frame of every video uses the fixed steer noise too.
+    Cut latency (off by default, see MODEL_NOTES.md, "The cost of a cut"): defer_context (0): run each
+    chunk's context pass (its KV-cache write) at the start of the next chunk, and skip it when that chunk
+    rebases, so a latent is ready one pass sooner and a cut does not pay for the old scene's pass.
+    Backend.interrupt() (always available, does nothing unless called) stops a non-rebase chunk at its
+    next pass boundary with ChunkInterrupted, so a steer cut can start without waiting for it.
     """
     # Options may arrive as strings from the server's --backend-opt KEY=VALUE.
     flag = lambda v: v if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes", "on")  # noqa: E731
@@ -993,7 +1088,7 @@ def load(width: int, height: int, steps: Optional[int] = None, device: str = "cu
              "cut_fade_refresh": flag, "refresh_noise": str,
              "refresh_anchor_t": lambda v: None if str(v).lower() == "none" else int(v),
              "steer_anchor_t": lambda v: None if v is None or str(v).lower() == "none" else int(v),
-             "steer_noise": str, "steer_noise_first_frame": flag}
+             "steer_noise": str, "steer_noise_first_frame": flag, "defer_context": flag}
     options = {k: types[k](v) if k in types else v for k, v in options.items()}
     steps = int(steps) if steps is not None and int(steps) > 0 else None  # 0 or None: distilled schedule
     t0 = time.time()
