@@ -5,6 +5,7 @@ import time
 import httpx
 
 from commands.service import CommandService
+from commands.state import SceneState
 from engine.reader import load_reader
 from engine.slow_reader import FoundrySlowReader, StateCachingReader, from_env, validate
 
@@ -102,3 +103,36 @@ def test_load_reader_commands_without_credentials(monkeypatch):
     reader = load_reader("commands")
     assert reader.committed_prompt and reader.state_fields()["changes"] == []
     assert reader.handle(final("make it winter"))["state"]["changes"][0]["label"] == "winter"
+
+
+def test_base_edit_keeps_the_other_changes():
+    # "turn the tree into a lighthouse" after winter and a lion: the base changes, the snow and the lion stay.
+    reply = json.dumps({"op": "edit_base", "base": "a lighthouse in a meadow"})
+    svc = CommandService(slow_reader=reader_replying(reply), slow_timeout_s=2)
+    svc.handle(final("make it winter"))
+    svc.handle(final("add a lion"))
+    before = svc.snapshot()["changes"]
+    out = svc.handle(final("turn the tree into a lighthouse"))
+    assert out["state"]["unmatched"] is False
+    after = svc.snapshot()
+    assert after["base"] == "a lighthouse in a meadow"
+    assert [(c["label"], c["phrase"]) for c in after["changes"]] == [(c["label"], c["phrase"]) for c in before]
+    assert "lighthouse" in out["steer"]["prompt"]
+    svc.handle(final("undo"))  # one undo reverts the whole base edit
+    assert svc.snapshot()["changes"] == before and svc.snapshot()["base"] != "a lighthouse in a meadow"
+
+
+def test_base_edit_keeps_a_season_with_a_world():
+    snap = {"base": "a road", "changes": [
+        {"id": "c1", "label": "winter", "kind": "season", "phrase": "snow", "strength": 1.0},
+        {"id": "c2", "label": "desert", "kind": "world", "phrase": "a desert", "strength": 1.0}]}
+    state = SceneState("a road")
+    state.apply(validate({"op": "edit_base", "base": "a bridge"}, snap))
+    assert sorted(c["label"] for c in state.snapshot()["changes"]) == ["desert", "winter"]
+
+
+def test_new_scene_still_clears_the_changes():
+    op = validate({"op": "new_scene", "base": "a beach"}, SNAP)
+    assert op == {"op": "new_scene", "base": "a beach"}
+    assert validate({"op": "edit_base", "base": "a beach"}, {"base": "x", "changes": []}) == op
+    assert validate({"op": "edit_base", "base": ""}, SNAP) is None
