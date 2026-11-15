@@ -137,7 +137,9 @@ def test_start_over_with_a_scene_reaches_the_final_reader():
     """Greptile on PR #105, engine/final_reader.py:262: the keyword table reads "start over with a beach" as a
     plain reset, which would drop the beach; the final reader makes it a new scene."""
     for sentence, op, word in (("start over with a beach", BEACH, "beach"), ("new scene of a desert", DESERT, "desert"),
-                               ("reset to a beach", BEACH, "beach")):
+                               ("reset to a beach", BEACH, "beach"),
+                               ("reset and start over with a beach", BEACH, "beach"),
+                               ("undo and start over with a beach", BEACH, "beach")):
         svc, chat = wrapper({"make it winter": reply([WINTER]), sentence: reply([op])})
         final(svc, "make it winter")
         out = final(svc, sentence, 2)
@@ -155,7 +157,8 @@ def test_start_over_with_unsafe_content_is_blocked():
 
 
 def test_a_bare_start_over_keeps_the_fast_path():
-    for sentence in ("start over", "reset", "start over please", "reset everything", "start over from scratch"):
+    for sentence in ("start over", "reset", "start over please", "reset everything", "start over from scratch",
+                     "reset immediately", "slowly start over", "reset right now", "reset and start over"):
         svc, chat = wrapper({"make it winter": reply([WINTER])})
         final(svc, "make it winter")
         out = final(svc, sentence, 2)
