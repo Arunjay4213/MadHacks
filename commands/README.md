@@ -88,6 +88,10 @@ A sentence is limited to 16 operations, and nested batches are rejected.
 - "undo", "go back", "revert", "take that back" and "never mind" restore the whole state before the last command, so one compound sentence or one world change is one undo step.
 - "undo the winter" removes the winter, not the last change.
 - "remove the river", or the × on a chip (a `remove` tap), removes one change and keeps the rest.
+- "remove the forest" removes the world, and objects added inside it stay (a tree added earlier is kept).
+- "remove the car near the forest" removes the car and keeps the forest.
+  A world named after a preposition ("near", "in", "by") is only the location of the object named before it, never the removal target.
+  This holds for every world, for example "remove the car near the meadow" keeps the meadow.
 - "reset", "start over" and "clear everything" go back to the base scene, and the engine starts a new video.
 - "a little more snow" and "a little less snow" move the strength up or down from where it is.
 
