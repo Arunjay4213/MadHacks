@@ -30,7 +30,7 @@ The layout is the "Halo" design: one centred column on a static gradient backgro
 - The heard caption under the video: the sentence (keyword highlighted), then "Understood · applying now", "Listening…" while you are still speaking or typing, or "Not understood". Partial speech never shows as understood. It fades out 4 s after the last update.
 - The command bar pinned near the bottom: the text box, the amber Hold to talk button, then Mic (Wispr), Undo and Reset, with key hints underneath.
 - Full screen: the video fills the screen; the caption and the bar float over the bottom; the status and delay pills stay at the top right; the header and hints are hidden.
-- Phone width: the video goes full width, the chips scroll sideways, the hints are hidden and the page may scroll.
+- Phone width: the status and delay pills move to their own row under the logo, the video goes full width, the chips scroll sideways, the hints are hidden and the page may scroll.
 
 ## Controls and keys
 
