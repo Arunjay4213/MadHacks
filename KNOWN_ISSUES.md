@@ -40,6 +40,10 @@ Options: pick one page for the demo and keep the other as a fallback, and pick o
 - **Added objects are small or at the edge.**
   Size and position words in the prompt help ("a large ... in the foreground at the left of the frame").
   The lion was the weakest case.
+- **A parked car after a change of place is sometimes lost or crushed.**
+  Live acceptance at 06:24 and 06:57 UTC (2026-11-15, `engine/samples/acceptance_live_0624.jpg`, `acceptance_live_0657.jpg`): "make it a desert" in the meadow demo chain (car and lion) and "turn it into a beach" after "add a red car" each passed once and failed once (car gone, or crushed at the bottom edge), with the same prompts.
+  An A/B with the same prompts (`engine/samples/parked_car_road_vs_landscape_ab_0712.jpg`, 2 runs each) showed the car in every run with the road form of the world, and once small or tiny with the landscape form, so the composer keeps the road form when a vehicle is in the scene.
+  It is run-to-run variation of the model, not a prompt fault we found.
 - **A car racing on a road, added to the plain meadow, is lost.**
   Live A/B on 2026-11-15 (issue #267): with the road clause ("a straight grey asphalt road ... runs across the scene") the road is drawn but the car is tiny, oncoming or gone in 4 of 4 runs, also with a longer road clause.
   The car template wording ("A red car, seen from directly behind ..., drives fast along a straight grey asphalt road through a green meadow ...") kept a large car on the road in 2 of 2.
