@@ -499,19 +499,31 @@ def reply_chips(chips, person_chip: str | None = None) -> list[str]:
     return out[:16]
 
 
-# Words of a chip label that say nothing about what is drawn ("second dog", "the city"): never the evidence for a chip.
-_CHIP_FILLER = frozenset("a an the of in on at to and with some more less second third another".split())
+# Words of a chip label that say nothing about what is drawn ("second dog", "the city", "light fog"): never the evidence
+# for a chip.
+_CHIP_FILLER = frozenset("""a an the of in on at to and with some more less second third another light heavy thick thin
+    little bit lot very""".split())
 
 
 def _chip_terms(label: str) -> set[str]:
-    """The words that show `label`'s thing is in a prompt: its own content words, and for a keyword table label
-    ("winter") every alias ("snow", "snowy", "frost", ...)."""
+    """The words that show `label`'s thing is in a prompt. Keywords of the keyword table inside the label are read left
+    to right, longest first, and each stands for all its entry's aliases ("winter": "snow", "frost", ...; the "fog" of
+    "light fog": "mist", "haze", ...), so "lightning bugs" are fireflies and never the storm's "lightning". The other
+    words count as themselves, except filler and amount words when the label has anything else ("light" alone stays)."""
     from commands.dictionary import KEYWORDS, normalize
-    terms = {w for w in normalize(label).split() if w not in _CHIP_FILLER}
-    entry = KEYWORDS.get(normalize(label))
-    if entry is not None:
-        terms |= {k for k, e in KEYWORDS.items() if e["label"] == entry["label"]}
-    return terms
+    words = normalize(label).split()
+    labels, rest, i = set(), [], 0
+    while i < len(words):
+        j = next((j for j in range(len(words), i, -1) if " ".join(words[i:j]) in KEYWORDS), None)
+        if j is None:
+            rest.append(words[i])
+            i += 1
+            continue
+        labels.add(KEYWORDS[" ".join(words[i:j])]["label"])
+        i = j
+    content = {w for w in rest if w not in _CHIP_FILLER}
+    terms = content if content or labels else set(rest)
+    return terms | {k for k, e in KEYWORDS.items() if e["label"] in labels}
 
 
 def _says(prompt: str, term: str) -> bool:

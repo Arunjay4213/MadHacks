@@ -481,6 +481,19 @@ def test_a_chip_whose_words_left_the_prompt_is_dropped():
     attempt = check_reply(json.loads(reply(kept, ["winter", "rain", "zoom out", "jensen huang"])),
                           {**user, "person_chip": "jensen huang"})
     assert attempt.entry.operations[0]["chips"] == ["winter", "rain", "zoom out", "jensen huang"]
+    # Greptile on #286: a longer label keeps the aliases of the thing inside it ("light fog" shown as "a thin mist").
+    attempt = check_reply(json.loads(reply("A meadow under a thin mist at night.", ["light fog", "night"])),
+                          {"prompt": "a meadow; a light fog drifts low; night", "chips": ["light fog", "night"],
+                           "sentence": "make it night"})
+    assert attempt.entry.operations[0]["chips"] == ["light fog", "night"]
+    # Greptile on #288: the longest keyword wins ("lightning bugs" are fireflies, not the storm's lightning), and a label
+    # made only of a filler word ("light") keeps that word as its evidence.
+    attempt = check_reply(json.loads(reply("A meadow under a dark thunderstorm with lightning.", ["lightning bugs"])),
+                          {"prompt": "a meadow with glowing fireflies", "chips": ["lightning bugs"], "sentence": "storm"})
+    assert attempt.entry.operations[0]["chips"] == []
+    attempt = check_reply(json.loads(reply("A dark meadow.", ["light"])),
+                          {"prompt": "a meadow with a warm light", "chips": ["light"], "sentence": "make it dark"})
+    assert attempt.entry.operations[0]["chips"] == []
 
 
 def test_the_final_reader_waits_3_5_s_by_default():

@@ -551,7 +551,9 @@ The light check (`final_reader.check_reply`) repairs what it can and never refus
 - A reply whose prompt is the prompt on screen (`Verdict.UNCHANGED`, often a cut that took the change away) is not used: it is asked again when there is time, else the dictionary reads the sentence, and on a free scene that shows as not understood, never as a chip with no change on screen.
 - Chips are cleaned (lower case, whole words up to 24 characters, at most 16, no duplicates), never a reason to drop the reply.
 - Chips match the prompt (`chips_in_prompt`): a chip whose words were in the prompt on screen and are in none of the new prompt is dropped and logged.
-  A chip's words are its own content words and, for a keyword table label, all its aliases ("winter": snow, snowy, frost, icy, ...).
+  A chip's words are its own content words and, for every keyword table entry named inside the label, all that entry's aliases ("winter": snow, snowy, frost, icy, ...; the "fog" of "light fog": mist, haze, ...).
+  Keywords inside a label are read left to right, longest first ("lightning bugs" are fireflies, not the storm's "lightning").
+  Filler and amount words ("second", "light", "thick", "some", ...) are no evidence when the label has other words; a label made only of them ("light") keeps them.
   A chip with no words in either prompt ("zoom out") and the named person's chip stay.
   Regression sweep on 243a1e7 (#285): "make it rain" on a snowy night took every snow word out and the "winter" chip stayed with nothing behind it.
 - On a car scene that is not a new scene, the prompt must still start with the template's subject sentence (any subject, any road) and its camera sentence word for word, and the road must name a drivable surface (`car_template.DRIVABLE`).
