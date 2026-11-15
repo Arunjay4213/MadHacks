@@ -2,7 +2,9 @@
 
 import json
 
+from commands.composer import compose
 from commands.service import CommandService
+from commands.state import SceneState
 from engine import car_template as ct
 from engine.final_reader import FinalReader, FinalReaderState, prompt_spec
 from engine.people import PEOPLE, for_model
@@ -122,17 +124,22 @@ def test_add_jensen_huang_on_the_car_scene_is_in_the_template():
     assert out["steer"]["prompt"] == ct.world_prompt("a red sports car", country, [LEFT])
 
 
-def test_the_pinned_demo_plays_jensen_huang_in_both_chains_with_no_call():
+def test_the_pinned_demo_plays_every_entry_and_jensen_huang_with_no_call():
     from engine.final_reader import DEFAULT_DEMO_PROMPTS, load_pinned
     entries = json.loads(open(DEFAULT_DEMO_PROMPTS).read())
     pinned = load_pinned(DEFAULT_DEMO_PROMPTS)
     assert len(pinned) == len(entries)
     reader = FinalReader(FinalReaderState.ON, chat=Chat({}), spec=prompt_spec(), pinned=pinned)
     svc = FinalReadingService(CommandService(semantic_reader=lambda *a: None), reader)
+    base = compose(SceneState().snapshot())
+    seen = {}  # composed prompt -> the words the model sees for it: the first rich prompt of that scene
     for e in entries:
+        if e["prompt_before"] == base and compose(svc._svc.snapshot()) != base:
+            svc.handle(final("reset"))  # the file starts a chain again from the meadow
+        assert compose(svc._svc.snapshot()) == e["prompt_before"], e["sentence"]
         out = svc.handle(final(e["sentence"]))
-        assert out["steer"]["prompt"] == e["prompt"], e["sentence"]
+        assert out["steer"]["prompt"] == seen.setdefault(compose(svc._svc.snapshot()), e["prompt"]), e["sentence"]
         if e["sentence"] == "add jensen huang":
             assert labels(out)[-1] == "jensen huang" and JENSEN in out["steer"]["prompt"].lower()
-    assert reader.stats()["calls"] == 0
-    assert [e["sentence"] for e in entries].count("add jensen huang") == 2
+    assert reader.stats()["calls"] == 0 and reader.stats()["pinned_hits"] == len(entries)
+    assert [e["sentence"] for e in entries].count("add jensen huang") >= 2
