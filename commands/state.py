@@ -5,6 +5,7 @@ from copy import deepcopy
 
 DEFAULT_BASE = "a wide shot of a meadow with a single oak tree"
 KINDS = ("world", "season", "weather", "time", "extra")
+WORLD_CLEARS = {"world", "season", "weather"}
 
 
 def _text(value, field):
@@ -72,7 +73,9 @@ class SceneState:
                         label=label, kind=kind, phrase=phrase, strength=strength)
             new_id = existing is None
             if kind != "extra":
-                changes[:] = [c for c in changes if c["kind"] != kind or c is existing]
+                # A new world brings its own season and weather, so it also clears those; time and objects stay.
+                cleared = WORLD_CLEARS if kind == "world" else {kind}
+                changes[:] = [c for c in changes if c["kind"] not in cleared or c is existing]
             if existing:
                 changes[changes.index(existing)] = item
             else:
