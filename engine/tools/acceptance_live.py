@@ -66,6 +66,8 @@ class Verdict(enum.Enum):
     PASS = "pass"          # every answer matches
     FAIL = "fail"          # at least one answer does not match
     UNJUDGED = "unjudged"  # no usable answer (call failed, bad reply, or the call cap was reached)
+    KNOWN = "known failure"  # a FAIL on a step the team decided not to fix ("known_failure" in the case): reported
+                             # apart, not counted
     NO_FRAME = "no frame"  # no fresh frame to judge: the video stopped, or the change never reached the screen
 
 
@@ -334,19 +336,20 @@ def write_report(out: Path, played: list[Played], frames: list, calib: dict | No
     passed = [s for s in judged if s["verdict"] == Verdict.PASS.value]
     unjudged = [s for s in steps if s.get("verdict") in (Verdict.UNJUDGED.value, Verdict.NO_FRAME.value)]
     delays = sorted(s["timing"]["delay_ms"] for s in steps if s.get("timing", {}).get("delay_ms") is not None)
-    summary = {"steps": len(steps), "judged": len(judged), "passed": len(passed),
+    known = [s for s in steps if s.get("verdict") == Verdict.KNOWN.value]
+    summary = {"steps": len(steps), "judged": len(judged), "passed": len(passed), "known_failures": len(known),
                "failed": len(judged) - len(passed), "unjudged": len(unjudged),
                "late": sum(1 for s in steps if s.get("timing", {}).get("late")),
                "delay_ms_median": delays[len(delays) // 2] if delays else None,
                "delay_ms_range": [delays[0], delays[-1]] if delays else None,
                "vision_calls": judge.calls,
                "calibration_accuracy": calib.get("accuracy") if calib else None,
-               "overall": ("pass" if judged and len(passed) == len(judged) and not unjudged
+               "overall": ("pass" if (judged or known) and len(passed) == len(judged) and not unjudged
                            and not meta.get("aborted") else "fail"), **meta}
     (out / "results.json").write_text(json.dumps({"summary": summary, "steps": steps}, indent=2) + "\n")
     lines = ["# Acceptance run (real model, vision judge)", "",
              f"Overall: **{summary['overall'].upper()}**: {summary['passed']} of {summary['judged']} judged steps "
-             f"pass, {summary['failed']} fail, {summary['unjudged']} unjudged; {summary['steps']} steps played, "
+             f"pass, {summary['failed']} fail, {summary['unjudged']} unjudged, {len(known)} known failures (not counted); {summary['steps']} steps played, "
              f"{summary['late']} late (first frame after {LOOK_AFTER_S:.0f} s).",
              f"Command to screen (client side): median {summary['delay_ms_median']} ms, range "
              f"{summary['delay_ms_range']}. Vision calls: {judge.calls}"
@@ -377,7 +380,7 @@ def write_report(out: Path, played: list[Played], frames: list, calib: dict | No
     return summary
 
 
-VERDICT_COLOURS = {"pass": (60, 170, 90), "fail": (220, 60, 60), "unjudged": (230, 160, 40),
+VERDICT_COLOURS = {"pass": (60, 170, 90), "fail": (220, 60, 60), "unjudged": (230, 160, 40), "known failure": (140, 140, 150),
                    "no frame": (220, 60, 60)}
 
 
@@ -429,6 +432,8 @@ def judge_played(judge: Judge, played: list[Played], frames: list, out: Path) ->
         if not p.step.get("visible"):
             continue  # played for the chain and the delay; the case asks nothing of this frame
         res = judge_frame(judge, jpeg_for_judge(frames[i][3]), step_questions(p.step))
+        if res["verdict"] == Verdict.FAIL.value and p.step.get("known_failure"):
+            res.update(verdict=Verdict.KNOWN.value, note=f"known failure: {p.step['known_failure']}")
         p.result.update(res)
         print(f"  {p.case}: {p.label}: {res['verdict']}" + (f" ({res['note']})" if res["note"] else ""))
 

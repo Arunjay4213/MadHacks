@@ -328,3 +328,11 @@ def test_undo_and_an_edit_on_a_car_scene_keeps_the_car_template():
                                       f"A dog standing nearby. {country.scene} {country.light} {STYLE}")
     chat.gate.set()
     reader.stop()
+
+
+def test_a_road_slot_must_name_a_drivable_surface():
+    from engine.car_template import field_problems
+    ok = {"road": "a beachfront road with pale sand beside it", "scene": "Waves roll in.", "light": "Bright sun."}
+    assert field_problems(ok) == []
+    sand = {**ok, "road": "a wide stretch of pale sand"}
+    assert any("drives on" in p for p in field_problems(sand))

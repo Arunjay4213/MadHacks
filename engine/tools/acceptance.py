@@ -36,7 +36,7 @@ CAR_SENTENCE = "new scene of a red sports car driving along a country road"
 STARTS = {"meadow": [], "car": [CAR_SENTENCE]}
 
 STEP_KEYS = {"say", "tap", "chip", "understood", "chips", "no_chips", "has", "lacks", "slow", "strength", "visible",
-             "look_after_s", "note"}
+             "look_after_s", "note", "known_failure"}
 CASE_KEYS = {"name", "start", "modes", "xfail", "note", "steps", "live"}
 TAPS = ("undo", "reset", "remove")
 # "up" and "down" compare a chip's strength with the step before; "low" (< 1), "full" (>= 1) and "high" (> 1)

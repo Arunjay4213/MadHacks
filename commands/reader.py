@@ -341,12 +341,31 @@ def read(text: str, snapshot: dict) -> dict:
                     phrase = _additional(phrase, entry, keyword, snapshot)
                 return out({"op": "add", **entry, "phrase": phrase, "strength": strength}, keyword)
     if existing:
+        if _unread_words(rest):
+            # "make the dog black": a change to an object the table cannot write. Keeping the strength would change
+            # nothing and still look understood; unmatched shows the user the words were not used.
+            return out(None, keyword)
         return out({"op": "set_strength", "id": existing["id"], "strength": strength}, keyword)
     return out({"op": "add", "label": entry["label"], "kind": entry["kind"], "phrase": _additional(entry["phrase"], entry, keyword, snapshot) if entry["kind"] == "extra" else entry["phrase"], "strength": strength}, keyword)
 
 
 # A clause starts with an explicit action (optionally after "also/then/please/now" and a pace word).
 _LEAD = r"^(?:(?:also|then|please|now|and)\s+)*(?:(?:slowly|gradually|gently|suddenly|instantly|quickly|immediately)\s+)?"
+_COLOURS = {"black", "white", "red", "orange", "yellow", "green", "blue", "purple", "pink", "grey", "gray", "brown",
+            "golden", "gold", "silver"}
+_EDIT_VERBS = {"make", "turn", "set", "keep", "change", "let", "have", "get", "go", "now", "please", "it", "its", "it's",
+               "just", "only", "even", "again", "back", "still", "ok", "okay", "so"}
+
+
+def _unread_words(rest: str) -> bool:
+    """True when `rest` (the sentence without the object's own words) holds a word that is not filler, an edit
+    verb, or a strength, more or less word: a description the keyword table does not apply."""
+    for rx in (_LOW_RX, _HIGH_RX, _MORE_RX, _LESS_RX):
+        rest = rx.sub(" ", rest)
+    filler = (_STOP - _COLOURS) | _EDIT_VERBS
+    return any(w not in filler for w in re.findall(r"[a-z']+", rest))
+
+
 _ACTION_RX = re.compile(_LEAD + r"(?:add|put|place|bring|include|build|draw|give me|i want|i'd like|let's|lets|let it|remove|delete"
                         r"|get rid of|take away|drop|lose|no more|stop the|without|make|turn|change|set|switch|show me|take me to|go to|go back"
                         r"|undo|revert|reset|start over|start again|clear|new scene|never mind|nevermind|take that back"
@@ -460,7 +479,10 @@ def style_fallback(text: str, snapshot: dict | None = None):
     strength_words = (m.group("more") or "") + spoken
     existing = _find(snapshot or {}, what)
     if existing:
-        return {"op": "set_strength", "id": existing["id"], "strength": strength_for(strength_words, existing["strength"])}
+        strength = strength_for(strength_words, existing["strength"])
+        if set(what.split()) - set(existing["label"].split()):
+            return None  # "make the dog black": a description of the dog it cannot write; nothing would change
+        return {"op": "set_strength", "id": existing["id"], "strength": strength}
     return {"op": "add", "label": what, "kind": "extra", "phrase": "the whole scene looks " + ("like " if like else "") + what,
             "strength": strength_for(strength_words)}
 

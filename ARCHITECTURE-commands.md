@@ -156,7 +156,7 @@ This runs when the final reader gives None, for CONTROL and MIXED sentences, and
 
 ## Found while reading (behaviour, not fixed here)
 
-- On a Sonnet car scene, a sentence that falls back to the dictionary (a timeout or a failed call, for example "add a dog") steers to the commands-side composed prompt of the bare vehicle base (`a red sports car; a dog standing nearby; a coastal cliff road. ...`), not the car template, because `composer` does not treat a bare "a red sports car" base as a road scene. The behaviour lock records this.
+- On a Sonnet car scene, a sentence that falls back to the dictionary (a timeout or a failed call, for example "add a dog") steers to the commands-side composed prompt of the bare vehicle base (`a red sports car; a dog standing nearby; a coastal highway on a cliff top. ...`), not the car template, because `composer` does not treat a bare "a red sports car" base as a road scene. The behaviour lock records this.
 - A partial can start a provisional move for a sentence that the content block later refuses (the final rolls it back); the block never runs on partials.
 - The engine path and the dictionary path give different prompts for "make it night" on a car scene (neon city against a night phrase in the template).
 

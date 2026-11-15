@@ -70,7 +70,9 @@ Repeating the current world still clears a later season.
 "turn the tree into a lighthouse" names one object, not the whole scene, so it is not a world change: it is left to the engine's final reader.
 
 The known places are in `world.py`: country road, desert, snowy mountain road, neon city, ocean coast (also "beach" and "sea"), Mars, forest and meadow.
-The first six are Ishaan's tested sentences, word for word (country road is the world of his tested car prompt); forest was added at the lead's request, and meadow lets "take me back to the meadow" return to the oak scene.
+The first six are Ishaan's tested sentences, word for word (country road is the world of his tested car prompt), except ocean coast; forest was added at the lead's request, and meadow lets "take me back to the meadow" return to the oak scene.
+Ocean coast was "a coastal cliff road. A bright turquoise ocean with white waves breaking on the rocks below ..."; in the live acceptance runs the car drove on the water and a parked car was crumpled, so it now names the road as grey asphalt with lane markings and puts the ocean far below the cliff (checked with a probe on the live GPU, 2026-11-15).
+When an object is on a road ("a red car racing along a road") and neither the base nor the world has one, the composer adds `ROAD_CLAUSE` ("a straight grey asphalt road with white lane markings runs across the scene") right after the base: with the road only inside the car's phrase, the meadow showed no road.
 A later season, weather or time change removes the matching built-in part of the world sentence (for example the desert's afternoon sun after "make it night").
 A sunlit time ("sunny", "make it day", "noon") also removes built-in weather that is not sunlit, such as overcast light, rain or falling snow, unless a weather change names the weather itself.
 A world can word such a change in its own light sentence: on the snowy mountain road "sunny" becomes "Bright winter sunshine in a clear blue sky, sparkling snow, crisp shadows." in place of the overcast winter light, and the snowy road and forest stay.
@@ -95,6 +97,7 @@ On the meadow, winter is still the season phrase.
 Explicit actions can be joined by and, then or a semicolon, and unambiguous noun lists can repeat an action ("add a dog and a cat").
 Descriptions such as "black and white" stay one phrase.
 "add snow near the river" adds only snow, and "add a dog and stop the rain" adds the dog and removes the rain.
+"make the dog black" on an existing dog is unmatched: the keyword table cannot recolour, and keeping the dog as it was would look understood while nothing changed.
 Words after a preposition are a location for every verb, so "make it snow near the river" adds snow even when a river is present, and "turn it to night near the river" sets night.
 After an add verb, "without" starts a removal: "add a dog without the rain" adds the dog and removes the rain.
 A rejected clause rolls back the whole sentence, including any provisional guess.

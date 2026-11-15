@@ -251,6 +251,9 @@ def current_world(snapshot: dict) -> World | None:
 # --- the model's fields ---------------------------------------------------------------------------------
 
 MAX_ROAD_WORDS = 14
+# A road slot without one of these words left the car on the sand or in the water (live acceptance run, 2026-11-15).
+DRIVABLE = frozenset({"road", "roads", "highway", "street", "lane", "avenue", "boulevard", "bridge", "motorway",
+                      "freeway", "causeway", "drive", "promenade", "track", "asphalt"})
 MAX_SCENE_WORDS = 40
 MAX_LIGHT_WORDS = 20
 # The subject and camera sentences are the engine's; the fields never move the camera or re-frame the shot.
@@ -278,6 +281,9 @@ def field_problems(reply: dict) -> list[str]:
     road, scene, light = (" ".join(fields[k].split()) for k in ("road", "scene", "light"))
     if not re.match(r"^(?:a|an|the)\s", road) or re.search(r"[.!?;]", road):
         out.append('"road" must be a noun phrase like "a snowy mountain road", with no period')
+    elif not set(re.findall(r"[a-z]+", road.lower())) & DRIVABLE:
+        out.append('"road" must name the paved road the vehicle drives on (road, highway, street, lane, bridge), '
+                   'or the vehicle is drawn on sand, water or grass')
     for k, v, limit in (("road", road, MAX_ROAD_WORDS), ("scene", scene, MAX_SCENE_WORDS),
                         ("light", light, MAX_LIGHT_WORDS)):
         if len(v.split()) > limit:
@@ -324,7 +330,14 @@ truck, van, bus, motorcycle, jeep or taxi), the engine writes the video prompt f
   <light> Cinematic, highly detailed, realistic, sharp focus, motion blur on the road."
 The engine writes the subject and camera sentences itself. For such a scene, reply with three more fields and
 leave "details" empty: {"blocked": ..., "operations": [...], "details": "", "road": "...", "scene": "...", "light": "..."}
-- "road": a noun phrase for the road of the new scene, starting with "a", at most 14 words, no period.
+- "road": a noun phrase for the road of the new scene, starting with "a", at most 14 words, no period. It always
+  names the paved road the vehicle drives on (road, highway, street, lane, bridge): the video model draws the vehicle
+  on whatever this says. For a beach it is a road beside the beach ("a beachfront road with pale sand and waves
+  beside it"), never sand or water.
+- "take me to X", "go to X", "drive to X", "turn it into X" on a vehicle scene: the vehicle keeps driving, now on a
+  road in X. The vehicle goes only when the user says so ("remove the car", "just the beach, no car"): then reply
+  with ONE new_scene whose base describes X itself ("a wide sandy beach with gentle turquoise waves") and no add
+  of kind world (a base that names a place cannot take another place).
 - "scene": ONE sentence (at most 40 words) about what lines both sides of the road: landscape, buildings, weather
   you can see. Never the camera, the shot or the frame. The scene's objects (kind extra) are added by the engine
   from their phrases, word for word: do not describe them again.
