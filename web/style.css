@@ -61,6 +61,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  position: relative;
+  z-index: 15; /* above the video box, so the delay tooltip is never hidden behind it */
 }
 .brand { display: flex; align-items: center; gap: 10px; }
 .logo { display: block; }
@@ -117,6 +119,7 @@ body {
   font-size: 12px;
   line-height: 1.45;
   letter-spacing: 0.02em;
+  white-space: normal;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s;
@@ -200,11 +203,13 @@ body {
   transform: translate(-50%, -50%);
   margin: 0;
   padding: 12px 20px;
-  border-radius: 999px;
+  border-radius: 18px;
   font-size: 15px;
   letter-spacing: 0.04em;
   color: var(--accent);
-  white-space: nowrap;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  text-align: center;
   pointer-events: none;
 }
 .notice[hidden] { display: none; }
@@ -372,6 +377,8 @@ kbd {
   .header { padding: 14px 16px; height: auto; min-height: 64px; flex-wrap: wrap; gap: 8px; }
   .banner { font-size: 10px; padding: 3px 8px; }
   .pill { padding: 0 10px; font-size: 12px; height: 30px; }
+  /* the delay pill sits about 86px from the left here, so the tooltip opens rightwards and fits the screen */
+  .timing { left: 0; right: auto; width: min(360px, calc(100vw - 104px)); }
   .frame { width: 100vw; border-radius: 0; border-left: 0; border-right: 0; }
   .chips { flex-wrap: nowrap; overflow-x: auto; right: 62px; scrollbar-width: none; }
   .chips::-webkit-scrollbar { display: none; }
