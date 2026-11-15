@@ -114,14 +114,19 @@ test('server words override local words even with a repeated timestamp; chips wa
 test('partial echoes never claim understanding; a confirmed LLM final without a keyword can', async ({ page }) => {
   const e = await engine(page);
   const input = page.locator('#editor-thought');
-  await input.pressSequentially('make it night', { delay: 40 });
-  e.state({ changes: [], heard: 'make it night', keyword: 'night', t_client: 1, unmatched: false });
+  await input.pressSequentially('make it night and', { delay: 40 });
+  e.state({ changes: [], heard: 'make it night and', keyword: 'night', t_client: 1, unmatched: false });
   await expect(page.locator('.words-status')).not.toContainText('understood');
   await expect(page.locator('.words-label')).toHaveText('Hearing…');
+  await page.waitForTimeout(5100);
+  expect(e.sent.filter(m => m.type === 'final')).toHaveLength(0);
+  e.state({ changes: [], heard: 'make it night and', keyword: 'night', t_client: 1, unmatched: false });
+  await expect(page.locator('.words-label')).toHaveText('Hearing…');
+  await expect(page.locator('.words-status')).toHaveText('');
   await input.press('Enter');
   await expect.poll(() => e.sent.some(m => m.type === 'final')).toBe(true);
   const t = e.sent.find(m => m.type === 'final')!.t_client;
-  e.state({ changes: [], heard: 'make it night', t_client: t, unmatched: false });
+  e.state({ changes: [], heard: 'make it night and', t_client: t, unmatched: false });
   await expect(page.locator('.words-status')).toHaveText('Understood');
 });
 
@@ -366,4 +371,34 @@ test('an external source draws its poster, then stops hidden GPU redraws', async
   const draws = await page.evaluate(() => (window as unknown as {gpuDraws: number}).gpuDraws);
   await page.waitForTimeout(350);
   expect(await page.evaluate(() => (window as unknown as {gpuDraws: number}).gpuDraws)).toBe(draws);
+});
+
+
+test('editing a pending whole insert back into an unfinished draft cancels its automatic retry', async ({ page }) => {
+  await page.goto('/test/fixtures/app.html?mode=delayed');
+  await enter(page);
+  const input = page.locator('#editor-thought');
+  await input.fill('make it winter');
+  await input.fill('add a river');
+  await input.pressSequentially(' and', { delay: 40 });
+  await page.evaluate(() => (window as unknown as {pendingMutations: {release: () => void}[]}).pendingMutations[0].release());
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => (window as unknown as {mutations: string[]}).mutations)).toEqual(['make it winter']);
+  await expect(input).toHaveValue('add a river and');
+});
+
+test('queued spatial edits retain the submitted pin after its visual expires', async ({ page }) => {
+  await page.goto('/test/fixtures/app.html?mode=delayed');
+  await enter(page);
+  await page.getByRole('button', { name: 'winter', exact: true }).click();
+  const touch = page.locator('.touch-surface');
+  const box = (await touch.boundingBox())!;
+  await touch.click({ position: { x: box.width * 0.25, y: box.height * 0.5 } });
+  await page.getByRole('button', { name: 'a river', exact: true }).click();
+  await page.waitForTimeout(4100);
+  await page.evaluate(() => (window as unknown as {pendingMutations: {release: () => void}[]}).pendingMutations[0].release());
+  await expect.poll(() => page.evaluate(() => (window as unknown as {mutationPayloads: unknown[]}).mutationPayloads.length)).toBe(2);
+  const coords = await page.evaluate(() => (window as unknown as {mutationPayloads: {spatialCoords: {x: number; y: number}}[]}).mutationPayloads[1].spatialCoords);
+  expect(coords.x).toBeCloseTo(0.25, 2);
+  expect(coords.y).toBeCloseTo(0.5, 2);
 });

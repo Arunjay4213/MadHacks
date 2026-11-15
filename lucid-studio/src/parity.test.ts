@@ -65,18 +65,18 @@ describe('web engine parity', () => {
     expect(parseEngineState({ heard: 'unmatched', unmatched: true })?.heard).toBe('unmatched');
     expect(parseEngineState({ changes: [{ id: 'r', label: 2 }] })).toBeNull();
   });
-  it('distinguishes a pending partial from a confirmed final and expires abandoned drafts', () => {
+  it('keeps a draft unconfirmed until submitted or cleared', () => {
     const heard = makeHeardTracker();
-    heard.sentPartial('make it winter', 100);
-    expect(heard.classify('make it winter', 99, 200)).toBe('pending');
+    heard.sentPartial('make it winter');
+    expect(heard.classify('make it winter', 99)).toBe('pending');
     heard.sentFinal('make it winter', 300);
-    expect(heard.classify('make it winter', 300, 400)).toBe('confirmed');
-    expect(heard.classify('add a lion', 301, 400)).toBe('other');
-    heard.sentPartial('add a lion', 500);
-    expect(heard.classify('add a lion', 99, 5501)).toBe('other');
-    heard.sentPartial('make it night', 6000);
+    expect(heard.classify('make it winter', 300)).toBe('confirmed');
+    expect(heard.classify('add a lion', 301)).toBe('other');
+    heard.sentPartial('add a lion');
+    expect(heard.classify('add a lion', 99)).toBe('pending');
+    heard.sentPartial('make it night');
     heard.clearPartials();
-    expect(heard.classify('make it night', 99, 6100)).toBe('other');
+    expect(heard.classify('make it night', 99)).toBe('other');
   });
   it('accepts web server aliases and uses secure sockets on HTTPS pages', () => {
     const loc = { protocol: 'https:', host: 'studio.test' };

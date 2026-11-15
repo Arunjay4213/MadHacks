@@ -70,3 +70,7 @@ merging #40. Resume in the managed worktree; modify only `lucid-studio/`.
 Keep local procedural output explicitly labeled; label an engine fake only when
 its message says `fake: true`. Keep source props distinct from a requested engine.
 Use native scroll and the existing rail rather than a second editor implementation.
+
+#118 follow-up: keep unsubmitted drafts unconfirmed, tie deferred sends to the input
+revision, and capture pins at submission. All three browser regressions pass; full
+validation is 22 unit + 19 browser cases on current main.

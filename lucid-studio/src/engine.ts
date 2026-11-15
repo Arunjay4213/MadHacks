@@ -88,19 +88,18 @@ export function makeLatencyTracker() {
 
 // Mirrors web/lib.js: an echoed draft is not a confirmed operation.
 export function makeHeardTracker() {
-  const partials = new Map<string, number>();
+  const partials = new Set<string>();
   const finals: { text: string; t: number }[] = [];
   return {
-    sentPartial(text: string, now = Date.now()) {
-      partials.set(text, now);
+    sentPartial(text: string) {
+      partials.add(text);
       if (partials.size > 50) partials.delete(partials.keys().next().value!);
     },
     sentFinal(text: string, t: number) { partials.clear(); finals.push({ text, t }); if (finals.length > 50) finals.shift(); },
     clearPartials() { partials.clear(); },
-    classify(text: string | null, t: number | null, now = Date.now()) {
+    classify(text: string | null, t: number | null) {
       if (finals.some(f => f.text === text && f.t === t)) return 'confirmed';
-      const sentAt = text === null ? undefined : partials.get(text);
-      return sentAt !== undefined && now - sentAt < 5000 ? 'pending' : 'other';
+      return text !== null && partials.has(text) ? 'pending' : 'other';
     },
   };
 }
