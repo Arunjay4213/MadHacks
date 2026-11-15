@@ -548,6 +548,7 @@ The light check (`final_reader.check_reply`) repairs what it can and never refus
 
 - `blocked`: no steer. `understood` false, or an empty prompt: not understood (unmatched, a provisional guess is rolled back), saved like a block.
 - A prompt over 300 words (`MAX_PROMPT_WORDS`) or 1900 characters is cut sentence by sentence from the end (the car template's style sentence stays last). umT5 reads 512 tokens; Sonnet's prompts measured 1.4 tokens a word and at least 3.9 characters a token, so both caps stay under 512. The earlier cap (180 words, 1600 characters) cut the sentence with the new object off long prompts (regression sweep on #273).
+- A reply with a driving vehicle but without the car template's forward motion (`drives_without_template`: a vehicle word, a driving verb, and no "moving forward away from the camera"; a sentence that says "side view" is exempt) is `Verdict.NOT_FORWARD`: asked again when there is time, else the dictionary reads the sentence (on a composed vehicle scene that is the car template). Only the template's shot drew cars forward on the GPU; other wording reversed them, drove them off the road or turned them to the camera (live, 2026-11-15).
 - A reply whose prompt is the prompt on screen (`Verdict.UNCHANGED`, often a cut that took the change away) is not used: it is asked again when there is time, else the dictionary reads the sentence, and on a free scene that shows as not understood, never as a chip with no change on screen.
 - Chips are cleaned (lower case, whole words up to 24 characters, at most 16, no duplicates), never a reason to drop the reply.
 - Chips match the prompt (`chips_in_prompt`): a chip whose words were in the prompt on screen and are in none of the new prompt is dropped and logged.
@@ -559,7 +560,7 @@ The light check (`final_reader.check_reply`) repairs what it can and never refus
   A reply that breaks this is still used and logged (`Verdict.REPAIRED`).
 - A REPAIRED or unusable reply is asked again once, with the reasons, when the first call took at most 3/7 of the wait (`RETRY_SHARE`), so a second call still fits; a REPAIRED first reply is kept if the retry runs past the wait.
   On the live 3.5 s wait that is a first call under 1.5 s, as it was at 3.0 s with half the wait; with half of 3.5 s, retries after 1.6 s first calls ran past the wait (#285).
-- The reply states are named in `Verdict` (accepted, repaired, not_understood, blocked, invalid, unchanged, failed); `/stats` counts the final verdict of every call in `verdicts`.
+- The reply states are named in `Verdict` (accepted, repaired, not_understood, blocked, invalid, unchanged, not_forward, failed); `/stats` counts the final verdict of every call in `verdicts`.
 
 The cache and the prompts:
 
