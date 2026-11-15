@@ -82,7 +82,7 @@ FENCE = re.compile(r"^\s*```[A-Za-z]*\s*|\s*```\s*$")
 # commands.state.MAX_FREE_PROMPT_CHARS (1900 characters, 487 tokens) stay under it. The cap only guards: a cut that takes
 # the sentence with the change away gives an unchanged prompt (Verdict.UNCHANGED).
 MAX_PROMPT_WORDS = 300
-ASKED_PROMPT_WORDS = 100     # what the system prompt asks for (60 to 100), so a long reply still fits the cap
+ASKED_PROMPT_WORDS = 90      # the hard limit the model is given (system prompt and user message); it writes about 110 to 130
 # Characters of a pinned or measured operation's phrase: a world sentence from commands/world.py is about 250, and a
 # saved racing car's phrase ends with the lane cue the old final reader added (", white dashed lane markings ...").
 CACHED_MAX_PHRASE = 400 + len(", white dashed lane markings rush toward the viewer")
@@ -191,10 +191,11 @@ SYSTEM_PROMPT = """You are a skilled prompt writer for a live text-to-video mode
 video plays continuously; each spoken sentence edits it. You get the prompt on screen and one sentence, and you write
 the complete new prompt. Reply with one JSON object only:
 {"blocked": <true or false>, "understood": <true or false>, "new_scene": <true or false>,
- "prompt": "<the complete new video prompt>", "chips": ["<label>", ...]}
+ "prompt": "<the complete new video prompt, at most {asked_words} words>", "chips": ["<label>", ...]}
 
 The user message is JSON: {"prompt": <the video prompt on screen now>, "chips": <the labels shown now>,
-"sentence": <what the user said>, "car_scene": <true when the prompt on screen is the car template below>}.
+"sentence": <what the user said>, "car_scene": <true when the prompt on screen is the car template below>,
+"words_on_screen": <the words of the prompt on screen>, "max_words": <the hard limit for your prompt>}.
 It may also have "view_change": true (the sentence asks for another camera or view), "person_chip" (the sentence adds
 a named person, already described in the sentence; use this label as their chip) and "rejected" (your earlier reply
 broke the rules given: reply again, fixed).
@@ -208,10 +209,15 @@ Rules:
 - Return the complete new prompt, never a diff. Keep everything the sentence does not change word for word (the
   subject, the objects, their positions, the camera, the light), so the picture does not jump. Change only what the
   sentence asks, and make that change clearly visible.
-- The prompt is at most {asked_words} words, also when the scene has grown: describe the older things more briefly
-  (keep each of them, in fewer words) instead of growing the prompt. The thing the sentence adds or changes is always
-  written in full. When the prompt on screen is already longer than {asked_words} words, the new prompt is shorter
-  than it: compress the oldest details first (a long reply is slow, and a late reply is lost).
+- Length: the prompt is at most {asked_words} words, every time, also when the scene has grown and also when the
+  prompt on screen is longer (then the new prompt is shorter than it). The viewer waits for every word you write, and
+  a late reply is lost. Spend the words on the change: the thing the sentence adds or changes gets a full description
+  (up to about 30 words); every older object, animal or person stays, in one short clause (what it is, a few look
+  words, where it is, which way it faces or moves); the setting, the light and the style get one short sentence each.
+  Shorten, never drop: every older thing keeps its clause. On a car scene the template's subject and camera
+  sentences stay word for word, so everything else is shorter.
+- Name each thing with the user's own word in it ("add dog" -> "a large brown dog", not only a breed; "add bird" ->
+  "birds" or "a bird"), so its chip stays.
 - Camera: keep the camera wording as it is unless the user asks for another camera, framing or view (zoom in or out,
   a wider or closer shot, side view, aerial or drone view, front view, low angle, pan), or a vehicle starts driving
   (the camera then follows it, below); then rewrite the camera wording to match ("zoom out": a wide establishing shot from further away, the subject smaller in the frame).
@@ -772,7 +778,8 @@ class FinalReader:
 
     def user_message(self, text: str, snapshot: dict, current: str) -> dict:
         user = {"prompt": current, "chips": [c["label"] for c in snapshot["changes"]],
-                "sentence": people.for_model(text), "car_scene": car_template.is_template(current)}
+                "sentence": people.for_model(text), "car_scene": car_template.is_template(current),
+                "words_on_screen": len(current.split()), "max_words": ASKED_PROMPT_WORDS}
         if user["car_scene"] and car_template.asks_view_change(text):
             user["view_change"] = True
         mention = people.mention(text)

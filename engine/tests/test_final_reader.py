@@ -163,7 +163,7 @@ def test_the_user_message_is_the_prompt_on_screen_the_chips_and_the_sentence():
     out = r("kill the tree's leaves", snap(LION), current_prompt="RICH PROMPT")
     assert out["operations"][0] == {"op": "free_scene", "prompt": "A bare oak tree.", "chips": ["bare tree"]}
     assert chat.calls[0][1] == {"prompt": "RICH PROMPT", "chips": ["lion"], "sentence": "kill the tree's leaves",
-                                "car_scene": False}
+                                "car_scene": False, "words_on_screen": 2, "max_words": 90}
     free = snap({"op": "free_scene", "prompt": "A bare oak tree.", "chips": ["bare tree"]})
     r("add jensen huang", free)  # on a composed scene the engine adds him with no call (engine/people.py)
     user = chat.calls[1][1]
@@ -313,7 +313,9 @@ def test_request_body_shape():
     assert set(body) == {"model", "max_tokens", "system", "messages", "thinking", "output_config"}
     assert body["model"] == "claude-sonnet-5-5" and body["max_tokens"] == 1024
     assert body["thinking"] == {"type": "between_tools"} and body["output_config"] == {"effort": "low"}
-    assert body["system"] == r.system_prompt and body["messages"][0]["role"] == "user"
+    assert body["system"] == [{"type": "text", "text": r.system_prompt,
+                               "cache_control": {"type": "ephemeral", "ttl": "1h"}}]
+    assert body["messages"][0]["role"] == "user"
 
 
 # --- the wrapper: the order of a final, against the real CommandService ------------------------------------

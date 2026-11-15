@@ -78,7 +78,7 @@ class FoundryChat:
 class FoundryMessages:
     """One Anthropic Messages API call per `complete(system, messages)`; returns the reply's text.
 
-    Request body: {"model", "max_tokens", "system", "messages", "thinking": {"type": "between_tools"},
+    Request body: {"model", "max_tokens", "system": [one cached text block], "messages", "thinking": {"type": "between_tools"},
     "output_config": {"effort": "low"}} by default; effort, thinking and max_tokens can be set (from_settings). No temperature: the model rejects it. "between_tools" is how Claude
     Sonnet 5.5 runs with thinking off (it is accepted at effort high or below and takes no other field).
     The text is the content blocks of type "text", joined. A refusal (stop_reason "refusal") has no text, so it
@@ -90,6 +90,10 @@ class FoundryMessages:
     MAX_TOKENS = 1024
     EFFORT = "low"                # output_config.effort: low, medium or high
     THINKING = "between_tools"    # thinking.type: between_tools is thinking off; others are passed as given
+    # Prompt caching of the system prompt: 1 hour, so a demo with long pauses between unscripted sentences still
+    # hits the cache (the 5 minute default would expire). Measured on the Foundry endpoint (2026-11-15): accepted,
+    # cache_read_input_tokens 5189 from the second call on.
+    CACHE_TTL = "1h"
 
     def __init__(self, url: str, key: str, model: str = DEFAULT_REWRITE_DEPLOYMENT, timeout_s: float = 5.0,
                  client: httpx.Client | None = None, effort: str = EFFORT, thinking: str = THINKING,
@@ -106,7 +110,11 @@ class FoundryMessages:
         return cls(settings.anthropic_url, settings.key, settings.rewrite_deployment, timeout_s=timeout_s, **options)
 
     def body(self, system: str, messages: list[dict]) -> dict:
-        return {"model": self.model, "max_tokens": self.max_tokens, "system": system, "messages": messages,
+        """The system prompt is one text block marked for prompt caching (CACHE_TTL): it is the same in every call
+        (about 5,200 tokens), so the endpoint reads it from its cache instead of processing it again. The reply's
+        usage shows cache_read_input_tokens on a hit."""
+        cached = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral", "ttl": self.CACHE_TTL}}]
+        return {"model": self.model, "max_tokens": self.max_tokens, "system": cached, "messages": messages,
                 "thinking": {"type": self.thinking}, "output_config": {"effort": self.effort}}
 
     def complete(self, system: str, messages: list[dict]) -> str:
