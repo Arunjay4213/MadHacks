@@ -151,15 +151,16 @@ class HangingChat:
 
 def test_after_a_sonnet_timeout_a_dog_on_the_car_scene_keeps_the_car_driving_forward():
     # Issue #237: the dictionary path sent "a red sports car; a dog standing nearby", so the car could reverse or the
-    # shot changed. The user still wants the same forward-driving car on the same road, now with a dog. Since #271
-    # "add a dog" is read whole by the keyword table (the fast path, no call); the result keeps the car template.
+    # shot changed. The user still wants the same forward-driving car on the same road, now with a dog. An add on a
+    # vehicle scene goes to Sonnet (engine/reader.py fast_path_ok); after its timeout the dictionary's result keeps
+    # the car template.
     chat = HangingChat()
     reader = FinalReader(FinalReaderState.ON, chat=chat, timeout_s=0.1)
     svc = FinalReadingService(CommandService(semantic_reader=lambda *a: None), reader)
     start = svc.handle(final(NEW_SCENE))["steer"]["prompt"]
     out = svc.handle(final("add a dog"))
     country = ct.WORLDS["country"]
-    assert reader.stats()["calls"] == 0 and [c["label"] for c in out["state"]["changes"]] == ["dog"]
+    assert reader.stats()["timeouts"] == 1 and [c["label"] for c in out["state"]["changes"]] == ["dog"]
     assert out["steer"]["prompt"] == (f"{HEAD}{country.road}, moving forward away from the camera. {CAMERA} "
                                       f"A dog standing nearby. {country.scene} {country.light} {STYLE}")
     assert ct.check_prompt(out["steer"]["prompt"], "a red sports car", ["a dog standing nearby"])

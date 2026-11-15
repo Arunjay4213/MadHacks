@@ -15,7 +15,9 @@ The engine calls `handle` on one worker thread, in arrival order, never on the g
 
 With --final-reader sonnet, FinalReadingService wraps CommandService and decides who reads each FINAL, in this order:
 undo and reset sentences (the dictionary), the content block, a pinned or cached answer, a measured car world, the
-dictionary when it reads the whole sentence (commands.service.dictionary_reading), and otherwise one Sonnet call that
+dictionary when it reads the whole sentence (commands.service.dictionary_reading) and the result is one the keyword
+table writes well (fast_path_ok: no object adds, no partial strengths, nothing added on a vehicle scene), and otherwise
+one Sonnet call that
 writes the whole new prompt (a free scene, final_reader.py). The answer is applied to the service's own scene, so
 chips, heard and undo work as for any other edit.
 """
@@ -28,6 +30,26 @@ from commands.service import dictionary_reading
 from commands.state import is_free
 
 log = logging.getLogger("engine.reader")
+
+# Kinds of change the keyword table writes as well as Sonnet: a tested place, season, weather or time of day at full
+# strength. Its object phrases change the count or the thing ("add an eagle" -> "a flock of birds", "add a human" ->
+# "a small group of people") and carry no size or position, so the model draws them small or not at all; a partial
+# strength reads "a subtle hint of a thick fog"; and on a vehicle scene the car template keeps the world's own light and
+# weather words beside the new ones ("clear blue summer sky" with "a thick fog"). Regression sweep on #273.
+FAST_PATH_KINDS = frozenset({"season", "weather", "time", "world"})
+
+
+def fast_path_ok(operations: list[dict], snapshot: dict) -> bool:
+    """True when the dictionary's `operations` for a whole sentence may skip Sonnet: undo, reset, remove, strength
+    changes and explicit new scenes, and adds of FAST_PATH_KINDS at full strength on a scene without a vehicle."""
+    from .car_template import vehicle_subject
+    for op in operations:
+        if op["op"] != "add":
+            continue
+        if op.get("kind") not in FAST_PATH_KINDS or op.get("strength", 1.0) != 1.0 \
+                or vehicle_subject(snapshot.get("base")) is not None:
+            return False
+    return True
 
 READERS = ("standin", "commands")
 
@@ -95,7 +117,8 @@ class FinalReadingService:
             return self._mapped(self._svc.handle(msg))
         fr = self._final_reader
         entry = fr.lookup(text, snapshot)  # the content block, pinned, cached or measured: no call
-        whole = entry is None and dictionary_reading(text, snapshot) is not None
+        reading = dictionary_reading(text, snapshot) if entry is None else None
+        whole = reading is not None and fast_path_ok(reading, snapshot)
         if kind is SentenceKind.MIXED:
             if entry is None and not whole:
                 split = leading_controls(text, snapshot)

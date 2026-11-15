@@ -213,8 +213,8 @@ class StepResult:
 
 def chip_matches(expected: str, label: str) -> bool:
     """A chip the user expects ("car") matches a label that holds those words ("red car", "second red car"), also in
-    the plural ("horse" matches "horses")."""
-    return re.search(rf"(?<![a-z]){re.escape(expected.lower())}(?:s|es)?(?![a-z])", label.lower()) is not None
+    the plural ("horse" matches "horses") or as the adjective the user said ("fog" matches "foggy", "rain" "rainy")."""
+    return re.search(rf"(?<![a-z]){re.escape(expected.lower())}(?:s|es|y|gy|ny)?(?![a-z])", label.lower()) is not None
 
 
 def _final(text: str, t: int) -> dict:

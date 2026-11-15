@@ -23,7 +23,7 @@ MAX_BATCH = 16  # operations in one batch (one undo step); also the most clauses
 MAX_LABEL = 24  # characters of a chip label
 FREE_KIND = "free"
 MAX_FREE_CHIPS = 16
-MAX_FREE_PROMPT_CHARS = 1600  # about 180 words (commands.rewriter.MAX_TOTAL_WORDS) with room
+MAX_FREE_PROMPT_CHARS = 1900  # under umT5's 512 tokens at the worst 3.9 characters a token measured on Sonnet's prompts
 
 
 class Origin(enum.Enum):
