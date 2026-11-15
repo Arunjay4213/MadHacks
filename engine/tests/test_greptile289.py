@@ -47,6 +47,9 @@ def test_a_camera_sentence_with_a_car_driving_in_it_is_still_a_driving_car():
                                                 new_scene=True)})
     out = wrapper(chat).handle(final(say))
     assert drive_shot(backward) is DriveShot.OTHER
+    # Greptile #291 P1: a camera only mentioned inside the car's description does not take the car's verb.
+    assert drive_shot("A car, its rear lights facing the camera, drives backward down the street.") is DriveShot.OTHER
+    assert drive_shot(CITY.split(". ")[0] + ".") is DriveShot.FORWARD  # the template's own first sentence drives
     assert out["steer"]["prompt"] == CITY and len(chat.calls) == 2  # refused, asked again, the measured shot used
 
 

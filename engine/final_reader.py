@@ -582,9 +582,11 @@ def retry_fits(elapsed_s: float, timeout_s: float) -> bool:
 _VEHICLES = r"(?:car|cars|sports car|truck|van|bus|jeep|suv|taxi|motorcycle|motorbike|vehicle)"
 _VEHICLE_RX = re.compile(r"\b" + _VEHICLES + r"\b")
 _DRIVING_RX = re.compile(r"\b(?:drives?|driving|races?|racing|speeds?|speeding|cruis(?:es|ing)|zooms?|zooming)\b")
-# Who does a driving verb: the nearest camera or vehicle word before it in its sentence. "The camera is slowly
-# zooming in on the car" is the camera's movement; "The camera tracks a car driving backward" is the car's.
-_ACTOR_RX = re.compile(r"\b(?:(?P<camera>camera)|" + _VEHICLES + r")\b")
+# Who does a driving verb: the nearest actor before it in its sentence, a vehicle word or a camera that starts a
+# clause. "The camera is slowly zooming in on the car" is the camera's movement; "The camera tracks a car driving
+# backward" and "A car, its rear lights facing the camera, drives backward" (the camera only mentioned) are the car's.
+_ACTOR_RX = re.compile(r"(?P<camera>(?:^|(?<=[,;] )|(?<=\band )|(?<=\bwhile )|(?<=\bas ))(?:the )?camera\b)|\b"
+                       + _VEHICLES + r"\b")
 
 
 def _vehicle_drives(sentence: str) -> bool:
