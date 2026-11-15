@@ -2,8 +2,22 @@ from pathlib import Path
 
 import pytest
 
-from engine.tools.demo_run import (Frame, ScriptError, Sent, StepKind, command_delay, first_frame_from, frame_at,
-                                   load_script, parse_script, shown_at)
+from engine.tools.demo_run import (
+    FRAMES_STOPPED_S,
+    Closed,
+    Frame,
+    Recording,
+    ScriptError,
+    Sent,
+    StepKind,
+    command_delay,
+    first_frame_from,
+    frame_at,
+    load_script,
+    parse_script,
+    run_failures,
+    shown_at,
+)
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "tools" / "demo_scripts"
 
@@ -83,3 +97,28 @@ def test_shown_at():
     assert shown_at(results, Frame(2.25, 5, 1)) == ("winter", None)
     assert shown_at(results, Frame(3.0, 8, 0)) == ("winter", "night")          # night never applied
     assert shown_at([], Frame(3.0, 8, 0)) == ("before the run", None)
+
+
+T0 = 100.0  # monotonic time of script second 0 in the run_failures tests
+
+
+@pytest.mark.parametrize("gap,fails", [(FRAMES_STOPPED_S - 0.1, False), (FRAMES_STOPPED_S, False),
+                                       (FRAMES_STOPPED_S + 0.1, True)])
+def test_run_failures_on_a_frame_gap_before_the_end(gap, fails):
+    frames = [Frame(0.0, 0, 0), Frame(10.0 - gap, 3, 2)]
+    out = run_failures(Recording(t0=T0), frames, T0 + 10.0)
+    assert bool(out) is fails
+    if fails:
+        assert out == [f"no frame in the last {gap:.1f} s of the run"]
+
+
+def test_run_failures_without_frames():
+    assert run_failures(Recording(t0=T0), [], T0 + 5.0) == ["no frames were received during the script"]
+
+
+def test_run_failures_counts_only_sockets_closed_before_the_stop():
+    frames = [Frame(4.9, 2, 0)]
+    rec = Recording(t0=T0, control_closed=Closed(T0 + 3.0, "closed by the server"),
+                    frames_closed=Closed(T0 + 6.0, "closed by the server"))  # after the stop: the end of the run
+    assert run_failures(rec, frames, T0 + 5.0) == ["the /control connection closed at 3.00 s (closed by the server)"]
+    assert run_failures(Recording(t0=T0), frames, T0 + 5.0) == []
