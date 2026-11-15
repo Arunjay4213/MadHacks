@@ -580,10 +580,11 @@ def retry_fits(elapsed_s: float, timeout_s: float) -> bool:
 
 
 _VEHICLE_RX = re.compile(r"\b(?:car|cars|sports car|truck|van|bus|jeep|suv|taxi|motorcycle|motorbike|vehicle)\b")
-_DRIVING_RX = re.compile(r"\b(?:drives?|driving|races?|racing|speeds?|speeding|cruis(?:es|ing)|zooms?|zooming)\b")
-# A clause about the camera ("The camera zooms in on the car", "..., the camera zooming in"): its verbs are the
-# camera's, not the vehicle's.
-_CAMERA_CLAUSE_RX = re.compile(r"\b(?:the\s+)?camera\b[^.!?,;]*")
+_DRIVING_VERBS = r"(?:drives?|driving|races?|racing|speeds?|speeding|cruis(?:es|ing)|zooms?|zooming)"
+_DRIVING_RX = re.compile(r"\b" + _DRIVING_VERBS + r"\b")
+# A driving verb whose subject is the camera ("The camera zooms in on the car", "..., the camera slowly zooming in"):
+# the camera's movement, not the vehicle's. Only the verb goes: "The camera tracks a car driving backward" still drives.
+_CAMERA_VERB_RX = re.compile(r"\bcamera\s+(?:[a-z]+ly\s+)?" + _DRIVING_VERBS + r"\b")
 # The measured shot's three parts, free of its speed words ("make it slow" writes "drives slowly" and "at the same
 # slow speed"): the rear view, the forward motion and the following camera with any one vehicle word ("A dark red
 # sedan ... behind the car" was drawn forward live).
@@ -604,11 +605,11 @@ class DriveShot(enum.Enum):
 
 
 def drive_shot(prompt) -> DriveShot:
-    """Which DriveShot `prompt` is. A sentence drives when, outside its camera clauses, it names a vehicle and a
-    driving verb."""
+    """Which DriveShot `prompt` is. A sentence drives when it names a vehicle and a driving verb that is not the
+    camera's (_CAMERA_VERB_RX)."""
     if not isinstance(prompt, str):
         return DriveShot.NONE
-    sentences = [_CAMERA_CLAUSE_RX.sub("", s.lower()) for s in re.split(r"(?<=[.!?])\s+", prompt)]
+    sentences = [_CAMERA_VERB_RX.sub("", s.lower()) for s in re.split(r"(?<=[.!?])\s+", prompt)]
     if not any(_VEHICLE_RX.search(s) and _DRIVING_RX.search(s) for s in sentences):
         return DriveShot.NONE
     low = prompt.lower()

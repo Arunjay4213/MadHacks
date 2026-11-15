@@ -37,6 +37,17 @@ def test_a_camera_zoom_on_a_parked_car_is_used():
     assert drive_shot(clause) is DriveShot.NONE  # the camera's verb in the car's own sentence
 
 
+def test_a_camera_sentence_with_a_car_driving_in_it_is_still_a_driving_car():
+    # Greptile #291 P1: only the camera's own verb is ignored, not the car's action after it.
+    backward = "A quiet city street at night. The camera tracks a car driving backward down the street."
+    say = "i now want a city at night with a car driving on the road"
+    chat = FakeChat({say: lambda user, n: reply(CITY if "rejected" in user else backward, ["city at night"],
+                                                new_scene=True)})
+    out = wrapper(chat).handle(final(say))
+    assert drive_shot(backward) is DriveShot.OTHER
+    assert out["steer"]["prompt"] == CITY and len(chat.calls) == 2  # refused, asked again, the measured shot used
+
+
 def test_a_side_view_stays_usable_for_later_edits():
     # Greptile #289 P1: after "show me a side view" was used, "make it rain" on that side view was refused.
     rain = SIDE.replace("Bright midday sunshine, crisp shadows.", "Heavy rain falling, dark grey storm clouds.")
