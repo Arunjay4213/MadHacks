@@ -115,11 +115,17 @@ def _pick(t: str):
 
     Adjective-like aliases ("bright", "dark", "snowy") name a time or weather change on their own,
     but in "add a bright red car" or "add dark clouds" the object is what the speaker means.
+    Words after the first preposition are a location: in "make it snow near the river" the change is snow,
+    not the river. Without an add verb the location is searched only when nothing comes before it ("turn it to night").
     """
     add = _ADD_RX.search(t)
-    end = add.start(2) + len(_PREP_RX.split(add.group(2), maxsplit=1)[0]) if add else len(t)
-    start = add.start(2) if add else 0
+    if add:
+        start, end = add.start(2), add.start(2) + len(_PREP_RX.split(add.group(2), maxsplit=1)[0])
+    else:
+        start, end = 0, len(_PREP_RX.split(t, maxsplit=1)[0])
     matches = list(KEYWORD_RX.finditer(t, start, end))
+    if not matches and not add:
+        matches = list(KEYWORD_RX.finditer(t))
     for m in matches:
         if KEYWORDS[m.group(0)]["kind"] == "extra":
             return m
@@ -339,6 +345,10 @@ _ACTION_RX = re.compile(_LEAD + r"(?:add|put|place|bring|include|build|draw|give
 _VERB_PREFIX_RX = re.compile(_LEAD + r"(?:add|put|place|bring|include|build|give me|remove|delete|get rid of|take away|no more"
                              r"|make it|turn it to|turn it|turn to)\b")
 _SOFT_SPLIT_RX = re.compile(r"\s+(?:and then|then|and|also)\s+(?=\S)")
+# "add a dog without the rain" is two edits: add the dog, remove the rain. Only after an add verb,
+# so a scene description ("take me to a beach without people") stays whole.
+_ADD_START_RX = re.compile(_LEAD + r"(?:add|put|place|bring|include|build|draw|give me|i want|i'd like)\b")
+_WITHOUT_SPLIT_RX = re.compile(r"\s+(?=without\s+\S)")
 _ARTICLE_RX = re.compile(r"^(?:(?:a|an|the|some|another)\s+)")
 
 
@@ -386,7 +396,11 @@ def split_commands(text: str) -> list[str]:
                 continue
             m = _VERB_PREFIX_RX.match(chunk)
             verb = m.group(0).strip() if m else None
-        clauses.extend(" ".join(c.split()) for c in current if c.strip())
+        for c in current:
+            c = " ".join(c.split())
+            if not c:
+                continue
+            clauses.extend(_WITHOUT_SPLIT_RX.split(c, maxsplit=1) if _ADD_START_RX.match(c) else [c])
     return clauses
 
 
