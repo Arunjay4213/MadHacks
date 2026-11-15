@@ -1,19 +1,23 @@
-/* Mirage: the demo page. One centred column on a flat dark background: header, the video box, the heard
-   caption, and the command bar pinned near the bottom. Blur is only ever on the small glass panels,
-   never on the video. Nothing animates continuously. */
+/* Mirage: the demo page. A white window on a pale blue page: header, the video on its mat, the voice
+   line, the controls row and the type field, in one centred column. Nothing animates except the voice
+   bars while speech is coming in, the 150 ms chip fade and hover colours. */
 :root {
-  --text: #f5f5f7;
-  --muted: #a1a1aa;
-  --accent: #f5b544;
-  --ok: #34d399;
-  --warn: #fbbf24;
-  --bad: #f87171;
-  --off: #71717a;
-  --glass: rgba(20, 20, 24, 0.70); /* darker than 0.62 so text stays readable over the brighter glow */
-  --glass-line: rgba(255, 255, 255, 0.10);
-  --ui: "Avenir Next", Avenir, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --page: #e3eefb;
+  --ink: #1d1d1f;
+  --ink-2: #3a3a3c;
+  --muted: #6e6e73;
+  --line: #c9ddf5;
+  --line-strong: #b9d3f4;
+  --soft: #edf4fd;
+  --hover: #d6e6fa;
+  --blue: #0071e3;
+  --icon: #0b4a99;
+  --orange: #e8730c;
+  --green: #34c759;
+  --amber-dot: #e8a100;
+  --ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -21,20 +25,15 @@
 html, body { height: 100%; margin: 0; }
 
 body {
-  min-height: 100vh;
-  color: var(--text);
+  padding: 20px;
+  background: var(--page);
+  color: var(--ink);
   font: 400 15px/1.4 var(--ui);
-  background: #0e0d0b; /* flat, no gradient */
   overflow: hidden; /* no page scroll on desktop */
   -webkit-font-smoothing: antialiased;
 }
 
-.glass {
-  background: var(--glass);
-  -webkit-backdrop-filter: blur(24px);
-  backdrop-filter: blur(24px);
-  border: 1px solid var(--glass-line);
-}
+kbd { font: 12px var(--mono); }
 
 .visually-hidden {
   position: absolute;
@@ -48,213 +47,363 @@ body {
   border: 0;
 }
 
-/* ---------- 1. header: logo + wordmark, status and delay pills ---------- */
+.window {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03), 0 16px 40px rgba(0, 0, 0, 0.05);
+}
+
+/* ---------- header ---------- */
 .header {
-  height: 80px;
-  padding: 24px 32px;
+  position: relative;
+  z-index: 15; /* above the video, so the delay breakdown is never hidden behind it */
+  flex: none;
+  height: 64px;
+  padding: 0 28px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  position: relative;
-  z-index: 15; /* above the video box, so the delay tooltip is never hidden behind it */
+  gap: 12px;
+  border-bottom: 2px solid var(--line-strong);
 }
-.brand { display: flex; align-items: center; gap: 10px; }
-.logo { display: block; }
-.wordmark {
-  font-family: Futura, "Futura PT", "Trebuchet MS", sans-serif;
-  font-size: 17px;
-  font-weight: 500;
-  letter-spacing: 0.32em;
-  text-transform: uppercase;
-}
-.banner {
-  margin-left: 6px;
-  padding: 4px 10px;
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.wordmark { font-size: 19px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); }
+.brand-divider { width: 1px; height: 18px; background: #dde8f7; }
+.tagline { font-size: 14px; color: var(--muted); white-space: nowrap; }
+.mock {
+  padding: 3px 9px;
   border-radius: 999px;
-  background: var(--accent);
-  color: #1a1203;
-  font-size: 11px;
+  background: #fff4e0;
+  border: 1px solid #f5d9a8;
+  color: #8a5300;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.04em;
   white-space: nowrap;
 }
-.banner[hidden] { display: none; }
+.mock[hidden] { display: none; }
 
-.pills { display: flex; gap: 8px; }
-.pill {
+/* The status capsule: the delay while connected (green, amber over 1.5 s, red over 3 s), otherwise the
+   connection state. */
+.status {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   height: 32px;
-  padding: 0 14px;
+  padding: 0 14px 0 12px;
   border-radius: 999px;
-  font-size: 13px;
-  letter-spacing: 0.04em;
+  border: 1px solid #f5d9a8;
+  background: #fff4e0;
+  color: #8a5300;
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
-.status[data-state="open"]::before { background: var(--ok); }
-.status[data-state="offline"]::before { background: var(--off); }
-.status[data-state="offline"] { color: var(--muted); }
+.status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--amber-dot); flex: none; }
+.status[data-state="open"] { background: #e9f9ee; border-color: #bfe8cc; color: #1b6e36; }
+.status[data-state="open"]::before { background: var(--green); }
+.status[data-state="open"][data-level="slow"] { background: #fff4e0; border-color: #f5d9a8; color: #8a5300; }
+.status[data-state="open"][data-level="slow"]::before { background: var(--amber-dot); }
+.status[data-state="open"][data-level="bad"] { background: #ffecec; border-color: #f5c2c2; color: #a51b1b; }
+.status[data-state="open"][data-level="bad"]::before { background: #e5484d; }
+.status[data-state="offline"] { background: #f2f2f7; border-color: #d2d2d7; color: #48484a; }
+.status[data-state="offline"]::before { background: #8e8e93; }
 
-.delay { position: relative; }
-.latency { font-variant-numeric: tabular-nums; }
-.latency[data-level="slow"] { color: var(--accent); }
-.latency[data-level="bad"] { color: var(--bad); }
 .timing {
   position: absolute;
   right: 0;
   top: calc(100% + 8px);
   width: max-content;
-  max-width: 360px;
+  max-width: min(360px, calc(100vw - 72px));
   padding: 8px 12px;
   border-radius: 12px;
-  color: var(--muted);
+  background: #fff;
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  color: var(--ink-2);
   font-size: 12px;
+  font-weight: 400;
   line-height: 1.45;
-  letter-spacing: 0.02em;
   white-space: normal;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s;
-  z-index: 20;
 }
-.delay:hover .timing { opacity: 1; }
+.status:hover .timing { opacity: 1; }
 
-/* ---------- 2. the video box ---------- */
-.column { display: flex; flex-direction: column; align-items: center; }
+/* ---------- banners: the video notice and the error, under the header ---------- */
+.banners {
+  position: absolute;
+  top: 74px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 14;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  pointer-events: none;
+}
+.banner {
+  margin: 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: #fff4e0;
+  border: 1px solid #f5d9a8;
+  color: #8a5300;
+  font-size: 13px;
+  text-align: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+.banner[hidden] { display: none; }
+
+/* ---------- the column ---------- */
+.column {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 20px;
+}
+
+/* The mat around the video, and the video box itself. app.js fits the canvas inside #frame (contain). */
+.mat {
+  padding: 8px;
+  border-radius: 30px;
+  border: 1px solid var(--line);
+  background: var(--soft);
+}
 .frame {
   position: relative;
-  width: min(980px, calc(100vw - 64px), calc((100vh - 300px) * 1.75));
+  /* 328 px of height is the rest of the column; the type box adds 76 px only while it is open (below).
+     The 240 px floor keeps the video on short screens, which may then scroll. */
+  width: min(910px, calc(100vw - 120px), max(240px, calc((100vh - 328px) * 1.75)));
   aspect-ratio: 672 / 384;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000;
-  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 22px;
-  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 0 80px rgba(245, 181, 68, 0.12);
+  background: #000;
   overflow: hidden;
 }
-/* app.js sets the canvas's CSS size to the frame fitted in this box (contain), so it is never cropped. */
 #video { display: block; max-width: 100%; max-height: 100%; background: #000; }
 
+/* ---------- chips ---------- */
 .chips {
   position: absolute;
   top: 14px;
   left: 14px;
-  right: 70px;
+  right: 14px;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
   transition: opacity 0.2s;
 }
-.chips[data-stale="true"] { opacity: 0.45; }
+.chips[data-stale="true"] { opacity: 0.5; }
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 30px;
-  padding: 0 4px 0 13px;
+  height: 26px;
+  padding: 0 4px 0 10px;
   border-radius: 999px;
-  background: var(--glass);
-  -webkit-backdrop-filter: blur(24px);
-  backdrop-filter: blur(24px);
-  border: 1px solid var(--glass-line);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
   white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
   animation: chip-in 150ms ease-out;
+  /* blue, the first colour; red and amber follow in order of creation */
+  background: #dcebff;
+  color: #0b3f8f;
+  --dot: #2f7bf6;
 }
+.chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--dot); flex: none; }
+.chip[data-color="red"] { background: #ffe1dd; color: #8e1408; --dot: #e5484d; }
+.chip[data-color="amber"] { background: #ffefc7; color: #6b4100; --dot: var(--amber-dot); }
 .chip.leaving { animation: chip-out 150ms ease-in forwards; pointer-events: none; }
 .chip-remove {
   display: inline-grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--text);
-  font: 500 14px/1 var(--ui);
+  background: rgba(0, 0, 0, 0.07);
+  color: inherit;
+  font: 600 13px/1 var(--ui);
   cursor: pointer;
 }
-.chip-remove:hover:not(:disabled) { background: rgba(248, 113, 113, 0.5); }
-.chip-remove:disabled { opacity: 0.4; cursor: not-allowed; }
+.chip-remove:hover:not(:disabled) { background: rgba(0, 0, 0, 0.14); }
+.chip-remove:disabled { opacity: 0.45; cursor: not-allowed; }
 @keyframes chip-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes chip-out { to { opacity: 0; } }
 
-.fs-btn { position: absolute; top: 14px; right: 14px; width: 40px; height: 40px; border-radius: 12px; }
-
-.notice {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  margin: 0;
-  padding: 12px 20px;
-  border-radius: 18px;
-  font-size: 15px;
-  letter-spacing: 0.04em;
-  color: var(--accent);
-  width: max-content;
-  max-width: calc(100% - 32px);
-  text-align: center;
-  pointer-events: none;
-}
-.notice[hidden] { display: none; }
-
-/* ---------- 3. the heard caption: height reserved so nothing jumps ---------- */
-.caption {
-  margin-top: 22px;
-  min-height: 62px;
-  width: min(980px, calc(100vw - 32px));
-  text-align: center;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-}
-.caption.visible { opacity: 1; }
-.caption-text { margin: 0; font-size: 28px; font-weight: 500; letter-spacing: -0.01em; line-height: 1.2; }
-.caption-text mark {
-  background: none;
-  color: var(--accent);
-  text-decoration: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 6px;
-}
-.caption-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 8px 0 0;
-  font-size: 13px;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-}
-.caption-status[data-state="understood"] { color: var(--text); }
-.caption-status[data-state="understood"]::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
-.caption-status[data-state="unmatched"] { color: var(--warn); }
-
-/* ---------- 4. the command bar ---------- */
-.bar {
-  position: fixed;
-  left: 50%;
-  bottom: 36px;
-  transform: translateX(-50%);
-  width: min(780px, calc(100vw - 32px));
-  height: 64px;
+/* ---------- the voice line ---------- */
+.voice {
+  margin: 18px 0 0;
+  height: 28px;
+  max-width: min(910px, calc(100vw - 120px));
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  padding: 0 10px 0 22px;
-  border-radius: 20px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  z-index: 10;
+  font-size: 20px;
+  font-style: italic;
+  color: var(--ink-2);
+  white-space: nowrap;
 }
+.voice-body { display: inline-flex; align-items: center; min-width: 0; }
+.voice-quote { color: var(--orange); font-style: normal; flex: none; }
+.voice-text { overflow: hidden; text-overflow: ellipsis; padding-right: 0.08em; }
+.voice[data-state="empty"] .voice-text, .voice-tail { color: var(--muted); }
+.voice-caret {
+  display: inline-block;
+  flex: none;
+  width: 2px;
+  height: 20px;
+  margin-left: 2px;
+  border-radius: 1px;
+  background: var(--blue);
+}
+.voice-note { flex: none; font-style: normal; font-size: 15px; color: #b45309; }
+.voice-icon { flex: none; display: block; width: 16px; height: 16px; }
+
+/* Five voice bars. "wave": a staggered CSS wave (Wispr, the toggle mic, or until the mic level is
+   ready). "level": heights from the mic level, written by app.js while push-to-talk is held. */
+.bars { flex: none; display: inline-flex; align-items: center; gap: 2px; height: 16px; }
+.bars span {
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--blue);
+  transform: scaleY(var(--h, 0.3));
+}
+.bars.wave span { animation: bar-wave 1s ease-in-out infinite; }
+.bars.wave span:nth-child(2) { animation-delay: 0.1s; }
+.bars.wave span:nth-child(3) { animation-delay: 0.2s; }
+.bars.wave span:nth-child(4) { animation-delay: 0.3s; }
+.bars.wave span:nth-child(5) { animation-delay: 0.4s; }
+@keyframes bar-wave { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+
+/* ---------- controls row ---------- */
+.dock { display: flex; flex-direction: column; align-items: center; }
+.controls {
+  margin-top: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 36px;
+}
+.group {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--soft);
+}
+.group-divider { width: 1px; height: 22px; background: var(--line); }
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--icon);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.icon-btn:hover:not(:disabled) { background: var(--hover); }
+.icon-btn[aria-expanded="true"] { background: var(--hover); }
+.icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* The hold-to-talk mic. The white ring is part of its shadow; the blue outer ring is its own layer
+   so it can scale with the mic level without repainting the button. */
+.ptt-wrap { position: relative; isolation: isolate; width: 80px; height: 80px; flex: none; }
+.ptt-ring {
+  position: absolute;
+  inset: -12px;
+  z-index: -1;
+  border-radius: 50%;
+  background: var(--hover);
+  transform: scale(var(--ring, 1));
+  transition: transform 80ms linear;
+}
+.ptt {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 0 0 6px #fff, 0 14px 28px rgba(0, 113, 227, 0.3);
+}
+.ptt[aria-pressed="true"] { background: #0062c4; }
+.ptt:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.ptt:focus-visible, .icon-btn:focus-visible, .chip-remove:focus-visible, .send:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.ptt:focus-visible { outline-offset: 16px; }
+
+/* ---------- type field: hidden until the Keyboard button opens it ---------- */
+.type {
+  margin-top: 28px;
+  width: min(420px, calc(100vw - 48px));
+  height: 48px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 0 18px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--soft);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.type[data-open="true"] { animation: type-in 180ms ease-out; }
+.type[data-open="true"]:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(255, 138, 31, 0.25);
+}
+/* Hidden but still focusable, never display:none: #command keeps focus so Wispr Flow can paste
+   into it, in every layout including full screen. */
+.type[data-open="false"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  opacity: 0;
+  pointer-events: none;
+}
+@keyframes type-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.type-icon { flex: none; color: var(--icon); }
 #command {
   flex: 1;
   min-width: 0;
@@ -262,131 +411,92 @@ body {
   border: 0;
   outline: none;
   background: transparent;
-  color: var(--text);
-  font: 400 17px var(--ui);
+  color: var(--ink);
+  font: 400 15px var(--ui);
 }
-#command::placeholder { color: var(--muted); }
-
-.ptt, .icon-btn {
-  display: inline-grid;
-  place-items: center;
+#command::placeholder { color: #4a6285; }
+.send {
   flex: none;
-  width: 44px;
-  height: 44px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
   padding: 0;
-  border-radius: 14px;
-  cursor: pointer;
-  transition: background 0.15s, box-shadow 0.15s, color 0.15s;
-}
-.ptt { border: 0; background: var(--accent); color: #17110a; }
-.ptt[aria-pressed="true"] { box-shadow: 0 0 0 4px rgba(245, 181, 68, 0.28), 0 0 28px rgba(245, 181, 68, 0.65); }
-.icon-btn { border: 1px solid transparent; background: transparent; color: var(--text); }
-.icon-btn.glass { border-color: var(--glass-line); background: var(--glass); }
-.icon-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.10); }
-.icon-btn[aria-pressed="true"] { background: rgba(245, 181, 68, 0.18); color: var(--accent); border-color: rgba(245, 181, 68, 0.4); }
-.ptt:disabled, .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.ptt:focus-visible, .icon-btn:focus-visible, .chip-remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.divider { width: 1px; height: 28px; margin: 0 4px; background: var(--glass-line); flex: none; }
-
-.hints {
-  position: fixed;
-  left: 50%;
-  bottom: 10px;
-  transform: translateX(-50%);
-  margin: 0;
-  color: var(--muted);
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-kbd {
-  font: 11px var(--mono);
-  padding: 1px 6px;
-  border-radius: 5px;
-  border: 1px solid var(--glass-line);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text);
-}
-
-.error {
-  position: fixed;
-  left: 50%;
-  top: 88px;
-  transform: translateX(-50%);
-  margin: 0;
-  padding: 8px 14px;
-  border-radius: 12px;
-  color: var(--bad);
-  font-size: 13px;
-  letter-spacing: 0.02em;
-  max-width: calc(100vw - 32px);
-  z-index: 12;
-}
-.error[hidden] { display: none; }
-
-.scrim { display: none; }
-
-/* ---------- full screen: the video fills the screen, bar and caption float over it ----------
-   app.js sets html.fs while the document is in full screen. */
-.fs body { background: #000; }
-.fs .brand, .fs .hints { display: none; }
-.fs .header { position: fixed; top: 0; right: 0; height: auto; padding: 16px 20px; z-index: 15; }
-.fs .pills .pill { height: 28px; font-size: 12px; padding: 0 12px; }
-.fs .frame {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  aspect-ratio: auto;
   border: 0;
-  border-radius: 0;
-  box-shadow: none;
-}
-.fs .fs-btn { top: 16px; right: auto; left: 16px; }
-.fs .chips { top: 66px; right: auto; max-width: 520px; }
-.fs .scrim {
-  display: block;
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 260px;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.6));
-  pointer-events: none;
-  z-index: 5;
-}
-.fs .caption {
-  position: fixed;
-  left: 50%;
-  bottom: 120px;
-  transform: translateX(-50%);
-  margin: 0;
-  z-index: 8;
-  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  background: var(--blue);
+  color: #fff;
+  cursor: pointer;
 }
 
-/* ---------- phone width: full-width video, page may scroll ---------- */
+/* ---------- full screen: the video fills the screen; the voice line and controls float ----------
+   app.js sets html.fs while the document is in full screen. */
+.fs body { padding: 0; background: #000; }
+.fs .window { border: 0; border-radius: 0; background: #000; box-shadow: none; }
+.fs .header { display: none; }
+.fs .banners { top: 16px; }
+.fs .column { padding: 0; }
+.fs .mat { position: fixed; inset: 0; padding: 0; border: 0; border-radius: 0; background: #000; }
+.fs .frame { width: 100vw; height: 100vh; aspect-ratio: auto; border-radius: 0; }
+.fs .dock {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: calc(100vw - 32px);
+  padding: 14px 24px 14px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+.fs .voice { margin: 0; max-width: calc(100vw - 80px); }
+.fs .controls { margin-top: 16px; gap: 22px; }
+.fs .type[data-open="true"] { margin-top: 14px; }
+.fs .group { padding: 3px 6px; gap: 6px; }
+.fs .icon-btn { width: 38px; height: 38px; }
+.fs .ptt-wrap { width: 56px; height: 56px; }
+.fs .ptt-ring { inset: -9px; }
+.fs .ptt svg { width: 22px; height: 22px; }
+
+/* ---------- phone width: stacked, full-width video, the page may scroll ---------- */
+@media (min-width: 701px) {
+  :root:not(.fs) .window:has(.type[data-open="true"]) .frame {
+    width: min(910px, calc(100vw - 120px), max(240px, calc((100vh - 404px) * 1.75)));
+  }
+}
+
+/* Short screens (a landscape phone, a small laptop window): the page scrolls instead of squeezing. */
+@media (max-height: 560px) {
+  body { overflow: auto; }
+  .window { height: auto; min-height: 100%; }
+}
+
 @media (max-width: 700px) {
-  body { overflow: auto; padding-bottom: 120px; }
-  .header { padding: 14px 16px; height: auto; min-height: 64px; flex-wrap: wrap; gap: 8px; }
-  .banner { font-size: 10px; padding: 3px 8px; }
-  .pill { padding: 0 10px; font-size: 12px; height: 30px; }
-  .pills { width: 100%; } /* always their own row, so the delay pill is always about 86px from the left */
-  /* ...and the tooltip opens rightwards from it and fits the screen */
-  .timing { left: 0; right: auto; width: min(360px, calc(100vw - 104px)); }
-  .frame { width: 100vw; border-radius: 0; border-left: 0; border-right: 0; }
-  .chips { flex-wrap: nowrap; overflow-x: auto; right: 62px; scrollbar-width: none; }
+  body { padding: 0; overflow: auto; }
+  .window { height: auto; min-height: 100%; border: 0; border-radius: 0; box-shadow: none; }
+  .header { padding: 0 16px; }
+  .tagline, .brand-divider { display: none; }
+  .column { padding: 16px 0 28px; }
+  .mat { width: 100%; padding: 6px; border-radius: 0; border-left: 0; border-right: 0; }
+  .frame { width: 100%; border-radius: 16px; }
+  .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .chips::-webkit-scrollbar { display: none; }
-  .caption-text { font-size: 22px; }
-  .bar { width: calc(100vw - 16px); bottom: 16px; padding: 0 6px 0 14px; gap: 2px; }
-  .ptt, .icon-btn { width: 40px; height: 40px; }
-  .fs-btn { width: 36px; height: 36px; }
-  .divider { margin: 0 2px; }
-  .hints { display: none; }
-  .error { top: 72px; }
+  .voice { max-width: calc(100vw - 32px); font-size: 18px; }
+  .controls { margin-top: 30px; gap: 14px; }
+  .group { gap: 4px; padding: 4px 5px; }
+  .icon-btn { width: 42px; height: 42px; }
+  .ptt-wrap { width: 68px; height: 68px; }
+  .ptt-ring { inset: -10px; }
+  .type[data-open="true"] { width: calc(100vw - 32px); margin-top: 24px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chip, .chip.leaving { animation: none; }
-  .caption, .timing, .chips { transition: none; }
+  .chip, .chip.leaving, .bars.wave span, .type[data-open="true"] { animation: none; }
+  .bars span { transform: scaleY(0.6); }
+  .bars span:nth-child(3) { transform: scaleY(1); }
+  .ptt-ring, .timing, .chips, .type, .icon-btn { transition: none; }
 }

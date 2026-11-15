@@ -9,16 +9,20 @@ Owner: `@anirudhaugile` (Ani), since the lead's swap on 2026-11-14. Started by `
 | `video` | `<canvas>` | draws decoded JPEG frames, newest only |
 | `frame` | any | the box the video fits into; app.js sets the canvas's CSS size to the fitted frame so its rounded corners sit on the picture |
 | `fullscreen` | `<button>` | toggles full screen; refocuses the text box; if the browser refuses, the error says to use View → Enter Full Screen |
-| `connection` | any | `textContent` = status; `data-state` = `connecting` / `open` / `closed` |
+| `connection` | any, holds `latency` and `timing` | the status capsule; `data-state` = `connecting` / `open` / `offline` |
 | `mode-banner` | any | shown only while server messages say `fake: true` (the fake server); hidden otherwise, including before the first message, so a real engine that is still loading is never labelled MOCK. |
-| `words` | any, `aria-live="polite"` | children replaced: a `.words-label` ("hearing…" while local, "heard" from the server), the full sentence in `.words-text` with one `<mark>` around the keyword, and `.words-understood` ("→ understood: <keyword>" or "→ not understood"); `data-unmatched="true"` when no operation; `data-kind` = `partial` / `final` / `server` |
+| `words` | any, `aria-live="polite"` | the voice line: children replaced with voice bars (`.bars`, `.wave` unless the mic level drives them), a tick or "!" icon, the words in quotes (`.voice-text`, the not-yet-final words in `.voice-tail`, then `.voice-caret`) and, when unmatched, `.voice-note`; `data-state` = `empty` / `speaking` / `typing` / `sent` / `understood` / `unmatched` / `plain` |
 | `changes` | any (list container) | children replaced from server state; `data-stale="true"` while disconnected |
 | `command-form` | `<form>` | submit is `preventDefault`ed (no reload); submit sends `final` |
 | `command` | `<input type="text">` | kept focused; input events send messages; cleared after `final` |
-| `mic` | `<button>` | toggle listening; `aria-pressed`; `disabled` + `title` if no speech API |
+| `keyboard` | `<button aria-controls="command-form">` | shows or hides the type box; `aria-expanded`; the box is `data-open` on `command-form` (`makeTypeBox` in `lib.js`) |
 | `ptt` | `<button>` | push-to-talk while pointer held; `aria-pressed` while held. The backtick key also works as push-to-talk. |
+| `ptt-ring` | any | the ring around `ptt`; `--ring` (scale) follows the mic level while push-to-talk is held |
+| `send` | `<button type="submit">` | submits `command-form` |
+| `reset` | `<button>` | sends the `reset` tap; `disabled` while disconnected |
+| `video-notice` | any | `textContent` = connecting / connection lost / paused, `hidden` while the video is live |
 | `undo` | `<button>` | sends undo; `disabled` while disconnected |
-| `latency` | any | `textContent` = `"— "` (unavailable) or `"<n> ms"` |
+| `latency` | any | `textContent` = `"0.9 s"` (the delay) or `"Live"` while connected and unmeasured, otherwise `"Connecting…"` / `"Reconnecting…"` / `"Offline"` |
 | `timing` | any | `textContent` = what the number measures, plus server stamps if any |
 | `error` | any, `role="alert"` | `textContent` = last error, `hidden` when none |
 
@@ -66,8 +70,8 @@ It sits in `PROTOCOL` in `lib.js` and in `fake-server.mjs`.
 1. Page against the fake server: done. Text box keeps focus (buttons never take it; blur and window focus refocus).
 2. Text box sends: done (paste at once, simulated keys after 200 ms, typing after 1.5 s; no Enter needed).
 3. Live mic: done. Push-to-talk key is `PUSH_TO_TALK_CODE` in `lib.js` (default backtick), ignored with Ctrl/Cmd/Alt
-   so it never clashes with Wispr Flow's Ctrl hotkey, and never types into the box. The mic toggle restarts Chrome's
-   recognizer when it ends by itself; blocked-mic and network errors are explained; the mic is disabled outside a
+   so it never clashes with Wispr Flow's Ctrl hotkey, and never types into the box. (The hands-free mic toggle was
+   removed in the redesign, #276, on the owner's decision.) Blocked-mic and network errors are explained; the mic is disabled outside a
    secure context (HTTPS or localhost). Needs a real voice test on the demo laptop.
 4. Chips and undo on real state: done. Checked against the engine (fake backend, `--reader commands`, 672x384):
    stack, remove by name and chip x, undo, unmatched words in red, delay steady at ~575 ms. Real-model check pending
