@@ -120,13 +120,18 @@ class FinalReadingService:
         reading = dictionary_reading(text, snapshot) if entry is None else None
         whole = reading is not None and fast_path_ok(reading, snapshot)
         if kind is SentenceKind.MIXED:
-            if entry is None and not whole:
-                split = leading_controls(text, snapshot)
-                if split is not None:  # "undo and add a dog": the edits are read on the scene the controls give
-                    return self._controls_then_edits(msg, *split)
-            # The final reader leaves undo and reset to the dictionary, which reads the whole sentence. When it does
-            # not read every clause by itself, Sonnet is still asked first, as the content check.
-            if entry is None and not whole:
+            split = leading_controls(text, snapshot)
+            if split is not None:
+                # "undo and add a dog": the edits are read on the scene the controls give. `whole` is not trusted
+                # here (dictionary_reading tries an undo on a snapshot with no history), and a saved answer for the
+                # whole sentence is used only when it is a block (an older build saved answers it then discarded).
+                if entry is not None and fr.result(entry, text, snapshot) == {"blocked": True}:
+                    return self._blocked(text)
+                return self._controls_then_edits(msg, *split)
+            # Any other mix ("add a dog and undo") goes to the dictionary, which runs the undo where it is said. Sonnet
+            # is asked first, as the content check, only when the keyword table does not read every clause by itself:
+            # fast_path_ok is about prompt quality, and its answer would be discarded here, so it is not a reason to wait.
+            if entry is None and reading is None:
                 entry = fr.ask(text, snapshot, self.committed_prompt)
             if entry is not None and fr.result(entry, text, snapshot) == {"blocked": True}:
                 return self._blocked(text)
@@ -163,7 +168,8 @@ class FinalReadingService:
         after = self._svc_trial(controls)
         fr = self._final_reader
         entry = fr.lookup(edits, after)
-        if entry is None and dictionary_reading(edits, after) is not None:
+        reading = dictionary_reading(edits, after) if entry is None else None
+        if reading is not None and fast_path_ok(reading, after):
             return self._dictionary(msg, before)  # the keyword table reads the whole sentence with the real undo
         if entry is None:
             entry = fr.ask(edits, after, self._model_prompts.get(compose(after), compose(after)))

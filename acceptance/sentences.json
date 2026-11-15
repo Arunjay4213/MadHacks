@@ -147,7 +147,7 @@
       "name": "reset-and-add",
       "steps": [
         {"say": "make it winter", "chips": ["winter"], "has": ["snow"]},
-        {"say": "reset and add a dog", "chips": ["dog"], "no_chips": ["winter"], "has": ["dog", "meadow"], "lacks": ["snow"]}
+        {"say": "reset and add a dog", "chips": ["dog"], "no_chips": ["winter"], "has": ["meadow"], "lacks": ["snow"]}
       ]
     },
     {
