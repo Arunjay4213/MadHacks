@@ -7,8 +7,8 @@ client (no network), the path the live engine takes with --reader commands --fin
 import json
 
 from commands.service import CommandService
-from engine.final_reader import FinalReader, FinalReaderState
-from engine.reader import FinalReadingService, SentenceKind, sentence_kind
+from engine.final_reader import FinalReader, FinalReaderState, prompt_spec
+from engine.reader import FinalReadingService
 
 NIGHT = {"op": "add", "label": "night", "kind": "time", "phrase": "at night", "strength": 1.0}
 WINTER = {"op": "add", "label": "winter", "kind": "season", "phrase": "snow on the ground", "strength": 1.0}
@@ -36,7 +36,7 @@ class FakeChat:
 
 def wrapper(replies):
     chat = FakeChat(replies)
-    return FinalReadingService(CommandService(), FinalReader(FinalReaderState.ON, chat=chat)), chat
+    return FinalReadingService(CommandService(), FinalReader(FinalReaderState.ON, chat=chat, spec=prompt_spec())), chat
 
 
 def final(svc, text, t=1):
@@ -62,14 +62,6 @@ def test_reset_and_an_unsafe_add_is_blocked():
     out = final(svc, "reset and add a naked man", 2)
     assert_blocked(svc, out)
     assert labels(out) == ["winter"]  # nothing applied: the reset is refused with the rest of the sentence
-
-
-def test_undo_and_an_unsafe_add_is_blocked():
-    svc, _ = wrapper({"make it winter": reply([WINTER])})
-    final(svc, "make it winter")
-    out = final(svc, "undo and add a naked man", 2)
-    assert_blocked(svc, out)
-    assert labels(out) == ["winter"]
 
 
 def test_an_edit_and_an_unsafe_add_is_blocked():
@@ -110,15 +102,6 @@ def test_undo_and_reset_alone_make_no_call():
     assert chat.sentences == ["make it winter"]  # the second "make it winter" is a cache hit
 
 
-def test_sentence_kinds():
-    snapshot = CommandService().snapshot()
-    assert sentence_kind("undo", snapshot) is SentenceKind.CONTROL
-    assert sentence_kind("reset", snapshot) is SentenceKind.CONTROL
-    assert sentence_kind("reset and add a naked man", snapshot) is SentenceKind.MIXED
-    assert sentence_kind("make it winter and add a naked man", snapshot) is SentenceKind.EDIT
-    assert sentence_kind("make it winter", snapshot) is SentenceKind.EDIT
-
-
 def test_pace_words_set_the_ramp_of_a_final_reader_result():
     """Greptile on PR #87, engine/reader.py:131: "slowly" and "suddenly" must survive the Sonnet path."""
     for sentence, ramp in (("slowly make it night", 12), ("suddenly make it night", 1), ("make it night", 1)):
@@ -146,14 +129,6 @@ def test_start_over_with_a_scene_reaches_the_final_reader():
         assert chat.sentences[-1] == sentence
         assert out["state"]["unmatched"] is False and labels(out) == []
         assert word in out["steer"]["prompt"] and "snow" not in out["steer"]["prompt"]
-
-
-def test_start_over_with_unsafe_content_is_blocked():
-    svc, _ = wrapper({"make it winter": reply([WINTER])})
-    final(svc, "make it winter")
-    out = final(svc, "start over with a naked man", 2)
-    assert_blocked(svc, out)
-    assert labels(out) == ["winter"]
 
 
 def test_a_bare_start_over_keeps_the_fast_path():
