@@ -75,9 +75,12 @@ def test_rejected_details_are_logged_with_the_reason_and_repaired(caplog):
     assert reader.stats()["details_repaired"] == 1 and reader.stats()["details_rejected"] == 0
 
 
-def test_too_long_details_are_cut_at_a_clause_and_the_budget_is_sent():
+def test_too_long_details_are_cut_at_a_clause_and_the_budget_is_sent(monkeypatch):
     # (a) Real shape: a long composed prompt (car, lion, winter, night) plus 46 words of details went over the
-    # validator's 100-word total and was dropped whole. Now the last clauses are cut until it fits.
+    # validator's total word limit and was dropped whole. Now the last clauses are cut until it fits.
+    # The limit is pinned at its old 100 words so this short scene still goes over it.
+    from commands import rewriter
+    monkeypatch.setattr(rewriter, "MAX_TOTAL_WORDS", 100)
     long = ", ".join(["frost-dusted ground", "crisp cold air", "soft blue-silver glow", "fine icy sparkle on every "
                       "surface", "deep cool shadows", "muted cool colours", "glittering crust of old snow",
                       "pale grey light on the frozen grass", "cold blue tones on every surface"])

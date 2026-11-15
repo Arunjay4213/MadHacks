@@ -1,11 +1,13 @@
 import json
 import unittest
+from pathlib import Path
 
-from commands.rewriter import SYSTEM_PROMPT, build_messages, validate_rewrite
+from commands.rewriter import MAX_TOTAL_WORDS, SYSTEM_PROMPT, build_messages, validate_rewrite
 
 CAR = "a wide shot of a meadow with a single oak tree; a red car driving forward, away from the camera"
 WINTER = CAR + "; winter scenery with snow on the ground"
 NIGHT = CAR + "; night time under a full moon"
+DEMO_PROMPTS = json.loads((Path(__file__).resolve().parents[2] / "engine" / "demo_prompts.json").read_text())
 GOOD = ("fine powder snow texture, pale sky, diffuse cool illumination, crisp surface detail, gentle tonal gradients, "
         "photorealistic detail, cinematic color rendering")
 
@@ -99,9 +101,28 @@ class RejectTest(unittest.TestCase):
     def test_length_and_lines(self):
         self.assertRejected(WINTER, " ".join(["frosty"] * 61))
         self.assertRejected(WINTER, GOOD + "\nsecond line")
-        long_prompt = WINTER + " " + " ".join(["detail"] * 75)
-        self.assertRejected(long_prompt, "cold blue tones, crisp air")  # over 100 words in total
+        long_prompt = WINTER + " " + " ".join(["detail"] * (MAX_TOTAL_WORDS - 2 - len(WINTER.split())))
+        self.assertEqual(len(long_prompt.split()), MAX_TOTAL_WORDS - 2)
+        self.assertRejected(long_prompt, "cold blue tones, crisp air")  # 3 words over the total cap
         self.assertEqual(validate_rewrite(long_prompt, reply("")), long_prompt)
+
+    def test_long_demo_scene_keeps_its_details(self):
+        # Real prompts from engine/demo_prompts.json: the meadow chain's fixed part reaches 95 to 120 words, so
+        # the old 100-word cap left nothing for details. 40 words of details after it must now pass.
+        entries = {e["sentence"]: e for e in DEMO_PROMPTS[:9]}
+        details = ", ".join(["warm ochre tones across the open ground", "fine dry grit on every surface",
+                             "pale dusty air", "soft golden light low on the dunes", "faint heat shimmer",
+                             "long soft shadows", "sun-bleached textures", "muted sand and amber colours",
+                             "photorealistic, cinematic, sharp detail"]).split()[:40]
+        details = " ".join(details)
+        self.assertEqual(len(details.split()), 40)
+        for sentence in ["make it a desert", "add a red car racing on a road"]:
+            prompt = entries[sentence]["canonical"]
+            self.assertGreaterEqual(len(prompt.split()), 95, sentence)
+            self.assertEqual(validate_rewrite(prompt, reply(details)), f"{prompt}; {details}", sentence)
+        desert = entries["make it a desert"]["canonical"]
+        filler = " ".join(["dusty"] * (200 - len(desert.split()) - 40))
+        self.assertRejected(desert + " " + filler, details)  # 200 words in total
 
     def test_markup_and_urls(self):
         for details in ["cold light {glow}", "see https://example.com", "<b>bold</b> snow", "cold `code`", "# heading"]:
