@@ -26,7 +26,7 @@ def chips(out):
 
 def test_a_camera_zoom_on_a_parked_car_is_used():
     # Greptile #289 P1: "The camera zooms in" next to a parked car was read as a driving car and refused.
-    zoom = STREET.replace("Bright midday", "The camera zooms in slowly on the cafe. Bright midday")
+    zoom = STREET.replace("Bright midday", "The camera is slowly zooming in on the car. Bright midday")
     svc = wrapper(FakeChat({"kill the tree's leaves": reply(STREET, ["city street", "parked car"]),
                             "zoom in on the cafe": reply(zoom, ["city street", "parked car", "zoom in"])}))
     svc.handle(final("kill the tree's leaves"))
@@ -35,6 +35,8 @@ def test_a_camera_zoom_on_a_parked_car_is_used():
     assert chips(out) == ["city street", "parked car", "zoom in"]
     clause = STREET.replace("still.", "still, the camera zooming in on it.")
     assert drive_shot(clause) is DriveShot.NONE  # the camera's verb in the car's own sentence
+    # Greptile #291 P1: words between the camera and its verb.
+    assert drive_shot(STREET + " The camera is slowly zooming in on the car.") is DriveShot.NONE
 
 
 def test_a_camera_sentence_with_a_car_driving_in_it_is_still_a_driving_car():

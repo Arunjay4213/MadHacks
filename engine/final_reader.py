@@ -579,12 +579,26 @@ def retry_fits(elapsed_s: float, timeout_s: float) -> bool:
     return elapsed_s <= timeout_s * RETRY_SHARE + 1e-9
 
 
-_VEHICLE_RX = re.compile(r"\b(?:car|cars|sports car|truck|van|bus|jeep|suv|taxi|motorcycle|motorbike|vehicle)\b")
-_DRIVING_VERBS = r"(?:drives?|driving|races?|racing|speeds?|speeding|cruis(?:es|ing)|zooms?|zooming)"
-_DRIVING_RX = re.compile(r"\b" + _DRIVING_VERBS + r"\b")
-# A driving verb whose subject is the camera ("The camera zooms in on the car", "..., the camera slowly zooming in"):
-# the camera's movement, not the vehicle's. Only the verb goes: "The camera tracks a car driving backward" still drives.
-_CAMERA_VERB_RX = re.compile(r"\bcamera\s+(?:[a-z]+ly\s+)?" + _DRIVING_VERBS + r"\b")
+_VEHICLES = r"(?:car|cars|sports car|truck|van|bus|jeep|suv|taxi|motorcycle|motorbike|vehicle)"
+_VEHICLE_RX = re.compile(r"\b" + _VEHICLES + r"\b")
+_DRIVING_RX = re.compile(r"\b(?:drives?|driving|races?|racing|speeds?|speeding|cruis(?:es|ing)|zooms?|zooming)\b")
+# Who does a driving verb: the nearest camera or vehicle word before it in its sentence. "The camera is slowly
+# zooming in on the car" is the camera's movement; "The camera tracks a car driving backward" is the car's.
+_ACTOR_RX = re.compile(r"\b(?:(?P<camera>camera)|" + _VEHICLES + r")\b")
+
+
+def _vehicle_drives(sentence: str) -> bool:
+    """True when a driving verb in the lower-case `sentence` belongs to a vehicle (_ACTOR_RX); a verb with no actor
+    before it ("Zooming past, a red car ...") belongs to the sentence's vehicle, if it has one."""
+    for verb in _DRIVING_RX.finditer(sentence):
+        actors = list(_ACTOR_RX.finditer(sentence, 0, verb.start()))
+        if actors and actors[-1].group("camera") is None:
+            return True
+        if not actors and _VEHICLE_RX.search(sentence):
+            return True
+    return False
+
+
 # The measured shot's three parts, free of its speed words ("make it slow" writes "drives slowly" and "at the same
 # slow speed"): the rear view, the forward motion and the following camera with any one vehicle word ("A dark red
 # sedan ... behind the car" was drawn forward live).
@@ -605,12 +619,10 @@ class DriveShot(enum.Enum):
 
 
 def drive_shot(prompt) -> DriveShot:
-    """Which DriveShot `prompt` is. A sentence drives when it names a vehicle and a driving verb that is not the
-    camera's (_CAMERA_VERB_RX)."""
+    """Which DriveShot `prompt` is. A sentence drives when a vehicle does one of its driving verbs (_vehicle_drives)."""
     if not isinstance(prompt, str):
         return DriveShot.NONE
-    sentences = [_CAMERA_VERB_RX.sub("", s.lower()) for s in re.split(r"(?<=[.!?])\s+", prompt)]
-    if not any(_VEHICLE_RX.search(s) and _DRIVING_RX.search(s) for s in sentences):
+    if not any(_vehicle_drives(s.lower()) for s in re.split(r"(?<=[.!?])\s+", prompt)):
         return DriveShot.NONE
     low = prompt.lower()
     if _REAR_WORDS in low and _FORWARD_WORDS in low and _FOLLOW_RX.search(low):
