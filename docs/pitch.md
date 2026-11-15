@@ -8,7 +8,7 @@ did not work in rehearsal; replace bracketed measurements with real results.
 We build on Training-Free Interactive World Models to let you shape a scene as it unfolds.
 
 A video that never stops generating and changes when you speak.
-A sentence we already know (pinned or cached) changes the picture 429 to 674 ms after the command.
+For a sentence we already know (pinned or cached), the first frame made from the command arrives 429 to 674 ms after it (command-to-frame latency); that frame starts a 0.5 s dissolve to the new picture.
 A new sentence adds about 2 s for the Sonnet call.
 
 You say "make it winter" and it snows. You say "also add a river" and a river
@@ -52,7 +52,8 @@ The video keeps moving while you shape the scene.
 - The engine team selects and verifies the upstream model, code and weight
   licenses. Copy their final exact model identifiers and source links here before
   submitting. Do not copy unlicensed SPED project files into this repository.
-- The delays in the pitch are measured from command to changed picture: 429 to 674 ms for a pinned or cached sentence, plus about 2 s for the Sonnet call on a new sentence.
+- The delays in the pitch are command-to-frame latency: from the command to the first frame of the chunk it applies to, not to a visibly changed pixel (see command-demo.md).
+  They are 429 to 674 ms for a pinned or cached sentence, plus about 2 s for the Sonnet call on a new sentence.
   Check them again on the final demo machine before presenting them.
 - Do not claim "slowly", "a lot more snow" or early steering on partial words: none is measured on the real model, and a provisional guess never re-anchors.
 - Do not claim the first real-time video generator/editor or use another project's
