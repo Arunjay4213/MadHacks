@@ -77,8 +77,10 @@ _TABLE = [
 _SUNLIT = frozenset({"clear", "haze"})
 _IMPLIED = {"day": {"weather": _SUNLIT}, "noon": {"weather": _SUNLIT}}
 # A world's own light sentence for an explicit change, in the style of Ishaan's measured light: on the snowy road a
-# sunny day is winter sunshine, so the road stays snowy instead of getting the generic daylight sentence.
-_LIGHT_WORDING = {("snowy mountain road", "day"): "bright winter sunshine in a clear blue sky, sparkling snow, crisp shadows"}
+# sunny day is winter sunshine, so the road stays snowy instead of getting the generic daylight sentence. Each sentence
+# names the season it says; an explicit change to another season ("make it summer") keeps the change's own phrase.
+_LIGHT_WORDING = {("snowy mountain road", "day"):
+                  ("winter", "bright winter sunshine in a clear blue sky, sparkling snow, crisp shadows")}
 _SEGMENTS = {label: segments for label, segments, _ in _TABLE}
 _PHRASES = {"".join(text for text, _ in segments) + ".": label for label, segments, _ in _TABLE}
 WORLDS: dict[str, dict] = {}
@@ -183,11 +185,17 @@ def world_with_overrides(world_change: dict | None, changes: list) -> str | None
     return "".join(kept) + "."
 
 
-def change_wording(world_change: dict | None, change: dict) -> str:
+def change_wording(world_change: dict | None, change: dict, changes: list) -> str:
     """The phrase a change is written with in this world: the world's own light sentence for it if it has one
-    ("sunny" on the snowy mountain road), else the change's phrase."""
+    ("sunny" on the snowy mountain road) and no active season change in `changes` names a different season,
+    else the change's phrase. So "snowy mountains", "summer", "day" never brings the winter sunshine back."""
     world = _PHRASES.get(world_change["phrase"]) if world_change else None
-    return _LIGHT_WORDING.get((world, change.get("label")), change["phrase"])
+    wording = _LIGHT_WORDING.get((world, change.get("label")))
+    if wording is None:
+        return change["phrase"]
+    season, sentence = wording
+    seasons = {c.get("label") for c in changes if c.get("kind") == "season" and c.get("strength", 1.0) > 0}
+    return change["phrase"] if seasons - {season} else sentence
 
 
 _WORLD_ALIAS_RX = re.compile(r"\b(?:" + "|".join(sorted(map(re.escape, WORLDS), key=len, reverse=True)) + r")\b")
