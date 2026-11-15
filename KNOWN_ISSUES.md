@@ -58,6 +58,6 @@ Options: pick one page for the demo and keep the other as a fallback, and pick o
   Not done: skipping Sonnet for any other sentence the dictionary fully understood (objects, weather and time on any scene, and worlds on a scene without the car).
   Not fixed, because it is outside the demo: after a pace sentence such as "slowly make it winter" on the car scene, or "slowly make it night" on the winter meadow, the next pinned step ("add a dog") misses its pin and waits for Sonnet.
   The pinned "slowly" sentence saves a different change than the plain one (a season change instead of the snowy-road world), and pins are keyed by the scene before the sentence (Greptile on #245).
-- **A base edit with 15 or more chips is dropped.**
-  "turn the tree into a lighthouse" is applied as a new scene plus one add for every existing change, and `commands/state.py` allows at most 16 operations in one batch, so with 15 or more chips it is rejected on both the Sonnet and the dictionary path (Greptile on #210).
+- **A base edit with 16 or more chips is dropped.**
+  "turn the tree into a lighthouse" is applied as a new scene plus one add for every existing change, and `commands/state.py` allows at most 16 operations in one batch, so with 16 or more chips it is rejected on both the Sonnet and the dictionary path, and with 15 when the same sentence also adds something ("... and add a dog") (Greptile on #210).
   Not fixed: the demo keeps about 4 objects at once (Gate 3). A fix would add a base-only operation to `SceneState`.
